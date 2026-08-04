@@ -50,6 +50,32 @@ function findBlock(text) {
   return block;
 }
 
+/**
+ * Frases tácticas de la ficha de un bicho.
+ *
+ * Las páginas de NPC no usan plantilla: la información útil está en prosa
+ * («High resists, not normally slowable, does not DT»). Se buscan las frases
+ * que contienen las palabras que importan en vez de intentar analizar una
+ * estructura que no existe.
+ */
+const TACTIC = new RegExp(
+  '\\b(slow|slowab|resist|immun|mez|mezzab|charm|snare|root|fear|stun|death touch'
+  + '|\\bDT\\b|enrage|summon|rampage|flurry|quad|\\bAE\\b|proc|magic weapon'
+  + '|unmezz|uncharm|unstun|unsnar|unfear|regen|heals?|dispel|silence)', 'i');
+
+export function tacticLines(text, max = 6) {
+  const out = [];
+  for (const raw of text.split(/(?<=[.!?])\s+|\n/)) {
+    const line = raw.trim().replace(/\s+/g, ' ');
+    if (line.length < 12 || line.length > 260) continue;
+    if (!TACTIC.test(line)) continue;
+    if (out.includes(line)) continue;
+    out.push(line);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 export class WikiClient {
   constructor(dir) {
     this.path = dir ? path.join(dir, 'wiki-cache.json') : null;
@@ -88,6 +114,33 @@ export class WikiClient {
         return res;
       })
       .catch(() => { this.pending.delete(key); return null; });
+    this.pending.set(key, job);
+    return job;
+  }
+
+  /** Ficha táctica de un bicho: lo que la wiki cuenta sobre cómo se pelea. */
+  async mob(name) {
+    const key = 'mob:' + String(name ?? '').toLowerCase();
+    if (!key) return null;
+    const e = this.cache[key];
+    if (e && Date.now() - e.at < (e.found ? TTL : NEG_TTL)) return e.found ? e : null;
+    if (this.pending.has(key)) return this.pending.get(key);
+
+    const job = (async () => {
+      const html = await this.#parsePage(name) ?? await this.#searchThenParse(name);
+      if (!html) return null;
+      const lines = tacticLines(stripTags(html.text));
+      if (!lines.length) return null;
+      return {
+        found: true, title: html.title, lines,
+        url: `${BASE}/${encodeURIComponent(html.title.replace(/ /g, '_'))}`,
+        at: Date.now(),
+      };
+    })().then((res) => {
+      this.cache[key] = res ?? { found: false, at: Date.now() };
+      this.#save(); this.pending.delete(key);
+      return res;
+    }).catch(() => { this.pending.delete(key); return null; });
     this.pending.set(key, job);
     return job;
   }

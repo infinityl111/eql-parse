@@ -10,7 +10,7 @@ const TRIGGERS = () => path.join(app.getPath('userData'), 'triggers.json');
 const DEFAULTS = {
   logPath: null, self: null, idleSec: 20, fromStart: false,
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
-  skipVersion: null, mergePets: false,
+  skipVersion: null, mergePets: false, myPets: [], notPets: [],
   tts: { enabled: true, voice: null, rate: 1, volume: 1 },
   sound: { enabled: true, volume: 0.5 },
 };
@@ -357,6 +357,15 @@ ipcMain.handle('encounter:export', async (_e, enc) => {
 // Ficha del objeto. Devuelve null si la wiki no lo tiene o no hay red.
 ipcMain.handle('pet:dismiss', (_e, n) => engine.dismissPet(n));
 
+ipcMain.handle('pets:names', (_e, { name, on }) => {
+  // Lista explícita del usuario: manda sobre lo que detecte el registro.
+  const my = new Set(cfg.myPets ?? []); const not = new Set(cfg.notPets ?? []);
+  if (on) { my.add(name); not.delete(name); } else { my.delete(name); not.add(name); }
+  cfg.myPets = [...my]; cfg.notPets = [...not];
+  saveConfig(cfg);
+  return { myPets: cfg.myPets, notPets: cfg.notPets };
+});
+
 ipcMain.handle('pets:merge', (_e, v) => { cfg.mergePets = !!v; saveConfig(cfg); return cfg.mergePets; });
 
 ipcMain.handle('update:get', () => (cfg.skipVersion === latest?.version ? null : latest));
@@ -366,6 +375,11 @@ ipcMain.handle('update:skip', (_e, v) => { cfg.skipVersion = v; saveConfig(cfg);
 ipcMain.handle('wiki:item', async (_e, name) => {
   if (!wiki) return null;
   try { return await wiki.item(name); } catch { return null; }
+});
+
+ipcMain.handle('wiki:mob', async (_e, name) => {
+  if (!wiki) return null;
+  try { return await wiki.mob(name); } catch { return null; }
 });
 
 ipcMain.handle('shell:wiki', (_e, item) => {

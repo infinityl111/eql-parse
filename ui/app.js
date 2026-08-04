@@ -237,9 +237,17 @@ async function renderSetup() {
 
 // ═══════════ Lista de peleas ═══════════
 /** Aplica la fusión de mascotas si está activada. */
+/** Nombres que cuentan como tu mascota: lo detectado más lo que marcaste tú. */
+function petNames() {
+  const det = state.snap?.allPets ?? state.snap?.pets ?? [];
+  return [...new Set([...det, ...(state.cfg.myPets ?? [])])]
+    .filter((n) => !(state.cfg.notPets ?? []).includes(n));
+}
+const isMyPet = (name) => petNames().includes(name);
+
 function withPets(f) {
   if (!f || !state.cfg.mergePets) return f;
-  return { ...f, rows: mergePets(f.rows, t('pets.merged'), state.snap?.allPets ?? state.snap?.pets ?? [], state.snap?.self) };
+  return { ...f, rows: mergePets(f.rows, t('pets.merged'), petNames(), state.snap?.self, state.cfg.notPets ?? []) };
 }
 
 function fightFor(snap) {
@@ -341,7 +349,8 @@ function renderFightList(snap) {
   $('btnSummary')?.addEventListener('click', async () => {
     const r = RANGES.find((x) => x.key === state.filter.range);
     state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null,
-      mergePets: !!state.cfg.mergePets, petLabel: t('pets.merged') });
+      mergePets: !!state.cfg.mergePets, petLabel: t('pets.merged'),
+      myPets: state.cfg.myPets ?? [], notPets: state.cfg.notPets ?? [] });
     state.view = 'summary';
     $('bodyGrid').innerHTML = '';
     renderApp();
@@ -1171,7 +1180,10 @@ function renderSummary() {
   if (!a || !a.fights) {
     host.innerHTML = `<div class="empty"><h2>${esc(t('sum.empty'))}</h2>
       <button id="sumBack">${esc(t('sum.back'))}</button></div>`;
-    $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
+    $('dosWiki')?.addEventListener('click', () => window.eql.openWiki(
+    a.foes.find((x) => x.name.toLowerCase().includes((state.filter.foe ?? '').toLowerCase()))?.name
+    ?? state.filter.foe));
+  $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
     return;
   }
   const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
@@ -1182,7 +1194,8 @@ function renderSummary() {
     <div class="sum-head">
       <h2>${esc(t('sum.title'))}</h2>
       <label class="chk mini" id="sumMergeL" title="${esc(t('pets.mergeHint'))}">
-        <input type="checkbox" id="sumMerge"${state.cfg.mergePets ? ' checked' : ''}> ${esc(t('pets.mergePets'))}</label>
+        <input type="checkbox" id="sumMerge"${state.cfg.mergePets ? ' checked' : ''}> ${esc(t('pets.mergePets'))}
+        <span class="dim">(${petNames().length})</span></label>
       <button id="sumBack">${esc(t('sum.back'))}</button>
     </div>
     <div class="metrics">
@@ -1196,6 +1209,20 @@ function renderSummary() {
       ${a.healing ? card(n0(a.healing), t('metric.healing')) : ''}
     </div>
     <div class="hint">${esc(t('sum.note'))}</div>
+    ${(() => {
+      // Aliados que pegan a tus enemigos pero no sabemos quiénes son. En vez de
+      // llenar la vista de casillas, se pide el comando que lo resuelve solo.
+      const unknown = a.rows.filter((r) => r.side !== 'enemy' && r.name !== state.snap?.self
+        && !r.petOf && !r.merged && !isMyPet(r.name)).map((r) => r.name);
+      if (!unknown.length) return '';
+      return `<div class="pethint sum-pethint">
+        <div class="pethint-main">${esc(t('pet.which'))}</div>
+        <div class="pethint-cmd">/pet who leader</div>
+        <div class="pethint-sub">${esc(t('pet.hintSum', { names: unknown.slice(0, 6).join(', ') }))}</div>
+      </div>`;
+    })()}
+
+    ${state.filter.foe ? foeDossier(a) : ''}
 
     <div class="sec-title eyebrow" style="margin-top:20px">${esc(t('side.allies'))}</div>
     ${a.rows.filter((r) => r.side !== 'enemy').map((r) => sumRow(r, maxDmg)).join('')}
@@ -1232,7 +1259,8 @@ function renderSummary() {
     const r = RANGES.find((x) => x.key === state.filter.range);
     state.openSumRows.clear();
     state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null,
-      mergePets: e.target.checked, petLabel: t('pets.merged') });
+      mergePets: e.target.checked, petLabel: t('pets.merged'),
+      myPets: state.cfg.myPets ?? [], notPets: state.cfg.notPets ?? [] });
     renderSummary();
   });
   host.querySelectorAll('.sum-row').forEach((el) => el.addEventListener('click', () => {
@@ -1252,6 +1280,62 @@ function renderSummary() {
   });
 }
 
+/**
+ * Expediente completo de un enemigo, cuando lo has elegido en el filtro.
+ * Junta lo medido en tus peleas con lo que cuenta la wiki.
+ */
+function foeDossier(a) {
+  const f = a.foes.find((x) => x.name.toLowerCase().includes(state.filter.foe.toLowerCase()))
+    ?? a.foes[0];
+  if (!f) return '';
+  if (!mobCache.has(f.name)) loadMob(f.name);
+  const mob = mobCache.get(f.name);
+  const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
+  const spells = (f.spells ?? []).filter((x) => x.landed + x.resisted >= 2);
+  const abTot = (f.abilities ?? []).reduce((n, x) => n + x.sum, 0) || 1;
+
+  return `<div class="dossier">
+    <div class="dos-head">
+      <h3>${esc(f.name)}</h3>
+      ${mob ? `<button class="lnk" id="dosWiki">${esc(t('foe.seeWiki'))}</button>` : ''}
+    </div>
+    <div class="metrics">
+      ${f.hp ? card(n0(f.hp.avg), t('foe.hp')) : ''}
+      ${card(f.fights, t('sum.fights', { n: f.fights }))}
+      ${f.kills ? card(f.kills, t('metric.kills', { n: f.kills })) : ''}
+      ${card(n0(f.damageTo), t('foe.youDealt'))}
+      ${card(n0(f.taken), t('foe.dealtYou'), 'foe')}
+      ${f.maxHit ? card(n0(f.maxHit), t('foe.maxHit'), 'foe') : ''}
+      ${card(n0(f.dps), 'dps')}
+    </div>
+    ${f.hp ? `<div class="hint">${esc(t('foe.hpNote'))} ${esc(t('foe.hpFrom', { n: f.hp.n }))}: ${
+      n0(f.hp.min)} – ${n0(f.hp.max)}</div>` : ''}
+
+    ${spells.length ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.weak'))} · ${esc(t('foe.measured'))}</div>
+      ${spells.map((x) => `<div class="foe-det-l">
+        <span>${esc(x.spell)}</span>
+        <b class="${x.rate >= 0.6 ? 'bad' : x.rate <= 0.2 ? 'good' : ''}">${Math.round((1 - x.rate) * 100)}%</b>
+        <span class="dim">${esc(t('foe.lands'))} · ${x.landed}/${x.landed + x.resisted}</span>
+      </div>`).join('')}</div>` : ''}
+
+    ${mob ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.wiki'))}</div>
+      ${mob.lines.map((l) => `<div class="fw-line">${esc(l)}</div>`).join('')}</div>` : ''}
+
+    ${f.abilities?.length ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.howHits'))}</div>
+      ${f.abilities.map((x) => `<div class="foe-det-l">
+        <i class="seg ${typeClass(x.type)}"></i><span>${esc(x.name)}</span>
+        <b>${n0(x.sum)}</b><span class="dim">${Math.round(x.sum / abTot * 100)}% · ×${x.n}</span>
+      </div>`).join('')}</div>` : ''}
+
+    ${f.lootList?.length ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.drops'))}</div>
+      <div class="loot">${f.lootList.map((l) => `<div class="loot-row">
+        <button class="loot-item" data-item="${esc(l.item)}">${esc(l.item)}</button>
+        ${l.n > 1 ? `<span class="num dim">×${l.n}</span>` : ''}</div>`).join('')}</div></div>` : ''}
+
+    ${f.zones?.length ? `<div class="hint">${esc(t('foe.zones'))}: ${esc(f.zones.join(', '))}</div>` : ''}
+  </div>`;
+}
+
 function sumRow(r, maxDmg) {
   const tot = r.types.reduce((x, [, v]) => x + v, 0) || 1;
   const open = state.openSumRows.has(r.name);
@@ -1259,6 +1343,7 @@ function sumRow(r, maxDmg) {
     <div class="sum-top">
       <span class="sum-name">${esc(r.name)}${
         r.petOf ? ` <span class="dim">(${esc(t('row.petOf', { who: r.petOf }))})</span>` : ''}</span>
+
       <span class="num strong">${n0(r.damage)}</span>
       <span class="num dim">${Math.round(r.share * 100)}%</span>
       ${r.accuracy !== null ? `<span class="num dim">${Math.round(r.accuracy * 100)}%</span>` : ''}
@@ -1309,15 +1394,45 @@ function sumRowDetail(r) {
 }
 
 /** Quién le hizo qué a ese enemigo, sacado del reparto por objetivo. */
+const mobCache = new Map();
+
+/** Pide a la wiki las notas del bicho y repinta cuando llegan. */
+async function loadMob(name) {
+  if (mobCache.has(name)) return;
+  mobCache.set(name, null);
+  try {
+    const d = await window.eql.wikiMob?.(name);
+    mobCache.set(name, d ?? null);
+    if (d && state.view === 'summary') renderSummary();
+  } catch { /* sin red */ }
+}
+
 function foeDetail(a, f) {
   const who = a.rows.filter((r) => r.side !== 'enemy')
     .map((r) => ({ name: r.name, sum: (r.targets ?? []).find((tg) => tg.name === f.name)?.sum ?? 0 }))
     .filter((x) => x.sum > 0).sort((x, y) => y.sum - x.sum);
   const base = who.reduce((x, y) => x + y.sum, 0) || 1;
+  if (!mobCache.has(f.name)) loadMob(f.name);
+  const mob = mobCache.get(f.name);
+
+  const spells = (f.spells ?? []).filter((x) => x.landed + x.resisted >= 2);
+  const weak = spells.length || mob ? `<div class="foe-weak">
+      <div class="eyebrow">${esc(t('foe.weak'))}</div>
+      ${spells.length ? `<div class="fw-sub">${esc(t('foe.measured'))}</div>
+        ${spells.map((x) => `<div class="foe-det-l">
+          <span>${esc(x.spell)}</span>
+          <b class="${x.rate >= 0.6 ? 'bad' : x.rate <= 0.2 ? 'good' : ''}">${
+            Math.round((1 - x.rate) * 100)}%</b>
+          <span class="dim">${esc(t('foe.lands'))} · ${x.landed}/${x.landed + x.resisted}</span>
+        </div>`).join('')}` : ''}
+      ${mob ? `<div class="fw-sub">${esc(t('foe.wiki'))}</div>
+        ${mob.lines.map((l) => `<div class="fw-line">${esc(l)}</div>`).join('')}` : ''}
+    </div>` : '';
+
   return `<div class="foe-det">${who.map((w) => `<div class="foe-det-l">
       <span>${esc(w.name)}</span><b>${n0(w.sum)}</b>
       <span class="dim">${Math.round(w.sum / base * 100)}%</span>
-    </div>`).join('')}</div>`;
+    </div>`).join('')}${weak}</div>`;
 }
 
 function renderApp() {

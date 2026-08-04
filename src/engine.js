@@ -4,13 +4,13 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { LogTailer } from './tailer.js';
 import { Parser } from './parser.js';
-import { EncounterTracker } from './encounter.js';
+import { EncounterTracker, DAMAGE_KINDS } from './encounter.js';
 import { TriggerEngine } from './triggers.js';
 import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
 import { setLang } from './i18n.js';
 import { FightStore } from './store.js';
-import { aggregate, mergePets } from './aggregate.js';
+import { aggregate, mergePets, ensureSides } from './aggregate.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
 
 /**
@@ -212,8 +212,13 @@ export class Engine extends EventEmitter {
         while (this.recentHits.length && this.recentHits[0].t < cut) this.recentHits.shift();
       }
 
-      // Ventana móvil: sólo daño que TE entra, en bruto.
-      if (ev.amount && ev.target === (this.self ?? 'You')) {
+      // Ventana móvil: sólo DAÑO que te entra, en bruto.
+      //
+      // La comprobación del tipo es imprescindible: las curaciones también
+      // traen cantidad y te tienen a ti como objetivo. Sin ella, cada Drain
+      // Spirit que te cura se contaba como daño mágico recibido, y el consejo
+      // te pedía Mage Hunter justo cuando más daño mágico estabas haciendo tú.
+      if (ev.amount > 0 && DAMAGE_KINDS.has(ev.kind) && ev.target === (this.self ?? 'You')) {
         this.recent.push({ t: ev.t, school: ev.school, raw: ev.rawAmount ?? ev.amount });
         const cut = ev.t - this.windowSec;
         while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
@@ -399,6 +404,7 @@ export class Engine extends EventEmitter {
       // mezclan, una pelea donde caíste dos veces se titula "Campeon ×2".
       dead: Object.fromEntries(enc.deadAt ?? new Map()),
       loot: (enc.loot ?? []).slice(0, 200),
+      spellVsFoe: [...(enc.spellVsFoe ?? new Map()).values()],
       kills: enc.kills.filter((k) => k.victim !== me && !petSet.has(k.victim)).map((k) => k.victim),
       // Los totales del grupo son sólo de los tuyos; el enemigo va aparte.
       total: allyTotal,
@@ -507,15 +513,26 @@ export class Engine extends EventEmitter {
 
   /** Consejo en vivo sobre los últimos segundos, no sobre la pelea entera. */
   #live() {
-    const now = this.tracker?.current?.end ?? (Date.now() / 1000);
+    // Fuera de combate no se aconseja: el reparto de un par de ticks sueltos
+    // mientras te buffean no dice nada de la siguiente pelea.
+    if (!this.tracker?.current) { this.suggestSince = null; return null; }
+    const now = this.tracker.current.end;
     const cut = now - this.windowSec;
     const win = this.recent.filter((r) => r.t >= cut);
     if (!win.length) return null;
     let melee = 0, spell = 0;
     for (const r of win) (r.school === 'melee' ? (melee += r.raw) : (spell += r.raw));
     const total = melee + spell;
-    return liveAdvice({ melee, spell, total, seconds: this.windowSec },
+    const l = liveAdvice({ melee, spell, total, seconds: this.windowSec, hits: win.length },
       { classes: this.activeClasses, stance: this.parser?.stance });
+    if (!l) return null;
+
+    // Estabilidad: la misma recomendación debe mantenerse unos segundos antes
+    // de decirla. Si no, en peleas mixtas cambiaría de opinión constantemente.
+    if (!l.suggest) { this.suggestSince = null; return l; }
+    if (this.suggestKey !== l.bestKey) { this.suggestKey = l.bestKey; this.suggestSince = now; }
+    if (now - this.suggestSince < 5) l.suggest = false;
+    return l;
   }
 
   setNarrate(cfg) { this.narrator.setConfig(cfg); }
@@ -575,15 +592,17 @@ export class Engine extends EventEmitter {
   aggregate(q = {}) {
     if (!this.store) return null;
     const list = this.store.filter({ ...q, limit: q.limit ?? 300 });
+    const pets = [...new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? []), ...(q.myPets ?? [])])];
     const full = list.map((sm) => {
       const f = this.store.get(sm.id);
-      return f ? { ...f, at: sm.at } : null;
+      // Las peleas guardadas antes de que existiera el bando se recalculan.
+      return f ? ensureSides({ ...f, at: sm.at }, this.self, pets) : null;
     }).filter(Boolean);
     // Se pasan las mascotas conocidas ahora mismo: rescata las peleas guardadas
     // antes de que la marca existiera.
-    const known = [...new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? [])])];
+    const known = [...new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? []), ...(q.myPets ?? [])])];
     return aggregate(
-      q.mergePets ? full.map((f) => ({ ...f, rows: mergePets(f.rows, q.petLabel, known, this.self) })) : full,
+      q.mergePets ? full.map((f) => ({ ...f, rows: mergePets(f.rows, q.petLabel, known, this.self, q.notPets ?? []) })) : full,
       this.self);
   }
   foeList(sinceMs) { return this.store?.foeList(sinceMs) ?? []; }
@@ -654,6 +673,8 @@ export class Engine extends EventEmitter {
   /** Pone a cero el acumulado del overlay sin tocar el histórico de peleas. */
   resetSession() {
     this.lastKill = null;
+    this.suggestKey = null;
+    this.suggestSince = null;
     this.killAgg.clear();
     this.recentHits.length = 0;
     this.session = new EncounterTracker({ self: this.self, idleSec: Number.POSITIVE_INFINITY });

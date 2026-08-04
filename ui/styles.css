@@ -606,3 +606,31 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .petbtn.yes:hover { border-color: var(--t-poison); color: var(--t-poison); }
 .petbtn.no:hover { border-color: var(--t-ds); color: var(--t-ds); }
 .name.otherpet, .ov-name.otherpet { color: var(--bone-faint); font-style: italic; }
+.petchk { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px;
+          font-size: 9px; text-transform: uppercase; letter-spacing: .08em;
+          color: var(--bone-faint); cursor: pointer; }
+.petchk input { width: 11px; height: 11px; }
+.petchk:hover { color: var(--t-cold); }
+.sum-pethint { margin: 14px 0 4px; }
+
+/* ── Puntos débiles del enemigo ──────────────────────── */
+.foe-weak { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--slate-700); }
+.fw-sub { margin: 6px 0 3px; font-size: 10px; text-transform: uppercase;
+          letter-spacing: .08em; color: var(--bone-faint); }
+.fw-line { font-size: 11.5px; color: var(--bone-dim); line-height: 1.5; padding: 1px 0; }
+.foe-det-l b.good { color: var(--t-poison); }
+.foe-det-l b.bad { color: var(--t-ds); }
+
+/* ── Expediente del enemigo ──────────────────────────── */
+.dossier { margin: 18px 0 8px; padding: 16px 18px;
+           background: var(--slate-850); border-left: 2px solid var(--t-ds); }
+.dos-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.dos-head h3 { font-family: var(--display); font-size: 17px; margin: 0; letter-spacing: .03em; }
+.dos-head .lnk { margin-left: auto; font-size: 9px; }
+.dos-block { margin-top: 14px; }
+.dos-block .eyebrow { margin-bottom: 5px; }
+.dossier .metrics { margin-bottom: 6px; }
+.dossier .loot { margin: 4px 0 0; padding: 8px 10px; }
+
+.metric b + span, .metric span { margin-left: 5px; }
+.dossier .metrics { flex-wrap: wrap; gap: 6px 10px; }

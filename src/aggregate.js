@@ -10,6 +10,45 @@
 
 const add = (map, key, n) => map.set(key, (map.get(key) ?? 0) + n);
 
+/**
+ * Deduce el bando cuando la pelea se guardó sin él.
+ *
+ * El campo `side` es reciente; las peleas anteriores no lo llevan y, al faltar,
+ * todo el mundo pasaba por aliado — incluidos los bichos. Se recalcula con la
+ * misma regla que usa el motor: enemigo es quien te pega a ti o a los tuyos, o
+ * a quien pegáis vosotros.
+ */
+export function ensureSides(f, self, petNames = []) {
+  if (!f?.rows?.length || f.rows.some((r) => r.side)) return f;
+  const ours = new Set([self, ...petNames].filter(Boolean));
+  const foes = new Set();
+
+  // Enemigo directo: te pegó a ti o a los tuyos, o vosotros le pegasteis.
+  for (const r of f.rows) {
+    if (ours.has(r.name)) continue;
+    if ((r.targets ?? []).some((t) => ours.has(t.name))) foes.add(r.name);
+  }
+  for (const r of f.rows) {
+    if (!ours.has(r.name)) continue;
+    for (const t of r.targets ?? []) if (!ours.has(t.name)) foes.add(t.name);
+  }
+
+  // Aliado: alguien que pega a tus enemigos. Así entran los compañeros de grupo
+  // y las mascotas sin depender de que nadie escriba nada.
+  const allies = new Set(ours);
+  for (const r of f.rows) {
+    if (foes.has(r.name) || ours.has(r.name)) continue;
+    if ((r.targets ?? []).some((t) => foes.has(t.name))) allies.add(r.name);
+  }
+
+  // Lo que queda sin decidir se da por enemigo, no por aliado: un nombre que no
+  // eres tú, no es tuyo y no ayuda a nadie es casi siempre un bicho de la zona.
+  return {
+    ...f,
+    rows: f.rows.map((r) => ({ ...r, side: allies.has(r.name) ? 'ally' : 'enemy' })),
+  };
+}
+
 function mergeRow(dst, r) {
   dst.damage += r.damage ?? 0;
   dst.taken += r.taken ?? 0;
@@ -69,8 +108,9 @@ export function aggregate(fights, self = null) {
   let seconds = 0, total = 0, enemyTotal = 0, healing = 0, kills = 0, losses = 0;
   let firstAt = null, lastAt = null;
 
-  for (const f of fights) {
-    if (!f) continue;
+  for (const raw of fights) {
+    if (!raw) continue;
+    const f = ensureSides(raw, self, []);
     seconds += f.duration ?? 0;
     total += f.total ?? 0;
     enemyTotal += f.enemyTotal ?? 0;
@@ -88,11 +128,35 @@ export function aggregate(fights, self = null) {
     // Por enemigo: cuántas veces te lo has cruzado y cuánto costó cada vez.
     for (const r of f.rows ?? []) {
       if (r.side !== 'enemy') continue;
-      const e = foes.get(r.name) ?? { name: r.name, fights: 0, kills: 0, damageTo: 0, seconds: 0, taken: 0, deaths: 0 };
+      const e = foes.get(r.name) ?? {
+        name: r.name, fights: 0, kills: 0, damageTo: 0, seconds: 0, taken: 0, deaths: 0,
+        maxHit: 0, hpSamples: [], zones: new Set(), abil: new Map(), loot: new Map(),
+      };
       e.fights += 1;
       e.seconds += f.duration ?? 0;
       e.taken += r.damage ?? 0;                 // lo que ESE enemigo repartió
-      if ((f.kills ?? []).includes(r.name)) e.kills += 1;
+      e.maxHit = Math.max(e.maxHit, r.max ?? 0);
+      if (f.zone) e.zones.add(f.zone);
+      // Con qué te pega: sus habilidades, sumadas de todas las peleas.
+      for (const a of r.abilities ?? []) {
+        const c = e.abil.get(a.name) ?? { name: a.name, type: a.type, sum: 0, n: 0, max: 0 };
+        c.sum += a.sum; c.n += a.n; c.max = Math.max(c.max, a.max ?? 0);
+        e.abil.set(a.name, c);
+      }
+      if ((f.kills ?? []).includes(r.name)) {
+        e.kills += 1;
+        // Vida estimada: lo que costó tumbarlo en esa pelea. El log no da la
+        // vida de nadie, pero el daño total hasta su muerte es una cota muy
+        // buena. Se guarda cada muestra para poder ver la dispersión.
+        const dealt = (f.rows ?? []).filter((x) => x.side !== 'enemy')
+          .reduce((n, x) => n + ((x.targets ?? []).find((tg) => tg.name === r.name)?.sum ?? 0), 0);
+        if (dealt > 0) e.hpSamples.push(Math.round(dealt));
+      }
+      for (const l of f.loot ?? []) {
+        const item = typeof l === 'string' ? l : l.item;
+        const from = typeof l === 'object' ? l.from : null;
+        if (item && from === r.name) e.loot.set(item, (e.loot.get(item) ?? 0) + 1);
+      }
       foes.set(r.name, e);
     }
     for (const r of f.rows ?? []) {
@@ -101,6 +165,16 @@ export function aggregate(fights, self = null) {
         const e = foes.get(tg.name);
         if (e) e.damageTo += tg.sum;
       }
+    }
+
+    // Qué hechizos tuyos entran contra cada enemigo y cuáles resiste.
+    for (const x of f.spellVsFoe ?? []) {
+      const e = foes.get(x.foe);
+      if (!e) continue;
+      if (!e.spells) e.spells = new Map();
+      const c = e.spells.get(x.spell) ?? { spell: x.spell, landed: 0, resisted: 0 };
+      c.landed += x.landed; c.resisted += x.resisted;
+      e.spells.set(x.spell, c);
     }
 
     for (const l of f.loot ?? []) {
@@ -129,7 +203,22 @@ export function aggregate(fights, self = null) {
     enemyDps: seconds ? enemyTotal / seconds : 0,
     rows: out,
     foes: [...foes.values()]
-      .map((e) => ({ ...e, dps: e.seconds ? e.damageTo / e.seconds : 0 }))
+      .map((e) => ({
+        ...e,
+        dps: e.seconds ? e.damageTo / e.seconds : 0,
+        // Qué hechizos tuyos entran contra él y cuáles resiste, medido.
+        zones: [...(e.zones ?? [])],
+        abilities: [...(e.abil ?? new Map()).values()].sort((a, b) => b.sum - a.sum).slice(0, 15),
+        lootList: [...(e.loot ?? new Map())].sort((a, b) => b[1] - a[1]).map(([item, n]) => ({ item, n })),
+        hp: e.hpSamples?.length ? {
+          n: e.hpSamples.length,
+          avg: Math.round(e.hpSamples.reduce((a, b) => a + b, 0) / e.hpSamples.length),
+          min: Math.min(...e.hpSamples), max: Math.max(...e.hpSamples),
+        } : null,
+        spells: [...(e.spells ?? new Map()).values()]
+          .map((c) => ({ ...c, rate: c.landed + c.resisted ? c.resisted / (c.landed + c.resisted) : 0 }))
+          .sort((a, b) => (b.landed + b.resisted) - (a.landed + a.resisted)).slice(0, 12),
+      }))
       .sort((a, b) => b.damageTo - a.damageTo),
     loot: [...loot.values()].map((l) => ({ item: l.item, n: l.n, from: [...l.from] }))
       .sort((a, b) => b.n - a.n || a.item.localeCompare(b.item)),
@@ -144,12 +233,14 @@ export function aggregate(fights, self = null) {
  * al mostrar y no al guardar: los datos originales quedan intactos y la opción
  * se puede activar y desactivar sin reconstruir nada.
  */
-export function mergePets(rows = [], label = 'Mascotas', known = [], self = null) {
+export function mergePets(rows = [], label = 'Mascotas', known = [], self = null, notPets = []) {
   // La marca `pet` va dentro de cada pelea, así que las guardadas antes de que
   // existiera no la tienen. La lista de mascotas conocidas las rescata.
   const set = new Set(known);
+  const no = new Set(notPets);   // lo que has desmarcado a mano nunca se funde
   const isPet = (r) => r.side !== 'enemy' && r.name !== self && r.name !== label
     && !r.petOf                                   // la de otro jugador no es tuya
+    && !no.has(r.name)
     && (r.pet || set.has(r.name));
   const pets = rows.filter(isPet);
   // Con una sola mascota también se renombra: al sumar varias peleas, cada

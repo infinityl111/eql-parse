@@ -156,8 +156,21 @@ export { STANCES, INVOCATIONS };
  *
  * Sólo devuelve algo si el cambio merece la pena, para no dar la lata.
  */
+/**
+ * Sugerir un cambio de postura exige tres cosas a la vez, no una.
+ *
+ * Con sólo el 8% relativo bastaban dos ticks de veneno mientras te buffean
+ * para pedirte Mage Hunter: sobre 40 puntos de daño, cualquier diferencia es
+ * un porcentaje enorme. Un cambio de postura cuesta 6 segundos de reutilización
+ * y tu atención en mitad de la pelea, así que hace falta que el daño medido sea
+ * de verdad y que la ganancia sea apreciable en valor absoluto.
+ */
+const LIVE_MIN_RAW = 1200;   // daño bruto mínimo en la ventana
+const LIVE_MIN_HITS = 5;     // golpes mínimos recibidos
+const LIVE_MIN_GAIN = 350;   // ganancia mínima en puntos, no sólo en porcentaje
+
 export function liveAdvice(win, ctx = {}) {
-  const { melee = 0, spell = 0, total = 0, seconds = 20 } = win;
+  const { melee = 0, spell = 0, total = 0, seconds = 20, hits = 0 } = win;
   if (total <= 0) return null;
   const { stances } = availableFor(ctx.classes ?? []);
   const usable = stances.filter((s) => s.mit.melee || s.mit.spell);
@@ -187,7 +200,12 @@ export function liveAdvice(win, ctx = {}) {
     current: ctx.stance ?? null,
     alreadyBest: curScore?.key === best.key,
     gain, worth,
-    suggest: !curScore || (curScore.key !== best.key && worth >= 0.08),
+    hits,
+    // Sin muestra suficiente se informa del reparto, pero no se sugiere nada.
+    enoughSample: total >= LIVE_MIN_RAW && hits >= LIVE_MIN_HITS,
+    suggest: !!curScore && curScore.key !== best.key
+      && total >= LIVE_MIN_RAW && hits >= LIVE_MIN_HITS
+      && worth >= 0.08 && gain >= LIVE_MIN_GAIN,
     scored,
     text: t('ov.brief', { kind: t(`adv.kind.${kind}`), stance: best.label,
       pct: Math.round((best.prevented / total) * 100) }),

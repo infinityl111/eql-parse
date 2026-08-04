@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('eql', {
   setNarrate: (n) => ipcRenderer.invoke('narrate:set', n),
   markPet: (name, on) => ipcRenderer.invoke('pet:mark', { name, on }),
   dismissPet: (n) => ipcRenderer.invoke('pet:dismiss', n),
+  setPetName: (name, on) => ipcRenderer.invoke('pets:names', { name, on }),
   onTheme: (fn) => ipcRenderer.on('theme', (_e, t) => fn(t)),
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
   getTriggers: () => ipcRenderer.invoke('triggers:get'),
@@ -39,6 +40,7 @@ contextBridge.exposeInMainWorld('eql', {
   reveal: (p) => ipcRenderer.invoke('shell:reveal', p),
   openWiki: (item) => ipcRenderer.invoke('shell:wiki', item),
   wikiItem: (item) => ipcRenderer.invoke('wiki:item', item),
+  wikiMob: (name) => ipcRenderer.invoke('wiki:mob', name),
   onSnapshot: (fn) => ipcRenderer.on('snapshot', (_e, s) => fn(s)),
   onOverlayState: (fn) => ipcRenderer.on('overlay:state', (_e, s) => fn(s)),
 });

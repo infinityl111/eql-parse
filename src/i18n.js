@@ -41,6 +41,14 @@ export const LANGS = [
 ];
 
 const ES = {
+  'foe.hpFrom_1': 'de una muerte',
+  'foe.hp': 'Vida estimada', 'foe.hpFrom': 'de {n} muertes', 'foe.howHits': 'Cómo te pega', 'foe.drops': 'Botín que suelta', 'foe.zones': 'Zonas',
+  'foe.maxHit': 'Máximo', 'foe.dealtYou': 'Te hizo', 'foe.youDealt': 'Le hiciste', 'foe.file': 'Ficha del enemigo', 'foe.seeWiki': 'Ver en la wiki',
+  'foe.hpNote': 'El log no da la vida de nadie: es lo que costó tumbarlo, así que es una cota, no un dato oficial.',
+  'foe.weak': 'Puntos débiles', 'foe.measured': 'Medido en tus peleas', 'foe.wiki': 'La wiki dice',
+  'foe.lands': 'entra', 'foe.resisted': 'resistido', 'foe.noData': 'Sin datos todavía',
+  'pet.hintSum': 'Sin identificar: {names}. Escribe el comando con la mascota fuera y quedará reconocida en todo el histórico.',
+  'pets.pet': 'mascota', 'pets.isMine': 'Marcar como tu mascota para juntarla con las demás',
   'row.petOf': 'mascota de {who}',
   // ── Cabecera y estado ──
   'app.tagline': 'World Champion Again',
@@ -342,6 +350,14 @@ const ES = {
 };
 
 const EN = {
+  'foe.hpFrom_1': 'from one kill',
+  'foe.hp': 'Estimated health', 'foe.hpFrom': 'from {n} kills', 'foe.howHits': 'How it hits you', 'foe.drops': 'What it drops', 'foe.zones': 'Zones',
+  'foe.maxHit': 'Biggest hit', 'foe.dealtYou': 'Dealt to you', 'foe.youDealt': 'You dealt', 'foe.file': 'Enemy file', 'foe.seeWiki': 'See on the wiki',
+  'foe.hpNote': 'The log gives no health values: this is what it took to drop it, so it is a bound, not an official figure.',
+  'foe.weak': 'Weak points', 'foe.measured': 'Measured in your fights', 'foe.wiki': 'The wiki says',
+  'foe.lands': 'lands', 'foe.resisted': 'resisted', 'foe.noData': 'No data yet',
+  'pet.hintSum': 'Unidentified: {names}. Type the command with your pet out and it will be recognised across the whole history.',
+  'pets.pet': 'pet', 'pets.isMine': 'Mark as your pet so it merges with the others',
   'row.petOf': '{who}\u2019s pet',
   'app.tagline': 'World Champion Again',
   'status.idle': 'no log', 'status.monitoring': 'monitoring',
@@ -633,6 +649,14 @@ const EN = {
 
 
 const FR = {
+  'foe.hpFrom_1': 'sur une mort',
+  'foe.hp': 'Vie estimée', 'foe.hpFrom': 'sur {n} morts', 'foe.howHits': 'Comment il frappe', 'foe.drops': 'Ce qu\u2019il lâche', 'foe.zones': 'Zones',
+  'foe.maxHit': 'Coup max', 'foe.dealtYou': 'T\u2019a infligé', 'foe.youDealt': 'Tu as infligé', 'foe.file': 'Fiche de l\u2019ennemi', 'foe.seeWiki': 'Voir sur le wiki',
+  'foe.hpNote': 'Le journal ne donne la vie de personne : c\u2019est ce qu\u2019il a fallu pour l\u2019abattre, donc une borne, pas un chiffre officiel.',
+  'foe.weak': 'Points faibles', 'foe.measured': 'Mesuré dans tes combats', 'foe.wiki': 'Le wiki dit',
+  'foe.lands': 'passe', 'foe.resisted': 'résisté', 'foe.noData': 'Pas encore de données',
+  'pet.hintSum': 'Non identifiés : {names}. Tape la commande avec ton familier sorti et il sera reconnu dans tout l\u2019historique.',
+  'pets.pet': 'familier', 'pets.isMine': 'Marquer comme ton familier pour le regrouper avec les autres',
   'row.petOf': 'familier de {who}',
   'pets.merge': 'regrouper',
   'pets.merged': 'Familiers',
@@ -1012,6 +1036,14 @@ const FR = {
 };
 
 const DE = {
+  'foe.hpFrom_1': 'aus einem Kill',
+  'foe.hp': 'Geschätzte Lebenspunkte', 'foe.hpFrom': 'aus {n} Kills', 'foe.howHits': 'Wie er dich trifft', 'foe.drops': 'Was er fallen lässt', 'foe.zones': 'Zonen',
+  'foe.maxHit': 'Größter Treffer', 'foe.dealtYou': 'Hat dir zugefügt', 'foe.youDealt': 'Du hast zugefügt', 'foe.file': 'Gegnerakte', 'foe.seeWiki': 'Im Wiki ansehen',
+  'foe.hpNote': 'Das Log nennt niemandes Leben: das ist, was nötig war, um ihn zu fällen, also eine Schranke, keine offizielle Zahl.',
+  'foe.weak': 'Schwachstellen', 'foe.measured': 'In deinen Kämpfen gemessen', 'foe.wiki': 'Das Wiki sagt',
+  'foe.lands': 'trifft', 'foe.resisted': 'widerstanden', 'foe.noData': 'Noch keine Daten',
+  'pet.hintSum': 'Nicht zugeordnet: {names}. Tippe den Befehl mit herausgerufenem Begleiter ein, dann wird er im ganzen Verlauf erkannt.',
+  'pets.pet': 'Begleiter', 'pets.isMine': 'Als deinen Begleiter markieren, um ihn mit den anderen zusammenzufassen',
   'row.petOf': 'Begleiter von {who}',
   'pets.merge': 'zusammen',
   'pets.merged': 'Begleiter',
@@ -1391,6 +1423,14 @@ const DE = {
 };
 
 const PT = {
+  'foe.hpFrom_1': 'de uma morte',
+  'foe.hp': 'Vida estimada', 'foe.hpFrom': 'de {n} mortes', 'foe.howHits': 'Como te bate', 'foe.drops': 'O que larga', 'foe.zones': 'Zonas',
+  'foe.maxHit': 'Máximo', 'foe.dealtYou': 'Fez-te', 'foe.youDealt': 'Fizeste-lhe', 'foe.file': 'Ficha do inimigo', 'foe.seeWiki': 'Ver na wiki',
+  'foe.hpNote': 'O registo não dá a vida de ninguém: é o que custou derrubá-lo, por isso é um limite, não um dado oficial.',
+  'foe.weak': 'Pontos fracos', 'foe.measured': 'Medido nos teus combates', 'foe.wiki': 'A wiki diz',
+  'foe.lands': 'entra', 'foe.resisted': 'resistido', 'foe.noData': 'Sem dados ainda',
+  'pet.hintSum': 'Por identificar: {names}. Escreve o comando com o familiar fora e ficará reconhecido em todo o histórico.',
+  'pets.pet': 'familiar', 'pets.isMine': 'Marcar como teu familiar para juntar com os outros',
   'row.petOf': 'familiar de {who}',
   'pets.merge': 'juntar',
   'pets.merged': 'Familiares',

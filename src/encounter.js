@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 
-const DAMAGE_KINDS = new Set(['melee', 'spell', 'dot', 'ds']);
+export const DAMAGE_KINDS = new Set(['melee', 'spell', 'dot', 'ds']);
 
 function bucket(map, key) {
   let b = map.get(key);
@@ -149,6 +149,7 @@ export class Encounter {
     this.targetTotals = new Map();  // para nombrar la pelea
     this.deadAt = new Map();       // nombre -> segundo en que cayó
     this.loot = [];                // {item, from, sold, upgraded, t}
+    this.spellVsFoe = new Map();   // 'enemigo|hechizo' -> {landed, resisted}
     this.targetFirst = new Map();  // nombre -> primer segundo en que le pegaron
     this.resistsSuffered = 0;
     this.casts = [];           // {t, source, ability, cat} — el análisis filtra por bando
@@ -255,13 +256,22 @@ export class EncounterTracker extends EventEmitter {
     if (this.current) {
       // Sólo cuenta como resistencia sufrida si el lanzador eras tú o tu mascota.
       if (ev.kind === 'resist') {
-        if (ev.caster === this.self || this.petNames?.has(ev.caster)) this.current.resistsSuffered++;
+        if (ev.caster === this.self || this.petNames?.has(ev.caster)) {
+          this.current.resistsSuffered++;
+          // Contra QUIÉN y con QUÉ hechizo: es lo que permite saber después a
+          // qué es resistente cada bicho, medido en tus propias peleas.
+          this.#tally(this.current, ev.target, ev.ability, 'resisted');
+        }
       } else if (ev.kind === 'resist_by_you') this.current.resistsCaused++;
       else if (ev.kind === 'interrupt') this.current.interrupts++;
       else if (ev.kind === 'cast' && ev.ability && ev.castCat && ev.source) {
         this.current.casts.push({ t: Math.round(ev.t - this.current.start), source: ev.source, ability: ev.ability, cat: ev.castCat });
       }
       else if (ev.kind === 'stance' && ev.stance) this.current.stancesSeen.add(ev.stance);
+      // Un hechizo tuyo que sí entró, para saber la proporción.
+      if (ev.kind === 'spell' && ev.ability && ev.target && ev.source === this.self) {
+        this.#tally(this.current, ev.target, ev.ability, 'landed');
+      }
       else if (ev.kind === 'invocation' && ev.invocation) this.current.invocationsSeen.add(ev.invocation);
     }
 
@@ -323,6 +333,15 @@ export class EncounterTracker extends EventEmitter {
   tick(nowSec) {
     if (!Number.isFinite(this.idleSec)) return;   // acumulador de sesión: no se cierra
     if (this.current && nowSec - this.current.end > this.idleSec) this.#close();
+  }
+
+  /** Anota si un hechizo tuyo entró o fue resistido contra ese enemigo. */
+  #tally(enc, foe, spell, field) {
+    if (!enc || !foe || !spell) return;
+    const k = `${foe}\u0000${spell}`;
+    const e = enc.spellVsFoe.get(k) ?? { foe, spell, landed: 0, resisted: 0 };
+    e[field] += 1;
+    enc.spellVsFoe.set(k, e);
   }
 
   #close() {
