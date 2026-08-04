@@ -4,3 +4,4 @@ calibracion*.txt
 config.json
 *.log
 *.bak
+*.exe
