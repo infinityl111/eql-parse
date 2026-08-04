@@ -129,9 +129,14 @@ export function analyse(f, ctx = {}) {
 
   // ── Quién es quién ─────────────────────────────────
   const pets = new Set(ctx.pets ?? []);
+  // El motor ya clasifica cada fila; sólo se recalcula si viniera sin marcar.
   const foes = new Set();
-  for (const r of f.rows) {
-    for (const tg of r.targets ?? []) if (tg.name === self || pets.has(tg.name)) foes.add(r.name);
+  if (f.rows.some((r) => r.side)) {
+    for (const r of f.rows) if (r.side === 'enemy') foes.add(r.name);
+  } else {
+    for (const r of f.rows) {
+      for (const tg of r.targets ?? []) if (tg.name === self || pets.has(tg.name)) foes.add(r.name);
+    }
   }
   const allies = f.rows.filter((r) => !foes.has(r.name));
   const enemies = f.rows.filter((r) => foes.has(r.name));

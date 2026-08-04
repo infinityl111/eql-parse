@@ -1,8 +1,9 @@
 import { t, setLang, getLang, LANGS, langInfo, TRANSLATED } from '../src/i18n.js';
 import { analyse } from '../src/analysis.js';
 import { advise } from '../src/advisor.js';
+import { RANGES } from '../src/ranges.js';
 import { initTriggers, renderTriggers } from './triggers.js';
-import { mountBanner, speak, playSound } from './alerts.js';
+import { mountBanner, speak, playSound, listVoices } from './alerts.js';
 
 const TYPES = ['magic', 'cold', 'fire', 'poison', 'disease', 'melee', 'ds', 'dot', 'spell'];
 const typeClass = (t) => (TYPES.includes(t) ? t : 'other');
@@ -22,7 +23,14 @@ const state = {
   view: 'combat',
   cfg: {},
   rowNodes: new Map(),
+  sideHeads: new Map(),
   detailStamp: new Map(),
+  showAll: false,
+  filter: { range: '24h', foe: '' },
+  fights: [],
+  fightCache: new Map(),
+  foes: [],
+  stats: null,
 };
 
 // ═══════════ Introducción de primera vez ═══════════
@@ -225,11 +233,42 @@ async function renderSetup() {
 
 // ═══════════ Lista de peleas ═══════════
 function fightFor(snap) {
-  if (state.selectedFight === 'live') {
-    // Sin combate activo, abrimos la última pelea con sustancia en vez del vacío.
-    return snap.current ?? snap.history.find((h) => !TRIVIAL(h)) ?? snap.history[0] ?? null;
+  if (state.selectedFight === 'live') return snap.current ?? state.fightCache.get(state.fights[0]?.id) ?? null;
+  // Las cerradas viven en disco: se piden por su identificador y se cachean.
+  return state.fightCache.get(state.selectedFight) ?? snap.current ?? null;
+}
+
+/** Trae del disco la pelea elegida y la deja en caché. */
+async function loadFight(id) {
+  if (id === 'live' || state.fightCache.has(id)) return;
+  try {
+    const f = await window.eql.getFight?.(id);
+    if (f) { state.fightCache.set(id, f); renderApp(); }
+  } catch (err) { console.error('pelea:', err); }
+}
+
+/** Recarga el índice según el tramo y el enemigo elegidos. */
+async function refreshFights() {
+  const r = RANGES.find((x) => x.key === state.filter.range);
+  const q = { sinceMs: r?.ms ?? null, foe: state.filter.foe || null, limit: 400 };
+  // Si el almacén falla o no está disponible, la aplicación sigue funcionando
+  // con la sesión en curso: quedarse en blanco es mucho peor que sin histórico.
+  try {
+    state.fights = (await window.eql.queryHistory?.(q)) ?? [];
+    state.foes = (await window.eql.foeList?.(r?.ms ?? null)) ?? [];
+    state.stats = (await window.eql.storeStats?.()) ?? null;
+  } catch (err) {
+    console.error('histórico:', err);
+    state.fights = []; state.foes = []; state.stats = null;
   }
-  return snap.history.find((h) => h.id === state.selectedFight) ?? snap.current;
+  const list = $('fightList');
+  if (list) list.dataset.sig = '';
+  // Si lo que estaba abierto se ha quedado fuera del filtro, abrimos lo primero.
+  if (state.selectedFight !== 'live' && !state.fights.some((f) => f.id === state.selectedFight)) {
+    state.selectedFight = state.fights[0] ? state.fights[0].id : 'live';
+  }
+  if (state.selectedFight !== 'live') await loadFight(state.selectedFight);
+  renderApp();
 }
 
 const TRIVIAL = (f) => f.duration < 3 || f.total < 500;
@@ -239,43 +278,60 @@ function fightCard(f, live) {
   return `<div class="fight ${live ? 'live' : ''} ${active ? 'active' : ''}" data-id="${f.id}" data-live="${live ? 1 : 0}">
     <div class="fight-name">${esc(f.label ?? t('fight.skirmish'))}</div>
     <div class="fight-sub">
-      <span class="num strong">${n0(f.raidDps)}</span><span class="u">dps</span>
-      <span class="num">${secs(f.duration)}</span>
-      <span class="num dim">${n0(f.total)}</span>
+      <span class="num strong foe">${n0(f.enemyDps ?? 0)}</span><span class="u">dps</span>
+      <span class="num">${n0(f.raidDps)}</span><span class="u">${esc(t('side.allies').toLowerCase())}</span>
+      <span class="num dim">${secs(f.duration)}</span>
     </div>
   </div>`;
 }
 
 function renderFightList(snap) {
-  const all = [...(snap.current ? [{ f: snap.current, live: true }] : []),
-               ...snap.history.map((f) => ({ f, live: false }))];
-  const shown = state.showAll ? all : all.filter((x) => x.live || !TRIVIAL(x.f));
-  const hidden = all.length - shown.length;
-
   const parts = [];
+
+  parts.push(`<div class="flt">
+    <select id="fltRange">${RANGES.map((r) => `<option value="${r.key}"${
+      state.filter.range === r.key ? ' selected' : ''}>${esc(r.key === 'all' ? t('flt.all') : t(`flt.${r.key}`))}</option>`).join('')}</select>
+    <select id="fltFoe">
+      <option value="">${esc(t('flt.allFoes'))}</option>
+      ${state.foes.map((f) => `<option value="${esc(f.name)}"${
+        state.filter.foe === f.name ? ' selected' : ''}>${esc(f.name)} · ${f.n}</option>`).join('')}
+    </select>
+  </div>`);
+
+  const shown = state.showAll ? state.fights : state.fights.filter((f) => !TRIVIAL(f));
+  const hidden = state.fights.length - shown.length;
+
+  if (snap.current) parts.push(fightCard(snap.current, true));
+
   let lastZone = null;
-  for (const { f, live } of shown) {
+  for (const f of shown) {
     const zone = f.zone ?? t('fight.unknownZone');
-    if (zone !== lastZone) {
-      lastZone = zone;
-      parts.push(`<div class="zone-sep eyebrow">${esc(zone)}</div>`);
-    }
-    parts.push(fightCard(f, live));
+    if (zone !== lastZone) { lastZone = zone; parts.push(`<div class="zone-sep eyebrow">${esc(zone)}</div>`); }
+    parts.push(fightCard(f, false));
   }
+  if (!shown.length && !snap.current) parts.push(`<div class="hint" style="padding:12px">${esc(t('flt.none'))}</div>`);
   if (hidden > 0 || state.showAll) {
     parts.push(`<button class="showall" id="btnShowAll">${state.showAll
-      ? t('fight.hideMinor') : t('fight.showMinor', { n: hidden })}</button>`);
+      ? esc(t('fight.hideMinor')) : esc(t('fight.showMinor', { n: hidden }))}</button>`);
+  }
+  if (state.stats) {
+    parts.push(`<div class="flt-foot eyebrow">${esc(t('flt.stored', {
+      n: state.stats.fights, kb: Math.round(state.stats.bytes / 1024) }))}</div>`);
   }
 
   const html = parts.join('');
   const list = $('fightList');
   if (list.dataset.sig === html) return;
   list.dataset.sig = html;
-  list.innerHTML = html || `<div class="hint" style="padding:12px">${t('fight.willAppear')}</div>`;
-  list.querySelectorAll('.fight').forEach((el) => el.addEventListener('click', () => {
+  list.innerHTML = html;
+
+  $('fltRange')?.addEventListener('change', (e) => { state.filter.range = e.target.value; refreshFights(); });
+  $('fltFoe')?.addEventListener('change', (e) => { state.filter.foe = e.target.value; refreshFights(); });
+  list.querySelectorAll('.fight').forEach((el) => el.addEventListener('click', async () => {
     state.selectedFight = el.dataset.live === '1' ? 'live' : +el.dataset.id;
     state.rowNodes.clear();
     if ($('rows')) $('rows').innerHTML = '';
+    await loadFight(state.selectedFight);
     renderApp();
   }));
   $('btnShowAll')?.addEventListener('click', () => { state.showAll = !state.showAll; list.dataset.sig = ''; renderApp(); });
@@ -370,12 +426,30 @@ function renderRows(snap) {
   const live = !!snap.current && f.id === snap.current.id;
   const seen = new Set();
 
+  // Cabecera al pasar de los tuyos a los enemigos: sin ella parecen el mismo
+  // reparto, que es justo lo que confundía en el resumen.
+  const hasFoes = f.rows.some((r) => r.side === 'enemy');
+  const hasAllies = f.rows.some((r) => r.side !== 'enemy');
+  let lastSide = null;
+
+  let rankAlly = 0, rankFoe = 0;
   f.rows.forEach((r, i) => {
     seen.add(r.name);
     let node = state.rowNodes.get(r.name);
     if (!node) { node = buildRow(r.name); state.rowNodes.set(r.name, node); }
-    updateRow(node, r, snap, live, i + 1);
-    if (host.children[i] !== node.el) host.insertBefore(node.el, host.children[i] ?? null);
+    updateRow(node, r, snap, live, r.side === 'enemy' ? ++rankFoe : ++rankAlly);
+    if (hasFoes && hasAllies && r.side !== lastSide) {
+      lastSide = r.side;
+      let h = state.sideHeads.get(r.side);
+      if (!h) {
+        h = document.createElement('div');
+        h.className = 'side-head eyebrow';
+        state.sideHeads.set(r.side, h);
+      }
+      h.textContent = t(r.side === 'enemy' ? 'side.enemies' : 'side.allies');
+      host.appendChild(h);
+    }
+    host.appendChild(node.el);
   });
 
   for (const [name, node] of state.rowNodes) {
@@ -560,6 +634,7 @@ const NARRATE_COMBAT = ['stance','deaths','petdeath','adds','summary','interrupt
 
 async function renderNarrate(host) {
   const n = await window.eql.getNarrate();
+  state.cfg.tts = n.tts ?? state.cfg.tts;
   const box = (group, key, label) => `<label class="chk">
     <input type="checkbox" data-g="${group}" data-k="${key}"${n[group]?.[key] ? ' checked' : ''}> ${esc(label)}</label>`;
   host.innerHTML = `<div class="narrate">
@@ -580,6 +655,37 @@ async function renderNarrate(host) {
     </div>
     <div class="hint">${esc(t('voice.castHint'))}</div>
 
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('voice.voice'))}</div>
+    <div class="voice-row">
+      <select id="nVoice">
+        <option value="">${esc(t('voice.default'))}</option>
+        ${(() => {
+          // Primero las del idioma de la interfaz, luego el resto agrupadas por
+          // idioma: con varios paquetes instalados la lista plana es ilegible.
+          const cur = (langInfo().speech ?? '').slice(0, 2).toLowerCase();
+          const all = listVoices();
+          const sel = (v) => ((n.tts?.voice ?? '') === v.name ? ' selected' : '');
+          const opt = (v) => `<option value="${esc(v.name)}"${sel(v)}>${esc(v.name)} · ${esc(v.lang)}</option>`;
+          const mine = all.filter((v) => (v.lang ?? '').toLowerCase().startsWith(cur));
+          const rest = all.filter((v) => !(v.lang ?? '').toLowerCase().startsWith(cur));
+          const byLang = new Map();
+          for (const v of rest) {
+            const k = (v.lang ?? '?').split('-')[0].toUpperCase();
+            if (!byLang.has(k)) byLang.set(k, []);
+            byLang.get(k).push(v);
+          }
+          return (mine.length ? `<optgroup label="${esc(t('voice.matching'))}">${mine.map(opt).join('')}</optgroup>` : '')
+            + [...byLang].sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([k, vs]) => `<optgroup label="${esc(k)}">${vs.map(opt).join('')}</optgroup>`).join('');
+        })()}
+      </select>
+      <label class="eyebrow">${esc(t('voice.rate'))}
+        <input type="range" id="nRate" min="0.5" max="2" step="0.1" value="${n.tts?.rate ?? 1}"></label>
+      <label class="eyebrow">${esc(t('voice.volume'))}
+        <input type="range" id="nVol" min="0" max="1" step="0.05" value="${n.tts?.volume ?? 1}"></label>
+    </div>
+    <div class="hint">${esc(t('voice.moreVoices'))}</div>
+
     <div class="narrate-row">
       <label class="eyebrow">${t('voice.cut')}
         <input type="number" id="nMax" min="40" max="400" value="${n.maxChars}" style="width:70px" ${t('voice.chars')}</label>
@@ -594,12 +700,18 @@ async function renderNarrate(host) {
     });
     next.maxChars = +host.querySelector('#nMax').value || 120;
     next.nukeNames = host.querySelector('#nNukes').value.split(',').map((x) => x.trim()).filter(Boolean);
+    next.tts = { ...(n.tts ?? {}), voice: host.querySelector('#nVoice').value || null,
+      rate: +host.querySelector('#nRate').value, volume: +host.querySelector('#nVol').value };
+    state.cfg.tts = next.tts;
     Object.assign(n, next);
     await window.eql.setNarrate(next);
   };
   host.querySelectorAll('input').forEach((el) => el.addEventListener('change', save));
-  host.querySelector('#nTest').addEventListener('click', () =>
-    speak(t('say.testPhrase'), { ...(state.cfg.tts ?? {}), speech: langInfo().speech }));
+  host.querySelector('#nTest').addEventListener('click', () => {
+    const tts = { voice: host.querySelector('#nVoice').value || null,
+      rate: +host.querySelector('#nRate').value, volume: +host.querySelector('#nVol').value };
+    speak(t('say.testPhrase'), { ...tts, speech: langInfo().speech });
+  });
 }
 
 // ═══════════ Gráfica: daño por segundo + franja de postura ═══════════
@@ -700,6 +812,10 @@ function renderAdvice(snap) {
       })
     : null;
   const live = snap.live;
+  // Sin ninguna pelea el panel no aporta nada y encima pide las clases con
+  // los desplegables ya rellenos, que despista.
+  if (!f) { host.innerHTML = ''; host.dataset.sig = ''; return; }
+
   const conflict = snap.classConflict && state.dismissedConflict !== JSON.stringify(snap.classConflict)
     ? snap.classConflict : null;
   const sig = JSON.stringify([getLang(), f?.id, a?.incoming, a?.current,
@@ -844,6 +960,7 @@ function renderHead(snap) {
       ${card(n0(f.raidDps), t('metric.raidDps'), 'lead')}
       ${card(n0(f.total), t('metric.total'))}
       ${card(secs(f.duration), t('metric.duration'))}
+      ${f.enemyDps ? card(n0(f.enemyDps), t('metric.enemyDps'), 'foe') : ''}
       ${f.healing ? card(n0(f.healing), t('metric.healing')) : ''}
       ${f.kills.length ? card(f.kills.length, t('metric.kills', { n: f.kills.length })) : ''}
       ${f.losses?.length ? card(f.losses.length, t('metric.losses', { n: f.losses.length }), 'bad') : ''}
@@ -998,8 +1115,10 @@ function renderChrome(snap) {
   $('fPath').textContent = snap.path ?? '';
 }
 
+let lastHistLen = -1;
 window.eql.onSnapshot((snap) => {
   state.snap = snap;
+  if (snap.history.length !== lastHistLen) { lastHistLen = snap.history.length; refreshFights(); }
   // Un fallo pintando la cabecera no debe impedir que se pinte el resto,
   // ni dejar la interfaz congelada.
   try { renderChrome(snap); } catch (err) { console.error('renderChrome:', err); }
@@ -1104,7 +1223,7 @@ $('btnSetup').addEventListener('contextmenu', (e) => { e.preventDefault(); openW
 // ═══════════ Avisos ═══════════
 const showBanner = mountBanner();
 window.eql.onAlert((a) => {
-  if (a.speak) speak(a.speak, { ...(state.cfg.tts ?? {}), queue: a.queue });
+  if (a.speak) speak(a.speak, { ...(state.cfg.tts ?? {}), speech: langInfo().speech, queue: a.queue });
   if (a.sound && state.cfg.sound?.enabled !== false) playSound(a.sound, state.cfg.sound?.volume ?? 0.5);
   showBanner(a);
 });
@@ -1129,5 +1248,6 @@ window.eql.getConfig().then((c) => {
   applyTheme(c.theme ?? 'dark');
   renderLangPicker();
   applyLangToChrome();
+  refreshFights();
   if (!c.logPath) renderApp();
 });

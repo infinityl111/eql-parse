@@ -44,7 +44,24 @@ export class TriggerEngine extends EventEmitter {
     this.nextTimerId = 1;
   }
 
+  /**
+   * Disparadores heredados que hay que neutralizar al cargar.
+   *
+   * Los disparadores se guardan en la configuración del usuario, así que
+   * cambiar la plantilla en el código no arregla las instalaciones que ya
+   * la tenían activada. Este de aquí saltaba con CUALQUIER muerte y decía
+   * "mascota caída"; la muerte de la mascota la avisa ahora el narrador,
+   * que sí sabe cuál es tu mascota.
+   */
+  static #LEGACY = [
+    { id: 'pet-dead', badPattern: 'has been slain by' },
+  ];
+
   load(defs = []) {
+    for (const d of defs) {
+      const bad = TriggerEngine.#LEGACY.find((L) => L.id === d.id && String(d.pattern ?? '').includes(L.badPattern));
+      if (bad && d.enabled !== false) { d.enabled = false; d.retired = true; }
+    }
     this.defs = defs;
     this.compiled = defs.filter((d) => d.enabled !== false).map(compile);
     return this.compiled.filter((c) => c.error).map((c) => ({ id: c.id, error: c.error }));
@@ -177,7 +194,10 @@ export const STARTER_TRIGGERS = [
     id: 'cast-any', name: 'Alguien empieza a castear', enabled: false,
     pattern: '^(.+?) begins casting (.+?)\\.$', regex: true,
     speak: '${1} lanza ${2}', text: '${1} → ${2}', holdMs: 3000,
-    note: 'Muy ruidoso en grupo. Úsalo acotando el nombre: ^Lady Vox begins casting',
+    note: 'Inservible tal cual: en una pelea con adds salta decenas de veces. '
+        + 'Para casteos importantes usa "Casteos enemigos" en Ajustes de voz, que filtra por '
+        + 'categoría y sólo avisa de enemigos. Esta plantilla es para vigilar a UNO concreto: '
+        + '^Lady Vox begins casting',
   },
   {
     id: 'boss-cast', name: 'Plantilla: casteo de un jefe', enabled: false,

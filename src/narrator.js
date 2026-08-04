@@ -28,6 +28,7 @@ export const DEFAULT_NARRATE = {
   },
   enemyCast: { ...DEFAULT_CAST_CATEGORIES },
   nukeNames: [],
+  tts: { voice: null, rate: 1, volume: 1 },
   maxChars: 120,
   bigCritFactor: 2.5,   // un golpe se anuncia si supera 2,5 veces tu media
 };
@@ -155,8 +156,10 @@ export class Narrator extends EventEmitter {
     const cfg = this.config.enemyCast;
     if (!cfg || !ev.ability || !ev.source) return false;
     if (ev.source === this.self || this.pets.has(ev.source)) return false;
-    // Sin esto avisaría también de los hechizos de tus compañeros de grupo.
-    if (this.foes.size && !this.foes.has(ev.source)) return false;
+    // Sólo se anuncia a quien sabemos que es enemigo. Antes, si aún no
+    // conocíamos ninguno, la comprobación se saltaba entera: fuera de combate
+    // eso significaba anunciar el gate de cualquier jugador de la zona.
+    if (!this.foes.has(ev.source)) return false;
 
     const cat = classifySpell(ev.ability, { nukeNames: this.config.nukeNames });
     if (!cat || !cfg[cat]) return false;

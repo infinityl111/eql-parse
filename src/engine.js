@@ -9,6 +9,7 @@ import { TriggerEngine } from './triggers.js';
 import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
 import { setLang } from './i18n.js';
+import { FightStore } from './store.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
 
 /**
@@ -100,6 +101,11 @@ export class Engine extends EventEmitter {
     this.level = null;
     this.classConflict = null;
     this.backfilling = false;
+    this.lastKill = null;
+    this.storePath = null;      // fichero de peleas guardadas
+    this.store = null;
+    this.history = [];          // peleas cerradas, la más reciente primero
+    this.saveTimer = null;
     this.foes = new Set();
     this.recent = [];           // daño recibido reciente, para el consejo en vivo
     this.windowSec = 20;
@@ -129,10 +135,38 @@ export class Engine extends EventEmitter {
       idleSec: opts.idleSec ?? 20,
       closeOnDeath: opts.closeOnDeath ?? false,
     });
-    this.tracker.on('close', (enc) => { this.narrator.fightEnd(this.#enc(enc)); this.emit('encounter'); });
+    this.tracker.on('close', (enc) => {
+      const f = this.#enc(enc);
+      this.narrator.fightEnd(f);
+      if (f && (f.total > 0 || f.enemyTotal > 0)) {
+        const sum = this.store?.append(f, Date.now()) ?? f;
+        this.history.unshift(sum);
+        if (this.history.length > 60) this.history.length = 60;
+        this.saveStore();
+      }
+      this.emit('encounter');
+    });
     this.tracker.on('open', () => { this.foes.clear(); this.narrator.fightStart(); });
+    // Acumulador de sesión: mismos eventos, pero no se cierra nunca. Es lo que
+    // ve el overlay, que sólo se pone a cero cuando tú lo pides.
+    this.session = new EncounterTracker({ self: this.self, idleSec: Number.POSITIVE_INFINITY });
 
-    this.tailer = new LogTailer(logPath, { pollMs: 100, fromStart: !!opts.fromStart });
+    // Se recupera lo guardado de ESTE log y se reanuda por donde iba, así que
+    // sólo se relee lo que se escribió mientras la aplicación estaba cerrada.
+    this.history = this.store ? this.store.filter({ limit: 60 }) : [];
+    let resume = opts.fromStart ? null : this.#resumeOffset(logPath);
+
+    // Primera vez con este log: sin nada guardado y sin punto de reanudación,
+    // se lee entero aunque no lo pidas. Depender de una casilla para algo que
+    // sólo tiene una respuesta razonable es pedirle al usuario que adivine.
+    // Basta con que el almacén esté vacío: si quedó un punto de reanudación
+    // de una sesión anterior pero no hay peleas guardadas, seguir desde ahí
+    // dejaría el histórico vacío para siempre.
+    const firstTime = !opts.fromStart && (this.store?.index.length ?? 0) === 0;
+    if (firstTime) { opts = { ...opts, fromStart: true }; resume = null; }
+    this.autoFullRead = firstTime;
+
+    this.tailer = new LogTailer(logPath, { pollMs: 100, fromStart: !!opts.fromStart, startOffset: resume });
     this.tailer.on('line', (l) => {
       const ev = this.parser.parse(l, this.seq++);
       if (!ev) return;
@@ -166,6 +200,8 @@ export class Engine extends EventEmitter {
         while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
       }
       this.tracker.feed(ev);
+      this.session?.feed(ev);
+      if (ev.kind === 'death' && ev.victim && !this.backfilling) this.#makeKillCard(ev);
       // Durante la lectura del histórico no se habla ni se disparan avisos: son
       // sucesos de hace horas. La guarda anterior miraba el estado, que pasaba
       // a "monitorizando" en el primer volcado, a mitad de la lectura.
@@ -211,6 +247,7 @@ export class Engine extends EventEmitter {
    * hora.
    */
   async #primeFromTail(logPath, bytes = 512 * 1024) {
+    const before = { parsed: this.parser.parsed, unknown: this.parser.unrecognized };
     try {
       const st = await fsp.stat(logPath);
       const from = Math.max(0, st.size - bytes);
@@ -234,9 +271,10 @@ export class Engine extends EventEmitter {
         if (ev.kind === 'stance' && ev.stance) this.seenStances.add(ev.stance);
         if (ev.kind === 'invocation' && ev.invocation) this.seenInvocations.add(ev.invocation);
       }
-      // Los contadores vuelven a cero: esto era contexto, no lectura en vivo.
-      this.parser.parsed = 0;
-      this.parser.unrecognized = 0;
+      // El precargado no debe contar como lectura en vivo, pero tampoco puede
+      // borrar lo que ya se hubiera leído del fichero al reanudar.
+      this.parser.parsed = before.parsed;
+      this.parser.unrecognized = before.unknown;
       this.narrator.setPets([...this.parser.pets.keys()]);
       return n;
     } catch { return 0; }
@@ -294,21 +332,51 @@ export class Engine extends EventEmitter {
     };
   }
 
+  /**
+   * Quién es enemigo y quién de los tuyos.
+   *
+   * Enemigo = te ha pegado a ti o a tu mascota, o tú o tu mascota le habéis
+   * pegado. Sin esta separación el "dps del grupo" sumaba los dos bandos y los
+   * porcentajes repartían entre atacantes y atacados a la vez.
+   */
+  #sides(rows, me, petSet) {
+    const foes = new Set();
+    const ours = new Set([me, ...petSet]);
+    for (const r of rows) {
+      const hitsUs = (r.byTarget ?? []).some(([n]) => ours.has(n));
+      if (hitsUs && !ours.has(r.name)) foes.add(r.name);
+    }
+    for (const r of rows) {
+      if (!ours.has(r.name)) continue;
+      for (const [n] of r.byTarget ?? []) if (!ours.has(n)) foes.add(n);
+    }
+    return foes;
+  }
+
   #enc(enc) {
     if (!enc) return null;
     const t = enc.totals();
     const me = this.self ?? 'You';
     const petSet = new Set(this.parser?.pets.keys() ?? []);
+    const foeSet = this.#sides(t.rows, me, petSet);
+    const allyRows = t.rows.filter((r) => !foeSet.has(r.name));
+    const foeRows = t.rows.filter((r) => foeSet.has(r.name));
+    const allyTotal = allyRows.reduce((a, r) => a + r.damage, 0);
+    const foeTotal = foeRows.reduce((a, r) => a + r.damage, 0);
     return {
       id: enc.id,
       zone: enc.zone,
       duration: t.duration,
-      total: t.total,
       healing: t.healing,
-      raidDps: t.raidDps,
       // Matar a un enemigo y perder a un tuyo son cosas distintas: si se
       // mezclan, una pelea donde caíste dos veces se titula "Campeon ×2".
+      dead: Object.fromEntries(enc.deadAt),
       kills: enc.kills.filter((k) => k.victim !== me && !petSet.has(k.victim)).map((k) => k.victim),
+      // Los totales del grupo son sólo de los tuyos; el enemigo va aparte.
+      total: allyTotal,
+      raidDps: allyTotal / t.duration,
+      enemyTotal: foeTotal,
+      enemyDps: foeTotal / t.duration,
       losses: enc.kills.filter((k) => k.victim === me || petSet.has(k.victim)).map((k) => k.victim),
       series: [...enc.series.values()].sort((a, b) => a.s - b.s),
       stanceSpans: enc.stanceSpans.map((x, i, arr) => ({
@@ -333,7 +401,11 @@ export class Engine extends EventEmitter {
       interrupts: enc.interrupts,
       closed: enc.closed,
       start: enc.start,
-      rows: t.rows.map((r) => this.#row(r)),
+      rows: t.rows.map((r) => {
+        const enemy = foeSet.has(r.name);
+        const base = enemy ? foeTotal : allyTotal;
+        return { ...this.#row(r), side: enemy ? 'enemy' : 'ally', share: base ? r.damage / base : 0 };
+      }),
     };
   }
 
@@ -379,7 +451,9 @@ export class Engine extends EventEmitter {
   }
 
   #advice(enc) {
-    if (!enc) return null;
+    // El histórico son resúmenes sin filas: sólo se aconseja sobre una pelea
+    // completa. Sin esta guarda el snapshot entero fallaba al no haber combate.
+    if (!enc?.rows) return null;
     const me = this.self ?? 'You';
     const row = enc.rows.find((r) => r.name === me);
     if (!row) return null;
@@ -408,6 +482,78 @@ export class Engine extends EventEmitter {
   }
 
   setNarrate(cfg) { this.narrator.setConfig(cfg); }
+
+  /** Dónde se guardan las peleas. Lo fija el proceso principal. */
+  setStorePath(dir) {
+    this.store = new FightStore(dir);
+    const n = this.store.load();
+    this.history = this.store.filter({ limit: 60 });
+    return n;
+  }
+
+  /** Guarda el punto de lectura para reanudar en la próxima sesión. */
+  saveStore(now = false) {
+    if (!this.store || !this.path) return;
+    try {
+      fs.mkdirSync(this.store.dir, { recursive: true });
+      fs.writeFileSync(path.join(this.store.dir, 'resume.json'), JSON.stringify({
+        [this.path]: { offset: this.tailer?.offset ?? null, self: this.self, at: Date.now() },
+      }));
+    } catch { /* disco lleno o permisos */ }
+  }
+
+  #resumeOffset(logPath) {
+    try {
+      const r = JSON.parse(fs.readFileSync(path.join(this.store.dir, 'resume.json'), 'utf8'));
+      return r[logPath]?.offset ?? null;
+    } catch { return null; }
+  }
+
+  /** Peleas del índice según tramo y enemigo. */
+  queryHistory(q = {}) {
+    if (!this.store) return [];
+    return this.store.filter(q);
+  }
+  getFight(id) { return this.store?.get(id) ?? null; }
+  foeList(sinceMs) { return this.store?.foeList(sinceMs) ?? []; }
+  storeStats() { return this.store?.stats() ?? null; }
+
+  /**
+   * Al caer un enemigo, quién le hizo cuánto.
+   *
+   * Se calcula sobre ESE objetivo, no sobre la pelea: en una pelea con varios
+   * bichos el reparto general no dice nada de quién mató a cuál. El dps va
+   * sobre el tiempo que ese enemigo estuvo recibiendo golpes.
+   */
+  #makeKillCard(ev) {
+    const enc = this.tracker?.current;
+    if (!enc) return;
+    const me = this.self ?? 'You';
+    const pets = new Set(this.parser?.pets.keys() ?? []);
+    if (ev.victim === me || pets.has(ev.victim)) return;      // los tuyos no
+
+    const first = enc.targetFirst.get(ev.victim) ?? enc.start;
+    const secs = Math.max(1, Math.round(ev.t - first) + 1);
+    const rows = [];
+    for (const c of enc.combatants.values()) {
+      const b = c.byTarget.get(ev.victim);
+      if (!b || b.sum <= 0 || c.name === ev.victim) continue;
+      rows.push({ name: c.name, damage: b.sum, dps: b.sum / secs, hits: b.n });
+    }
+    if (!rows.length) return;
+    const total = rows.reduce((a, r) => a + r.damage, 0);
+    rows.sort((a, b) => b.damage - a.damage);
+    for (const r of rows) r.share = total ? r.damage / total : 0;
+    this.lastKill = { victim: ev.victim, seconds: secs, total, rows, at: Date.now() };
+  }
+
+  /** Pone a cero el acumulado del overlay sin tocar el histórico de peleas. */
+  resetSession() {
+    this.lastKill = null;
+    this.session = new EncounterTracker({ self: this.self, idleSec: Number.POSITIVE_INFINITY });
+    if (this.tracker) this.session.zone = this.tracker.zone;
+    return true;
+  }
   setLang(code) { setLang(code); }
 
   markPet(name) { this.parser?.markPet(name); this.narrator.setPets([...(this.parser?.pets.keys() ?? [])]); }
@@ -419,7 +565,7 @@ export class Engine extends EventEmitter {
    * memorizarlos: hay que pedirle al usuario un /pet who leader.
    */
   #petHint(enc) {
-    if (!enc) return null;
+    if (!enc?.rows) return null;
     const me = this.self ?? 'You';
     const known = new Set(this.parser?.pets.keys() ?? []);
     const mine = enc.rows.find((r) => r.name === me);
@@ -436,11 +582,11 @@ export class Engine extends EventEmitter {
 
   snapshot() {
     const current = this.#enc(this.tracker?.current);
-    const history = (this.tracker?.history ?? []).slice(-40).reverse().map((e) => this.#enc(e));
     return {
       ...this.describe(),
       classes: this.activeClasses,
       classSource: this.classSource,
+      autoFullRead: !!this.autoFullRead,
       classConflict: this.classConflict,
       level: this.level,
       parsed: this.parser?.parsed ?? 0,
@@ -448,9 +594,11 @@ export class Engine extends EventEmitter {
       pets: this.parser ? [...this.parser.pets.keys()] : [],
       timers: this.triggers.snapshot(),
       current,
-      history,
-      advice: this.#advice(current ?? history[0]),
-      petHint: this.#petHint(current ?? history[0]),
+      history: this.history,
+      session: this.#enc(this.session?.current),
+      lastKill: this.lastKill ?? null,
+      advice: this.#advice(current ?? this.history[0]),
+      petHint: this.#petHint(current ?? this.history[0]),
       currentPet: this.parser?.currentPet ?? null,
       live: (() => { const l = this.#live(); this.narrator.stance(l); return l; })(),
     };

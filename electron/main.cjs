@@ -68,7 +68,7 @@ function createMain() {
 
 function createOverlay() {
   if (overlayWin) { overlayWin.show(); return; }
-  const b = cfg.overlayBounds ?? { x: 40, y: 40, width: 360, height: 260 };
+  const b = cfg.overlayBounds ?? { x: 40, y: 40, width: 640, height: 420 };
   overlayWin = new BrowserWindow({
     ...b,
     frame: false, transparent: true, resizable: true, skipTaskbar: true, icon: ICON,
@@ -126,6 +126,7 @@ async function boot() {
   TriggerEngine = trig.TriggerEngine; STARTER_TRIGGERS = trig.STARTER_TRIGGERS;
   engine = new Engine();
   cfg = loadConfig();
+  engine.setStorePath(app.getPath('userData'));
   triggerDefs = loadTriggers() ?? STARTER_TRIGGERS;
   engine.triggers.load(triggerDefs);
   // Sólo habla la ventana principal, para no oír el aviso dos veces.
@@ -160,7 +161,10 @@ async function boot() {
 
 app.whenReady().then(boot);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  engine?.saveStore(true);      // sin esto se perderían las peleas del final
+  globalShortcut.unregisterAll();
+});
 
 // ─────────── IPC ───────────
 
@@ -273,6 +277,13 @@ ipcMain.handle('log:attach', async (_e, { logPath, self, fromStart, idleSec }) =
 });
 
 ipcMain.handle('log:detach', () => { engine.detach(); return engine.describe(); });
+
+ipcMain.handle('history:query', (_e, q) => engine.queryHistory(q ?? {}));
+ipcMain.handle('history:fight', (_e, id) => engine.getFight(id));
+ipcMain.handle('history:foes', (_e, sinceMs) => engine.foeList(sinceMs));
+ipcMain.handle('history:stats', () => engine.storeStats());
+
+ipcMain.handle('session:reset', () => engine.resetSession());
 
 ipcMain.handle('overlay:open', () => { createOverlay(); return true; });
 ipcMain.handle('overlay:close', () => { overlayWin?.close(); return true; });

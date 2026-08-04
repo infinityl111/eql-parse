@@ -22,6 +22,8 @@ export class LogTailer extends EventEmitter {
     this.path = path;
     this.pollMs = opts.pollMs ?? 100;
     this.fromStart = opts.fromStart ?? false;
+    // Byte por el que se quedó la última sesión: así sólo se relee lo nuevo.
+    this.startOffset = Number.isFinite(opts.startOffset) ? opts.startOffset : null;
     this.chunkSize = opts.chunkSize ?? 1 << 20; // 1 MiB
     this.encoding = opts.encoding ?? 'latin1';  // EQ escribe cp1252, no UTF-8
     this.offset = 0;
@@ -41,13 +43,14 @@ export class LogTailer extends EventEmitter {
       st = null;
     }
     if (st) {
-      this.offset = this.fromStart ? 0 : st.size;
+      this.offset = this.fromStart ? 0
+        : (this.startOffset !== null && this.startOffset <= st.size ? this.startOffset : st.size);
       this.sig = this.#sig(st);
     }
     this.timer = setInterval(() => this.#poll(), this.pollMs);
     this.timer.unref?.();
     this.emit('start', { path: this.path, offset: this.offset });
-    if (this.fromStart) await this.#poll();
+    if (this.fromStart || this.offset < (await fsp.stat(this.path).then((x) => x.size, () => 0))) await this.#poll();
     return this;
   }
 

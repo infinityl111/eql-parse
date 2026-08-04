@@ -3,67 +3,103 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self';">
-<title>EQL Parse <SPAIN> Guild (World Champion Again) — overlay</title>
+<title>EQL Parse — overlay</title>
 <link rel="stylesheet" href="styles.css">
 <style>
   body { background: transparent; overflow: hidden; }
   .ov { height: 100vh; display: flex; flex-direction: column;
-        background: rgba(18,22,30,.74); border: 1px solid rgba(51,61,78,.8);
-        backdrop-filter: blur(3px);
-        opacity: .34; transition: opacity .45s ease; }
-  .ov.active { opacity: 1; }
+        background: rgba(18,22,30,.76); border: 1px solid rgba(51,61,78,.85);
+        backdrop-filter: blur(3px); opacity: .38; transition: opacity .45s ease; }
+  .ov.active, .ov:hover { opacity: 1; }
   .ov.flash { opacity: 1; border-color: var(--t-cold); }
-  .ov:hover { opacity: 1; }
   @media (prefers-reduced-motion: reduce) { .ov { transition: none; } }
-  .ov-bar { display: flex; align-items: center; gap: 8px; padding: 5px 8px;
-            background: rgba(22,27,37,.9); border-bottom: 1px solid rgba(51,61,78,.7);
-            -webkit-app-region: drag; }
+  :root[data-theme="light"] .ov { background: rgba(248,245,239,.90); }
+  :root[data-theme="light"] .ov-bar { background: rgba(229,224,213,.94); }
+
+  .ov-bar { display: flex; align-items: center; gap: 8px; padding: 5px 7px;
+            background: rgba(22,27,37,.92); border-bottom: 1px solid rgba(51,61,78,.7);
+            -webkit-app-region: drag; flex: none; }
   .ov-bar .eyebrow { font-size: 9px; }
   .ov-bar .spacer { margin-left: auto; }
-  .ov-fight { color: var(--bone-dim); overflow: hidden; text-overflow: ellipsis;
-              white-space: nowrap; max-width: 40%; }
   .ov-btn { -webkit-app-region: no-drag; background: transparent; border: 0;
-            color: var(--bone-faint); font-size: 12px; line-height: 1;
-            padding: 2px 4px; cursor: pointer; border-radius: 2px; }
-  .ov-btn:hover { color: var(--bone); background: rgba(255,255,255,.08); }
+            color: var(--bone-faint); font-size: 11px; line-height: 1;
+            padding: 3px 5px; cursor: pointer; border-radius: 2px;
+            font-family: var(--display); letter-spacing: .08em; text-transform: uppercase; }
+  .ov-btn:hover { color: var(--bone); background: rgba(255,255,255,.09); }
   .ov-btn.close:hover { color: #fff; background: var(--t-ds); }
-  .ov-final { padding: 7px 9px; margin: 4px 8px 0; text-align: center;
+
+  .ov-final { padding: 6px 9px; margin: 4px 7px 0; text-align: center; flex: none;
               background: rgba(111,199,216,.14); border-left: 2px solid var(--t-cold); }
-  .ov-final b { font-family: var(--mono); font-size: 15px; }
-  .ov-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
-            margin-right: 6px; vertical-align: 1px; flex: none; }
-  .ov-rows { flex: 1; overflow: hidden; padding: 5px 8px 7px; }
-  .ov-row { padding: 3px 0; }
-  .ov-top { display: flex; align-items: baseline; gap: 8px; }
-  .ov-name { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ov-final b { font-family: var(--mono); font-size: 14px; }
+  .ov-advice { margin: 4px 7px 0; padding: 4px 7px; font-size: 11px; flex: none;
+               background: rgba(224,138,75,.15); border-left: 2px solid var(--t-fire); }
+
+  /* Dos columnas: los tuyos a la izquierda, los enemigos a la derecha */
+  .ov-cols { flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+             gap: 1px; background: rgba(51,61,78,.5); min-height: 0; }
+  .ov-col { display: flex; flex-direction: column; min-height: 0;
+            background: rgba(18,22,30,.35); }
+  :root[data-theme="light"] .ov-col { background: rgba(255,253,248,.4); }
+  .ov-col-h { display: flex; align-items: baseline; gap: 6px; padding: 4px 8px; flex: none;
+              border-bottom: 1px solid rgba(51,61,78,.6); }
+  .ov-col-h .n { margin-left: auto; font-family: var(--mono); font-size: 11px; }
+  .ov-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 3px 8px 6px; }
+  .ov-list::-webkit-scrollbar { width: 6px; }
+  .ov-list::-webkit-scrollbar-thumb { background: var(--slate-600); border-radius: 3px; }
+
+  .ov-row { padding: 3px 0; cursor: pointer; }
+  .ov-row:hover .ov-name { color: #fff; }
+  .ov-row.dead { opacity: .42; }
+  .ov-row.open { background: rgba(255,255,255,.05); }
+  .ov-top { display: flex; align-items: baseline; gap: 6px; }
+  .ov-rank { font-family: var(--mono); font-size: 9px; color: var(--bone-faint); width: 13px; flex: none; }
+  .ov-name { flex: 1; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ov-name.self { color: var(--t-cold); }
-  .ov-dps { font-family: var(--mono); font-size: 12.5px; }
-  .ov-pct { font-family: var(--mono); font-size: 10px; color: var(--bone-dim); width: 38px; text-align: right; }
-  .ov .bar { height: 6px; margin-top: 2px; background: rgba(26,32,43,.8); }
-  .ov-empty { padding: 18px 8px; text-align: center; color: var(--bone-faint); font-size: 11px; }
-  .locked { color: var(--t-poison); }
-  .ov-advice { margin: 4px 8px 0; padding: 4px 7px; font-size: 11px;
-               background: rgba(224,138,75,.14); border-left: 2px solid var(--t-fire);
-               color: var(--bone); }
-  #oTimers:not(:empty) { padding: 5px 8px 2px; border-bottom: 1px solid rgba(51,61,78,.6); }
-  .alerts { position: fixed; top: 0; left: 0; right: 0; display: flex; flex-direction: column;
-            align-items: center; gap: 4px; padding-top: 4px; pointer-events: none; z-index: 50; }
+  .ov-dps { font-family: var(--mono); font-size: 12px; }
+  .ov-pct { font-family: var(--mono); font-size: 9.5px; color: var(--bone-dim); width: 32px; text-align: right; }
+  .ov-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; flex: none; }
+  .ov .bar { height: 5px; margin-top: 2px; background: rgba(26,32,43,.75); }
+  .ov-det { margin: 4px 0 5px 19px; padding: 5px 8px; font-size: 10.5px;
+            background: rgba(0,0,0,.22); border-left: 1px solid var(--slate-600); }
+  :root[data-theme="light"] .ov-det { background: rgba(0,0,0,.06); }
+  .ov-det-l { display: flex; gap: 7px; padding: 1px 0; }
+  .ov-det-l span:first-child { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ov-det-l b { font-family: var(--mono); font-weight: 500; }
+  .ov-det-kv { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-bottom: 4px; color: var(--bone-dim); }
+  .ov-kill { margin: 4px 7px 0; padding: 6px 8px; flex: none;
+             background: rgba(168,199,79,.14); border-left: 2px solid var(--t-poison); }
+  .ok-h { display: flex; align-items: baseline; gap: 7px; margin-bottom: 4px; font-size: 12px; }
+  .ok-h .spacer { margin-left: auto; }
+  .ok-row { display: flex; align-items: center; gap: 6px; padding: 1px 0; font-size: 11px; }
+  .ok-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ok-pct { width: 30px; text-align: right; color: var(--bone-dim); font-size: 10px; }
+  .ok-bar { width: 60px; height: 4px; background: rgba(26,32,43,.7); flex: none; }
+  .ok-bar div { height: 100%; background: var(--t-poison); }
+  .ov-empty { padding: 14px 8px; text-align: center; color: var(--bone-faint); font-size: 10.5px; }
 </style>
 </head>
 <body>
   <div class="ov">
     <div class="ov-bar">
       <span class="eyebrow" id="oTitle">EQL &lt;SPAIN&gt;</span>
-      <span class="eyebrow ov-fight" id="oFight"></span>
       <span class="eyebrow spacer num" id="oMeta"></span>
-      <span class="eyebrow" id="oLock" title="Ctrl+Alt+O para alternar"></span>
-      <button class="ov-btn" id="oPass" title="Dejar pasar los clics al juego (Ctrl+Alt+O)">◎</button>
-      <button class="ov-btn close" id="oClose" title="Cerrar el overlay (Ctrl+Alt+X)">✕</button>
+      <button class="ov-btn" id="oReset">reset</button>
+      <button class="ov-btn" id="oPass">◎</button>
+      <button class="ov-btn close" id="oClose">✕</button>
     </div>
-    <div id="oTimers"></div>
     <div class="ov-final" id="oFinal" style="display:none"></div>
+    <div class="ov-kill" id="oKill" style="display:none"></div>
     <div class="ov-advice" id="oAdvice" style="display:none"></div>
-    <div class="ov-rows" id="oRows"></div>
+    <div class="ov-cols">
+      <div class="ov-col">
+        <div class="ov-col-h"><span class="eyebrow" id="oAlliesH"></span><span class="n" id="oAlliesN"></span></div>
+        <div class="ov-list" id="oAllies"></div>
+      </div>
+      <div class="ov-col">
+        <div class="ov-col-h"><span class="eyebrow" id="oEnemiesH"></span><span class="n" id="oEnemiesN"></span></div>
+        <div class="ov-list" id="oEnemies"></div>
+      </div>
+    </div>
   </div>
   <script type="module" src="overlay.js"></script>
 </body>

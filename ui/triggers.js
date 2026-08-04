@@ -1,3 +1,4 @@
+import { t } from '../src/i18n.js';
 import { listVoices, speak, playSound } from './alerts.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -10,7 +11,7 @@ let cfg = {};
 let onDirty = () => {};
 
 const BLANK = () => ({
-  id: uid(), name: 'Disparador nuevo', enabled: true,
+  id: uid(), name: t('tg.newName'), enabled: true,
   pattern: '', regex: true, ignoreCase: true,
   speak: '', text: '', sound: null, color: null, holdMs: 4000,
   timerLabel: '', timerSeconds: 0, timerWarnAt: 0, timerRestart: 'restart',
@@ -33,23 +34,23 @@ export function renderTriggers(host) {
   host.innerHTML = `<div class="trig">
     <div class="trig-list">
       <div class="trig-actions">
-        <button class="primary" id="tAdd">Nuevo</button>
-        <button id="tImport">Importar</button>
-        <button id="tExport">Exportar</button>
-        <button id="tReset">Plantillas</button>
+        <button class="primary" id="tAdd">${t('tg.new')}</button>
+        <button id="tImport">${t('tg.import')}</button>
+        <button id="tExport">${t('tg.export')}</button>
+        <button id="tReset">${t('tg.templates')}</button>
       </div>
       <div id="tItems"></div>
       <div class="tts-panel">
-        <div class="sec-title eyebrow">Voz y sonido</div>
-        <label class="chk"><input type="checkbox" id="ttsOn" ${cfg.tts?.enabled ? 'checked' : ''}> Leer los avisos en voz alta</label>
-        <label class="eyebrow" style="margin-top:8px;display:block">Voz</label>
+        <div class="sec-title eyebrow">${t('tg.voiceSound')}</div>
+        <label class="chk"><input type="checkbox" id="ttsOn" ${cfg.tts?.enabled ? 'checked' : ''}> ${t('tg.readAloud')}</label>
+        <label class="eyebrow" style="margin-top:8px;display:block">${t('tg.voice')}</label>
         <select id="ttsVoice" class="wide"></select>
-        <label class="eyebrow" style="margin-top:8px;display:block">Velocidad <span class="num" id="rateVal">${cfg.tts?.rate ?? 1}</span></label>
+        <label class="eyebrow" style="margin-top:8px;display:block">${t('tg.rate')} <span class="num" id="rateVal">${cfg.tts?.rate ?? 1}</span></label>
         <input type="range" id="ttsRate" min="0.6" max="1.8" step="0.1" value="${cfg.tts?.rate ?? 1}" class="wide">
-        <label class="chk" style="margin-top:8px"><input type="checkbox" id="sndOn" ${cfg.sound?.enabled ? 'checked' : ''}> Sonidos</label>
+        <label class="chk" style="margin-top:8px"><input type="checkbox" id="sndOn" ${cfg.sound?.enabled ? 'checked' : ''}> ${t('tg.sounds')}</label>
         <div style="margin-top:10px;display:flex;gap:6px">
-          <button id="ttsTest">Probar voz</button>
-          <button id="sndTest">Probar sonido</button>
+          <button id="ttsTest">${t('tg.testVoice')}</button>
+          <button id="sndTest">${t('tg.testSound')}</button>
         </div>
       </div>
     </div>
@@ -74,7 +75,7 @@ function renderList() {
       </div>
       ${d.timerSeconds > 0 ? `<span class="badge">${d.timerSeconds}s</span>` : ''}
     </div>`).join('')
-    : '<div class="hint" style="padding:12px">Sin disparadores. Crea uno o carga las plantillas.</div>';
+    : `<div class="hint" style="padding:12px">${t('tg.empty')}</div>`;
 
   el.querySelectorAll('.trig-item').forEach((n) => n.addEventListener('click', (e) => {
     if (e.target.classList.contains('tg')) return;
@@ -98,32 +99,30 @@ function renderEditor() {
   const host = document.getElementById('tEdit');
   const d = defs.find((x) => x.id === selected);
   if (!d) {
-    host.innerHTML = '<div class="empty"><h2>Ningún disparador seleccionado</h2><p>Elige uno de la lista o crea uno nuevo.</p></div>';
+    host.innerHTML = `<div class="empty"><h2>${t('tg.noneSel')}</h2><p>${t('tg.noneSelHint')}</p></div>`;
     return;
   }
   host.innerHTML = `
-    ${field('Nombre', 'fName', d.name)}
+    ${field(t('tg.name'), 'fName', d.name)}
     <div class="field">
-      <label class="eyebrow">Patrón</label>
+      <label class="eyebrow">${t('tg.pattern')}</label>
       <input id="fPattern" class="wide" value="${esc(d.pattern)}" placeholder="^(.+?) begins casting (.+?)\\.$">
       <div class="row-inline">
-        <label class="chk"><input type="checkbox" id="fRegex" ${d.regex ? 'checked' : ''}> Expresión regular</label>
-        <label class="chk"><input type="checkbox" id="fCase" ${d.ignoreCase !== false ? 'checked' : ''}> Ignorar mayúsculas</label>
+        <label class="chk"><input type="checkbox" id="fRegex" ${d.regex ? 'checked' : ''}> ${t('tg.regex')}</label>
+        <label class="chk"><input type="checkbox" id="fCase" ${d.ignoreCase !== false ? 'checked' : ''}> ${t('tg.ignoreCase')}</label>
       </div>
-      <div class="hint">Con <code>\${1}</code>…<code>\${9}</code> insertas los grupos capturados en la voz y el texto.
-        <code>\${line}</code> es la línea entera. En EQL el log nombra el hechizo, así que
-        <code>^Lady Vox begins casting (.+?)\\.$</code> te da el hechizo en <code>\${1}</code>.</div>
+      <div class="hint">${esc(t('tg.patternHelp'))}</div>
     </div>
 
     <div class="sec-title eyebrow" style="margin-top:18px">Al casar</div>
-    ${field('Decir en voz alta', 'fSpeak', d.speak, '${1} lanza ${2}')}
-    ${field('Mostrar en pantalla', 'fText', d.text, 'VOX · ${1}')}
+    ${field(t('tg.speak'), 'fSpeak', d.speak, '${1} lanza ${2}')}
+    ${field(t('tg.show'), 'fText', d.text, 'VOX · ${1}')}
     <div class="grid3">
-      <div class="field"><label class="eyebrow">Sonido</label>
+      <div class="field"><label class="eyebrow">${t('tg.sound')}</label>
         <select id="fSound" class="wide">
-          <option value="">Ninguno</option>
-          <option value="alert" ${d.sound === 'alert' ? 'selected' : ''}>Aviso</option>
-          <option value="warn" ${d.sound === 'warn' ? 'selected' : ''}>Atención</option>
+          <option value="">${t('tg.sndNone')}</option>
+          <option value="alert" ${d.sound === 'alert' ? 'selected' : ''}>${t('tg.sndAlert')}</option>
+          <option value="warn" ${d.sound === 'warn' ? 'selected' : ''}>${t('tg.sndWarn')}</option>
           <option value="end" ${d.sound === 'end' ? 'selected' : ''}>Cierre</option>
         </select></div>
       <div class="field"><label class="eyebrow">Color</label>
@@ -132,9 +131,9 @@ function renderEditor() {
         <input id="fHold" class="wide" type="number" min="1" max="30" value="${(d.holdMs ?? 4000) / 1000}"></div>
     </div>
 
-    <div class="sec-title eyebrow" style="margin-top:18px">Temporizador</div>
+    <div class="sec-title eyebrow" style="margin-top:18px">${t('tg.timerSec')}</div>
     <div class="grid3">
-      <div class="field"><label class="eyebrow">Duración (s)</label>
+      <div class="field"><label class="eyebrow">${t('tg.duration')}</label>
         <input id="fSecs" class="wide" type="number" min="0" max="3600" value="${d.timerSeconds ?? 0}"></div>
       <div class="field"><label class="eyebrow">Avisar al quedar (s)</label>
         <input id="fWarn" class="wide" type="number" min="0" max="120" value="${d.timerWarnAt ?? 0}"></div>
@@ -145,23 +144,23 @@ function renderEditor() {
           <option value="multiple" ${d.timerRestart === 'multiple' ? 'selected' : ''}>Permitir varios</option>
         </select></div>
     </div>
-    ${field('Nombre del temporizador', 'fTLabel', d.timerLabel, 'Vox · ${1}')}
+    ${field(t('tg.timerName'), 'fTLabel', d.timerLabel, 'Vox · ${1}')}
     ${field('Decir al terminar', 'fTEndSpeak', d.timerEndSpeak, 'Vox lista')}
     ${field('Mostrar al terminar', 'fTEndText', d.timerEndText)}
-    ${field('Cancelar temporizadores que contengan', 'fCancel', d.cancelTimer, 'Vox', 'Útil para cortar una cuenta atrás cuando el jefe muere.')}
+    ${field(t('tg.cancelTimers'), 'fCancel', d.cancelTimer, 'Vox', t('tg.cancelHint'))}
 
     <div class="sec-title eyebrow" style="margin-top:18px">Probar</div>
     <div class="field">
-      <input id="fTestLine" class="wide num" value="${esc(testLine)}" placeholder="Pega aquí una línea de tu log">
-      <div class="hint">Pega una línea real de tu log (sin la marca de tiempo) y comprueba qué saldría.</div>
+      <input id="fTestLine" class="wide num" value="${esc(testLine)}" placeholder="${esc(t('tg.testLine'))}">
+      <div class="hint">${t('tg.testHelp')}</div>
     </div>
     <div id="tResult"></div>
 
     <div class="actions">
-      <button class="primary" id="fSave">Guardar</button>
+      <button class="primary" id="fSave">${t('tg.save')}</button>
       <button id="fTest">Probar</button>
       <button id="fDup">Duplicar</button>
-      <button id="fDel">Borrar</button>
+      <button id="fDel">${t('tg.delete')}</button>
     </div>`;
 
   wireEditor(d);
@@ -171,7 +170,7 @@ function readEditor(d) {
   const v = (id) => document.getElementById(id)?.value ?? '';
   return {
     ...d,
-    name: v('fName') || 'Sin nombre',
+    name: v('fName') || t('tg.noName'),
     pattern: v('fPattern'),
     regex: document.getElementById('fRegex').checked,
     ignoreCase: document.getElementById('fCase').checked,
@@ -197,7 +196,7 @@ function wireEditor(d) {
     renderList();
     const bad = errors.find((e) => e.id === d.id);
     document.getElementById('tResult').innerHTML = bad
-      ? `<div class="test bad">El patrón no compila: ${esc(bad.error)}</div>`
+      ? `<div class="test bad">${esc(t('tg.badPattern', { err: bad.error }))}</div>`
       : '<div class="test good">Guardado y activo.</div>';
   });
 
@@ -206,14 +205,14 @@ function wireEditor(d) {
     const def = readEditor(d);
     const r = await window.eql.testTrigger(def, testLine);
     const out = document.getElementById('tResult');
-    if (!r.ok) { out.innerHTML = `<div class="test bad">El patrón no compila: ${esc(r.error)}</div>`; return; }
-    if (!r.matched) { out.innerHTML = '<div class="test">No casa con esa línea.</div>'; return; }
+    if (!r.ok) { out.innerHTML = `<div class="test bad">${esc(t('tg.badPattern', { err: r.error }))}</div>`; return; }
+    if (!r.matched) { out.innerHTML = `<div class="test">${t('tg.noMatch')}</div>`; return; }
     out.innerHTML = `<div class="test good">
       <div>Casa. Grupos capturados:</div>
       ${r.groups.slice(1).map((g, i) => `<div class="num">\${${i + 1}} = ${esc(g ?? '')}</div>`).join('') || '<div class="hint">Sin grupos.</div>'}
-      ${r.speak ? `<div style="margin-top:6px">Diría: <b>${esc(r.speak)}</b></div>` : ''}
-      ${r.text ? `<div>Mostraría: <b>${esc(r.text)}</b></div>` : ''}
-      ${def.timerSeconds ? `<div>Temporizador: <b>${esc(r.timerLabel || def.name)}</b> · ${def.timerSeconds}s</div>` : ''}
+      ${r.speak ? `<div style="margin-top:6px">${t('tg.wouldSay')}: <b>${esc(r.speak)}</b></div>` : ''}
+      ${r.text ? `<div>${t('tg.wouldShow')}: <b>${esc(r.text)}</b></div>` : ''}
+      ${def.timerSeconds ? `<div>${t('tg.timerSec')}: <b>${esc(r.timerLabel || def.name)}</b> · ${def.timerSeconds}s</div>` : ''}
     </div>`;
     if (r.speak && cfg.tts?.enabled) speak(r.speak, cfg.tts);
     if (def.sound && cfg.sound?.enabled) playSound(def.sound, cfg.sound.volume);
@@ -237,7 +236,7 @@ function fillVoices() {
   if (!sel) return;
   const paint = () => {
     const vs = listVoices();
-    sel.innerHTML = `<option value="">Automática (es-ES)</option>${
+    sel.innerHTML = `<option value="">${t('tg.auto')}</option>${
       vs.map((v) => `<option value="${esc(v.name)}" ${cfg.tts?.voice === v.name ? 'selected' : ''}>${esc(v.name)} · ${esc(v.lang)}</option>`).join('')}`;
   };
   paint();
