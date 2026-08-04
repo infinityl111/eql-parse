@@ -147,6 +147,8 @@ export class Encounter {
     this.series = new Map();        // segundo -> {dmg, taken, heal} para la gráfica
     this.stanceSpans = [];          // [{from, to, stance}] franja de postura
     this.targetTotals = new Map();  // para nombrar la pelea
+    this.deadAt = new Map();       // nombre -> segundo en que cayó
+    this.targetFirst = new Map();  // nombre -> primer segundo en que le pegaron
     this.resistsSuffered = 0;
     this.casts = [];           // {t, source, ability, cat} — el análisis filtra por bando
     this.resistsCaused = 0;    // hechizos enemigos que TÚ resististe
@@ -265,7 +267,7 @@ export class EncounterTracker extends EventEmitter {
     const isCombat = DAMAGE_KINDS.has(ev.kind) || ev.kind === 'miss' || ev.kind === 'heal' || ev.kind === 'death';
     if (!isCombat) return;
 
-    if (this.current && ev.t - this.current.end > this.idleSec) this.#close();
+    if (Number.isFinite(this.idleSec) && this.current && ev.t - this.current.end > this.idleSec) this.#close();
     if (!this.current) {
       this.current = new Encounter(this.nextId++, ev.t, this.zone);
       this.emit('open', this.current);
@@ -288,6 +290,7 @@ export class EncounterTracker extends EventEmitter {
       if (ev.target) {
         const b = enc.targetTotals.get(ev.target) ?? 0;
         enc.targetTotals.set(ev.target, b + ev.amount);
+        if (!enc.targetFirst.has(ev.target)) enc.targetFirst.set(ev.target, ev.t);
       }
       if (ev.stance) enc.markStance(ev.t, ev.stance);
     } else if (ev.kind === 'miss') {
@@ -299,6 +302,7 @@ export class EncounterTracker extends EventEmitter {
       if (ev.target) enc.actor(ev.target).addHealTaken(ev);
     } else if (ev.kind === 'death') {
       enc.kills.push({ t: ev.t, victim: ev.victim, killer: ev.killer });
+      if (ev.victim) enc.deadAt.set(ev.victim, Math.max(0, Math.round(ev.t - enc.start)));
       if (ev.victim) enc.actor(ev.victim).deaths++;
       if (this.closeOnDeath) this.#close();
       return;
@@ -307,6 +311,7 @@ export class EncounterTracker extends EventEmitter {
   }
 
   tick(nowSec) {
+    if (!Number.isFinite(this.idleSec)) return;   // acumulador de sesión: no se cierra
     if (this.current && nowSec - this.current.end > this.idleSec) this.#close();
   }
 
