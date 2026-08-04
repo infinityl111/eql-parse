@@ -37,6 +37,9 @@ export class FightStore {
       healing: f.healing, kills: f.kills, losses: f.losses,
       // Nombres de los enemigos, para poder filtrar sin abrir la pelea.
       foes: (f.rows ?? []).filter((r) => r.side === 'enemy').map((r) => r.name),
+      // Los nombres del botín van en el índice: así el aviso al pasar el ratón
+      // por una pelea no obliga a leerla entera del disco.
+      loot: (f.loot ?? []).map((l) => l.item),
     };
   }
 

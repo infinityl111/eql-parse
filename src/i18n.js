@@ -160,7 +160,7 @@ const ES = {
   'cat.nuke': 'Los que tú añadas abajo',
 
   // ── Overlay ──
-  'ov.noCombat': 'Sin combate', 'ov.reset': 'reiniciar', 'ov.killed': 'abatido', 'voice.voice': 'Voz', 'voice.rate': 'Velocidad', 'voice.volume': 'Volumen', 'voice.default': 'Voz por defecto del sistema', 'voice.moreVoices': 'Para tener voces de otros idiomas: Configuración → Hora e idioma → Idioma y región → Agregar idioma, y en Opciones de ese idioma marca Voz. Reinicia la aplicación después. Las voces «naturales» del Narrador no valen: Windows no las abre a otras aplicaciones.', 'voice.matching': 'Del idioma activo', 'voice.others': 'Otros idiomas', 'ov.clicksGame': 'clics al juego',
+  'ov.noCombat': 'Sin combate', 'ov.reset': 'reiniciar', 'ov.dpsKill': 'por abatido', 'ov.killed': 'abatido', 'voice.voice': 'Voz', 'voice.rate': 'Velocidad', 'voice.volume': 'Volumen', 'voice.default': 'Voz por defecto del sistema', 'voice.moreVoices': 'Para tener voces de otros idiomas: Configuración → Hora e idioma → Idioma y región → Agregar idioma, y en Opciones de ese idioma marca Voz. Reinicia la aplicación después. Las voces «naturales» del Narrador no valen: Windows no las abre a otras aplicaciones.', 'voice.matching': 'Del idioma activo', 'voice.others': 'Otros idiomas', 'ov.clicksGame': 'clics al juego',
   'ov.clicksOverlay': 'clics al overlay', 'ov.close': 'Cerrar el overlay',
   'ov.passThrough': 'Dejar pasar los clics al juego',
 
@@ -212,6 +212,15 @@ const ES = {
   'cl.DRU': 'Druida', 'cl.ENC': 'Encantador', 'cl.MAG': 'Mago', 'cl.MNK': 'Monje',
   'cl.NEC': 'Nigromante', 'cl.PAL': 'Paladín', 'cl.RNG': 'Explorador', 'cl.ROG': 'Pícaro',
   'cl.SHD': 'Shadow Knight', 'cl.SHM': 'Chamán', 'cl.WAR': 'Guerrero', 'cl.WIZ': 'Brujo',
+  'loot.title': 'Botín', 'loot.from': 'de', 'loot.sold': 'vendido por', 'loot.upgraded': 'mejorado a',
+  'loot.wiki': 'Abrir en la wiki de EQL', 'loot.none': 'Sin botín en esta pelea.',
+  'loot.count': '{n} objetos', 'loot.count_1': '1 objeto',
+  'sum.title': 'Resumen del tramo', 'sum.open': 'Ver resumen', 'sum.back': 'Volver',
+  'sum.fights': 'peleas', 'sum.fights_1': 'pelea', 'sum.combatTime': 'en combate',
+  'sum.note': 'El dps se calcula sobre los segundos de combate, no sobre el tiempo transcurrido.',
+  'sum.byFoe': 'Por enemigo', 'sum.times': '{n} veces', 'sum.times_1': '1 vez',
+  'sum.killed': 'abatido {n}', 'sum.youDealt': 'le hiciste', 'sum.itDealt': 'te hizo',
+  'sum.empty': 'No hay peleas en este tramo.',
   'flt.range': 'Tramo', 'flt.foe': 'Enemigo', 'flt.all': 'Todo', 'flt.allFoes': 'Todos',
   'flt.2h': 'Últimas 2 h', 'flt.12h': 'Últimas 12 h', 'flt.24h': 'Últimas 24 h',
   'flt.3d': 'Últimos 3 días', 'flt.7d': 'Última semana', 'flt.30d': 'Último mes',
@@ -438,7 +447,7 @@ const EN = {
   'cat.escape': 'Escape', 'cat.resurrect': 'Resurrect', 'cat.dispel': 'Dispel',
   'cat.nuke': 'The ones you add below',
 
-  'ov.noCombat': 'No combat', 'ov.reset': 'reset', 'ov.killed': 'killed', 'voice.voice': 'Voice', 'voice.rate': 'Rate', 'voice.volume': 'Volume', 'voice.default': 'System default voice', 'voice.moreVoices': 'To get voices in other languages: Settings -> Time & language -> Language & region -> Add a language, then tick Speech in that language\u2019s options. Restart the app afterwards. Narrator\u2019s natural voices will not work: Windows does not open them to other apps.', 'voice.matching': 'Current language', 'voice.others': 'Other languages', 'ov.clicksGame': 'clicks to game',
+  'ov.noCombat': 'No combat', 'ov.reset': 'reset', 'ov.dpsKill': 'per kill', 'ov.killed': 'killed', 'voice.voice': 'Voice', 'voice.rate': 'Rate', 'voice.volume': 'Volume', 'voice.default': 'System default voice', 'voice.moreVoices': 'To get voices in other languages: Settings -> Time & language -> Language & region -> Add a language, then tick Speech in that language\u2019s options. Restart the app afterwards. Narrator\u2019s natural voices will not work: Windows does not open them to other apps.', 'voice.matching': 'Current language', 'voice.others': 'Other languages', 'ov.clicksGame': 'clicks to game',
   'ov.clicksOverlay': 'clicks to overlay', 'ov.close': 'Close the overlay',
   'ov.passThrough': 'Let clicks through to the game',
 
@@ -489,6 +498,15 @@ const EN = {
   'cl.DRU': 'Druid', 'cl.ENC': 'Enchanter', 'cl.MAG': 'Magician', 'cl.MNK': 'Monk',
   'cl.NEC': 'Necromancer', 'cl.PAL': 'Paladin', 'cl.RNG': 'Ranger', 'cl.ROG': 'Rogue',
   'cl.SHD': 'Shadow Knight', 'cl.SHM': 'Shaman', 'cl.WAR': 'Warrior', 'cl.WIZ': 'Wizard',
+  'loot.title': 'Loot', 'loot.from': 'from', 'loot.sold': 'sold for', 'loot.upgraded': 'upgraded to',
+  'loot.wiki': 'Open on the EQL wiki', 'loot.none': 'No loot in this fight.',
+  'loot.count': '{n} items', 'loot.count_1': '1 item',
+  'sum.title': 'Range summary', 'sum.open': 'See summary', 'sum.back': 'Back',
+  'sum.fights': 'fights', 'sum.fights_1': 'fight', 'sum.combatTime': 'in combat',
+  'sum.note': 'Dps is measured over seconds in combat, not over elapsed time.',
+  'sum.byFoe': 'By enemy', 'sum.times': '{n} times', 'sum.times_1': 'once',
+  'sum.killed': 'killed {n}', 'sum.youDealt': 'you dealt', 'sum.itDealt': 'it dealt',
+  'sum.empty': 'No fights in this range.',
   'flt.range': 'Range', 'flt.foe': 'Enemy', 'flt.all': 'All', 'flt.allFoes': 'All',
   'flt.2h': 'Last 2 h', 'flt.12h': 'Last 12 h', 'flt.24h': 'Last 24 h',
   'flt.3d': 'Last 3 days', 'flt.7d': 'Last week', 'flt.30d': 'Last month',
@@ -716,7 +734,7 @@ const FR = {
   'cat.escape': 'Fuite', 'cat.resurrect': 'R\u00e9surrection', 'cat.dispel': 'Dissipation',
   'cat.nuke': 'Ceux que tu ajoutes ci-dessous',
 
-  'ov.noCombat': 'Hors combat', 'ov.reset': 'remise à zéro', 'ov.killed': 'abattu', 'ov.clicksGame': 'clics vers le jeu',
+  'ov.noCombat': 'Hors combat', 'ov.reset': 'remise à zéro', 'ov.dpsKill': 'par abattu', 'ov.killed': 'abattu', 'ov.clicksGame': 'clics vers le jeu',
   'ov.clicksOverlay': 'clics vers la surcouche', 'ov.close': 'Fermer la surcouche',
   'ov.passThrough': 'Laisser passer les clics vers le jeu',
 
@@ -849,7 +867,7 @@ const DE = {
   'cat.escape': 'Flucht', 'cat.resurrect': 'Wiederbeleben', 'cat.dispel': 'Bannen',
   'cat.nuke': 'Die, die du unten eintr\u00e4gst',
 
-  'ov.noCombat': 'Kein Kampf', 'ov.reset': 'zurücksetzen', 'ov.killed': 'erlegt', 'ov.clicksGame': 'Klicks ans Spiel',
+  'ov.noCombat': 'Kein Kampf', 'ov.reset': 'zurücksetzen', 'ov.dpsKill': 'pro Kill', 'ov.killed': 'erlegt', 'ov.clicksGame': 'Klicks ans Spiel',
   'ov.clicksOverlay': 'Klicks ans Overlay', 'ov.close': 'Overlay schlie\u00dfen',
   'ov.passThrough': 'Klicks ans Spiel durchlassen',
 
@@ -982,7 +1000,7 @@ const PT = {
   'cat.escape': 'Fuga', 'cat.resurrect': 'Ressuscitar', 'cat.dispel': 'Dissipar',
   'cat.nuke': 'Os que acrescentares abaixo',
 
-  'ov.noCombat': 'Sem combate', 'ov.reset': 'reiniciar', 'ov.killed': 'abatido', 'ov.clicksGame': 'cliques para o jogo',
+  'ov.noCombat': 'Sem combate', 'ov.reset': 'reiniciar', 'ov.dpsKill': 'por abatido', 'ov.killed': 'abatido', 'ov.clicksGame': 'cliques para o jogo',
   'ov.clicksOverlay': 'cliques para a sobreposi\u00e7\u00e3o', 'ov.close': 'Fechar a sobreposi\u00e7\u00e3o',
   'ov.passThrough': 'Deixar passar os cliques para o jogo',
 

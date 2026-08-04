@@ -31,6 +31,8 @@ const state = {
   fightCache: new Map(),
   foes: [],
   stats: null,
+  summary: null,
+  openFoes: new Set(),
 };
 
 // ═══════════ Introducción de primera vez ═══════════
@@ -296,7 +298,8 @@ function renderFightList(snap) {
       ${state.foes.map((f) => `<option value="${esc(f.name)}"${
         state.filter.foe === f.name ? ' selected' : ''}>${esc(f.name)} · ${f.n}</option>`).join('')}
     </select>
-  </div>`);
+  </div>
+  <button class="sumbtn" id="btnSummary">${esc(t('sum.open'))}</button>`);
 
   const shown = state.showAll ? state.fights : state.fights.filter((f) => !TRIVIAL(f));
   const hidden = state.fights.length - shown.length;
@@ -327,6 +330,20 @@ function renderFightList(snap) {
 
   $('fltRange')?.addEventListener('change', (e) => { state.filter.range = e.target.value; refreshFights(); });
   $('fltFoe')?.addEventListener('change', (e) => { state.filter.foe = e.target.value; refreshFights(); });
+  $('btnSummary')?.addEventListener('click', async () => {
+    const r = RANGES.find((x) => x.key === state.filter.range);
+    state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null });
+    state.view = 'summary';
+    $('bodyGrid').innerHTML = '';
+    renderApp();
+  });
+  list.querySelectorAll('.fight').forEach((el) => {
+    const id = el.dataset.live === '1' ? null : +el.dataset.id;
+    const f = id === null ? snap.current : state.fights.find((x) => x.id === id);
+    if (!f?.loot?.length) return;
+    el.addEventListener('mouseenter', () => showLootTip(f));
+    el.addEventListener('mouseleave', hideTip);
+  });
   list.querySelectorAll('.fight').forEach((el) => el.addEventListener('click', async () => {
     state.selectedFight = el.dataset.live === '1' ? 'live' : +el.dataset.id;
     state.rowNodes.clear();
@@ -600,6 +617,58 @@ function placeTip() {
 }
 function hideTip() { if (tipEl) tipEl.style.display = 'none'; }
 function showTip() { updateTip(); if (tipEl) { tipEl.style.display = 'block'; placeTip(); } }
+
+const wikiCache = new Map();     // nombre -> ficha, o null si la wiki no la tiene
+let hoverItem = null;
+
+/**
+ * Ficha del objeto al pasar el ratón, con el aspecto del juego.
+ *
+ * La consulta va con retardo: pasar el ratón por encima de una lista no debe
+ * disparar diez peticiones a la wiki.
+ */
+function showItemTip(name) {
+  hoverItem = name;
+  const paint = (data) => {
+    if (hoverItem !== name) return;               // el ratón ya se fue
+    const tip = ensureTip();
+    tip.className = 'tip item-tip';
+    tip.innerHTML = data
+      ? `<div class="it-head">${esc(data.title)}</div>
+         ${data.image ? `<img class="it-img" src="${esc(data.image)}" alt="">` : ''}
+         <div class="it-lines">${data.lines.map((l) => `<div>${esc(l)}</div>`).join('')}</div>`
+      : `<div class="it-head">${esc(name)}</div>
+         <div class="it-lines dim">${esc(t('loot.noWiki'))}</div>`;
+    tip.style.display = 'block';
+    placeTip();
+  };
+
+  if (wikiCache.has(name)) { paint(wikiCache.get(name)); return; }
+  setTimeout(async () => {
+    if (hoverItem !== name) return;
+    const data = await window.eql.wikiItem?.(name).catch(() => null);
+    wikiCache.set(name, data ?? null);
+    paint(data ?? null);
+  }, 220);
+}
+
+function hideItemTip() {
+  hoverItem = null;
+  const tip = document.querySelector('.tip');
+  if (tip) { tip.className = 'tip'; tip.style.display = 'none'; }
+}
+
+/** Aviso con el botín, al pasar el ratón por una pelea de la lista. */
+function showLootTip(f) {
+  const el = ensureTip();
+  el.innerHTML = `<div class="tip-head">${esc(t('loot.title'))}</div>
+    <div class="tip-types">${(f.loot ?? []).slice(0, 12).map((l) =>
+      `<div class="tip-type"><span>${esc(typeof l === 'string' ? l : l.item)}</span></div>`).join('')}
+      ${(f.loot ?? []).length > 12 ? `<div class="dim" style="font-size:10.5px">${
+        esc(t('tip.more', { n: f.loot.length - 12 }))}</div>` : ''}</div>`;
+  el.style.display = 'block';
+  placeTip();
+}
 
 function updateTip() {
   const f = fightFor(state.snap);
@@ -929,6 +998,21 @@ function renderAdvice(snap) {
 }
 
 // ═══════════ Cabecera de la pelea ═══════════
+/** Botín de la pelea. Cada objeto abre su página en la wiki al pulsarlo. */
+function lootHTML(f) {
+  const loot = f.loot ?? [];
+  if (!loot.length) return '';
+  return `<div class="loot">
+    <div class="sec-title eyebrow">${esc(t('loot.title'))} · ${esc(t('loot.count', { n: loot.length }))}</div>
+    ${loot.map((l) => `<div class="loot-row">
+      <button class="loot-item" data-item="${esc(l.item)}" title="${esc(t('loot.wiki'))}">${esc(l.item)}</button>
+      ${l.from ? `<span class="dim">${esc(t('loot.from'))} ${esc(l.from)}</span>` : ''}
+      ${l.upgraded ? `<span class="loot-up">${esc(t('loot.upgraded'))} ${esc(l.upgraded)}</span>` : ''}
+      ${l.sold ? `<span class="dim">${esc(t('loot.sold'))} ${esc(l.sold)}</span>` : ''}
+    </div>`).join('')}
+  </div>`;
+}
+
 function renderHead(snap) {
   const f = fightFor(snap);
   const host = $('fightHead');
@@ -965,7 +1049,13 @@ function renderHead(snap) {
       ${f.kills.length ? card(f.kills.length, t('metric.kills', { n: f.kills.length })) : ''}
       ${f.losses?.length ? card(f.losses.length, t('metric.losses', { n: f.losses.length }), 'bad') : ''}
     </div>
-    ${chartHTML(f)}`;
+    ${chartHTML(f)}
+    ${lootHTML(f)}`;
+  host.querySelectorAll('.loot-item').forEach((el) => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); window.eql.openWiki(el.dataset.item); });
+    el.addEventListener('mouseenter', () => showItemTip(el.dataset.item));
+    el.addEventListener('mouseleave', hideItemTip);
+  });
   $('btnExport')?.addEventListener('click', (e) => { e.stopPropagation(); window.eql.exportEncounter(f); });
   $('btnAnalyse')?.addEventListener('click', (e) => { e.stopPropagation(); state.view = 'analysis'; $('bodyGrid').innerHTML = ''; renderApp(); });
 }
@@ -1053,7 +1143,106 @@ function renderTimers(snap) {
     </div>`).join('');
 }
 
+/** Todas las peleas del tramo en un único desglose, desplegable por enemigo. */
+function renderSummary() {
+  const a = state.summary;
+  const host = $('bodyGrid');
+  if (!a || !a.fights) {
+    host.innerHTML = `<div class="empty"><h2>${esc(t('sum.empty'))}</h2>
+      <button id="sumBack">${esc(t('sum.back'))}</button></div>`;
+    $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
+    return;
+  }
+  const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
+  const maxDmg = Math.max(...a.rows.map((r) => r.damage), 1);
+
+  host.innerHTML = `<div class="summary">
+    <div class="sum-head">
+      <h2>${esc(t('sum.title'))}</h2>
+      <button id="sumBack">${esc(t('sum.back'))}</button>
+    </div>
+    <div class="metrics">
+      ${card(n0(a.dps), 'dps')}
+      ${card(n0(a.total), t('metric.damage'))}
+      ${card(n0(a.enemyDps), t('metric.enemyDps'), 'foe')}
+      ${card(secs(a.seconds), t('sum.combatTime'))}
+      ${card(a.fights, t('sum.fights', { n: a.fights }))}
+      ${a.kills ? card(a.kills, t('metric.kills', { n: a.kills })) : ''}
+      ${a.losses ? card(a.losses, t('metric.losses', { n: a.losses }), 'bad') : ''}
+      ${a.healing ? card(n0(a.healing), t('metric.healing')) : ''}
+    </div>
+    <div class="hint">${esc(t('sum.note'))}</div>
+
+    <div class="sec-title eyebrow" style="margin-top:20px">${esc(t('side.allies'))}</div>
+    ${a.rows.filter((r) => r.side !== 'enemy').map((r) => sumRow(r, maxDmg)).join('')}
+
+    <div class="sec-title eyebrow" style="margin-top:20px">${esc(t('sum.byFoe'))}</div>
+    ${a.foes.map((f) => `<div class="foe-row" data-foe="${esc(f.name)}">
+        <div class="foe-top">
+          <span class="foe-name">${esc(f.name)}</span>
+          <span class="dim">${esc(t('sum.times', { n: f.fights }))}${
+            f.kills ? ` · ${esc(t('sum.killed', { n: f.kills }))}` : ''}</span>
+          <span class="num strong">${n0(f.damageTo)}</span>
+          <span class="num dim">${n0(f.dps)} dps</span>
+          <span class="num foe">${n0(f.taken)}</span>
+        </div>
+        ${state.openFoes.has(f.name) ? foeDetail(a, f) : ''}
+      </div>`).join('')}
+
+    ${a.loot.length ? `<div class="sec-title eyebrow" style="margin-top:20px">${esc(t('loot.title'))}</div>
+      <div class="loot">${a.loot.map((l) => `<div class="loot-row">
+        <button class="loot-item" data-item="${esc(l.item)}">${esc(l.item)}</button>
+        ${l.n > 1 ? `<span class="num dim">×${l.n}</span>` : ''}
+        ${l.from.length ? `<span class="dim">${esc(t('loot.from'))} ${esc(l.from.slice(0, 3).join(', '))}</span>` : ''}
+      </div>`).join('')}</div>` : ''}
+  </div>`;
+
+  $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
+  host.querySelectorAll('.foe-row').forEach((el) => el.addEventListener('click', () => {
+    const nm = el.dataset.foe;
+    state.openFoes.has(nm) ? state.openFoes.delete(nm) : state.openFoes.add(nm);
+    renderSummary();
+  }));
+  host.querySelectorAll('.loot-item').forEach((el) => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); window.eql.openWiki(el.dataset.item); });
+    el.addEventListener('mouseenter', () => showItemTip(el.dataset.item));
+    el.addEventListener('mouseleave', hideItemTip);
+  });
+}
+
+function sumRow(r, maxDmg) {
+  const tot = r.types.reduce((x, [, v]) => x + v, 0) || 1;
+  return `<div class="sum-row">
+    <div class="sum-top">
+      <span class="sum-name">${esc(r.name)}</span>
+      <span class="num strong">${n0(r.damage)}</span>
+      <span class="num dim">${Math.round(r.share * 100)}%</span>
+      ${r.accuracy !== null ? `<span class="num dim">${Math.round(r.accuracy * 100)}%</span>` : ''}
+      ${r.crits ? `<span class="num dim">${r.crits} crit</span>` : ''}
+      ${r.deaths ? `<span class="num foe">${r.deaths}†</span>` : ''}
+    </div>
+    <div class="bar-track"><div class="bar" style="width:${(r.damage / maxDmg * 100).toFixed(1)}%">${
+      r.types.map(([ty, v]) => `<div class="seg ${typeClass(ty)}" style="width:${(v / tot * 100).toFixed(2)}%"></div>`).join('')
+    }</div></div>
+    <div class="sum-ab">${r.abilities.slice(0, 8).map((x) => `<span><i class="seg ${typeClass(x.type)}"></i>${
+      esc(x.name)} <b>${n0(x.sum)}</b></span>`).join('')}</div>
+  </div>`;
+}
+
+/** Quién le hizo qué a ese enemigo, sacado del reparto por objetivo. */
+function foeDetail(a, f) {
+  const who = a.rows.filter((r) => r.side !== 'enemy')
+    .map((r) => ({ name: r.name, sum: (r.targets ?? []).find((tg) => tg.name === f.name)?.sum ?? 0 }))
+    .filter((x) => x.sum > 0).sort((x, y) => y.sum - x.sum);
+  const base = who.reduce((x, y) => x + y.sum, 0) || 1;
+  return `<div class="foe-det">${who.map((w) => `<div class="foe-det-l">
+      <span>${esc(w.name)}</span><b>${n0(w.sum)}</b>
+      <span class="dim">${Math.round(w.sum / base * 100)}%</span>
+    </div>`).join('')}</div>`;
+}
+
 function renderApp() {
+  if (state.view === 'summary') { renderSummary(); return; }
   if (state.wizard) {
     // Sin esta guarda el snapshot de 250 ms reconstruiría la tarjeta entera y
     // ningún botón llegaría a recibir el clic. La navegación repinta a mano.

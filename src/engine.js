@@ -10,6 +10,7 @@ import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
 import { setLang } from './i18n.js';
 import { FightStore } from './store.js';
+import { aggregate } from './aggregate.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
 
 /**
@@ -102,6 +103,9 @@ export class Engine extends EventEmitter {
     this.classConflict = null;
     this.backfilling = false;
     this.lastKill = null;
+    // DPS con sentido: por enemigo abatido, desde el primer golpe hasta que cae.
+    this.killAgg = new Map();   // nombre -> {damage, seconds, kills}
+    this.recentHits = [];       // {t, name, amount} de los últimos 20 s
     this.storePath = null;      // fichero de peleas guardadas
     this.store = null;
     this.history = [];          // peleas cerradas, la más reciente primero
@@ -193,6 +197,13 @@ export class Engine extends EventEmitter {
       if (ev.kind === 'class_change') this.classConflict = { reason: 'message', raw: ev.raw };
       if (ev.kind === 'stance' && ev.stance) this.#checkConflict('stance', ev.stance);
       if (ev.kind === 'invocation' && ev.invocation) this.#checkConflict('invocation', ev.invocation);
+      // Golpes recientes de todo el mundo, para el DPS de los últimos segundos.
+      if (ev.amount > 0 && ev.source && !this.backfilling) {
+        this.recentHits.push({ t: ev.t, name: ev.source, amount: ev.amount });
+        const cut = ev.t - 20;
+        while (this.recentHits.length && this.recentHits[0].t < cut) this.recentHits.shift();
+      }
+
       // Ventana móvil: sólo daño que TE entra, en bruto.
       if (ev.amount && ev.target === (this.self ?? 'You')) {
         this.recent.push({ t: ev.t, school: ev.school, raw: ev.rawAmount ?? ev.amount });
@@ -225,8 +236,10 @@ export class Engine extends EventEmitter {
     this.status = opts.fromStart ? 'reading' : 'monitoring';
     this.backfilling = true;
     this.narrator.setMuted(true);
-    return this.tailer.start()
-      .then(() => (opts.fromStart ? 0 : this.#primeFromTail(logPath)))
+    // El precargado va ANTES de arrancar el lector: si no, las primeras líneas
+    // nuevas crean peleas antes de que sepamos la zona, la postura o la mascota.
+    return Promise.resolve(opts.fromStart ? 0 : this.#primeFromTail(logPath))
+      .then(() => this.tailer.start())
       .then(() => {
         // start() no resuelve hasta que ha leído todo lo pendiente, así que
         // aquí el histórico ya está procesado y lo que llegue es de ahora.
@@ -276,6 +289,12 @@ export class Engine extends EventEmitter {
       this.parser.parsed = before.parsed;
       this.parser.unrecognized = before.unknown;
       this.narrator.setPets([...this.parser.pets.keys()]);
+      // El agregador tiene su propia zona y no se entera del precargado: sin
+      // esto, las peleas de la sesión nacen sin zona hasta el siguiente cambio.
+      if (this.parser.zone) {
+        if (this.tracker) this.tracker.zone = this.parser.zone;
+        if (this.session) this.session.zone = this.parser.zone;
+      }
       return n;
     } catch { return 0; }
   }
@@ -370,7 +389,8 @@ export class Engine extends EventEmitter {
       healing: t.healing,
       // Matar a un enemigo y perder a un tuyo son cosas distintas: si se
       // mezclan, una pelea donde caíste dos veces se titula "Campeon ×2".
-      dead: Object.fromEntries(enc.deadAt),
+      dead: Object.fromEntries(enc.deadAt ?? new Map()),
+      loot: (enc.loot ?? []).slice(0, 200),
       kills: enc.kills.filter((k) => k.victim !== me && !petSet.has(k.victim)).map((k) => k.victim),
       // Los totales del grupo son sólo de los tuyos; el enemigo va aparte.
       total: allyTotal,
@@ -378,8 +398,8 @@ export class Engine extends EventEmitter {
       enemyTotal: foeTotal,
       enemyDps: foeTotal / t.duration,
       losses: enc.kills.filter((k) => k.victim === me || petSet.has(k.victim)).map((k) => k.victim),
-      series: [...enc.series.values()].sort((a, b) => a.s - b.s),
-      stanceSpans: enc.stanceSpans.map((x, i, arr) => ({
+      series: [...(enc.series ?? new Map()).values()].sort((a, b) => a.s - b.s),
+      stanceSpans: (enc.stanceSpans ?? []).map((x, i, arr) => ({
         ...x, to: i === arr.length - 1 ? Math.max(x.to, enc.end - enc.start) : x.to,
       })),
       label: (() => {
@@ -396,7 +416,7 @@ export class Engine extends EventEmitter {
       })(),
 
       resistsSuffered: enc.resistsSuffered,
-      casts: enc.casts.slice(0, 300),
+      casts: (enc.casts ?? []).slice(0, 300),
       resistsCaused: enc.resistsCaused,
       interrupts: enc.interrupts,
       closed: enc.closed,
@@ -515,6 +535,17 @@ export class Engine extends EventEmitter {
     return this.store.filter(q);
   }
   getFight(id) { return this.store?.get(id) ?? null; }
+
+  /** Todas las peleas del tramo sumadas en un solo desglose. */
+  aggregate(q = {}) {
+    if (!this.store) return null;
+    const list = this.store.filter({ ...q, limit: q.limit ?? 300 });
+    const full = list.map((sm) => {
+      const f = this.store.get(sm.id);
+      return f ? { ...f, at: sm.at } : null;
+    }).filter(Boolean);
+    return aggregate(full, this.self);
+  }
   foeList(sinceMs) { return this.store?.foeList(sinceMs) ?? []; }
   storeStats() { return this.store?.stats() ?? null; }
 
@@ -544,12 +575,47 @@ export class Engine extends EventEmitter {
     const total = rows.reduce((a, r) => a + r.damage, 0);
     rows.sort((a, b) => b.damage - a.damage);
     for (const r of rows) r.share = total ? r.damage / total : 0;
+    // Cada muerte aporta una ventana medida: daño y segundos reales de pelea
+    // contra ESE enemigo. La media de la sesión es la suma de las ventanas,
+    // no el promedio de los promedios, que pesaría igual una pelea de 3
+    // segundos que una de tres minutos.
+    for (const r of rows) {
+      const a = this.killAgg.get(r.name) ?? { damage: 0, seconds: 0, kills: 0 };
+      a.damage += r.damage;
+      a.seconds += secs;
+      a.kills += 1;
+      this.killAgg.set(r.name, a);
+    }
     this.lastKill = { victim: ev.victim, seconds: secs, total, rows, at: Date.now() };
+  }
+
+  /**
+   * DPS por combatiente, en tres lecturas distintas y ninguna intercambiable:
+   *   kill  media de las ventanas de cada enemigo abatido
+   *   w10   últimos 10 segundos
+   *   w20   últimos 20 segundos
+   */
+  #sessionDps() {
+    const now = this.tracker?.current?.end ?? (Date.now() / 1000);
+    const out = {};
+    for (const [name, a] of this.killAgg) {
+      out[name] = { kill: a.seconds ? a.damage / a.seconds : null, kills: a.kills, w10: 0, w20: 0 };
+    }
+    for (const h of this.recentHits) {
+      const age = now - h.t;
+      if (age > 20) continue;
+      if (!out[h.name]) out[h.name] = { kill: null, kills: 0, w10: 0, w20: 0 };
+      out[h.name].w20 += h.amount / 20;
+      if (age <= 10) out[h.name].w10 += h.amount / 10;
+    }
+    return out;
   }
 
   /** Pone a cero el acumulado del overlay sin tocar el histórico de peleas. */
   resetSession() {
     this.lastKill = null;
+    this.killAgg.clear();
+    this.recentHits.length = 0;
     this.session = new EncounterTracker({ self: this.self, idleSec: Number.POSITIVE_INFINITY });
     if (this.tracker) this.session.zone = this.tracker.zone;
     return true;
@@ -597,6 +663,7 @@ export class Engine extends EventEmitter {
       history: this.history,
       session: this.#enc(this.session?.current),
       lastKill: this.lastKill ?? null,
+      sessionDps: this.#sessionDps(),
       advice: this.#advice(current ?? this.history[0]),
       petHint: this.#petHint(current ?? this.history[0]),
       currentPet: this.parser?.currentPet ?? null,

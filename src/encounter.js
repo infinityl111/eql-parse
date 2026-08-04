@@ -148,6 +148,7 @@ export class Encounter {
     this.stanceSpans = [];          // [{from, to, stance}] franja de postura
     this.targetTotals = new Map();  // para nombrar la pelea
     this.deadAt = new Map();       // nombre -> segundo en que cayó
+    this.loot = [];                // {item, from, sold, upgraded, t}
     this.targetFirst = new Map();  // nombre -> primer segundo en que le pegaron
     this.resistsSuffered = 0;
     this.casts = [];           // {t, source, ability, cat} — el análisis filtra por bando
@@ -262,6 +263,15 @@ export class EncounterTracker extends EventEmitter {
       }
       else if (ev.kind === 'stance' && ev.stance) this.current.stancesSeen.add(ev.stance);
       else if (ev.kind === 'invocation' && ev.invocation) this.current.invocationsSeen.add(ev.invocation);
+    }
+
+    // El botín llega tras la muerte, dentro de la ventana de la pelea.
+    if (ev.kind === 'loot' && ev.item && this.current) {
+      this.current.loot.push({
+        item: ev.item, from: ev.from ?? null,
+        sold: ev.sold ?? null, upgraded: ev.upgraded ?? null,
+        t: Math.max(0, Math.round(ev.t - this.current.start)),
+      });
     }
 
     const isCombat = DAMAGE_KINDS.has(ev.kind) || ev.kind === 'miss' || ev.kind === 'heal' || ev.kind === 'death';

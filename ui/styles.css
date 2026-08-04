@@ -507,3 +507,55 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .flt { display: flex; gap: 6px; padding: 0 0 10px; }
 .flt select { flex: 1; min-width: 0; font-family: var(--body); font-size: 11.5px; padding: 4px 5px; }
 .flt-foot { padding: 10px 2px 4px; color: var(--bone-faint); text-align: center; }
+
+/* ── Botín ───────────────────────────────────────────── */
+.loot { margin: 4px 0 18px; padding: 11px 14px; background: var(--slate-850);
+        border-left: 2px solid var(--t-poison); }
+.loot .sec-title { margin-bottom: 6px; }
+.loot-row { display: flex; align-items: baseline; gap: 9px; padding: 2px 0; font-size: 12.5px; }
+.loot-item { background: transparent; border: 0; padding: 0; cursor: pointer;
+             font-family: var(--body); font-size: 12.5px; letter-spacing: 0;
+             text-transform: none; color: var(--t-cold); border-bottom: 1px dotted currentColor; }
+.loot-item:hover { color: var(--bone); background: transparent; }
+.loot-row .dim { font-size: 11.5px; color: var(--bone-faint); }
+.loot-up { font-size: 11.5px; color: var(--t-poison); }
+
+/* ── Resumen del tramo ───────────────────────────────── */
+.sumbtn { width: 100%; margin-bottom: 10px; font-size: 10px; }
+.summary { padding: 22px 26px; overflow-y: auto; }
+.sum-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+.sum-head h2 { font-family: var(--display); font-size: 19px; margin: 0; letter-spacing: .04em; }
+.sum-head button { margin-left: auto; }
+
+.sum-row { padding: 7px 0; border-bottom: 1px solid var(--slate-800); }
+.sum-top { display: flex; align-items: baseline; gap: 11px; margin-bottom: 4px; }
+.sum-name { flex: 1; font-size: 13.5px; }
+.sum-top .foe { color: var(--t-ds); }
+.sum-ab { display: flex; flex-wrap: wrap; gap: 3px 14px; margin-top: 5px;
+          font-size: 11px; color: var(--bone-dim); }
+.sum-ab i { display: inline-block; width: 6px; height: 6px; margin-right: 5px; }
+.sum-ab b { font-family: var(--mono); font-weight: 500; color: var(--bone); }
+
+.foe-row { padding: 7px 10px; margin-bottom: 2px; cursor: pointer;
+           border-left: 2px solid transparent; }
+.foe-row:hover { background: var(--slate-850); border-left-color: var(--slate-600); }
+.foe-top { display: flex; align-items: baseline; gap: 11px; }
+.foe-name { flex: 1; font-size: 13px; }
+.foe-top .foe { color: var(--t-ds); }
+.foe-det { margin: 6px 0 2px 14px; padding-left: 10px; border-left: 1px solid var(--slate-700); }
+.foe-det-l { display: flex; gap: 10px; padding: 1px 0; font-size: 11.5px; color: var(--bone-dim); }
+.foe-det-l span:first-child { flex: 1; }
+.foe-det-l b { font-family: var(--mono); font-weight: 500; color: var(--bone); }
+
+/* ── Ficha del objeto, con el aspecto del juego ──────── */
+.tip.item-tip { max-width: 340px; padding: 0; background: #0d1117;
+                border: 1px solid #3a4a5c; }
+:root[data-theme="light"] .tip.item-tip { background: #0d1117; }
+.it-head { padding: 7px 11px 5px; font-size: 13px; color: #7fe08a;
+           font-family: var(--body); }
+.it-img { display: block; margin: 0 11px 6px; width: 40px; height: 40px;
+          object-fit: contain; image-rendering: pixelated; background: #1a2029; }
+.it-lines { padding: 0 11px 9px; font-family: var(--mono); font-size: 11px;
+            line-height: 1.5; color: #d8d2c4; }
+.it-lines div:first-child { color: #d8b26a; }
+.it-lines.dim { color: #8a8578; font-family: var(--body); font-size: 11.5px; }

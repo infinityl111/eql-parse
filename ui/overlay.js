@@ -32,6 +32,17 @@ function bar(row, widthPct) {
 function detail(r) {
   const kv = [
     `${t('row.damage')} <b>${n0(r.damage)}</b>`,
+    // El dps sobre los segundos en que realmente pegó: sobre la sesión entera
+    // sería una cifra sin sentido, con todo el tiempo parado dentro.
+    (() => {
+      const d = dpsMap[r.name];
+      if (!d) return '';
+      const parts = [];
+      if (d.kill) parts.push(`${t('ov.dpsKill')} <b>${n0(d.kill)}</b>`);
+      if (d.w10) parts.push(`10s <b>${n0(d.w10)}</b>`);
+      if (d.w20) parts.push(`20s <b>${n0(d.w20)}</b>`);
+      return parts.join('');
+    })(),
     `${t('row.max')} <b>${n0(r.max)}</b>`,
     r.meleeHits + r.misses ? `${t('row.accuracy')} <b>${Math.round(r.accuracy * 100)}%</b>` : '',
     r.crits ? `${t('row.crits')} <b>${r.crits}</b>` : '',
@@ -44,29 +55,47 @@ function detail(r) {
   return `<div class="ov-det"><div class="ov-det-kv">${kv.replace(/(<\/b>)(?=\S)/g, '$1 ')}</div>${abil}</div>`;
 }
 
-function rowHTML(r, rank, self, dead, maxDps) {
+function rowHTML(r, rank, self, dead, maxDmg) {
   const isOpen = open.has(r.name);
   return `<div class="ov-row ${dead ? 'dead' : ''} ${isOpen ? 'open' : ''}" data-name="${esc(r.name)}">
       <div class="ov-top">
         <span class="ov-rank">${rank}</span>
         <i class="ov-dot" style="background:${dotFor(r.name)}"></i>
         <span class="ov-name ${r.name === self ? 'self' : ''}">${esc(r.name)}</span>
-        <span class="ov-dps num">${n0(r.dps)}</span>
+        <span class="ov-dps num">${n0(r.damage)}</span>
+        <span class="ov-rate num">${(() => {
+          const d = dpsMap[r.name];
+          if (!d) return '';
+          // Preferimos el medido por enemigo abatido; si aún no hay ninguno,
+          // los últimos 20 segundos.
+          const v = d.kill ?? (d.w20 || null);
+          return v ? `${n0(v)} dps` : '';
+        })()}</span>
         <span class="ov-pct">${Math.round(r.share * 100)}%</span>
       </div>
-      ${bar(r, maxDps ? (r.dps / maxDps) * 100 : 0)}
+      ${bar(r, maxDmg ? (r.damage / maxDmg) * 100 : 0)}
       ${isOpen ? detail(r) : ''}
     </div>`;
 }
 
+// Lo último pintado en cada columna, para poder repintar al desplegar una fila
+// sin esperar al siguiente envío del motor.
+const painted = new Map();
+let dpsMap = {};      // DPS por combatiente, del motor
+
 function renderColumn(host, rows, self, deadMap) {
+  painted.set(host.id, { rows, self, deadMap });
   if (!rows.length) { host.innerHTML = `<div class="ov-empty">${esc(t('ov.noCombat'))}</div>`; return; }
-  const maxDps = Math.max(...rows.map((r) => r.dps), 1);
-  host.innerHTML = rows.map((r, i) => rowHTML(r, i + 1, self, deadMap[r.name] !== undefined, maxDps)).join('');
+  const maxDmg = Math.max(...rows.map((r) => r.damage), 1);
+  const scroll = host.scrollTop;
+  host.innerHTML = rows.map((r, i) => rowHTML(r, i + 1, self, deadMap[r.name] !== undefined, maxDmg)).join('');
+  host.scrollTop = scroll;
   host.querySelectorAll('.ov-row').forEach((el) => el.addEventListener('click', () => {
     const nm = el.dataset.name;
     open.has(nm) ? open.delete(nm) : open.add(nm);
-    host.dataset.sig = '';           // fuerza el repintado inmediato
+    host.dataset.sig = '';
+    const p = painted.get(host.id);
+    if (p) renderColumn(host, p.rows, p.self, p.deadMap);   // respuesta inmediata
   }));
 }
 
@@ -139,6 +168,7 @@ window.eql.onSnapshot((snap) => {
     return;
   }
 
+  dpsMap = snap.sessionDps ?? {};
   const dead = S.dead ?? {};
   const allies = S.rows.filter((r) => r.side !== 'enemy');
   // Vivos primero por daño; los caídos debajo, del más reciente al más antiguo,
@@ -150,11 +180,15 @@ window.eql.onSnapshot((snap) => {
     return b.damage - a.damage;
   }).slice(0, MAX_ENEMIES);
 
-  $('oMeta').textContent = `${n0(S.raidDps)} dps · ${secs(S.duration)}`;
+  const live10 = allies.reduce((a, r) => a + (dpsMap[r.name]?.w10 ?? 0), 0);
+  $('oMeta').textContent = live10 > 0
+    ? `${n0(live10)} dps · ${n0(S.total)} · ${secs(S.duration)}`
+    : `${n0(S.total)} · ${secs(S.duration)}`;
   $('oAlliesN').textContent = n0(S.total);
   $('oEnemiesN').textContent = n0(S.enemyTotal);
 
-  const sigA = JSON.stringify([allies.map((r) => [r.name, r.damage]), [...open]]);
+  const sigA = JSON.stringify([allies.map((r) => [r.name, r.damage,
+    Math.round(dpsMap[r.name]?.kill ?? dpsMap[r.name]?.w20 ?? 0)]), [...open]]);
   const sigE = JSON.stringify([enemies.map((r) => [r.name, r.damage, dead[r.name]]), [...open]]);
   if ($('oAllies').dataset.sig !== sigA) { $('oAllies').dataset.sig = sigA; renderColumn($('oAllies'), allies, snap.self, dead); }
   if ($('oEnemies').dataset.sig !== sigE) { $('oEnemies').dataset.sig = sigE; renderColumn($('oEnemies'), enemies, snap.self, dead); }

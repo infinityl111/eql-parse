@@ -127,6 +127,7 @@ async function boot() {
   engine = new Engine();
   cfg = loadConfig();
   engine.setStorePath(app.getPath('userData'));
+  import('../src/wiki.js').then(({ WikiClient }) => { wiki = new WikiClient(app.getPath('userData')); });
   triggerDefs = loadTriggers() ?? STARTER_TRIGGERS;
   engine.triggers.load(triggerDefs);
   // Sólo habla la ventana principal, para no oír el aviso dos veces.
@@ -280,6 +281,7 @@ ipcMain.handle('log:detach', () => { engine.detach(); return engine.describe(); 
 
 ipcMain.handle('history:query', (_e, q) => engine.queryHistory(q ?? {}));
 ipcMain.handle('history:fight', (_e, id) => engine.getFight(id));
+ipcMain.handle('history:aggregate', (_e, q) => engine.aggregate(q ?? {}));
 ipcMain.handle('history:foes', (_e, sinceMs) => engine.foeList(sinceMs));
 ipcMain.handle('history:stats', () => engine.storeStats());
 
@@ -311,6 +313,21 @@ ipcMain.handle('encounter:export', async (_e, enc) => {
   if (r.canceled) return null;
   fs.writeFileSync(r.filePath, JSON.stringify(enc, null, 2));
   return r.filePath;
+});
+
+// Sólo se abre la wiki de EQL: no se acepta cualquier URL que llegue por IPC.
+// Ficha del objeto. Devuelve null si la wiki no lo tiene o no hay red.
+ipcMain.handle('wiki:item', async (_e, name) => {
+  if (!wiki) return null;
+  try { return await wiki.item(name); } catch { return null; }
+});
+
+ipcMain.handle('shell:wiki', (_e, item) => {
+  const name = String(item ?? '').trim();
+  if (!name) return false;
+  const q = encodeURIComponent(name.replace(/\s*\+\d+$/, ''));   // el "+2" no existe en la wiki
+  shell.openExternal(`https://eqlwiki.com/index.php?search=${q}&go=Go`);
+  return true;
 });
 
 ipcMain.handle('shell:reveal', (_e, p) => { if (p) shell.showItemInFolder(p); });
