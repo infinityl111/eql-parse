@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self';">
+<title>EQL Parse <SPAIN> Guild (World Champion Again) — overlay</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { background: transparent; overflow: hidden; }
+  .ov { height: 100vh; display: flex; flex-direction: column;
+        background: rgba(18,22,30,.74); border: 1px solid rgba(51,61,78,.8);
+        backdrop-filter: blur(3px);
+        opacity: .34; transition: opacity .45s ease; }
+  .ov.active { opacity: 1; }
+  .ov.flash { opacity: 1; border-color: var(--t-cold); }
+  .ov:hover { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .ov { transition: none; } }
+  .ov-bar { display: flex; align-items: center; gap: 8px; padding: 5px 8px;
+            background: rgba(22,27,37,.9); border-bottom: 1px solid rgba(51,61,78,.7);
+            -webkit-app-region: drag; }
+  .ov-bar .eyebrow { font-size: 9px; }
+  .ov-bar .spacer { margin-left: auto; }
+  .ov-fight { color: var(--bone-dim); overflow: hidden; text-overflow: ellipsis;
+              white-space: nowrap; max-width: 40%; }
+  .ov-btn { -webkit-app-region: no-drag; background: transparent; border: 0;
+            color: var(--bone-faint); font-size: 12px; line-height: 1;
+            padding: 2px 4px; cursor: pointer; border-radius: 2px; }
+  .ov-btn:hover { color: var(--bone); background: rgba(255,255,255,.08); }
+  .ov-btn.close:hover { color: #fff; background: var(--t-ds); }
+  .ov-final { padding: 7px 9px; margin: 4px 8px 0; text-align: center;
+              background: rgba(111,199,216,.14); border-left: 2px solid var(--t-cold); }
+  .ov-final b { font-family: var(--mono); font-size: 15px; }
+  .ov-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+            margin-right: 6px; vertical-align: 1px; flex: none; }
+  .ov-rows { flex: 1; overflow: hidden; padding: 5px 8px 7px; }
+  .ov-row { padding: 3px 0; }
+  .ov-top { display: flex; align-items: baseline; gap: 8px; }
+  .ov-name { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ov-name.self { color: var(--t-cold); }
+  .ov-dps { font-family: var(--mono); font-size: 12.5px; }
+  .ov-pct { font-family: var(--mono); font-size: 10px; color: var(--bone-dim); width: 38px; text-align: right; }
+  .ov .bar { height: 6px; margin-top: 2px; background: rgba(26,32,43,.8); }
+  .ov-empty { padding: 18px 8px; text-align: center; color: var(--bone-faint); font-size: 11px; }
+  .locked { color: var(--t-poison); }
+  .ov-advice { margin: 4px 8px 0; padding: 4px 7px; font-size: 11px;
+               background: rgba(224,138,75,.14); border-left: 2px solid var(--t-fire);
+               color: var(--bone); }
+  #oTimers:not(:empty) { padding: 5px 8px 2px; border-bottom: 1px solid rgba(51,61,78,.6); }
+  .alerts { position: fixed; top: 0; left: 0; right: 0; display: flex; flex-direction: column;
+            align-items: center; gap: 4px; padding-top: 4px; pointer-events: none; z-index: 50; }
+</style>
+</head>
+<body>
+  <div class="ov">
+    <div class="ov-bar">
+      <span class="eyebrow" id="oTitle">EQL &lt;SPAIN&gt;</span>
+      <span class="eyebrow ov-fight" id="oFight"></span>
+      <span class="eyebrow spacer num" id="oMeta"></span>
+      <span class="eyebrow" id="oLock" title="Ctrl+Alt+O para alternar"></span>
+      <button class="ov-btn" id="oPass" title="Dejar pasar los clics al juego (Ctrl+Alt+O)">◎</button>
+      <button class="ov-btn close" id="oClose" title="Cerrar el overlay (Ctrl+Alt+X)">✕</button>
+    </div>
+    <div id="oTimers"></div>
+    <div class="ov-final" id="oFinal" style="display:none"></div>
+    <div class="ov-advice" id="oAdvice" style="display:none"></div>
+    <div class="ov-rows" id="oRows"></div>
+  </div>
+  <script type="module" src="overlay.js"></script>
+</body>
+</html>

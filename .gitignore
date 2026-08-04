@@ -1,0 +1,6 @@
+node_modules/
+dist/
+calibracion*.txt
+config.json
+*.log
+*.bak

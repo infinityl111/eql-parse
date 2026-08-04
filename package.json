@@ -1,0 +1,55 @@
+{
+  "name": "eql-parse",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Parser DPS en tiempo real para EverQuest Legends — <SPAIN> Guild",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "calibrate": "node bin/calibrate.js",
+    "live": "node bin/live.js",
+    "test": "node test/smoke.js",
+    "dist": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "dev.miguelangelfernandez.eqlparse",
+    "productName": "EQL Parse SPAIN Guild",
+    "files": [
+      "electron/**",
+      "src/**",
+      "ui/**",
+      "build/icon.ico",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EQL Parse SPAIN",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "asar": false,
+    "artifactName": "EQL-Parse-SPAIN-${version}-setup.${ext}"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

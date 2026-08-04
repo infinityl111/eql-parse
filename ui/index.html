@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self';">
+  <title>EQL Parse <SPAIN> Guild (World Champion Again)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div id="langPick" class="langpick"></div>
+      <div class="brand">
+        <span class="brand-main">EQL<span class="dot-sep">·</span>Parse</span>
+        <span class="brand-guild">&lt;SPAIN&gt; Guild</span>
+        <span class="brand-tag" id="brandTag">World Champion Again</span>
+      </div>
+      <div class="status">
+        <span class="dot" id="dot"></span>
+        <span class="eyebrow" id="statusText">sin log</span>
+      </div>
+      <nav class="nav">
+        <button class="tab active" id="tabCombat">Combate</button>
+        <button class="tab" id="tabTriggers">Avisos</button>
+      </nav>
+      <div class="meta">
+        <span class="eyebrow"><span id="lblChar">Personaje</span> <b id="mChar">—</b></span>
+        <span class="eyebrow"><span id="lblZone">Zona</span> <b id="mZone">—</b></span>
+        <span class="eyebrow"><span id="lblStance">Postura</span> <b id="mStance">—</b></span>
+        <button id="btnHelp" class="ghost icon" title="Ver la introducción">?</button>
+        <button id="btnTheme" class="ghost">◑ Claro</button>
+        <button id="btnOverlay">Overlay</button>
+        <button id="btnSetup">Cambiar log</button>
+      </div>
+    </header>
+
+    <div class="body" id="bodyGrid">
+      <aside id="fightList"></aside>
+      <main id="mainPane"></main>
+    </div>
+
+    <footer>
+      <span><span id="lblLines">Líneas</span> <b class="num" id="fParsed">0</b></span>
+      <span><span id="lblUnknown">Sin reconocer</span> <b class="num" id="fUnknown">0</b></span>
+      <span id="fPets"></span>
+      <span class="path" id="fPath" title="Abrir la carpeta del log"></span>
+    </footer>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
