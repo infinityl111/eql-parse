@@ -1,6 +1,6 @@
 {
   "name": "eql-parse",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Parser DPS en tiempo real para EverQuest Legends — <SPAIN> Guild",
   "main": "electron/main.cjs",
@@ -51,5 +51,6 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "author": "Miguel Ángel Fernández"
 }
