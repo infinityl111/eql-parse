@@ -1,31 +1,33 @@
-﻿# EQL Parse &lt;SPAIN&gt; Guild
+# EQL Parse &lt;SPAIN&gt; Guild
 
-Parser de combate en tiempo real para EverQuest Legends: medidor de daÃ±o,
-overlay sobre el juego, consejo de postura, avisos por voz y anÃ¡lisis
+[Descargar la última versión](https://github.com/infinityl111/eql-parse-spain/releases/latest) · [Invitar a un café](https://paypal.me/eqcampeon)
+
+Parser de combate en tiempo real para EverQuest Legends: medidor de daño,
+overlay sobre el juego, consejo de postura, avisos por voz y análisis
 posterior de las peleas grandes.
 
-Interfaz en espaÃ±ol, inglÃ©s, francÃ©s, alemÃ¡n y portuguÃ©s.
+Interfaz en español, inglés, francés, alemán y portugués.
 
 ---
 
-## Para quien sÃ³lo quiere usarlo
+## Para quien sólo quiere usarlo
 
-1. Descarga `EQL-Parse-SPAIN-1.0.0-setup.exe` y ejecÃºtalo.
-2. Windows dirÃ¡ que no reconoce la aplicaciÃ³n. Es normal en programas sin
-   certificado de firma: **MÃ¡s informaciÃ³n â†’ Ejecutar de todos modos**.
+1. Descarga `EQL-Parse-SPAIN-1.0.0-setup.exe` y ejecútalo.
+2. Windows dirá que no reconoce la aplicación. Es normal en programas sin
+   certificado de firma: **Más información → Ejecutar de todos modos**.
 3. Dentro del juego, escribe `/log on`.
-4. Options â†’ Filters: pon **todo lo relacionado con daÃ±o al mÃ¡ximo detalle**,
-   tanto lo tuyo como lo de los demÃ¡s. Sin esto el parser no ve el daÃ±o del
-   grupo y las cifras salen mal. Es el fallo nÃºmero uno.
-5. Abre la aplicaciÃ³n. Busca sola tu `eqlog_*.txt` en todas las unidades.
-6. En el panel de consejo, elige tus tres clases. TambiÃ©n se leen escribiendo
+4. Options → Filters: pon **todo lo relacionado con daño al máximo detalle**,
+   tanto lo tuyo como lo de los demás. Sin esto el parser no ve el daño del
+   grupo y las cifras salen mal. Es el fallo número uno.
+5. Abre la aplicación. Busca sola tu `eqlog_*.txt` en todas las unidades.
+6. En el panel de consejo, elige tus tres clases. También se leen escribiendo
    `/who` en el juego.
 7. Si usas mascota, escribe `/pet who leader` una vez: en EQL cambia de nombre
-   en cada invocaciÃ³n y asÃ­ se identifica sola.
+   en cada invocación y así se identifica sola.
 
 ### Atajos
 
-| Atajo | QuÃ© hace |
+| Atajo | Qué hace |
 | --- | --- |
 | `Ctrl+Alt+M` | Muestra u oculta el overlay |
 | `Ctrl+Alt+O` | Alterna entre clics al juego y clics al overlay |
@@ -49,44 +51,44 @@ npm run calibrate -- "ruta\al\eqlog.txt" --self TuPJ
 ```
 src/tailer.js      lectura incremental del log
 src/patterns.js    diccionario de patrones, calibrado contra logs reales
-src/parser.js      lÃ­nea -> evento normalizado
-src/encounter.js   segmentaciÃ³n de peleas y agregaciÃ³n
+src/parser.js      línea -> evento normalizado
+src/encounter.js   segmentación de peleas y agregación
 src/stances.js     datos de posturas e invocaciones de las 16 clases
-src/advisor.js     quÃ© postura conviene, con el daÃ±o revertido a bruto
-src/analysis.js    anÃ¡lisis posterior de peleas largas
-src/spells.js      clasificaciÃ³n de hechizos por categorÃ­a
+src/advisor.js     qué postura conviene, con el daño revertido a bruto
+src/analysis.js    análisis posterior de peleas largas
+src/spells.js      clasificación de hechizos por categoría
 src/narrator.js    voz: chat y combate
-src/triggers.js    disparadores por expresiÃ³n regular, estilo GINA
+src/triggers.js    disparadores por expresión regular, estilo GINA
 src/i18n.js        traducciones
 src/engine.js      fachada que une todo
-electron/          ventanas, IPC, configuraciÃ³n
-ui/                interfaz, sin compilaciÃ³n
+electron/          ventanas, IPC, configuración
+ui/                interfaz, sin compilación
 ```
 
-`npm run calibrate` recorre un log y lista las lÃ­neas que el parser **no**
+`npm run calibrate` recorre un log y lista las líneas que el parser **no**
 reconoce, ordenadas por frecuencia. Es la herramienta para ampliar el
-diccionario cuando EQL cambie textos o aÃ±ada hechizos.
+diccionario cuando EQL cambie textos o añada hechizos.
 
 ---
 
-## QuÃ© no puede saber
+## Qué no puede saber
 
-El log de EverQuest no registra vida, vigor, manÃ¡ ni posiciones de nadie. De
-ahÃ­ salen los lÃ­mites del programa, y ninguno se disimula:
+El log de EverQuest no registra vida, vigor, maná ni posiciones de nadie. De
+ahí salen los límites del programa, y ninguno se disimula:
 
 - Los costes de cada postura dicen el precio, **no si puedes pagarlo**.
-- El anÃ¡lisis nunca dirÃ¡ si una cura llegÃ³ tarde: no hay dato de vida.
-- SÃ³lo se conoce **tu** postura; la de los demÃ¡s no aparece.
-- La marca de tiempo tiene resoluciÃ³n de un segundo, asÃ­ que en peleas de
+- El análisis nunca dirá si una cura llegó tarde: no hay dato de vida.
+- Sólo se conoce **tu** postura; la de los demás no aparece.
+- La marca de tiempo tiene resolución de un segundo, así que en peleas de
   pocos segundos el DPS tiene un error estructural grande. Se usa la
-  convenciÃ³n de GamParse y ACT, `total / (Ãºltimo âˆ’ primero + 1)`, que es la
+  convención de GamParse y ACT, `total / (último − primero + 1)`, que es la
   comparable con lo que postea la gente.
-- El daÃ±o de escudo sin posesivo (`shards of ice`) no se puede atribuir y se
+- El daño de escudo sin posesivo (`shards of ice`) no se puede atribuir y se
   deja aparte en vez de adjudicarlo a alguien.
+
+---
 
 ## Apoyo
 
-Proyecto personal y gratuito. Si te resulta util y te apetece invitar a un cafe,
-el enlace esta en el boton Sponsor de arriba. No hace falta.
-
-
+Proyecto personal y gratuito. Si te resulta útil y te apetece invitar a un café,
+[aquí está el enlace](https://paypal.me/eqcampeon). No hace falta.
