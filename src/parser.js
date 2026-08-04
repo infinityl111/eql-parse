@@ -48,7 +48,9 @@ export class Parser {
     this.self = opts.self ?? null;
     this.castWindow = (opts.castWindowSec ?? 12);
     this.recentCasts = [];      // [{t, source, ability}]
-    this.pets = new Map();      // nombre de mascota -> dueño
+    this.pets = new Map();      // nombre de mascota -> dueño (confirmadas)
+    this.petMaybe = new Set();  // sospechosas, sin confirmar
+    this.otherPets = new Map(); // mascota ajena -> dueño, sacado de su /pet who leader
     this.currentPet = null;     // la última vista: en EQL el nombre cambia por invocación
     this.pendingCrit = null;    // {t, source, amount}
     this.unrecognized = 0;
@@ -81,9 +83,10 @@ export class Parser {
   markPet(name) {
     if (!name) return;
     this.pets.set(name, this.self ?? 'You');
+    this.petMaybe.delete(name);
     this.currentPet = name;
   }
-  unmarkPet(name) { this.pets.delete(name); if (this.currentPet === name) this.currentPet = null; }
+  unmarkPet(name) { this.pets.delete(name); this.petMaybe.delete(name); if (this.currentPet === name) this.currentPet = null; }
 
   #norm(name) {
     if (name == null) return null;
@@ -147,15 +150,27 @@ export class Parser {
         break;
 
       case 'pet_order':
+        // Tú le has dado la orden, así que es tuya.
         this.pets.set(ev.pet, this.self ?? 'You');
         this.currentPet = ev.pet;
         break;
 
+      case 'pet_maybe':
+        // Podría ser de otro jugador del grupo: se anota como candidata.
+        this.petMaybe.add(ev.pet);
+        break;
+
       case 'pet_leader':
-        // La única fuente inequívoca. Sólo cuenta si el líder eres tú.
+        // La única fuente inequívoca de a quién pertenece una mascota.
         if (ev.leader === (this.self ?? 'You') || ev.leader === 'You') {
           this.pets.set(ev.pet, this.self ?? 'You');
           this.currentPet = ev.pet;
+          this.otherPets.delete(ev.pet);
+        } else {
+          // Es de otro jugador: se anota para nombrarla bien y no preguntarla.
+          this.otherPets.set(ev.pet, ev.leader);
+          this.petMaybe.delete(ev.pet);
+          this.pets.delete(ev.pet);
         }
         break;
 

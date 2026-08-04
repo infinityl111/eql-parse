@@ -10,6 +10,7 @@ const TRIGGERS = () => path.join(app.getPath('userData'), 'triggers.json');
 const DEFAULTS = {
   logPath: null, self: null, idleSec: 20, fromStart: false,
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
+  skipVersion: null, mergePets: false,
   tts: { enabled: true, voice: null, rate: 1, volume: 1 },
   sound: { enabled: true, volume: 0.5 },
 };
@@ -44,6 +45,41 @@ let triggerDefs = [];
 let mainWin = null;
 let overlayWin = null;
 let pushTimer = null;
+let wiki = null;      // cliente de la wiki
+let latest = null;    // { version, url } si hay una versión más nueva publicada
+
+const REPO = 'infinityl111/eql-parse-spain';
+
+/** Compara 1.2.10 con 1.3.0 sin traerse una librería para tres números. */
+function newerThan(a, b) {
+  const pa = String(a).replace(/^v/, '').split('.').map(Number);
+  const pb = String(b).replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true;
+    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false;
+  }
+  return false;
+}
+
+/**
+ * Mira si hay versión nueva publicada. Sólo consulta y avisa: no descarga ni
+ * instala nada. Con un ejecutable sin firmar, actualizar solo dispararía el
+ * aviso de Windows cada vez, y es mejor que la descarga sea una decisión
+ * consciente.
+ */
+async function checkUpdate() {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { 'User-Agent': 'EQL-Parse-SPAIN', Accept: 'application/vnd.github+json' },
+    });
+    if (!r.ok) return;
+    const j = await r.json();
+    const tag = j.tag_name ?? '';
+    if (!tag || !newerThan(tag, app.getVersion())) { latest = null; return; }
+    latest = { version: tag.replace(/^v/, ''), url: j.html_url };
+    if (cfg.skipVersion !== latest.version) mainWin?.webContents.send('update', latest);
+  } catch { /* sin red: se reintenta en la próxima comprobación */ }
+}
 
 function createMain() {
   mainWin = new BrowserWindow({
@@ -136,6 +172,8 @@ async function boot() {
     if (overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send('alert', { ...a, speak: null });
   });
   createMain();
+  setTimeout(checkUpdate, 4000);            // sin retrasar el arranque
+  setInterval(checkUpdate, 6 * 3600e3);
   startPush();
 
   if (cfg.classes?.length) engine.setClasses(cfg.classes);
@@ -317,6 +355,14 @@ ipcMain.handle('encounter:export', async (_e, enc) => {
 
 // Sólo se abre la wiki de EQL: no se acepta cualquier URL que llegue por IPC.
 // Ficha del objeto. Devuelve null si la wiki no lo tiene o no hay red.
+ipcMain.handle('pet:dismiss', (_e, n) => engine.dismissPet(n));
+
+ipcMain.handle('pets:merge', (_e, v) => { cfg.mergePets = !!v; saveConfig(cfg); return cfg.mergePets; });
+
+ipcMain.handle('update:get', () => (cfg.skipVersion === latest?.version ? null : latest));
+ipcMain.handle('update:open', () => { if (latest) shell.openExternal(latest.url); return true; });
+ipcMain.handle('update:skip', (_e, v) => { cfg.skipVersion = v; saveConfig(cfg); return true; });
+
 ipcMain.handle('wiki:item', async (_e, name) => {
   if (!wiki) return null;
   try { return await wiki.item(name); } catch { return null; }

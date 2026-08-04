@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('eql', {
   getNarrate: () => ipcRenderer.invoke('narrate:get'),
   setNarrate: (n) => ipcRenderer.invoke('narrate:set', n),
   markPet: (name, on) => ipcRenderer.invoke('pet:mark', { name, on }),
+  dismissPet: (n) => ipcRenderer.invoke('pet:dismiss', n),
   onTheme: (fn) => ipcRenderer.on('theme', (_e, t) => fn(t)),
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
   getTriggers: () => ipcRenderer.invoke('triggers:get'),

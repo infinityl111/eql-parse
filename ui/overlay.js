@@ -61,7 +61,9 @@ function rowHTML(r, rank, self, dead, maxDmg) {
       <div class="ov-top">
         <span class="ov-rank">${rank}</span>
         <i class="ov-dot" style="background:${dotFor(r.name)}"></i>
-        <span class="ov-name ${r.name === self ? 'self' : ''}">${esc(r.name)}</span>
+        <span class="ov-name ${r.name === self ? 'self' : ''} ${r.petOf ? 'otherpet' : ''}"
+          title="${r.petOf ? esc(t('row.petOf', { who: r.petOf })) : ''}">${esc(r.name)}${
+          r.petOf ? ` <span class="dim">(${esc(r.petOf)})</span>` : ''}</span>
         <span class="ov-dps num">${n0(r.damage)}</span>
         <span class="ov-rate num">${(() => {
           const d = dpsMap[r.name];

@@ -197,7 +197,9 @@ const rules = [
   // en EQL cada invocación cambia el nombre, así que no vale memorizarlos.
   { kind: 'pet_leader', hint: 'My leader is', re: /^(.+?) says,? 'My leader is (.+?)\.?'$/, map: (m) => ({ pet: m[1], leader: m[2] }) },
   { kind: 'pet_claim', hint: 'told you', re: /^(.+?) told you, '(.*?Master[.!])'$/, map: (m) => ({ pet: m[1] }) },
-  { kind: 'pet_claim', hint: 'Master', re: /^(.+?) says?,? ['`](.*?Master[.!])/, map: (m) => ({ pet: m[1] }) },
+  // Dicho en voz alta, no en un tell: en grupo puede ser la mascota de otro.
+  // Sólo se propone como candidata; confirmarla exige /pet who leader.
+  { kind: 'pet_maybe', hint: 'Master', re: /^(.+?) says?,? ['`](.*?Master[.!])/, map: (m) => ({ pet: m[1] }) },
 
   // ═══ CHAT ═══
   // Se captura el TEXTO, no sólo el emisor: es lo que se lee en voz.

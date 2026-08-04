@@ -135,3 +135,54 @@ export function aggregate(fights, self = null) {
       .sort((a, b) => b.n - a.n || a.item.localeCompare(b.item)),
   };
 }
+
+/**
+ * Funde todas las mascotas en una sola fila.
+ *
+ * En EQL la mascota cambia de nombre en cada invocación, así que dos días de
+ * juego dejan cinco o seis filas que en realidad son la misma cosa. Se fusiona
+ * al mostrar y no al guardar: los datos originales quedan intactos y la opción
+ * se puede activar y desactivar sin reconstruir nada.
+ */
+export function mergePets(rows = [], label = 'Mascotas', known = [], self = null) {
+  // La marca `pet` va dentro de cada pelea, así que las guardadas antes de que
+  // existiera no la tienen. La lista de mascotas conocidas las rescata.
+  const set = new Set(known);
+  const isPet = (r) => r.side !== 'enemy' && r.name !== self && r.name !== label
+    && !r.petOf                                   // la de otro jugador no es tuya
+    && (r.pet || set.has(r.name));
+  const pets = rows.filter(isPet);
+  // Con una sola mascota también se renombra: al sumar varias peleas, cada
+  // una tendrá la suya con otro nombre y sin esto no se agruparían nunca.
+  if (!pets.length) return rows;
+  const dst = {
+    ...pets[0], name: label, pet: true, merged: pets.length,
+    mergedFrom: pets.map((p) => p.name),
+    damage: 0, taken: 0, healingDone: 0, hits: 0, meleeHits: 0, misses: 0,
+    crits: 0, flurries: 0, ripostes: 0, deaths: 0, max: 0, activeSec: 0, share: 0,
+  };
+  const ab = new Map(); const ty = new Map(); const tg = new Map();
+  for (const p of pets) {
+    dst.damage += p.damage ?? 0; dst.taken += p.taken ?? 0;
+    dst.healingDone += p.healingDone ?? 0;
+    dst.hits += p.hits ?? 0; dst.meleeHits += p.meleeHits ?? 0; dst.misses += p.misses ?? 0;
+    dst.crits += p.crits ?? 0; dst.flurries += p.flurries ?? 0; dst.ripostes += p.ripostes ?? 0;
+    dst.deaths += p.deaths ?? 0; dst.activeSec += p.activeSec ?? 0;
+    dst.max = Math.max(dst.max, p.max ?? 0);
+    dst.share += p.share ?? 0;
+    for (const a of p.abilities ?? []) {
+      const k = `${a.name}\u0000${a.type ?? ''}`;
+      const c = ab.get(k) ?? { name: a.name, type: a.type, sum: 0, n: 0, max: 0 };
+      c.sum += a.sum; c.n += a.n; c.max = Math.max(c.max, a.max ?? 0);
+      ab.set(k, c);
+    }
+    for (const [k, v] of p.types ?? []) ty.set(k, (ty.get(k) ?? 0) + v);
+    for (const x of p.targets ?? []) tg.set(x.name, (tg.get(x.name) ?? 0) + x.sum);
+  }
+  dst.accuracy = dst.meleeHits + dst.misses ? dst.meleeHits / (dst.meleeHits + dst.misses) : null;
+  dst.dps = dst.activeSec ? dst.damage / dst.activeSec : (pets[0].dps ?? 0);
+  dst.abilities = [...ab.values()].sort((a, b) => b.sum - a.sum);
+  dst.types = [...ty.entries()].sort((a, b) => b[1] - a[1]);
+  dst.targets = [...tg.entries()].sort((a, b) => b[1] - a[1]).map(([name, sum]) => ({ name, sum }));
+  return [...rows.filter((r) => !isPet(r)), dst].sort((a, b) => b.damage - a.damage);
+}

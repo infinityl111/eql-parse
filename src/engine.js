@@ -10,7 +10,7 @@ import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
 import { setLang } from './i18n.js';
 import { FightStore } from './store.js';
-import { aggregate } from './aggregate.js';
+import { aggregate, mergePets } from './aggregate.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
 
 /**
@@ -106,6 +106,9 @@ export class Engine extends EventEmitter {
     // DPS con sentido: por enemigo abatido, desde el primer golpe hasta que cae.
     this.killAgg = new Map();   // nombre -> {damage, seconds, kills}
     this.recentHits = [];       // {t, name, amount} de los últimos 20 s
+    this.knownPets = new Set();  // todas las vistas alguna vez, entre sesiones
+    this.petsSaved = 0;
+    this.notMine = new Set();    // aliados que ya dijiste que no son tuyos
     this.storePath = null;      // fichero de peleas guardadas
     this.store = null;
     this.history = [];          // peleas cerradas, la más reciente primero
@@ -142,8 +145,13 @@ export class Engine extends EventEmitter {
     this.tracker.on('close', (enc) => {
       const f = this.#enc(enc);
       this.narrator.fightEnd(f);
+      for (const n of this.parser?.pets.keys() ?? []) this.knownPets.add(n);
       if (f && (f.total > 0 || f.enemyTotal > 0)) {
-        const sum = this.store?.append(f, Date.now()) ?? f;
+        // La hora de la PELEA, no la de importarla: si no, al reconstruir el
+        // almacén releyendo el log, todo queda fechado en el mismo instante y
+        // los filtros por tramo dejan de significar nada.
+        const at = Math.round((f.start ?? Date.now() / 1000) * 1000);
+        const sum = this.store?.append(f, at) ?? f;
         this.history.unshift(sum);
         if (this.history.length > 60) this.history.length = 60;
         this.saveStore();
@@ -376,7 +384,7 @@ export class Engine extends EventEmitter {
     if (!enc) return null;
     const t = enc.totals();
     const me = this.self ?? 'You';
-    const petSet = new Set(this.parser?.pets.keys() ?? []);
+    const petSet = new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? [])]);
     const foeSet = this.#sides(t.rows, me, petSet);
     const allyRows = t.rows.filter((r) => !foeSet.has(r.name));
     const foeRows = t.rows.filter((r) => foeSet.has(r.name));
@@ -424,7 +432,16 @@ export class Engine extends EventEmitter {
       rows: t.rows.map((r) => {
         const enemy = foeSet.has(r.name);
         const base = enemy ? foeTotal : allyTotal;
-        return { ...this.#row(r), side: enemy ? 'enemy' : 'ally', share: base ? r.damage / base : 0 };
+        // La marca va en la fila y no en una lista aparte: las mascotas cambian
+        // de nombre en cada invocación y el histórico no sabría reconocerlas.
+        return {
+          ...this.#row(r), side: enemy ? 'enemy' : 'ally',
+          pet: !enemy && r.name !== me && petSet.has(r.name),
+          // Mascota de otro jugador: se nombra con su dueño y nunca se funde
+          // con las tuyas ni se pregunta por ella.
+          petOf: !enemy ? (this.parser?.otherPets.get(r.name) ?? null) : null,
+          share: base ? r.damage / base : 0,
+        };
       }),
     };
   }
@@ -506,6 +523,14 @@ export class Engine extends EventEmitter {
   /** Dónde se guardan las peleas. Lo fija el proceso principal. */
   setStorePath(dir) {
     this.store = new FightStore(dir);
+    // Las mascotas cambian de nombre en cada invocación y el parser sólo
+    // recuerda las de esta sesión. Sin una lista acumulada, el histórico de
+    // ayer no puede reconocer a las de ayer.
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(dir, 'pets.json'), 'utf8'));
+      for (const n of raw.pets ?? []) this.knownPets.add(n);
+      this.petsSaved = this.knownPets.size;
+    } catch { /* aún no hay lista */ }
     const n = this.store.load();
     this.history = this.store.filter({ limit: 60 });
     return n;
@@ -514,6 +539,16 @@ export class Engine extends EventEmitter {
   /** Guarda el punto de lectura para reanudar en la próxima sesión. */
   saveStore(now = false) {
     if (!this.store || !this.path) return;
+    try {
+      const all = new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? [])]);
+      this.knownPets = all;
+      // Se compara con lo guardado, no con el conjunto en memoria: éste ya se
+      // ha ido actualizando al cerrar cada pelea.
+      if (all.size && all.size !== this.petsSaved) {
+        fs.writeFileSync(path.join(this.store.dir, 'pets.json'), JSON.stringify({ pets: [...all] }));
+        this.petsSaved = all.size;
+      }
+    } catch { /* sin permisos */ }
     try {
       fs.mkdirSync(this.store.dir, { recursive: true });
       fs.writeFileSync(path.join(this.store.dir, 'resume.json'), JSON.stringify({
@@ -544,7 +579,12 @@ export class Engine extends EventEmitter {
       const f = this.store.get(sm.id);
       return f ? { ...f, at: sm.at } : null;
     }).filter(Boolean);
-    return aggregate(full, this.self);
+    // Se pasan las mascotas conocidas ahora mismo: rescata las peleas guardadas
+    // antes de que la marca existiera.
+    const known = [...new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? [])])];
+    return aggregate(
+      q.mergePets ? full.map((f) => ({ ...f, rows: mergePets(f.rows, q.petLabel, known, this.self) })) : full,
+      this.self);
   }
   foeList(sinceMs) { return this.store?.foeList(sinceMs) ?? []; }
   storeStats() { return this.store?.stats() ?? null; }
@@ -622,6 +662,9 @@ export class Engine extends EventEmitter {
   }
   setLang(code) { setLang(code); }
 
+  /** «Ese no es mío»: deja de preguntarlo. */
+  dismissPet(name) { this.notMine.add(name); this.parser?.petMaybe.delete(name); return true; }
+
   markPet(name) { this.parser?.markPet(name); this.narrator.setPets([...(this.parser?.pets.keys() ?? [])]); }
   unmarkPet(name) { this.parser?.unmarkPet(name); this.narrator.setPets([...(this.parser?.pets.keys() ?? [])]); }
 
@@ -633,17 +676,26 @@ export class Engine extends EventEmitter {
   #petHint(enc) {
     if (!enc?.rows) return null;
     const me = this.self ?? 'You';
-    const known = new Set(this.parser?.pets.keys() ?? []);
+    const known = new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? [])]);
     const mine = enc.rows.find((r) => r.name === me);
     if (!mine) return null;
     const myFoes = new Set(mine.targets.map((t) => t.name));
+    // Alguien que pega a TUS enemigos, no eres tú, no es enemigo, no es una
+    // mascota confirmada y no lo has descartado ya. En grupo puede ser la
+    // mascota de otro: por eso hay que preguntarlo en vez de suponerlo.
     const candidates = enc.rows
-      .filter((r) => r.name !== me && !known.has(r.name) && r.damage > 0)
+      .filter((r) => r.name !== me && !known.has(r.name) && !this.notMine.has(r.name)
+        && !this.parser?.otherPets.has(r.name) && r.damage > 0)
       .filter((r) => r.targets.some((t) => myFoes.has(t.name)))
-      .filter((r) => !myFoes.has(r.name))       // no es uno de tus enemigos
+      .filter((r) => !myFoes.has(r.name))
       .map((r) => r.name);
     if (!candidates.length) return null;
-    return { candidates, currentPet: this.parser?.currentPet ?? null };
+    return {
+      candidates,
+      // Las que dijeron "Master" en voz alta son las más probables.
+      likely: candidates.filter((n) => this.parser?.petMaybe.has(n)),
+      currentPet: this.parser?.currentPet ?? null,
+    };
   }
 
   snapshot() {
@@ -658,6 +710,8 @@ export class Engine extends EventEmitter {
       parsed: this.parser?.parsed ?? 0,
       unknown: this.parser?.unrecognized ?? 0,
       pets: this.parser ? [...this.parser.pets.keys()] : [],
+      allPets: [...new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? [])])],
+      petOwners: Object.fromEntries(this.parser?.otherPets ?? []),
       timers: this.triggers.snapshot(),
       current,
       history: this.history,

@@ -522,7 +522,11 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 
 /* ── Resumen del tramo ───────────────────────────────── */
 .sumbtn { width: 100%; margin-bottom: 10px; font-size: 10px; }
-.summary { padding: 22px 26px; overflow-y: auto; }
+/* Ocupa las dos columnas del grid: sin esto cae en la del listado, que es
+   estrecha, y el resumen queda ilegible. */
+.summary { grid-column: 1 / -1; padding: 22px 30px 40px; overflow-y: auto;
+           max-width: 1100px; margin: 0 auto; width: 100%;
+           height: 100%; min-height: 0; }
 .sum-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
 .sum-head h2 { font-family: var(--display); font-size: 19px; margin: 0; letter-spacing: .04em; }
 .sum-head button { margin-left: auto; }
@@ -559,3 +563,46 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
             line-height: 1.5; color: #d8d2c4; }
 .it-lines div:first-child { color: #d8b26a; }
 .it-lines.dim { color: #8a8578; font-family: var(--body); font-size: 11.5px; }
+
+/* ── Aviso de versión nueva ──────────────────────────── */
+.updbar { display: flex; align-items: center; gap: 12px; padding: 8px 18px;
+          background: rgba(111,199,216,.14); border-bottom: 1px solid var(--t-cold);
+          font-size: 12.5px; flex: none; }
+.updbar span { flex: 1; }
+.updbar button { font-size: 10px; }
+.chk.mini { display: inline-flex; align-items: center; gap: 5px; margin-left: 12px;
+            font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+            color: var(--bone-faint); cursor: pointer; }
+.chk.mini input { width: 11px; height: 11px; }
+.chk.mini:hover { color: var(--bone-dim); }
+
+/* ── Desglose de un combatiente en el resumen ────────── */
+.sum-row { cursor: pointer; }
+.sum-row:hover .sum-name { color: var(--bone); }
+.sum-row.open { background: var(--slate-850); padding-left: 10px; padding-right: 10px;
+                border-left: 2px solid var(--t-cold); }
+.sum-det { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--slate-700); }
+.sd-kv { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 10px;
+         font-size: 11.5px; color: var(--bone-dim); }
+.sd-kv b { font-family: var(--mono); font-weight: 500; color: var(--bone); }
+.sd-kv .foe { color: var(--t-ds); }
+.sd-block { margin-bottom: 12px; }
+.sd-block .eyebrow { margin-bottom: 4px; }
+.sd-l { display: flex; align-items: center; gap: 9px; padding: 1px 0; font-size: 11.5px; }
+.sd-l i { flex: none; width: 7px; height: 7px; }
+.sd-l span:nth-child(1), .sd-l span:nth-child(2) { flex: 1; }
+.sd-l b { font-family: var(--mono); font-weight: 500; min-width: 66px; text-align: right; }
+.sd-l .dim { min-width: 42px; text-align: right; color: var(--bone-faint); font-size: 10.5px; }
+.sum-head .chk.mini { margin-left: auto; }
+.sum-head button { margin-left: 12px; }
+.pethint-cmd { font-family: var(--mono); font-size: 14px; margin: 6px 0 8px;
+               padding: 6px 11px; background: var(--slate-900);
+               border-left: 2px solid var(--t-cold); user-select: all; display: inline-block; }
+.petcand { display: inline-flex; align-items: center; gap: 6px; margin: 0 10px 6px 0;
+           padding: 4px 8px; background: var(--slate-900); }
+.petcand.likely { border-left: 2px solid var(--t-poison); }
+.petcand b { font-size: 12.5px; }
+.petbtn { font-size: 9px; padding: 3px 7px; }
+.petbtn.yes:hover { border-color: var(--t-poison); color: var(--t-poison); }
+.petbtn.no:hover { border-color: var(--t-ds); color: var(--t-ds); }
+.name.otherpet, .ov-name.otherpet { color: var(--bone-faint); font-style: italic; }

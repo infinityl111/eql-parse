@@ -2,6 +2,7 @@ import { t, setLang, getLang, LANGS, langInfo, TRANSLATED } from '../src/i18n.js
 import { analyse } from '../src/analysis.js';
 import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
+import { mergePets } from '../src/aggregate.js';
 import { initTriggers, renderTriggers } from './triggers.js';
 import { mountBanner, speak, playSound, listVoices } from './alerts.js';
 
@@ -33,6 +34,7 @@ const state = {
   stats: null,
   summary: null,
   openFoes: new Set(),
+  openSumRows: new Set(),
 };
 
 // ═══════════ Introducción de primera vez ═══════════
@@ -234,6 +236,12 @@ async function renderSetup() {
 }
 
 // ═══════════ Lista de peleas ═══════════
+/** Aplica la fusión de mascotas si está activada. */
+function withPets(f) {
+  if (!f || !state.cfg.mergePets) return f;
+  return { ...f, rows: mergePets(f.rows, t('pets.merged'), state.snap?.allPets ?? state.snap?.pets ?? [], state.snap?.self) };
+}
+
 function fightFor(snap) {
   if (state.selectedFight === 'live') return snap.current ?? state.fightCache.get(state.fights[0]?.id) ?? null;
   // Las cerradas viven en disco: se piden por su identificador y se cachean.
@@ -332,7 +340,8 @@ function renderFightList(snap) {
   $('fltFoe')?.addEventListener('change', (e) => { state.filter.foe = e.target.value; refreshFights(); });
   $('btnSummary')?.addEventListener('click', async () => {
     const r = RANGES.find((x) => x.key === state.filter.range);
-    state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null });
+    state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null,
+      mergePets: !!state.cfg.mergePets, petLabel: t('pets.merged') });
     state.view = 'summary';
     $('bodyGrid').innerHTML = '';
     renderApp();
@@ -399,7 +408,7 @@ function buildRow(name) {
 
 function updateRow(node, r, snap, live, rank) {
   const { refs } = node;
-  const sig = `${rank}|${r.damage}|${r.dps.toFixed(1)}|${r.share.toFixed(4)}|${r.hits}|${r.misses}|${r.crits}|${r.taken}|${r.healingDone}`;
+  const sig = `${rank}|${r.damage}|${r.dps.toFixed(1)}|${r.share.toFixed(4)}|${r.hits}|${r.misses}|${r.crits}|${r.taken}|${r.healingDone}|${r.petOf ?? ''}`;
   const open = state.expanded.has(r.name);
   node.el.classList.toggle('open', open);
 
@@ -407,8 +416,10 @@ function updateRow(node, r, snap, live, rank) {
     refs.sig = sig;
     refs.rank.textContent = rank;
     node.el.classList.toggle('me', r.name === snap.self);
-    refs.name.textContent = r.name;
-    refs.name.className = `name ${r.name === snap.self ? 'self' : ''} ${snap.pets.includes(r.name) ? 'pet' : ''}`;
+        refs.name.textContent = r.petOf ? `${r.name} (${t('row.petOf', { who: r.petOf })})` : r.name;
+    refs.name.className = `name ${r.name === snap.self ? 'self' : ''} ${
+      r.pet || snap.pets.includes(r.name) ? 'pet' : ''} ${r.petOf ? 'otherpet' : ''}`;
+    refs.name.title = r.petOf ? t('row.petOf', { who: r.petOf }) : '';
     refs.dps.textContent = n0(r.dps);
     refs.share.textContent = `${(r.share * 100).toFixed(1)}%`;
     refs.bar.innerHTML = `<div class="bar-track">${barHTML(r.types, r.share * 100)}</div>`;
@@ -437,7 +448,7 @@ function updateRow(node, r, snap, live, rank) {
 }
 
 function renderRows(snap) {
-  const f = fightFor(snap);
+  const f = withPets(fightFor(snap));
   const host = $('rows');
   if (!f) { host.innerHTML = ''; state.rowNodes.clear(); return; }
   const live = !!snap.current && f.id === snap.current.id;
@@ -846,14 +857,24 @@ function renderPetHint(snap) {
   host.dataset.sig = sig;
   if (!h) { host.innerHTML = ''; return; }
 
+  const likely = new Set(h.likely ?? []);
   host.innerHTML = `<div class="pethint">
     <div class="pethint-main">${t('pet.which')}</div>
+    <div class="pethint-cmd">/pet who leader</div>
     <div class="pethint-sub">${esc(t('pet.hint'))}</div>
-    <div class="pethint-btns">${h.candidates.map((c) =>
-      `<button class="petbtn" data-name="${esc(c)}">${t('pet.mark', { name: esc(c) })}</button>`).join('')}</div>
+    <div class="pethint-btns">${h.candidates.map((c) => `
+      <span class="petcand ${likely.has(c) ? 'likely' : ''}">
+        <b>${esc(c)}</b>
+        <button class="petbtn yes" data-name="${esc(c)}">${esc(t('pet.mine'))}</button>
+        <button class="petbtn no" data-name="${esc(c)}">${esc(t('pet.notMine'))}</button>
+      </span>`).join('')}</div>
   </div>`;
-  host.querySelectorAll('.petbtn').forEach((el) => el.addEventListener('click', async () => {
+  host.querySelectorAll('.petbtn.yes').forEach((el) => el.addEventListener('click', async () => {
     await window.eql.markPet(el.dataset.name, true);
+    host.dataset.sig = '';
+  }));
+  host.querySelectorAll('.petbtn.no').forEach((el) => el.addEventListener('click', async () => {
+    await window.eql.dismissPet(el.dataset.name);
     host.dataset.sig = '';
   }));
 }
@@ -871,7 +892,7 @@ function renderAdvice(snap) {
   // El consejo se calcula sobre la pelea SELECCIONADA. Antes venía del motor,
   // que siempre miraba la que estuviera en curso: bastaba una escaramuza suelta
   // donde no hubieras pegado para que no encontrara tu fila y no aconsejara nada.
-  const f = fightFor(snap);
+  const f = withPets(fightFor(snap));
   const classes = snap.classes ?? [];
   const myRow = f?.rows.find((r) => r.name === snap.self);
   const a = (myRow && classes.length)
@@ -1014,7 +1035,7 @@ function lootHTML(f) {
 }
 
 function renderHead(snap) {
-  const f = fightFor(snap);
+  const f = withPets(fightFor(snap));
   const host = $('fightHead');
   if (!f) {
     host.innerHTML = `<div class="empty"><h2>${t('fight.none')}</h2>
@@ -1156,14 +1177,17 @@ function renderSummary() {
   const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
   const maxDmg = Math.max(...a.rows.map((r) => r.damage), 1);
 
-  host.innerHTML = `<div class="summary">
+  const scroll = host.querySelector('.summary')?.scrollTop ?? 0;
+  host.innerHTML = `<div class="summary" id="sumRoot">
     <div class="sum-head">
       <h2>${esc(t('sum.title'))}</h2>
+      <label class="chk mini" id="sumMergeL" title="${esc(t('pets.mergeHint'))}">
+        <input type="checkbox" id="sumMerge"${state.cfg.mergePets ? ' checked' : ''}> ${esc(t('pets.mergePets'))}</label>
       <button id="sumBack">${esc(t('sum.back'))}</button>
     </div>
     <div class="metrics">
       ${card(n0(a.dps), 'dps')}
-      ${card(n0(a.total), t('metric.damage'))}
+      ${card(n0(a.total), t('metric.total'))}
       ${card(n0(a.enemyDps), t('metric.enemyDps'), 'foe')}
       ${card(secs(a.seconds), t('sum.combatTime'))}
       ${card(a.fights, t('sum.fights', { n: a.fights }))}
@@ -1197,7 +1221,25 @@ function renderSummary() {
       </div>`).join('')}</div>` : ''}
   </div>`;
 
+  // Se conserva la posición: desplegar un enemigo no debe saltar al principio.
+  const root = $('sumRoot');
+  if (root && scroll) root.scrollTop = scroll;
+
   $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
+  $('sumMerge')?.addEventListener('change', async (e) => {
+    state.cfg.mergePets = e.target.checked;
+    await window.eql.setMergePets(e.target.checked);
+    const r = RANGES.find((x) => x.key === state.filter.range);
+    state.openSumRows.clear();
+    state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null,
+      mergePets: e.target.checked, petLabel: t('pets.merged') });
+    renderSummary();
+  });
+  host.querySelectorAll('.sum-row').forEach((el) => el.addEventListener('click', () => {
+    const nm = el.dataset.row;
+    state.openSumRows.has(nm) ? state.openSumRows.delete(nm) : state.openSumRows.add(nm);
+    renderSummary();
+  }));
   host.querySelectorAll('.foe-row').forEach((el) => el.addEventListener('click', () => {
     const nm = el.dataset.foe;
     state.openFoes.has(nm) ? state.openFoes.delete(nm) : state.openFoes.add(nm);
@@ -1212,9 +1254,11 @@ function renderSummary() {
 
 function sumRow(r, maxDmg) {
   const tot = r.types.reduce((x, [, v]) => x + v, 0) || 1;
-  return `<div class="sum-row">
+  const open = state.openSumRows.has(r.name);
+  return `<div class="sum-row ${open ? 'open' : ''}" data-row="${esc(r.name)}">
     <div class="sum-top">
-      <span class="sum-name">${esc(r.name)}</span>
+      <span class="sum-name">${esc(r.name)}${
+        r.petOf ? ` <span class="dim">(${esc(t('row.petOf', { who: r.petOf }))})</span>` : ''}</span>
       <span class="num strong">${n0(r.damage)}</span>
       <span class="num dim">${Math.round(r.share * 100)}%</span>
       ${r.accuracy !== null ? `<span class="num dim">${Math.round(r.accuracy * 100)}%</span>` : ''}
@@ -1226,6 +1270,41 @@ function sumRow(r, maxDmg) {
     }</div></div>
     <div class="sum-ab">${r.abilities.slice(0, 8).map((x) => `<span><i class="seg ${typeClass(x.type)}"></i>${
       esc(x.name)} <b>${n0(x.sum)}</b></span>`).join('')}</div>
+    ${open ? sumRowDetail(r) : ''}
+  </div>`;
+}
+
+/** Desglose completo de un combatiente sumando todas las peleas del tramo. */
+function sumRowDetail(r) {
+  const tbl = (title, rows, base) => rows.length ? `<div class="sd-block">
+      <div class="eyebrow">${esc(title)}</div>
+      ${rows.map(([name, val, extra, ty]) => `<div class="sd-l">
+        ${ty !== undefined ? `<i class="seg ${typeClass(ty)}"></i>` : ''}
+        <span>${esc(name)}</span>
+        <b>${n0(val)}</b>
+        <span class="dim">${base ? Math.round(val / base * 100) + '%' : ''}</span>
+        <span class="dim">${extra ?? ''}</span>
+      </div>`).join('')}
+    </div>` : '';
+
+  const dmg = r.damage || 1;
+  return `<div class="sum-det">
+    <div class="sd-kv">
+      ${r.hits ? `<span>${esc(t('row.hits'))} <b>${n0(r.hits)}</b></span>` : ''}
+      ${r.accuracy !== null ? `<span>${esc(t('row.accuracy'))} <b>${Math.round(r.accuracy * 100)}%</b></span>` : ''}
+      ${r.crits ? `<span>${esc(t('row.crits'))} <b>${r.crits}</b></span>` : ''}
+      ${r.flurries ? `<span>${esc(t('row.flurries'))} <b>${r.flurries}</b></span>` : ''}
+      ${r.ripostes ? `<span>${esc(t('row.ripostes'))} <b>${r.ripostes}</b></span>` : ''}
+      <span>${esc(t('row.max'))} <b>${n0(r.max)}</b></span>
+      ${r.taken ? `<span>${esc(t('row.taken'))} <b>${n0(r.taken)}</b></span>` : ''}
+      ${r.healingDone ? `<span>${esc(t('row.healed'))} <b>${n0(r.healingDone)}</b></span>` : ''}
+      ${r.deaths ? `<span class="foe">${esc(t('metric.losses', { n: r.deaths }))} <b>${r.deaths}</b></span>` : ''}
+      ${r.merged ? `<span class="dim">${esc(r.mergedFrom.join(', '))}</span>` : ''}
+    </div>
+    ${tbl(t('det.byAbility'), r.abilities.map((a) => [a.name, a.sum, `×${a.n}`, a.type]), dmg)}
+    ${tbl(t('det.byType'), r.types.map(([ty, v]) => [ty, v, '', ty]), dmg)}
+    ${tbl(t('det.byTarget'), (r.targets ?? []).map((x) => [x.name, x.sum, '']), dmg)}
+    ${tbl(t('det.takenBy'), (r.takenBySource ?? []).map((x) => [x.name, x.sum, '']), r.taken || 1)}
   </div>`;
 }
 
@@ -1242,7 +1321,12 @@ function foeDetail(a, f) {
 }
 
 function renderApp() {
-  if (state.view === 'summary') { renderSummary(); return; }
+  if (state.view === 'summary') {
+    // Sólo se monta una vez. Sin esta guarda el snapshot de 250 ms reconstruye
+    // la vista entera y el scroll vuelve arriba en cuanto lo mueves.
+    if (!$('sumRoot')) renderSummary();
+    return;
+  }
   if (state.wizard) {
     // Sin esta guarda el snapshot de 250 ms reconstruiría la tarjeta entera y
     // ningún botón llegaría a recibir el clic. La navegación repinta a mano.
@@ -1300,7 +1384,24 @@ function renderChrome(snap) {
   const el = $('mStance'); if (el) el.textContent = post || '—';
   $('fParsed').textContent = n0(snap.parsed);
   $('fUnknown').textContent = n0(snap.unknown);
-  $('fPets').innerHTML = snap.pets.length ? `${t('foot.pets')} <b class="num">${snap.pets.map(esc).join(', ')}</b>` : '';
+  const fp = $('fPets');
+  const sig = `${snap.pets.join(',')}|${(snap.allPets ?? []).length}|${state.cfg.mergePets ? 1 : 0}|${getLang()}`;
+  if (snap.pets.length && fp.dataset.sig !== sig) {
+    fp.dataset.sig = sig;
+    fp.innerHTML = `${t('foot.pets')} <b class="num">${snap.pets.map(esc).join(', ')}</b>
+      <label class="chk mini" title="${esc(t('pets.mergeHint'))}"><input type="checkbox" id="fMerge"${
+        state.cfg.mergePets ? ' checked' : ''}> ${esc(t('pets.merge'))}${
+        (snap.allPets ?? []).length > snap.pets.length ? ` (${snap.allPets.length})` : ''}</label>`;
+    $('fMerge').addEventListener('change', async (e) => {
+      state.cfg.mergePets = e.target.checked;
+      await window.eql.setMergePets(e.target.checked);
+      state.rowNodes.clear();
+      if ($('rows')) $('rows').innerHTML = '';
+      const l = $('bodyGrid'); if (l) l.dataset.sig = '';
+      state.summary = null; state.view = 'combat';
+      renderApp();
+    });
+  } else if (!snap.pets.length) { fp.innerHTML = ''; fp.dataset.sig = ''; }
   $('fPath').textContent = snap.path ?? '';
 }
 
@@ -1429,6 +1530,24 @@ $('tabCombat').addEventListener('click', () => setView('combat'));
 $('tabTriggers').addEventListener('click', async () => { await initTriggers(); setView('triggers'); });
 
 window.eql.onLang((c) => { setLang(c); applyLangToChrome(); renderLangPicker(); });
+
+/** Aviso de versión nueva. Sólo informa: la descarga la decides tú. */
+function showUpdate(u) {
+  const bar = $('updBar');
+  if (!bar || !u) return;
+  bar.innerHTML = `<span>${esc(t('upd.title', { v: u.version }))}</span>
+    <button class="primary" id="updGet">${esc(t('upd.get'))}</button>
+    <button id="updSkip">${esc(t('upd.skip'))}</button>`;
+  bar.style.display = 'flex';
+  $('updGet').addEventListener('click', () => window.eql.openUpdate());
+  $('updSkip').addEventListener('click', () => {
+    window.eql.skipUpdate(u.version);
+    bar.style.display = 'none';
+  });
+}
+
+window.eql.onUpdate?.(showUpdate);
+window.eql.getUpdate?.().then((u) => { if (u) showUpdate(u); }).catch(() => {});
 
 window.eql.getConfig().then((c) => {
   state.cfg = c;
