@@ -1,6 +1,7 @@
 # EQL Parse &lt;SPAIN&gt; Guild
 
-[Descargar la última versión](https://github.com/infinityl111/eql-parse-spain/releases/latest) · [Invitar a un café](https://paypal.me/eqcampeon)
+[![Descargar](https://img.shields.io/github/v/release/infinityl111/eql-parse-spain?label=Descargar&style=for-the-badge&color=1f7c8c)](https://github.com/infinityl111/eql-parse-spain/releases/latest)
+[![Invitar a un café](https://img.shields.io/badge/Invitar%20a%20un%20caf%C3%A9-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/eqcampeon)
 
 Parser de combate en tiempo real para EverQuest Legends: medidor de daño,
 overlay sobre el juego, consejo de postura, avisos por voz y análisis
