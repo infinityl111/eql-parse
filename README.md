@@ -83,3 +83,8 @@ ahí salen los límites del programa, y ninguno se disimula:
   comparable con lo que postea la gente.
 - El daño de escudo sin posesivo (`shards of ice`) no se puede atribuir y se
   deja aparte en vez de adjudicarlo a alguien.
+
+## Apoyo
+
+Proyecto personal y gratuito. Si te resulta util y te apetece invitar a un cafe,
+el enlace esta en el boton Sponsor de arriba. No hace falta.
