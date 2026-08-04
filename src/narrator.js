@@ -103,13 +103,13 @@ export class Narrator extends EventEmitter {
       case 'death':
         if (ev.victim === this.self) {
           if (!c.combat.deaths) return false;
-          this.#say(t('say.youDied'), { kind: 'bad', color: '#B0555F', holdMs: 6000, text: 'MUERTO' });
+          this.#say(t('say.youDied'), { kind: 'bad', color: '#B0555F', holdMs: 6000, text: t('say.youDied').toUpperCase() });
           return true;
         }
         // Sólo si es TU mascota. El disparador genérico saltaba con cualquier
         // muerte del combate, incluida la del enemigo.
         if (c.combat.petdeath && this.pets.has(ev.victim)) {
-          this.#say(t('say.petDied'), { kind: 'bad', color: '#B0555F', text: 'MASCOTA CAÍDA', holdMs: 4000 });
+          this.#say(t('say.petDied'), { kind: 'bad', color: '#B0555F', text: t('say.petDied').toUpperCase(), holdMs: 4000 });
           return true;
         }
         return false;
@@ -122,7 +122,7 @@ export class Narrator extends EventEmitter {
       case 'interrupt':
         if (!c.combat.interrupt) return false;
         if (ev.source && ev.source !== this.self && ev.source !== 'You') return false;
-        this.#say(t('say.interrupted'), { kind: 'warn', text: 'INTERRUMPIDO' });
+        this.#say(t('say.interrupted'), { kind: 'warn', text: t('say.interrupted').toUpperCase() });
         return true;
 
       case 'skillup':
@@ -206,7 +206,7 @@ export class Narrator extends EventEmitter {
     const avg = this.hitSamples.reduce((a, b) => a + b, 0) / this.hitSamples.length;
     if (ev.amount < avg * this.config.bigCritFactor) return false;
     this.#say(`${Math.round(ev.amount)}${ev.crit ? ' ' + t('say.crit') : ''}`, {
-      kind: 'good', color: '#A8C74F', text: `${n(ev.amount)}${ev.crit ? ' ¡CRÍTICO!' : ''}`, holdMs: 2500,
+      kind: 'good', color: '#A8C74F', text: `${n(ev.amount)}${ev.crit ? ' ' + t('say.crit').toUpperCase() : ''}`, holdMs: 2500,
     });
     return true;
   }

@@ -1,5 +1,7 @@
 # EQL Parse &lt;SPAIN&gt; Guild
 
+**Español** · [English](README.en.md)
+
 [![Descargar](https://img.shields.io/github/v/release/infinityl111/eql-parse-spain?label=Descargar&style=for-the-badge&color=1f7c8c)](https://github.com/infinityl111/eql-parse-spain/releases/latest)
 [![Invitar a un café](https://img.shields.io/badge/Invitar%20a%20un%20caf%C3%A9-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/eqcampeon)
 
@@ -8,6 +10,8 @@ overlay sobre el juego, consejo de postura, avisos por voz y análisis
 posterior de las peleas grandes.
 
 Interfaz en español, inglés, francés, alemán y portugués.
+
+![Ventana principal](docs/combate.png)
 
 ---
 
@@ -36,6 +40,54 @@ Interfaz en español, inglés, francés, alemán y portugués.
 
 El overlay necesita EQL en **ventana o borderless**. En pantalla completa
 exclusiva Windows no deja dibujar nada por encima.
+
+---
+
+## Qué hace
+
+### Consejo de postura medido, no supuesto
+
+![Consejo de postura](docs/postura.png)
+
+El log guarda el daño **ya mitigado**: si estabas en Defensive, el melé que ves
+está a la mitad. Comparar posturas con esas cifras te empujaría siempre hacia la
+que ya llevabas puesta. El programa revierte la mitigación usando la postura
+activa en cada golpe y compara sobre daño bruto.
+
+De la aritmética del wiki salen dos umbrales que a ojo no se ven:
+
+- Channeler supera a Defensive cuando el daño mágico pasa de la mitad del melé.
+- Y supera a Mage Hunter cuando el melé pasa de la mitad del mágico.
+
+Es decir, Channeler no es un término medio conformista: es la elección correcta
+en toda la franja central.
+
+### Análisis posterior de las peleas grandes
+
+![Análisis](docs/analisis.png)
+
+Corta la pelea en fases por lo que pasa, no por tiempo: cuando cambia la
+composición del daño entrante, cuando dejas de pegar, cuando entra un pico o el
+jefe invoca. Después señala once cosas concretas, cada una con su impacto
+cuantificado: tiempo sin pegar, postura equivocada por tramos, precisión,
+curaciones del enemigo, control recibido, interrupciones, resistencias,
+curación desperdiciada, foco, bajas y ráfaga contra sostenido.
+
+### Overlay
+
+Se atenúa fuera de combate y se ilumina al empezar. Al cerrarse la pelea
+destaca el resultado unos segundos. Avisa si tu postura no es la mejor, y sólo
+si el cambio merece la pena.
+
+### Voz
+
+Lee el chat entrante con una casilla por canal —susurros, grupo, hermandad,
+raid— y comenta el combate: cambio de postura recomendado, tu muerte, la de tu
+mascota, enemigos que se suman, resumen al acabar.
+
+También avisa de los casteos enemigos que cambian la pelea, filtrados por
+categoría: curaciones, encantar, mez, miedo, raíz. Sólo de enemigos, nunca de
+tus compañeros, y sin repetir la misma categoría del mismo bicho en 8 segundos.
 
 ---
 

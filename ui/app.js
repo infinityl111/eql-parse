@@ -1,5 +1,6 @@
-import { t, setLang, LANGS, langInfo, TRANSLATED } from '../src/i18n.js';
+import { t, setLang, getLang, LANGS, langInfo, TRANSLATED } from '../src/i18n.js';
 import { analyse } from '../src/analysis.js';
+import { advise } from '../src/advisor.js';
 import { initTriggers, renderTriggers } from './triggers.js';
 import { mountBanner, speak, playSound } from './alerts.js';
 
@@ -73,7 +74,7 @@ async function renderWizard() {
     4: () => `<h1>${esc(t('wz.4.title'))}</h1>
       <p>${esc(t('wz.4.body'))}</p>
       <div class="wz-classes">${[0, 1, 2].map((i) => `<select class="wzcls" data-i="${i}">${
-        CLASS_LIST.map(([k, v]) => `<option value="${k}"${(w.classes?.[i] ?? '') === k ? ' selected' : ''}>${esc(v)}</option>`).join('')
+        classList().map(([k, v]) => `<option value="${k}"${(w.classes?.[i] ?? '') === k ? ' selected' : ''}>${esc(v)}</option>`).join('')
       }</select>`).join('')}</div>
       <p class="hint">${esc(t('wz.4.who'))}</p>
       <div class="wz-who" id="wzWho">${esc(t('wz.4.waiting'))}</div>`,
@@ -182,21 +183,20 @@ async function renderSetup() {
   state.rowNodes.clear();
   $('bodyGrid').innerHTML = `<div class="setup" style="grid-column:1/-1">
     <h1>${t('setup.title')}</h1>
-    <p>Activa el registro en el juego con <code>/log on</code> y pon los filtros de daño al máximo
-       detalle, o el daño de los demás no llegará al fichero.</p>
+    <p>${esc(t('setup.intro'))}</p>
     ${cands.length ? `<div class="field"><label class="eyebrow">${t('setup.found')}</label>
       <div class="candidates">${cands.map((c) => `<div class="cand" data-path="${esc(c.path)}">${esc(c.path)}
         <small>${new Date(c.mtime).toLocaleString('es-ES')}</small></div>`).join('')}</div></div>`
-      : '<p class="hint">No he encontrado ningún <code>eqlog_*.txt</code> en las rutas habituales. Búscalo a mano.</p>'}
+      : `<p class="hint">${esc(t('setup.notFound'))}</p>`}
     <div class="field"><label class="eyebrow">${t('setup.path')}</label>
       <input class="wide" id="inPath" value="${esc(cfg.logPath ?? '')}" placeholder="D:\\EVERQUEST LEGENDS\\Logs\\eqlog_...txt"></div>
-    <div class="field"><label class="eyebrow">Tu personaje <span class="hint">(vacío = deducir del fichero)</span></label>
+    <div class="field"><label class="eyebrow">${esc(t('setup.character'))} <span class="hint">${esc(t('setup.characterHint'))}</span></label>
       <input id="inSelf" value="${esc(cfg.self ?? '')}" placeholder="Campeon"></div>
     <div class="field"><label class="eyebrow">${t('setup.idle')}</label>
       <input id="inIdle" type="number" min="5" max="120" value="${cfg.idleSec ?? 20}" style="width:80px">
       <span class="hint">${t('setup.idleUnit')}</span></div>
     <div class="field"><label><input type="checkbox" id="inFromStart" ${cfg.fromStart ? 'checked' : ''}> ${t('setup.fromStart')}</label>
-      <div class="hint">Recupera el historial de peleas anteriores. En logs grandes tarda unos segundos.</div></div>
+      <div class="hint">${esc(t('setup.fromStartHint'))}</div></div>
     <div class="actions">
       <button class="primary" id="btnAttach">${t('setup.start')}</button>
       <button id="btnBrowse">${t('setup.browse')}</button>
@@ -436,15 +436,14 @@ function detailHTML(r) {
       [{ label: t('adv.invocation') }, { label: t('det.dmg'), right: true, w: '90px' }, { label: t('det.share'), right: true, w: '64px' }, { label: t('det.hits'), right: true, w: '60px' }],
       r.invocations.map((x) => [esc(x.name), n0(x.sum), pct(x.sum / dmgTotal), x.n]),
     ) : ''}
-    <div class="hint">Stances e invocaciones sólo existen en EQL. Se atribuyen a la
-    postura activa en el momento del golpe; el log no informa de la de los demás.</div>`) : '';
+    <div class="hint">${esc(t('det.stanceNote'))}</div>`) : '';
 
   const swings = r.meleeHits + r.misses;
   const offence = section(t('det.offence'), `<div class="kv">
       <span>${t('det.hitsLanded')} <b>${n0(r.hits)}</b></span>
       <span>${t('det.swings')} <b>${n0(swings)}</b></span>
       <span>${t('row.accuracy')} <b>${swings ? pct(r.accuracy) : '—'}</b></span>
-      <span>${t('row.crits')} <b>${r.crits ? `${r.crits} · ${pct(r.critRate)} · ${n0(r.critDamage)} daño` : '—'}</b></span>
+      <span>${t('row.crits')} <b>${r.crits ? `${r.crits} · ${pct(r.critRate)} · ${n0(r.critDamage)} ${t('row.damage')}` : '—'}</b></span>
       ${r.flurries ? `<span>${t('det.flurry')} <b>${r.flurries}</b></span>` : ''}
       ${r.ripostes ? `<span>${t('det.ripostes')} <b>${r.ripostes}</b></span>` : ''}
       <span>${t('det.bigHit')} <b>${n0(r.max)}</b></span>
@@ -495,8 +494,7 @@ function detailHTML(r) {
       <span>${t('det.dpsActive')} <b>${n1(r.dpsActive)}</b></span>
       <span>${t('det.activeSecs')} <b>${r.activeSec} ${t('det.of')} ${r.ownSec}</b></span>
     </div>
-    <div class="hint">El log de EQ marca la hora al segundo, así que en peleas de pocos segundos
-    estas tres cifras divergen bastante. La primera es la comparable con otros parsers.</div>`);
+    <div class="hint">${esc(t('det.paceNote'))}</div>`);
 
   return `<div class="detail">${composition}${abilities}${targets}${stanceSec}${offence}${defence}${healing}${activity}</div>`;
 }
@@ -539,19 +537,19 @@ function updateTip() {
   t.innerHTML = `<div class="tip-head">${esc(r.name)}</div>
     <div class="tip-grid">
       <span class="eyebrow">DPS</span><b class="num">${n1(r.dps)}</b>
-      <span class="eyebrow">Daño</span><b class="num">${n0(r.damage)} · ${pct(r.share)}</b>
-      ${r.meleeHits + r.misses ? `<span class="eyebrow">Precisión</span><b class="num">${pct(r.accuracy)} · ${r.meleeHits}/${r.meleeHits + r.misses}</b>` : ''}
-      ${r.crits ? `<span class="eyebrow">Críticos</span><b class="num">${r.crits} · ${pct(r.critRate)}</b>` : ''}
-      <span class="eyebrow">Mín–Máx</span><b class="num">${n0(r.min)}–${n0(r.max)}</b>
-      ${r.taken ? `<span class="eyebrow">Recibido</span><b class="num">${n0(r.taken)}</b>` : ''}
+      <span class="eyebrow">${esc(t('det.dmg'))}</span><b class="num">${n0(r.damage)} · ${pct(r.share)}</b>
+      ${r.meleeHits + r.misses ? `<span class="eyebrow">${esc(t('row.accuracy'))}</span><b class="num">${pct(r.accuracy)} · ${r.meleeHits}/${r.meleeHits + r.misses}</b>` : ''}
+      ${r.crits ? `<span class="eyebrow">${esc(t('row.crits'))}</span><b class="num">${r.crits} · ${pct(r.critRate)}</b>` : ''}
+      <span class="eyebrow">${esc(t('det.minmax'))}</span><b class="num">${n0(r.min)}–${n0(r.max)}</b>
+      ${r.taken ? `<span class="eyebrow">${esc(t('row.taken'))}</span><b class="num">${n0(r.taken)}</b>` : ''}
       ${r.healingDone ? `<span class="eyebrow">Curado</span><b class="num">${n0(r.healingDone)}</b>` : ''}
     </div>
     <div class="tip-types">${r.types.map(([ty, v]) =>
       `<div class="tip-type"><i class="seg ${typeClass(ty)}"></i><span>${esc(ty)}</span><b class="num">${n0(v)}</b><span class="num dim">${pct(v / dmgTotal)}</span></div>`).join('')}</div>
     ${r.abilities.length ? `<div class="tip-abils">${r.abilities.slice(0, 4).map((a) =>
       `<div class="tip-type"><span>${esc(a.name)}</span><b class="num">${n0(a.sum)}</b><span class="num dim">×${a.n}</span></div>`).join('')}
-      ${r.abilities.length > 4 ? `<div class="dim" style="font-size:10.5px">y ${r.abilities.length - 4} más</div>` : ''}</div>` : ''}
-    <div class="tip-foot eyebrow">Clic para el desglose completo</div>`;
+      ${r.abilities.length > 4 ? `<div class="dim" style="font-size:10.5px">${t('tip.more', { n: r.abilities.length - 4 })}</div>` : ''}</div>` : ''}
+    <div class="tip-foot eyebrow">${esc(t('tip.click'))}</div>`;
 }
 
 
@@ -567,12 +565,11 @@ async function renderNarrate(host) {
   host.innerHTML = `<div class="narrate">
     <div class="sec-title eyebrow">${t('voice.readChat')}</div>
     <div class="chks">${NARRATE_CHAT.map(([k, l]) => box('chat', k, l())).join('')}</div>
-    <div class="hint">Se lee «Notarino te dice que dónde vamos». Lo que escribes tú no se lee,
-      ni se repite el mismo mensaje dos veces seguidas. Los mensajes largos se cortan.</div>
+    <div class="hint">${esc(t('voice.chatHint'))}</div>
 
     <div class="sec-title eyebrow" style="margin-top:16px">${t('voice.combat')}</div>
     <div class="chks">${NARRATE_COMBAT.map(([k, l]) => box('combat', k, l())).join('')}</div>
-    <div class="hint">El chat se encola y los avisos de combate cortan: un aviso tardío no sirve.</div>
+    <div class="hint">${esc(t('voice.combatHint'))}</div>
 
     <div class="sec-title eyebrow" style="margin-top:16px">${t('voice.enemyCasts')}</div>
     <div class="chks">${NARRATE_CAST.map(([k, l]) => box('enemyCast', k, l())).join('')}</div>
@@ -581,8 +578,7 @@ async function renderNarrate(host) {
         <input id="nNukes" style="flex:1;min-width:220px" placeholder="Ice Comet, Lava Bolt"
           value="${esc((n.nukeNames ?? []).join(', '))}"></label>
     </div>
-    <div class="hint">Sólo se avisa de lo que lanza un enemigo (alguien a quien pegáis tú o tu mascota),
-      nunca de tus compañeros, y no se repite la misma categoría del mismo bicho en 8 segundos.</div>
+    <div class="hint">${esc(t('voice.castHint'))}</div>
 
     <div class="narrate-row">
       <label class="eyebrow">${t('voice.cut')}
@@ -644,15 +640,15 @@ function chartHTML(f) {
 
   return `<div class="chart">
     ${band ? `<svg class="chart-band" viewBox="0 0 ${W} ${BAND}" preserveAspectRatio="none" role="img"
-      aria-label="Postura activa a lo largo de la pelea">${band}</svg>` : ''}
+      aria-label="${esc(t('chart.bandLabel'))}">${band}</svg>` : ''}
     <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
-      aria-label="Daño por segundo, pico ${n0(peak)}">
+      aria-label="${esc(t('chart.svgLabel', { v: n0(peak) }))}">
       <path d="${area}" fill="var(--t-cold)" opacity=".16"/>
       <path d="${line}" fill="none" stroke="var(--t-cold)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
       ${taken ? `<path d="${taken}" fill="none" stroke="var(--t-ds)" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ''}
     </svg>
     <div class="chart-foot">
-      <span class="eyebrow">pico ${n0(peak)}/s</span>
+      <span class="eyebrow">${esc(t('chart.peak', { v: n0(peak) }))}</span>
       <span class="chart-legend eyebrow">${legend}${taken ? `<span><i class="dash"></i>${t('chart.taken')}</span>` : ''}</span>
       <span class="eyebrow">${secs(dur)}</span>
     </div>
@@ -671,9 +667,7 @@ function renderPetHint(snap) {
 
   host.innerHTML = `<div class="pethint">
     <div class="pethint-main">${t('pet.which')}</div>
-    <div class="pethint-sub">En EQL la mascota cambia de nombre en cada invocación, así que no puedo
-      darla por conocida. Escribe <code>/pet who leader</code> en el juego y se identifica sola,
-      o márcala aquí.</div>
+    <div class="pethint-sub">${esc(t('pet.hint'))}</div>
     <div class="pethint-btns">${h.candidates.map((c) =>
       `<button class="petbtn" data-name="${esc(c)}">${t('pet.mark', { name: esc(c) })}</button>`).join('')}</div>
   </div>`;
@@ -684,26 +678,37 @@ function renderPetHint(snap) {
 }
 
 // ═══════════ Consejo de postura ═══════════
-const CLASS_LIST = [['','—'],['BER','Berserker'],['BRD','Bardo'],['BST','Beastlord'],['CLR','Clérigo'],
-  ['DRU','Druida'],['ENC','Encantador'],['MAG','Mago'],['MNK','Monje'],['NEC','Nigromante'],
-  ['PAL','Paladín'],['RNG','Explorador'],['ROG','Pícaro'],['SHD','Shadow Knight'],['SHM','Chamán'],
-  ['WAR','Guerrero'],['WIZ','Brujo']];
-const CLASS_NAMES = Object.fromEntries(CLASS_LIST.filter(([k]) => k).map(([k, v]) => [k, v]));
+const CLASS_CODES = ['', 'BER', 'BRD', 'BST', 'CLR', 'DRU', 'ENC', 'MAG', 'MNK', 'NEC',
+  'PAL', 'RNG', 'ROG', 'SHD', 'SHM', 'WAR', 'WIZ'];
+// Función y no constante: los nombres cambian con el idioma.
+const classList = () => CLASS_CODES.map((k) => [k, k ? t(`cl.${k}`) : '—']);
+const CLASS_NAMES = new Proxy({}, { get: (_, c) => t(`cl.${String(c)}`) });
 
 function renderAdvice(snap) {
   const host = $('advice');
   if (!host) return;
-  const a = snap.advice;
-  const classes = a?.classes ?? snap.classes ?? [];
+  // El consejo se calcula sobre la pelea SELECCIONADA. Antes venía del motor,
+  // que siempre miraba la que estuviera en curso: bastaba una escaramuza suelta
+  // donde no hubieras pegado para que no encontrara tu fila y no aconsejara nada.
+  const f = fightFor(snap);
+  const classes = snap.classes ?? [];
+  const myRow = f?.rows.find((r) => r.name === snap.self);
+  const a = (myRow && classes.length)
+    ? advise(myRow, {
+        classes, stance: snap.stance, invocation: snap.invocation,
+        resistsSuffered: f.resistsSuffered, interrupts: f.interrupts,
+      })
+    : null;
   const live = snap.live;
   const conflict = snap.classConflict && state.dismissedConflict !== JSON.stringify(snap.classConflict)
     ? snap.classConflict : null;
-  const sig = JSON.stringify([a?.incoming, a?.current, a?.defence.map((d) => d.prevented), classes,
-    conflict, live && [live.kind, live.bestKey, live.suggest]]);
+  const sig = JSON.stringify([getLang(), f?.id, a?.incoming, a?.current,
+    a?.defence.map((d) => d.prevented), classes, conflict,
+    live && [live.kind, live.bestKey, live.suggest]]);
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
 
-  const sel = (i) => `<select class="cls" data-i="${i}">${CLASS_LIST.map(([k, v]) =>
+  const sel = (i) => `<select class="cls" data-i="${i}">${classList().map(([k, v]) =>
     `<option value="${k}"${(classes[i] ?? '') === k ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
 
   const conflictBox = conflict ? `<div class="conflict">
@@ -725,9 +730,7 @@ function renderAdvice(snap) {
         <span class="adv-classes">${sel(0)}${sel(1)}${sel(2)}</span>
       </div>
       <div class="adv-verdict">${t('adv.needClasses')}</div>
-      <div class="hint">Sin ellas no puedo aconsejarte, porque cada clase tiene unas posturas y no otras.
-      Deducirlas del log no siempre es posible: Shadow Knight y Paladín comparten Defensive, Mage Hunter y
-      Spellblade, así que son indistinguibles por las posturas. También se leen solas de tu <code>/who</code>.</div>
+      <div class="hint">${esc(t('adv.needClassesHint'))}</div>
     </div>`;
     host.querySelectorAll('.cls').forEach((el) => el.addEventListener('change', async () => {
       await window.eql.setClasses([...host.querySelectorAll('.cls')].map((x) => x.value));
@@ -740,18 +743,19 @@ function renderAdvice(snap) {
       <div class="live-main">${live.suggest
         ? `Cambia a <b>${esc(live.best)}</b>`
         : `<b>${esc(live.current ?? live.best)}</b> es la correcta ahora mismo`}</div>
-      <div class="live-sub">últimos ${live.seconds}s · daño ${esc(live.kind)}
-        (${Math.round(live.meleeShare * 100)}% melé) · ${n0(live.dps)}/s entrante</div>
+      <div class="live-sub">${esc(t('adv.liveSub', { s: live.seconds, kind: live.kind,
+        pct: Math.round(live.meleeShare * 100), dps: n0(live.dps) }))}</div>
     </div>` : '';
 
   const mix = a.incoming.meleeShare;
-  const kind = a.incoming.total === 0 ? '—' : mix > 0.7 ? 'casi todo melé' : mix < 0.3 ? 'casi todo mágico' : 'mixto';
+  const kind = a.incoming.total === 0 ? '—'
+    : mix > 0.7 ? t('adv.mostlyMelee') : mix < 0.3 ? t('adv.mostlyMagic') : t('adv.mixed');
 
   host.innerHTML = `<div class="advice">
     <div class="adv-head">
       <span class="eyebrow">${t('adv.title')}</span>
-      <span class="src eyebrow">${{ manual: 'clases fijadas por ti', who: 'clases leídas de tu /who',
-        deducidas: 'clases deducidas del log', parciales: 'clases deducidas a medias', desconocidas: '' }[snap.classSource] ?? ''}</span>
+      <span class="src eyebrow">${snap.classSource && snap.classSource !== 'desconocidas'
+        ? esc(t(`adv.src.${snap.classSource}`)) : ''}</span>
       <span class="adv-classes">${sel(0)}${sel(1)}${sel(2)}</span>
     </div>
     ${conflictBox}
@@ -759,42 +763,40 @@ function renderAdvice(snap) {
     ${a.incoming.total ? `
       <div class="adv-verdict">${esc(a.verdict ?? '')}</div>
       <div class="kv">
-        <span>Daño entrante (bruto) <b>${n0(a.incoming.total)}</b></span>
-        <span>Reparto <b>${kind}</b></span>
-        <span>Melé <b>${n0(a.incoming.melee)}</b></span>
-        <span>Mágico <b>${n0(a.incoming.spell)}</b></span>
-        <span>Ahora <b>${esc(a.current.stance ?? '—')}${a.current.invocation ? ' · ' + esc(a.current.invocation) : ''}</b></span>
+        <span>${esc(t('adv.incoming'))} <b>${n0(a.incoming.total)}</b></span>
+        <span>${esc(t('adv.split'))} <b>${kind}</b></span>
+        <span>${esc(t('adv.melee'))} <b>${n0(a.incoming.melee)}</b></span>
+        <span>${esc(t('adv.magic'))} <b>${n0(a.incoming.spell)}</b></span>
+        <span>${esc(t('adv.now'))} <b>${esc(a.current.stance ?? '—')}${a.current.invocation ? ' · ' + esc(a.current.invocation) : ''}</b></span>
       </div>
       ${table(
-        [{ label: 'Stance' }, { label: 'Evitaría', right: true, w: '84px' }, { label: 'Del total', right: true, w: '68px' },
-         { label: 'Vigor', right: true, w: '66px' }, { label: 'Maná', right: true, w: '62px' }],
+        [{ label: 'Stance' }, { label: t('adv.wouldAvoid'), right: true, w: '84px' }, { label: t('adv.ofTotal'), right: true, w: '68px' },
+         { label: t('adv.endurance'), right: true, w: '66px' }, { label: t('adv.mana'), right: true, w: '62px' }],
         a.defence.map((d) => [
-          `${esc(d.label)}${d.key === (a.current.stance ?? '').toLowerCase().replace(/\s*stance\s*$/, '') ? ' <span class="dim">(activa)</span>' : ''}`,
+          `${esc(d.label)}${d.key === (a.current.stance ?? '').toLowerCase().replace(/\s*stance\s*$/, '') ? ` <span class="dim">${esc(t('adv.active'))}</span>` : ''}`,
           n0(d.prevented), pct(d.share), n0(d.endurance), d.mana ? n0(d.mana) : '—',
         ]),
       )}
-      <div class="hint">${esc(a.defence[0]?.note ?? '')}</div>
-    ` : '<div class="hint">Sin daño recibido en esta pelea: no hay nada que mitigar.</div>'}
+      <div class="hint">${esc(a.defence[0]?.noteKey ? t(a.defence[0].noteKey) : '')}</div>
+    ` : `<div class="hint">${esc(t('adv.noDamage'))}</div>`}
 
     ${a.offence.filter((o) => o.bonus > 0).length ? `
-      <div class="sec-title eyebrow" style="margin-top:12px">Si prefieres pegar</div>
+      <div class="sec-title eyebrow" style="margin-top:12px">${esc(t('adv.ifYouHit'))}</div>
       ${table(
-        [{ label: 'Stance' }, { label: 'Daño extra', right: true, w: '90px' }, { label: 'Cuesta', right: true, w: '80px' }],
-        a.offence.filter((o) => o.bonus > 0).map((o) => [esc(o.label), '+' + n0(o.bonus), n0(o.endurance) + ' vigor']),
+        [{ label: 'Stance' }, { label: t('adv.extraDamage'), right: true, w: '90px' }, { label: t('adv.costs'), right: true, w: '80px' }],
+        a.offence.filter((o) => o.bonus > 0).map((o) => [esc(o.label), '+' + n0(o.bonus), n0(o.endurance) + ' ' + t('adv.endurance').toLowerCase()]),
       )}` : ''}
 
     ${a.invocations.filter((i) => i.score > 0).length ? `
-      <div class="sec-title eyebrow" style="margin-top:12px">Invocación</div>
+      <div class="sec-title eyebrow" style="margin-top:12px">${esc(t('adv.invocation'))}</div>
       ${a.invocations.filter((i) => i.score > 0).slice(0, 3).map((i) => `
         <div class="adv-inv">
           <b>${esc(i.label)}</b>
           ${i.why.length ? `<span class="dim">${esc(i.why.join(' · '))}</span>` : ''}
-          <div class="hint">${esc(i.note)}</div>
+          <div class="hint">${esc(i.noteKey ? t(i.noteKey) : '')}</div>
         </div>`).join('')}` : ''}
 
-    <div class="hint" style="margin-top:10px">El log no registra vigor ni maná, así que los costes indican
-    el precio pero no si puedes pagarlo. El daño entrante se muestra sin mitigar, revertido según la postura
-    que tenías en cada golpe.</div>
+    <div class="hint" style="margin-top:10px">${esc(t('adv.footnote'))}</div>
   </div>`;
 
   host.querySelectorAll('.cls').forEach((el) => el.addEventListener('change', async () => {
@@ -895,7 +897,7 @@ function renderAnalysis(snap) {
 
   $('anView').innerHTML = `<div class="analysis">
     <div class="an-head">
-      <div><h2>${esc(f.label ?? '')}</h2>
+      <div><h2>${esc(f.label ?? t('fight.skirmish'))}</h2>
         <div class="eyebrow">${secs(f.duration)} · ${n0(f.total)} · ${esc(f.zone ?? '')}</div></div>
       <div class="an-score"><div class="an-score-v num">${a.score}</div>
         <div class="eyebrow">${esc(t('an.score'))}</div></div>
@@ -1056,6 +1058,7 @@ function applyLangToChrome() {
   set('btnSetup', t('hdr.changeLog'));
   const h = $('btnHelp'); if (h) h.title = t('wz.reopen');
   set('brandTag', t('app.tagline'));
+  const fp = $('fPath'); if (fp) fp.title = t('foot.openFolder');
   const b = $('btnTheme');
   if (b) b.textContent = state.theme === 'light' ? `◐ ${t('hdr.themeDark')}` : `◑ ${t('hdr.themeLight')}`;
 }

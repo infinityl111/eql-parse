@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import { STANCES, INVOCATIONS, availableFor, normStance, normInvocation, CLASS_NAMES } from './stances.js';
 
 const pct = (v) => `${Math.round(v * 100)}%`;
@@ -42,7 +43,7 @@ export function advise(row, ctx = {}) {
         key: s.key, label: s.label, prevented, endurance, mana,
         share: incoming ? prevented / incoming : 0,
         perEndurance: endurance ? prevented / endurance : Infinity,
-        note: s.note, costModel: s.costModel,
+        noteKey: s.noteKey, costModel: s.costModel,
       };
     })
     .sort((a, b) => b.prevented - a.prevented);
@@ -55,7 +56,7 @@ export function advise(row, ctx = {}) {
       const bonus = s.meleeBonus ? rawMeleeOut * s.meleeBonus : 0;
       return {
         key: s.key, label: s.label, bonus, endurance: bonus,
-        note: s.note,
+        noteKey: s.noteKey,
         approx: !s.meleeBonus,   // Striker/Ranged no se pueden estimar del log
       };
     })
@@ -76,26 +77,26 @@ export function advise(row, ctx = {}) {
     const why = [];
     if (iv.good?.includes('resistencias') && signals.resistencias) {
       score += signals.resistencias * 3;
-      why.push(`${signals.resistencias} resistencias sufridas`);
+      why.push(t('why.resists', { n: signals.resistencias }));
     }
     if (iv.good?.includes('interrupciones') && signals.interrupciones) {
       score += signals.interrupciones * 3;
-      why.push(`${signals.interrupciones} lanzamientos interrumpidos`);
+      why.push(t('why.interrupts', { n: signals.interrupciones }));
     }
     if (iv.good?.includes('curacion') && signals.curacion) {
       score += 8;
-      why.push(`curas por ${Math.round(signals.curacion)}`);
+      why.push(t('why.healing', { n: Math.round(signals.curacion) }));
     }
     if (iv.good?.includes('dano_hechizo') && signals.dano_hechizo / totalOut > 0.35) {
       score += 10;
-      why.push(`${pct(signals.dano_hechizo / totalOut)} de tu daño es mágico`);
+      why.push(t('why.magicShare', { pct: pct(signals.dano_hechizo / totalOut) }));
     }
     if (iv.good?.includes('dano_melee') && signals.dano_melee / totalOut > 0.35 && signals.dano_hechizo > 0) {
       score += 9;
-      why.push('mezclas melé y hechizo');
+      why.push(t('why.mixed'));
     }
     if (iv.good?.includes('sostenido')) score += 1;
-    return { key: iv.key, label: iv.label, score, why, note: iv.note };
+    return { key: iv.key, label: iv.label, score, why, noteKey: iv.noteKey };
   }).sort((a, b) => b.score - a.score);
 
   // ── Resumen ──────────────────────────────────────────
@@ -106,11 +107,12 @@ export function advise(row, ctx = {}) {
   if (best && incoming > 0) {
     const gain = cur ? best.prevented - cur.prevented : best.prevented;
     if (cur && best.key === current) {
-      verdict = `Ya estabas en ${best.label}, que es la que más aguanta con este reparto de daño.`;
+      verdict = t('adv.alreadyBest', { stance: best.label });
     } else if (gain > incoming * 0.04) {
-      verdict = `${best.label} habría evitado ${Math.round(gain)} de daño más que ${cur ? cur.label : 'lo que llevabas'}.`;
+      verdict = t('adv.wouldGain', { stance: best.label, n: Math.round(gain),
+        current: cur ? cur.label : t('adv.yourStance') });
     } else {
-      verdict = `La diferencia entre ${best.label} y ${cur ? cur.label : 'tu postura'} es menor del 4%: no compensa cambiar.`;
+      verdict = t('adv.notWorth', { stance: best.label, current: cur ? cur.label : t('adv.yourStance') });
     }
   }
 
@@ -131,8 +133,9 @@ export function briefAdvice(a) {
   const cur = normStance(a.current.stance);
   if (best.key === cur) return null;   // ya vas bien, no molestar
   const mix = a.incoming.meleeShare;
-  const kind = mix > 0.7 ? 'melé' : mix < 0.3 ? 'mágico' : 'mixto';
-  return `Daño ${kind} — ${best.label} evitaría ${Math.round(best.share * 100)}%`;
+  const kind = mix > 0.7 ? 'fisico' : mix < 0.3 ? 'magico' : 'equilibrado';
+  return t('ov.brief', { kind: t(`adv.kind.${kind}`), stance: best.label,
+    pct: Math.round(best.share * 100) });
 }
 
 export { STANCES, INVOCATIONS };
@@ -170,7 +173,7 @@ export function liveAdvice(win, ctx = {}) {
   const cur = normStance(ctx.stance);
   const curScore = scored.find((s) => s.key === cur);
   const meleeShare = melee / total;
-  const kind = meleeShare > 0.7 ? 'físico' : meleeShare < 0.3 ? 'mágico' : 'equilibrado';
+  const kind = meleeShare > 0.7 ? 'fisico' : meleeShare < 0.3 ? 'magico' : 'equilibrado';
 
   // Umbral: por debajo del 8% de mejora no compensa gastar el cambio de postura
   // (6 segundos de reutilización) ni la atención en mitad de la pelea.
@@ -186,6 +189,7 @@ export function liveAdvice(win, ctx = {}) {
     gain, worth,
     suggest: !curScore || (curScore.key !== best.key && worth >= 0.08),
     scored,
-    text: `Daño ${kind} (${Math.round(meleeShare * 100)}% melé) · ${best.label} evitaría ${Math.round((best.prevented / total) * 100)}%`,
+    text: t('ov.brief', { kind: t(`adv.kind.${kind}`), stance: best.label,
+      pct: Math.round((best.prevented / total) * 100) }),
   };
 }

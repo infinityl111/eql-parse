@@ -324,7 +324,7 @@ export class Engine extends EventEmitter {
         }
         const foes = [...enc.targetTotals].filter(([n]) => n !== (this.self ?? 'You'));
         foes.sort((a, b) => b[1] - a[1]);
-        return foes.length ? foes[0][0] : 'Escaramuza';
+        return foes.length ? foes[0][0] : null;
       })(),
 
       resistsSuffered: enc.resistsSuffered,

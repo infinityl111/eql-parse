@@ -11,13 +11,14 @@
  * dicen el precio, no si puedes pagarlo.
  */
 
+import { t } from './i18n.js';
+
 export const CLASSES = ['BER','BRD','BST','CLR','DRU','ENC','MAG','MNK','NEC','PAL','RNG','ROG','SHD','SHM','WAR','WIZ'];
-export const CLASS_NAMES = {
-  BER:'Berserker', BRD:'Bardo', BST:'Beastlord', CLR:'Clérigo', DRU:'Druida',
-  ENC:'Encantador', MAG:'Mago', MNK:'Monje', NEC:'Nigromante', PAL:'Paladín',
-  RNG:'Explorador', ROG:'Pícaro', SHD:'Shadow Knight', SHM:'Chamán',
-  WAR:'Guerrero', WIZ:'Brujo',
-};
+
+
+/** Nombre de la clase en el idioma activo. */
+export const className = (c) => t(`cl.${c}`);
+export const CLASS_NAMES = new Proxy({}, { get: (_, c) => t(`cl.${String(c)}`) });
 
 export const INT_CLASSES = ['ENC','MAG','NEC','WIZ'];
 export const WIS_CLASSES = ['CLR','DRU','SHM'];
@@ -37,47 +38,47 @@ export const STANCES = {
   balanced: {
     label: 'Balanced', mit: { melee: 0.10, spell: 0.10 }, hit: 0.10,
     costModel: 'free', classes: ['BER','BRD','BST','MNK','PAL','RNG','ROG','SHD','WAR'],
-    note: 'Sin coste y duplica la regeneración de vigor. Es la de reserva.',
+    noteKey: 'sn.balanced',
   },
   defensive: {
     label: 'Defensive', mit: { melee: 0.50, spell: 0.20 },
     costModel: 'mitigated', classes: ['PAL','SHD','WAR'],
-    note: 'La mejor contra melé puro.',
+    noteKey: 'sn.defensive',
   },
   'mage hunter': {
     label: 'Mage Hunter', mit: { melee: 0.20, spell: 0.50 },
     costModel: 'mitigated', classes: ['BER','PAL','SHD'],
-    note: 'Espejo de Defensive: para daño mágico.',
+    noteKey: 'sn.magehunter',
   },
   channeler: {
     label: 'Channeler', mit: { melee: 0.40, spell: 0.40 },
     costModel: 'split', classes: ['CLR','DRU','ENC','MAG','NEC','SHM','WIZ'],
-    note: 'Cobertura ante daño mixto y mejora el canalizado. Cuesta la mitad de vigor por punto, pero grava el maná.',
+    noteKey: 'sn.channeler',
   },
   evasive: {
     label: 'Evasive', mit: { melee: 0.95, spell: 0.00 }, evade: 0.95,
     costModel: 'evaded2', classes: ['BRD','MNK','RNG','BST','ROG'],
-    note: 'Evita el 95% de los ataques entrantes, pero falla si te quedas sin vigor.',
+    noteKey: 'sn.evasive',
   },
   offensive: {
     label: 'Offensive', mit: { melee: 0, spell: 0 }, meleeBonus: 1.00, hit: 0.25,
     costModel: 'dealt', classes: ['BER','BRD','BST','MNK','PAL','RNG','ROG','SHD','WAR'],
-    note: 'Duplica el daño melé. Por debajo del 25% de vigor pierdes precisión.',
+    noteKey: 'sn.offensive',
   },
   striker: {
     label: 'Striker', mit: { melee: 0, spell: 0 }, skillWeapon: 3, skillOther: 5, hit: 0.25,
     costModel: 'dealt', classes: ['BER','MNK','ROG','WAR'],
-    note: 'Multiplica las habilidades de combate, no el autoataque.',
+    noteKey: 'sn.striker',
   },
   ranged: {
     label: 'Ranged', mit: { melee: 0, spell: 0 }, hit: 0.25,
     costModel: 'dealt', classes: ['BER','MNK','RNG','ROG'],
-    note: 'Sin distancia mínima, y el ataque a distancia puede doblar y triplicar.',
+    noteKey: 'sn.ranged',
   },
   berserker: {
     label: 'Berserker', mit: { melee: 0, spell: 0 }, hit: 0.25, selfDamage: 0.083,
     costModel: 'dealt', classes: ['BER'],
-    note: 'Duplica velocidad de ataque, pero te llevas el 8,3% de tu propio daño.',
+    noteKey: 'sn.berserker',
   },
 };
 
@@ -85,48 +86,48 @@ export const INVOCATIONS = {
   'arcane mastery': {
     label: 'Arcane Mastery', classes: ['ENC','MAG','NEC','SHD','WIZ'],
     scale: INT_CLASSES,
-    note: 'Reduce tiempo de lanzamiento y recuperación un 20%, más un 10% por cada clase de inteligencia extra.',
+    noteKey: 'iv.arcanemastery',
     good: ['casteo'],
   },
   divine: {
     label: 'Divine', classes: ['BST','CLR','DRU','PAL','RNG','SHM'], scale: WIS_CLASSES,
-    note: 'El maná gastado cura al miembro del grupo con menos vida. Convierte cualquier gasto en curación pasiva.',
+    noteKey: 'iv.divine',
     good: ['curacion', 'grupo'],
   },
   empower: {
     label: 'Empower', classes: ['CLR','DRU','ENC','MAG','NEC','SHM','WIZ'], scale: NON_HYBRID_CASTERS,
-    note: 'Daño de hechizo +20% (y +10% por clase lanzadora no híbrida extra) a cambio de un 20% más de maná.',
+    noteKey: 'iv.empower',
     good: ['dano_hechizo'],
   },
   inversion: {
     label: 'Inversion', classes: ['BRD','BST','PAL','CLR','DRU','ENC','MAG','NEC','RNG','SHD','SHM','WIZ'],
-    note: 'Pasa dos tercios del tiempo de lanzamiento a recuperación global: te expone menos a interrupciones.',
+    noteKey: 'iv.inversion',
     good: ['interrupciones', 'movilidad'],
   },
   inviolable: {
     label: 'Inviolable', classes: ['BRD','WIZ'],
-    note: 'Los hechizos no se pueden interrumpir, al precio del doble de maná más lo mismo en vigor.',
+    noteKey: 'iv.inviolable',
     good: ['interrupciones'],
   },
   'over channel': {
     label: 'Over Channel', classes: ['BRD','BST','PAL','CLR','DRU','ENC','MAG','NEC','RNG','SHD','SHM','WIZ'],
     scale: NON_HYBRID_CASTERS,
-    note: 'Ajuste de resistencia de −150, más −15 por clase lanzadora no híbrida. Contra enemigos que te resisten mucho.',
+    noteKey: 'iv.overchannel',
     good: ['resistencias'],
   },
   recovery: {
     label: 'Recovery', classes: ['BRD','BST','PAL','CLR','DRU','ENC','MAG','NEC','RNG','SHD','SHM','WIZ'],
-    note: 'Regeneras maná al doble y los hechizos cuestan un 5% menos. La de reserva para lanzadores.',
+    noteKey: 'iv.recovery',
     good: ['sostenido'],
   },
   spellblade: {
     label: 'Spellblade', classes: ['BST','PAL','RNG','SHD'],
-    note: 'Convierte la primera gema de hechizo en un proc. Pensada para builds que pegan a melé mientras procan.',
+    noteKey: 'iv.spellblade',
     good: ['hibrido', 'dano_melee'],
   },
   unyielding: {
     label: 'Unyielding', classes: ['BER','MNK','ROG','WAR'],
-    note: 'Duplica la regeneración de vida y da un 25% de resistencia a miedo, mez y encanto. Sin coste.',
+    noteKey: 'iv.unyielding',
     good: ['sostenido', 'control'],
   },
 };

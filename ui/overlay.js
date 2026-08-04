@@ -16,6 +16,7 @@ const dotFor = (name) => {
   return DOTS[h % DOTS.length];
 };
 
+const KIND = { 'físico': 'fisico', 'mágico': 'magico', 'equilibrado': 'equilibrado' };
 let lastFightId = null;
 let flashUntil = 0;
 
@@ -27,7 +28,8 @@ function briefFrom(a) {
   if (best.key === cur) return null;
   const mix = a.incoming.meleeShare;
   const kind = mix > 0.7 ? 'melé' : mix < 0.3 ? 'mágico' : 'mixto';
-  return `Daño ${kind} · ${best.label} evitaría ${Math.round(best.share * 100)}%`;
+  return t('ov.brief', { kind: t(`adv.kind.${KIND[kind] ?? 'equilibrado'}`), stance: best.label,
+    pct: Math.round(best.share * 100) });
 }
 const MAX_ROWS = 8;
 
@@ -46,7 +48,7 @@ function renderTimers(list) {
 function showFinal(f) {
   const el = $('oFinal');
   if (!el) return;
-  el.innerHTML = `<div class="eyebrow">${esc(f.label ?? 'pelea cerrada')}</div>
+  el.innerHTML = `<div class="eyebrow">${esc(f.label ?? t('ov.fightEnded'))}</div>
     <b>${n0(f.raidDps)}</b> <span class="eyebrow">dps · ${secs(f.duration)}</span>`;
   el.style.display = 'block';
   flashUntil = Date.now() + 4000;
@@ -55,7 +57,9 @@ function showFinal(f) {
 
 window.eql.onSnapshot((snap) => {
   renderTimers(snap.timers ?? []);
-  const tip = snap.live?.suggest ? `Cambia a ${snap.live.best} · daño ${snap.live.kind}` : null;
+  const tip = snap.live?.suggest
+    ? `${t('say.switchTo', { stance: snap.live.best })} · ${t(`adv.kind.${KIND[snap.live.kind] ?? 'equilibrado'}`)}`
+    : null;
   const el = document.getElementById('oAdvice');
   if (el) { el.textContent = tip ?? ''; el.style.display = tip ? 'block' : 'none'; }
   const f = snap.current ?? snap.history[0];
@@ -75,7 +79,7 @@ window.eql.onSnapshot((snap) => {
   if (ft) ft.textContent = f?.label ?? '';
   $('oMeta').textContent = f ? `${n0(f.raidDps)} dps · ${secs(f.duration)}` : '';
   if (!f || !f.rows.length) {
-    $('oRows').innerHTML = '<div class="ov-empty">Sin combate</div>';
+    $('oRows').innerHTML = `<div class="ov-empty">${t('ov.noCombat')}</div>`;
     return;
   }
   $('oRows').innerHTML = f.rows.slice(0, MAX_ROWS).map((r) => {
