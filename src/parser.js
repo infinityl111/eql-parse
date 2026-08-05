@@ -222,6 +222,12 @@ export class Parser {
 
     // La postura sólo se conoce para tu personaje: el log no dice la de los demás.
     const me = this.self ?? 'You';
+    // También cuando el lanzador eres tú: en una resistencia, tu nombre viene
+    // en `caster`, no en `source`, y sin esto no sabríamos con qué invocación
+    // se lanzó el hechizo que te resistieron.
+    if (ev.caster === me && !ev.invocation) ev.invocation = this.invocation;
+    if (ev.caster === me && !ev.stance) ev.stance = this.stance;
+
     if (ev.source && ev.source === me) {
       ev.stance = ev.stance ?? this.stance;
       ev.invocation = ev.invocation ?? this.invocation;

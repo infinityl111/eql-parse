@@ -309,11 +309,11 @@ function renderFightList(snap) {
   parts.push(`<div class="flt">
     <select id="fltRange">${RANGES.map((r) => `<option value="${r.key}"${
       state.filter.range === r.key ? ' selected' : ''}>${esc(r.key === 'all' ? t('flt.all') : t(`flt.${r.key}`))}</option>`).join('')}</select>
-    <select id="fltFoe">
-      <option value="">${esc(t('flt.allFoes'))}</option>
-      ${state.foes.map((f) => `<option value="${esc(f.name)}"${
-        state.filter.foe === f.name ? ' selected' : ''}>${esc(f.name)} · ${f.n}</option>`).join('')}
-    </select>
+    <input id="fltFoe" list="foeList" placeholder="${esc(t('flt.allFoes'))}"
+      value="${esc(state.filter.foe ?? '')}" autocomplete="off">
+    <datalist id="foeList">
+      ${state.foes.map((f) => `<option value="${esc(f.name)}">${f.n}</option>`).join('')}
+    </datalist>
   </div>
   <button class="sumbtn" id="btnSummary">${esc(t('sum.open'))}</button>`);
 
@@ -345,7 +345,24 @@ function renderFightList(snap) {
   list.innerHTML = html;
 
   $('fltRange')?.addEventListener('change', (e) => { state.filter.range = e.target.value; refreshFights(); });
-  $('fltFoe')?.addEventListener('change', (e) => { state.filter.foe = e.target.value; refreshFights(); });
+  // Se espera a que dejes de escribir: filtrar en cada tecla releería el índice
+  // entero con cada letra.
+  let foeTimer = null;
+  $('fltFoe')?.addEventListener('input', (e) => {
+    const v = e.target.value;
+    clearTimeout(foeTimer);
+    foeTimer = setTimeout(() => {
+      if (state.filter.foe === v) return;
+      state.filter.foe = v;
+      refreshFights();
+    }, 350);
+  });
+  $('fltFoe')?.addEventListener('change', (e) => {
+    clearTimeout(foeTimer);
+    if (state.filter.foe === e.target.value) return;
+    state.filter.foe = e.target.value;
+    refreshFights();
+  });
   $('btnSummary')?.addEventListener('click', async () => {
     const r = RANGES.find((x) => x.key === state.filter.range);
     state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null,
@@ -1316,7 +1333,12 @@ function foeDossier(a) {
         <span>${esc(x.spell)}</span>
         <b class="${x.rate >= 0.6 ? 'bad' : x.rate <= 0.2 ? 'good' : ''}">${Math.round((1 - x.rate) * 100)}%</b>
         <span class="dim">${esc(t('foe.lands'))} · ${x.landed}/${x.landed + x.resisted}</span>
-      </div>`).join('')}</div>` : ''}
+      </div>
+      ${(x.byInv ?? []).map((b) => `<div class="foe-det-l sub">
+        <span>${esc(b.inv ? t('foe.withInv', { inv: b.inv }) : t('foe.noInv'))}</span>
+        <b class="${b.rate >= 0.6 ? 'bad' : b.rate <= 0.2 ? 'good' : ''}">${Math.round((1 - b.rate) * 100)}%</b>
+        <span class="dim">${b.landed}/${b.landed + b.resisted}</span>
+      </div>`).join('')}`).join('')}</div>` : ''}
 
     ${mob ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.wiki'))}</div>
       ${mob.lines.map((l) => `<div class="fw-line">${esc(l)}</div>`).join('')}</div>` : ''}

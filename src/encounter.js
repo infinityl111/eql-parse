@@ -260,7 +260,7 @@ export class EncounterTracker extends EventEmitter {
           this.current.resistsSuffered++;
           // Contra QUIÉN y con QUÉ hechizo: es lo que permite saber después a
           // qué es resistente cada bicho, medido en tus propias peleas.
-          this.#tally(this.current, ev.target, ev.ability, 'resisted');
+          this.#tally(this.current, ev.target, ev.ability, 'resisted', ev.invocation);
         }
       } else if (ev.kind === 'resist_by_you') this.current.resistsCaused++;
       else if (ev.kind === 'interrupt') this.current.interrupts++;
@@ -270,7 +270,7 @@ export class EncounterTracker extends EventEmitter {
       else if (ev.kind === 'stance' && ev.stance) this.current.stancesSeen.add(ev.stance);
       // Un hechizo tuyo que sí entró, para saber la proporción.
       if (ev.kind === 'spell' && ev.ability && ev.target && ev.source === this.self) {
-        this.#tally(this.current, ev.target, ev.ability, 'landed');
+        this.#tally(this.current, ev.target, ev.ability, 'landed', ev.invocation);
       }
       else if (ev.kind === 'invocation' && ev.invocation) this.current.invocationsSeen.add(ev.invocation);
     }
@@ -336,10 +336,13 @@ export class EncounterTracker extends EventEmitter {
   }
 
   /** Anota si un hechizo tuyo entró o fue resistido contra ese enemigo. */
-  #tally(enc, foe, spell, field) {
+  #tally(enc, foe, spell, field, inv = null) {
     if (!enc || !foe || !spell) return;
-    const k = `${foe}\u0000${spell}`;
-    const e = enc.spellVsFoe.get(k) ?? { foe, spell, landed: 0, resisted: 0 };
+    // La invocación forma parte de la clave: Over Channel resta 150 a la
+    // resistencia del objetivo, así que mezclar intentos con y sin ella daría
+    // una media que no describe ninguna de las dos situaciones.
+    const k = `${foe}\u0000${spell}\u0000${inv ?? ''}`;
+    const e = enc.spellVsFoe.get(k) ?? { foe, spell, inv: inv ?? null, landed: 0, resisted: 0 };
     e[field] += 1;
     enc.spellVsFoe.set(k, e);
   }

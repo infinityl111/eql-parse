@@ -41,6 +41,7 @@ export const LANGS = [
 ];
 
 const ES = {
+  'foe.withInv': 'con {inv}', 'foe.noInv': 'sin invocación',
   'foe.hpFrom_1': 'de una muerte',
   'foe.hp': 'Vida estimada', 'foe.hpFrom': 'de {n} muertes', 'foe.howHits': 'Cómo te pega', 'foe.drops': 'Botín que suelta', 'foe.zones': 'Zonas',
   'foe.maxHit': 'Máximo', 'foe.dealtYou': 'Te hizo', 'foe.youDealt': 'Le hiciste', 'foe.file': 'Ficha del enemigo', 'foe.seeWiki': 'Ver en la wiki',
@@ -350,6 +351,7 @@ const ES = {
 };
 
 const EN = {
+  'foe.withInv': 'with {inv}', 'foe.noInv': 'no invocation',
   'foe.hpFrom_1': 'from one kill',
   'foe.hp': 'Estimated health', 'foe.hpFrom': 'from {n} kills', 'foe.howHits': 'How it hits you', 'foe.drops': 'What it drops', 'foe.zones': 'Zones',
   'foe.maxHit': 'Biggest hit', 'foe.dealtYou': 'Dealt to you', 'foe.youDealt': 'You dealt', 'foe.file': 'Enemy file', 'foe.seeWiki': 'See on the wiki',
@@ -649,6 +651,7 @@ const EN = {
 
 
 const FR = {
+  'foe.withInv': 'avec {inv}', 'foe.noInv': 'sans invocation',
   'foe.hpFrom_1': 'sur une mort',
   'foe.hp': 'Vie estimée', 'foe.hpFrom': 'sur {n} morts', 'foe.howHits': 'Comment il frappe', 'foe.drops': 'Ce qu\u2019il lâche', 'foe.zones': 'Zones',
   'foe.maxHit': 'Coup max', 'foe.dealtYou': 'T\u2019a infligé', 'foe.youDealt': 'Tu as infligé', 'foe.file': 'Fiche de l\u2019ennemi', 'foe.seeWiki': 'Voir sur le wiki',
@@ -1036,6 +1039,7 @@ const FR = {
 };
 
 const DE = {
+  'foe.withInv': 'mit {inv}', 'foe.noInv': 'ohne Invokation',
   'foe.hpFrom_1': 'aus einem Kill',
   'foe.hp': 'Geschätzte Lebenspunkte', 'foe.hpFrom': 'aus {n} Kills', 'foe.howHits': 'Wie er dich trifft', 'foe.drops': 'Was er fallen lässt', 'foe.zones': 'Zonen',
   'foe.maxHit': 'Größter Treffer', 'foe.dealtYou': 'Hat dir zugefügt', 'foe.youDealt': 'Du hast zugefügt', 'foe.file': 'Gegnerakte', 'foe.seeWiki': 'Im Wiki ansehen',
@@ -1423,6 +1427,7 @@ const DE = {
 };
 
 const PT = {
+  'foe.withInv': 'com {inv}', 'foe.noInv': 'sem invocação',
   'foe.hpFrom_1': 'de uma morte',
   'foe.hp': 'Vida estimada', 'foe.hpFrom': 'de {n} mortes', 'foe.howHits': 'Como te bate', 'foe.drops': 'O que larga', 'foe.zones': 'Zonas',
   'foe.maxHit': 'Máximo', 'foe.dealtYou': 'Fez-te', 'foe.youDealt': 'Fizeste-lhe', 'foe.file': 'Ficha do inimigo', 'foe.seeWiki': 'Ver na wiki',

@@ -172,8 +172,12 @@ export function aggregate(fights, self = null) {
       const e = foes.get(x.foe);
       if (!e) continue;
       if (!e.spells) e.spells = new Map();
-      const c = e.spells.get(x.spell) ?? { spell: x.spell, landed: 0, resisted: 0 };
+      const c = e.spells.get(x.spell) ?? { spell: x.spell, landed: 0, resisted: 0, byInv: new Map() };
       c.landed += x.landed; c.resisted += x.resisted;
+      const key = x.inv ?? '';
+      const b = c.byInv.get(key) ?? { inv: x.inv ?? null, landed: 0, resisted: 0 };
+      b.landed += x.landed; b.resisted += x.resisted;
+      c.byInv.set(key, b);
       e.spells.set(x.spell, c);
     }
 
@@ -216,7 +220,17 @@ export function aggregate(fights, self = null) {
           min: Math.min(...e.hpSamples), max: Math.max(...e.hpSamples),
         } : null,
         spells: [...(e.spells ?? new Map()).values()]
-          .map((c) => ({ ...c, rate: c.landed + c.resisted ? c.resisted / (c.landed + c.resisted) : 0 }))
+          .map((c) => ({
+            ...c,
+            rate: c.landed + c.resisted ? c.resisted / (c.landed + c.resisted) : 0,
+            // Sólo se desglosa si hubo intentos con más de una invocación:
+            // con una sola, repetir la misma cifra no aporta nada.
+            byInv: [...(c.byInv ?? new Map()).values()]
+              .filter((b) => b.landed + b.resisted >= 2)
+              .map((b) => ({ ...b, rate: b.resisted / (b.landed + b.resisted) }))
+              .sort((a, b) => (b.landed + b.resisted) - (a.landed + a.resisted)),
+          }))
+          .map((c) => ({ ...c, byInv: c.byInv.length > 1 ? c.byInv : [] }))
           .sort((a, b) => (b.landed + b.resisted) - (a.landed + a.resisted)).slice(0, 12),
       }))
       .sort((a, b) => b.damageTo - a.damageTo),

@@ -634,3 +634,9 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 
 .metric b + span, .metric span { margin-left: 5px; }
 .dossier .metrics { flex-wrap: wrap; gap: 6px 10px; }
+.flt input { flex: 1; min-width: 0; font-family: var(--body); font-size: 11.5px;
+             padding: 4px 6px; background: var(--slate-900); color: var(--bone);
+             border: 1px solid var(--slate-700); }
+.flt input:focus { outline: none; border-color: var(--t-cold); }
+.foe-det-l.sub { padding-left: 16px; font-size: 10.5px; color: var(--bone-faint); }
+.foe-det-l.sub b { min-width: 52px; }

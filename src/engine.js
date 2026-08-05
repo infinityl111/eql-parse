@@ -304,6 +304,12 @@ export class Engine extends EventEmitter {
       this.narrator.setPets([...this.parser.pets.keys()]);
       // El agregador tiene su propia zona y no se entera del precargado: sin
       // esto, las peleas de la sesión nacen sin zona hasta el siguiente cambio.
+      // Lo que no aparezca en la ventana releída se recupera de lo guardado.
+      const saved = this.#resumeInfo(logPath);
+      if (!this.parser.zone && saved?.zone) this.parser.zone = saved.zone;
+      if (!this.parser.stance && saved?.stance) this.parser.stance = saved.stance;
+      if (!this.parser.invocation && saved?.invocation) this.parser.invocation = saved.invocation;
+
       if (this.parser.zone) {
         if (this.tracker) this.tracker.zone = this.parser.zone;
         if (this.session) this.session.zone = this.parser.zone;
@@ -569,17 +575,25 @@ export class Engine extends EventEmitter {
     try {
       fs.mkdirSync(this.store.dir, { recursive: true });
       fs.writeFileSync(path.join(this.store.dir, 'resume.json'), JSON.stringify({
-        [this.path]: { offset: this.tailer?.offset ?? null, self: this.self, at: Date.now() },
+        [this.path]: {
+          offset: this.tailer?.offset ?? null, self: this.self, at: Date.now(),
+          // La zona también: si llevas horas en la misma, su línea de entrada
+          // queda fuera de los 512 KB que se releen y se perdería al reabrir.
+          zone: this.parser?.zone ?? null,
+          stance: this.parser?.stance ?? null,
+          invocation: this.parser?.invocation ?? null,
+        },
       }));
     } catch { /* disco lleno o permisos */ }
   }
 
-  #resumeOffset(logPath) {
+  #resumeInfo(logPath) {
     try {
-      const r = JSON.parse(fs.readFileSync(path.join(this.store.dir, 'resume.json'), 'utf8'));
-      return r[logPath]?.offset ?? null;
+      return JSON.parse(fs.readFileSync(path.join(this.store.dir, 'resume.json'), 'utf8'))[logPath] ?? null;
     } catch { return null; }
   }
+
+  #resumeOffset(logPath) { return this.#resumeInfo(logPath)?.offset ?? null; }
 
   /** Peleas del índice según tramo y enemigo. */
   queryHistory(q = {}) {
