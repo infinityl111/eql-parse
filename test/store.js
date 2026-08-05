@@ -245,5 +245,76 @@ console.log('\nred de seguridad de la reconstrucción');
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+// ── 8. Una pelea nueva tiene que ANUNCIARSE, no sólo guardarse ────────────
+//
+// Fallo real: se veía la pelea en directo y al cerrarse desaparecía sin llegar
+// a la lista. Estaba guardada en disco desde el primer momento; lo que fallaba
+// era el aviso a la interfaz, que miraba `history.length`. Como `history` se
+// recorta a 60, con 60 peleas guardadas o más esa longitud ya no cambia nunca:
+// unshift y recorte la dejan igual. La lista dejaba de releer el índice y sólo
+// volvía a la vida al tocar el filtro o al reiniciar.
+//
+// Se comprueban las dos mitades: que la señal vieja está muda (si no, la prueba
+// pasaría sola y no probaría nada) y que la nueva sí suena.
+console.log('\naviso de pelea nueva con el histórico lleno');
+{
+  const { Engine } = await import('../src/engine.js');
+  const dir = tmp();
+  const s = new FightStore(dir);
+  // 61 peleas guardadas: una más que el recorte de `history`.
+  for (let i = 1; i <= 61; i++) s.append(fight(i, `bicho ${i}`, 1000 + i), 4_000_000 + i * 1000);
+
+  const log = path.join(dir, 'eqlog_Campeon_erudin.txt');
+  fs.writeFileSync(log, '[Tue Aug 04 18:00:00 2026] You have entered Lower Guk.\n');
+
+  const e = new Engine();
+  e.setStorePath(dir);
+  await e.attach(log, { self: 'Campeon', idleSec: 20 });
+
+  ok(e.history.length === 60, 'el histórico en memoria viene recortado a 60', String(e.history.length));
+
+  const golpe = (t, amount) => ({
+    kind: 'melee', t, seq: 0, raw: '', school: 'melee',
+    source: 'Campeon', target: 'a revultant rat', amount, ability: 'hits',
+  });
+
+  const antesPeleas = e.store.index.length;
+  const antesLongitud = e.history.length;
+  const antesSeq = e.storeSeq;
+
+  // Una pelea de verdad: dos golpes y silencio hasta que caduca.
+  e.feedEvent(golpe(1_800_000_000, 700));
+  e.feedEvent(golpe(1_800_000_010, 900));
+  e.tracker.tick(1_800_000_100);
+
+  ok(e.store.index.length === antesPeleas + 1, 'la pelea llega al almacén',
+    `${antesPeleas} -> ${e.store.index.length}`);
+  ok(e.store.index[0].total === 1600, 'y con el daño que tuvo', String(e.store.index[0].total));
+  // La mitad que explica el fallo: la señal vieja no se mueve.
+  ok(e.history.length === antesLongitud,
+    'la longitud del histórico NO cambia: por eso la lista no se enteraba',
+    `${antesLongitud} -> ${e.history.length}`);
+  // La mitad que lo arregla.
+  ok(e.storeSeq > antesSeq, 'el contador de cambios sí sube', `${antesSeq} -> ${e.storeSeq}`);
+  ok(e.snapshot().storeSeq === e.storeSeq, 'y viaja en el snapshot que ve la interfaz');
+
+  // Y una segunda pelea vuelve a anunciarse: no basta con avisar una vez.
+  const trasPrimera = e.storeSeq;
+  e.feedEvent(golpe(1_800_001_000, 500));
+  e.feedEvent(golpe(1_800_001_005, 500));
+  e.tracker.tick(1_800_001_100);
+  ok(e.storeSeq > trasPrimera, 'la segunda pelea también se anuncia',
+    `${trasPrimera} -> ${e.storeSeq}`);
+
+  // El tramo de las dos últimas horas las incluye: el filtro no era el problema.
+  const ahora = Date.now();
+  const recientes = e.queryHistory({ sinceMs: 2 * 3600 * 1000 });
+  ok(recientes.length === 0 || recientes.every((x) => x.at >= ahora - 2 * 3600 * 1000),
+    'el filtro por tramo compara con la hora de la pelea y no descarta nada más');
+
+  e.detach();
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

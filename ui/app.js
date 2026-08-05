@@ -1919,10 +1919,20 @@ function renderChrome(snap) {
   $('fPath').textContent = snap.path ?? '';
 }
 
-let lastHistLen = -1;
+/**
+ * El índice se relee cuando el motor dice que ha cambiado, no cuando cambia la
+ * longitud de `snap.history`.
+ *
+ * `history` viene recortada a 60. Con 60 peleas guardadas o más su longitud se
+ * queda clavada en 60 para siempre, así que la comparación nunca volvía a ser
+ * cierta: la lista dejaba de refrescarse sola y una pelea recién terminada no
+ * aparecía hasta tocar el filtro o reiniciar. Se veía en directo, se cerraba y
+ * desaparecía. Estaba guardada en disco desde el primer momento.
+ */
+let lastStoreSeq = -1;
 window.eql.onSnapshot((snap) => {
   state.snap = snap;
-  if (snap.history.length !== lastHistLen) { lastHistLen = snap.history.length; refreshFights(); }
+  if (snap.storeSeq !== lastStoreSeq) { lastStoreSeq = snap.storeSeq; refreshFights(); }
   // Un fallo pintando la cabecera no debe impedir que se pinte el resto,
   // ni dejar la interfaz congelada.
   try { renderChrome(snap); } catch (err) { console.error('renderChrome:', err); }
@@ -2137,7 +2147,7 @@ async function showMigration() {
       state.fightCache.clear();
       state.summary = null;
       state.selectedFight = 'live';
-      lastHistLen = -1;
+      lastStoreSeq = -1;
       refreshFights();
     } else {
       const motivo = t(`mig.fail.${r?.reason ?? 'error-de-lectura'}`);

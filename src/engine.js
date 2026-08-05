@@ -132,6 +132,17 @@ export class Engine extends EventEmitter {
     this.storePath = null;      // fichero de peleas guardadas
     this.store = null;
     this.history = [];          // peleas cerradas, la más reciente primero
+    // Contador de cambios del histórico: sube cada vez que una pelea llega al
+    // almacén o que se cambia de almacén. Es la señal que usa la lista para
+    // saber que tiene que releer el índice.
+    //
+    // Antes esa señal era `history.length`, y `history` está recortada a 60. Con
+    // 60 peleas guardadas o más la longitud ya no volvía a cambiar nunca —
+    // unshift y recorte la dejan igual—, así que la lista dejaba de refrescarse
+    // y las peleas nuevas no aparecían hasta tocar el filtro o reiniciar. Se
+    // veían en directo y desaparecían al cerrarse. Estaban guardadas: no se
+    // enseñaban.
+    this.storeSeq = 0;
     this.saveTimer = null;
     this.foes = new Set();
     this.recent = [];           // daño recibido reciente, para el consejo en vivo
@@ -178,6 +189,7 @@ export class Engine extends EventEmitter {
         const sum = this.store?.append(f, at) ?? f;
         this.history.unshift(sum);
         if (this.history.length > 60) this.history.length = 60;
+        this.storeSeq++;
         this.saveStore();
       }
       this.petPrompt(f);
@@ -191,6 +203,7 @@ export class Engine extends EventEmitter {
     // Se recupera lo guardado de ESTE log y se reanuda por donde iba, así que
     // sólo se relee lo que se escribió mientras la aplicación estaba cerrada.
     this.history = this.store ? this.store.filter({ limit: 60 }) : [];
+    this.storeSeq++;
     let resume = opts.fromStart ? null : this.#resumeOffset(logPath);
 
     // Primera vez con este log: sin nada guardado y sin punto de reanudación,
@@ -851,6 +864,7 @@ export class Engine extends EventEmitter {
     } catch { /* aún no hay lista */ }
     const n = this.store.load();
     this.history = this.store.filter({ limit: 60 });
+    this.storeSeq++;
     return n;
   }
 
@@ -1138,6 +1152,10 @@ export class Engine extends EventEmitter {
       timers: this.triggers.snapshot(),
       current,
       history: this.history,
+      // Lo que mira la lista para saber si tiene que releer el índice. No es un
+      // número de peleas: es un contador de cambios, y por eso sirve aunque
+      // `history` esté recortada y su longitud no se mueva.
+      storeSeq: this.storeSeq,
       session: this.#enc(this.session?.current),
       lastKill: this.lastKill ?? null,
       sessionDps: this.#sessionDps(),
