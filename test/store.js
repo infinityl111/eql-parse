@@ -316,5 +316,87 @@ console.log('\naviso de pelea nueva con el histórico lleno');
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+// ── 9. La pila de combates del overlay ────────────────────────────────────
+//
+// El overlay pasa a ir combate a combate: cada pelea cerrada es una entrada.
+// Lo que se comprueba aquí es el contrato del motor con él, que es lo único
+// que se puede medir sin una pantalla delante:
+//   - una pelea cerrada entra en la pila, recortada y con identidad propia,
+//   - la relectura del histórico NO la ensucia con peleas de hace horas,
+//   - el reset la vacía junto al acumulado de la sesión.
+console.log('\npila de combates del overlay');
+{
+  const { Engine, overlayFight, fightKey } = await import('../src/engine.js');
+  const dir = tmp();
+  const log = path.join(dir, 'eqlog_Campeon_erudin.txt');
+  fs.writeFileSync(log, '[Tue Aug 04 18:00:00 2026] You have entered Lower Guk.\n');
+
+  const e = new Engine();
+  e.setStorePath(dir);
+  await e.attach(log, { self: 'Campeon', idleSec: 20 });
+
+  const golpe = (t, target, amount) => ({
+    kind: 'melee', t, seq: 0, raw: '', school: 'melee',
+    source: 'Campeon', target, amount, ability: 'hits',
+  });
+
+  ok(e.closedFights.length === 0, 'la pila arranca vacía');
+
+  e.feedEvent(golpe(1_800_000_000, 'a spectre', 1200));
+  e.feedEvent(golpe(1_800_000_020, 'a spectre', 800));
+  e.tracker.tick(1_800_000_100);
+
+  ok(e.closedFights.length === 1, 'la pelea cerrada entra en la pila');
+  const b = e.closedFights[0];
+  ok(b.total === 2000 && b.label === 'a spectre', 'con su daño y su nombre',
+    `${b.label} · ${b.total}`);
+  ok(b.rows.some((r) => r.name === 'Campeon' && r.side === 'ally')
+    && b.rows.some((r) => r.name === 'a spectre' && r.side === 'enemy'),
+    'y los dos bandos separados');
+  // Recortada: sin series, sin casts, sin hechizos por enemigo. Es lo que
+  // permite mandarla por su canal sin cargarse el ritmo del overlay.
+  ok(b.series === undefined && b.casts === undefined && b.spellVsFoe === undefined,
+    'va recortada: nada de lo que el overlay no pinta');
+  ok(b.rows.every((r) => (r.abilities ?? []).length <= 6),
+    'y como mucho las seis habilidades que enseña el desglose');
+
+  // La identidad no puede ser el `id` a secas: al reconectar el log vuelve a
+  // empezar por 1 y un bloque nuevo taparía a uno que ya está en la pila.
+  ok(fightKey({ id: 1, start: 100 }) !== fightKey({ id: 1, start: 200 }),
+    'dos peleas con el mismo id pero distinto inicio son distintas');
+  ok(overlayFight(null) === null, 'sin pelea no hay bloque');
+
+  // Segunda pelea: entra por delante.
+  e.feedEvent(golpe(1_800_001_000, 'a revultant rat', 500));
+  e.feedEvent(golpe(1_800_001_010, 'a revultant rat', 500));
+  e.tracker.tick(1_800_001_100);
+  ok(e.closedFights.length === 2 && e.closedFights[0].label === 'a revultant rat',
+    'la más reciente va arriba', e.closedFights[0].label);
+  ok(e.closedFights[0].key !== e.closedFights[1].key, 'y cada bloque tiene su identidad');
+
+  // Al releer el histórico no se apila nada: son peleas de hace horas y
+  // aparecerían en el overlay como si acabaran de terminar.
+  e.backfilling = true;
+  e.feedEvent(golpe(1_800_002_000, 'an ire ghast', 900));
+  e.feedEvent(golpe(1_800_002_010, 'an ire ghast', 900));
+  e.tracker.tick(1_800_002_100);
+  e.backfilling = false;
+  ok(e.closedFights.length === 2, 'la relectura del histórico no ensucia la pila',
+    String(e.closedFights.length));
+  ok(e.store.index.length === 3, 'pero sí se guarda, que es otra cosa',
+    String(e.store.index.length));
+
+  // Borrón y cuenta nueva: las dos mitades a la vez.
+  e.killAgg.set('Campeon', { damage: 1000, seconds: 10, kills: 1 });
+  e.resetSession();
+  ok(e.closedFights.length === 0, 'el reset vacía la pila de combates');
+  ok(e.killAgg.size === 0, 'y el acumulado de la sesión con ella');
+  ok(e.store.index.length === 3, 'sin tocar el histórico guardado',
+    String(e.store.index.length));
+
+  e.detach();
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

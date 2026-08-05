@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('eql', {
   detach: () => ipcRenderer.invoke('log:detach'),
   openOverlay: () => ipcRenderer.invoke('overlay:open'),
   resetSession: () => ipcRenderer.invoke('session:reset'),
+  // La pila de combates del overlay: lo que ya hay, y lo que va cayendo.
+  overlayFights: () => ipcRenderer.invoke('overlay:fights'),
+  onFightClosed: (fn) => ipcRenderer.on('fight:closed', (_e, f) => fn(f)),
+  onSessionCleared: (fn) => ipcRenderer.on('session:cleared', () => fn()),
   queryHistory: (q) => ipcRenderer.invoke('history:query', q),
   getFight: (uid) => ipcRenderer.invoke('history:fight', uid),
   foeList: (sinceMs) => ipcRenderer.invoke('history:foes', sinceMs),

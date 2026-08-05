@@ -88,6 +88,47 @@ export function parseLogName(p) {
   return m ? { character: m[1], server: m[2] } : { character: null, server: null };
 }
 
+/** Cuántas peleas cerradas conserva el overlay. Las de abajo se caen. */
+const OVERLAY_FIGHTS = 10;
+
+/**
+ * Identidad de una pelea DENTRO de la sesión, para el overlay.
+ *
+ * No vale el `id` a secas: al reconectar el log vuelve a empezar por 1 y un
+ * bloque nuevo se confundiría con uno que ya está en la pila. Con el instante
+ * de inicio delante no se repite.
+ */
+export const fightKey = (f) => (f ? `${f.id}@${Math.round(f.start ?? 0)}` : null);
+
+/**
+ * Lo que el overlay necesita de una pelea cerrada, y ni un campo más.
+ *
+ * Una pelea completa ocupa entre 10 y 30 KB —lo que ocupa en el almacén—, y al
+ * overlay le llega un envío cada medio segundo. Mandar las diez últimas en cada
+ * envío serían cientos de kilobytes por segundo para unas cifras que sólo
+ * cambian cuando termina un combate. Se recorta una vez, al cerrar, y se manda
+ * una sola vez por su propio canal.
+ *
+ * Las filas conservan los NOMBRES de los campos que trae la pelea viva, para
+ * que el overlay pinte las dos con el mismo código: lo único que las distingue
+ * es de dónde vienen.
+ */
+export function overlayFight(f) {
+  if (!f) return null;
+  return {
+    key: fightKey(f), label: f.label, duration: f.duration, at: Date.now(),
+    total: f.total, enemyTotal: f.enemyTotal, dead: f.dead ?? {},
+    rows: (f.rows ?? []).map((r) => ({
+      name: r.name, side: r.side, damage: r.damage, dps: r.dps, share: r.share,
+      types: r.types, petOf: r.petOf ?? null, max: r.max, crits: r.crits,
+      meleeHits: r.meleeHits, misses: r.misses, accuracy: r.accuracy,
+      taken: r.taken, healingDone: r.healingDone,
+      // Seis: es lo que enseña el desglose al desplegar una fila, ni una más.
+      abilities: (r.abilities ?? []).slice(0, 6),
+    })),
+  };
+}
+
 export class Engine extends EventEmitter {
   constructor() {
     super();
@@ -143,6 +184,9 @@ export class Engine extends EventEmitter {
     // veían en directo y desaparecían al cerrarse. Estaban guardadas: no se
     // enseñaban.
     this.storeSeq = 0;
+    // Las últimas peleas cerradas, recortadas para el overlay. Van por su
+    // propio canal y no en el snapshot: ver overlayFight().
+    this.closedFights = [];
     this.saveTimer = null;
     this.foes = new Set();
     this.recent = [];           // daño recibido reciente, para el consejo en vivo
@@ -179,6 +223,7 @@ export class Engine extends EventEmitter {
     });
     this.tracker.on('close', (enc) => {
       const f = this.#enc(enc);
+      let cerrada = null;              // la versión recortada, para el overlay
       this.narrator.fightEnd(f);
       for (const n of this.parser?.pets.keys() ?? []) this.knownPets.add(n);
       if (f && (f.total > 0 || f.enemyTotal > 0)) {
@@ -191,14 +236,27 @@ export class Engine extends EventEmitter {
         if (this.history.length > 60) this.history.length = 60;
         this.storeSeq++;
         this.saveStore();
+        // El overlay apila las peleas cerradas: la misma condición que para
+        // guardarla, así lo que se ve arriba es lo que hay en la lista.
+        //
+        // Durante la relectura del histórico no se apila nada: son peleas de
+        // hace horas y aparecerían como si acabaran de terminar.
+        if (!this.backfilling) {
+          cerrada = overlayFight(f);
+          this.closedFights.unshift(cerrada);
+          if (this.closedFights.length > OVERLAY_FIGHTS) this.closedFights.length = OVERLAY_FIGHTS;
+        }
       }
       this.petPrompt(f);
-      this.emit('encounter');
+      this.emit('encounter', cerrada);
     });
     this.tracker.on('open', () => { this.foes.clear(); this.narrator.fightStart(); });
-    // Acumulador de sesión: mismos eventos, pero no se cierra nunca. Es lo que
-    // ve el overlay, que sólo se pone a cero cuando tú lo pides.
+    // Acumulador de sesión: mismos eventos, pero no se cierra nunca. Es la
+    // referencia de cómo llevas la sesión, y sólo se pone a cero cuando tú lo
+    // pides. La pila de combates del overlay arranca vacía con cada log: las
+    // peleas del anterior no son de esta sesión.
     this.session = new EncounterTracker({ self: this.self, idleSec: Number.POSITIVE_INFINITY });
+    this.closedFights = [];
 
     // Se recupera lo guardado de ESTE log y se reanuda por donde iba, así que
     // sólo se relee lo que se escribió mientras la aplicación estaba cerrada.
@@ -667,6 +725,10 @@ export class Engine extends EventEmitter {
     const z = parseZone(enc.zone);
     return {
       id: enc.id,
+      // La misma identidad que llevan las cerradas: es lo que permite al
+      // overlay saber que el bloque de arriba y el que acaba de llegar por el
+      // otro canal son la misma pelea, y no pintarla dos veces.
+      key: fightKey({ id: enc.id, start: enc.start }),
       zone: enc.zone,
       zoneBase: z.base, zoneMode: z.mode, diff: z.diff, diffTag: z.tag,
       // Nivel y clases de ESTA pelea. `null` significa que no se sabe, y se
@@ -1056,13 +1118,21 @@ export class Engine extends EventEmitter {
     return out;
   }
 
-  /** Pone a cero el acumulado del overlay sin tocar el histórico de peleas. */
+  /**
+   * Borrón y cuenta nueva en el overlay, sin tocar el histórico de peleas.
+   *
+   * Vacía las dos cosas a la vez —la pila de combates y el acumulado de la
+   * sesión— porque son la misma pregunta: «empiezo a contar de nuevo». Vaciar
+   * una y dejar la otra daría una pantalla donde la tira de sesión habla de
+   * peleas que ya no se ven.
+   */
   resetSession() {
     this.lastKill = null;
     this.suggestKey = null;
     this.suggestSince = null;
     this.killAgg.clear();
     this.recentHits.length = 0;
+    this.closedFights = [];
     this.session = new EncounterTracker({ self: this.self, idleSec: Number.POSITIVE_INFINITY });
     if (this.tracker) this.session.zone = this.tracker.zone;
     return true;

@@ -32,24 +32,45 @@
   .ov-btn:hover { color: var(--bone); background: rgba(255,255,255,.09); }
   .ov-btn.close:hover { color: #fff; background: var(--t-ds); }
 
-  .ov-final { padding: 6px 9px; margin: 4px 7px 0; text-align: center; flex: none;
-              background: rgba(111,199,216,.14); border-left: 2px solid var(--t-cold); }
-  .ov-final b { font-family: var(--mono); font-size: 14px; }
   .ov-advice { margin: 4px 7px 0; padding: 4px 7px; font-size: 11px; flex: none;
                background: rgba(224,138,75,.15); border-left: 2px solid var(--t-fire); }
 
-  /* Dos columnas: los tuyos a la izquierda, los enemigos a la derecha */
-  .ov-cols { flex: 1; display: grid; grid-template-columns: 1fr 1fr;
-             gap: 1px; background: rgba(51,61,78,.5); min-height: 0; }
-  .ov-col { display: flex; flex-direction: column; min-height: 0;
-            background: rgba(18,22,30,.35); }
-  :root[data-theme="light"] .ov-col { background: rgba(255,253,248,.4); }
-  .ov-col-h { display: flex; align-items: baseline; gap: 6px; padding: 4px 8px; flex: none;
-              border-bottom: 1px solid rgba(51,61,78,.6); }
-  .ov-col-h .n { margin-left: auto; font-family: var(--mono); font-size: 11px; }
-  .ov-list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 3px 8px 6px; }
-  .ov-list::-webkit-scrollbar { width: 6px; }
-  .ov-list::-webkit-scrollbar-thumb { background: var(--slate-600); border-radius: 3px; }
+  /* La tira de sesión: fija arriba, nunca rota. Es la referencia de cómo vas
+     tú en la sesión mientras los combates de abajo van cayendo. */
+  .ov-ses { display: flex; align-items: baseline; gap: 7px; flex: none;
+            padding: 4px 9px; border-bottom: 1px solid rgba(51,61,78,.7);
+            background: rgba(139,123,216,.13); }
+  .ov-ses .eyebrow { font-size: 9px; }
+  .ov-ses .who { font-size: 11.5px; color: var(--t-cold); }
+  .ov-ses .tot { margin-left: auto; font-family: var(--mono); font-size: 13px; }
+  .ov-ses .rate { font-family: var(--mono); font-size: 9.5px; color: var(--bone-dim); }
+
+  /* La pila de combates. El scroll vive aquí y no dentro de cada bloque: así
+     los cerrados van bajando de verdad en vez de comprimirse. */
+  .ov-stack { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
+  .ov-stack::-webkit-scrollbar { width: 6px; }
+  .ov-stack::-webkit-scrollbar-thumb { background: var(--slate-600); border-radius: 3px; }
+
+  .ovf { border-bottom: 1px solid rgba(51,61,78,.5); }
+  .ovf-h { display: flex; align-items: baseline; gap: 6px; padding: 4px 8px; cursor: pointer; }
+  .ovf-h:hover { background: rgba(255,255,255,.05); }
+  .ovf.live .ovf-h { background: rgba(111,199,216,.13); }
+  .ovf.nueva .ovf-h { animation: ovf-in .9s ease-out; }
+  @keyframes ovf-in { from { background: rgba(111,199,216,.4); } }
+  @media (prefers-reduced-motion: reduce) { .ovf.nueva .ovf-h { animation: none; } }
+  .ovf-caret { font-size: 8px; color: var(--bone-faint); width: 9px; flex: none; }
+  .ovf-label { flex: 1; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ovf-tot { font-family: var(--mono); font-size: 11.5px; }
+  .ovf-dur { font-family: var(--mono); font-size: 9.5px; color: var(--bone-faint); width: 40px; text-align: right; }
+
+  /* Dos columnas dentro del bloque: los tuyos a la izquierda, los enemigos a
+     la derecha. Los porcentajes de las dos son de ESTA pelea. */
+  .ovf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+              background: rgba(51,61,78,.4); }
+  .ovf-col { background: rgba(18,22,30,.35); padding: 2px 8px 5px; min-width: 0; }
+  :root[data-theme="light"] .ovf-col { background: rgba(255,253,248,.4); }
+  .ovf-colh { display: flex; align-items: baseline; gap: 6px; padding: 1px 0 3px; }
+  .ovf-colh .n { margin-left: auto; font-family: var(--mono); font-size: 10px; }
 
   .ov-row { padding: 3px 0; cursor: pointer; }
   .ov-row:hover .ov-name { color: #fff; }
@@ -92,18 +113,12 @@
       <button class="ov-btn" id="oPass">◎</button>
       <button class="ov-btn close" id="oClose">✕</button>
     </div>
-    <div class="ov-final" id="oFinal" style="display:none"></div>
+    <div class="ov-ses" id="oSession"></div>
     <div class="ov-kill" id="oKill" style="display:none"></div>
     <div class="ov-advice" id="oAdvice" style="display:none"></div>
-    <div class="ov-cols">
-      <div class="ov-col">
-        <div class="ov-col-h"><span class="eyebrow" id="oAlliesH"></span><span class="n" id="oAlliesN"></span></div>
-        <div class="ov-list" id="oAllies"></div>
-      </div>
-      <div class="ov-col">
-        <div class="ov-col-h"><span class="eyebrow" id="oEnemiesH"></span><span class="n" id="oEnemiesN"></span></div>
-        <div class="ov-list" id="oEnemies"></div>
-      </div>
+    <div class="ov-stack" id="oStack">
+      <div id="oLive"></div>
+      <div id="oClosed"></div>
     </div>
   </div>
   <script type="module" src="overlay.js"></script>

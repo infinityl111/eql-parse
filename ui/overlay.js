@@ -1,5 +1,27 @@
 import { t, setLang } from '../src/i18n.js';
 
+/**
+ * El overlay va combate a combate.
+ *
+ * Arriba, una tira fija con TU marcha de la sesión: daño acumulado y dps por
+ * abatido. No rota nunca — es la referencia de cómo llevas la tarde.
+ *
+ * Debajo, una pila de combates. El de arriba es el que está pasando (o el
+ * último, si ya no hay ninguno) y va desplegado; los cerrados van bajando
+ * plegados a una línea y se abren al pincharlos. Se conservan ocho y el resto
+ * se cae.
+ *
+ * TODAS las cifras de un bloque son de ESA pelea: el daño, el reparto y el
+ * porcentaje. Lo de la sesión vive arriba y sólo arriba. Mezclarlo daría una
+ * pantalla donde el 68% de una columna y el 41% de la de al lado se refieren a
+ * cosas distintas sin decirlo.
+ *
+ * La pelea viva llega en cada snapshot; las cerradas por su propio canal, una
+ * sola vez cada una: recortadas ocupan un par de kilobytes, pero mandarlas
+ * todas dos veces por segundo serían cientos por segundo para unas cifras que
+ * sólo cambian al terminar un combate.
+ */
+
 const TYPES = ['magic', 'cold', 'fire', 'poison', 'disease', 'melee', 'ds', 'dot', 'spell'];
 const typeClass = (x) => (TYPES.includes(x) ? x : 'other');
 const esc = (x) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -17,24 +39,56 @@ const dotFor = (name) => {
   return DOTS[h % DOTS.length];
 };
 
-const MAX_ENEMIES = 20;      // los caídos más antiguos dejan de listarse
-const open = new Set();      // filas desplegadas, por nombre
-let lastFightId = null;
+const MAX_ENEMIES = 20;      // dentro de un bloque: los caídos más antiguos se dejan de listar
+const VISIBLES = 8;          // combates cerrados que se conservan a la vista
+
+let closed = [];             // peleas cerradas, la más reciente primero
+// Filas desplegadas. La clave lleva la pelea delante: el mismo enemigo aparece
+// en varios combates y, con el nombre a secas, desplegarlo en uno lo desplegaba
+// en todos.
+const openRows = new Set();
+// Dos conjuntos con un significado cada uno, en vez de uno con dos.
+//
+// El bloque de arriba nace abierto y los de abajo nacen plegados, así que un
+// solo conjunto de «desplegados» tendría que significar lo contrario según
+// dónde estuviera el bloque. Éstos guardan sólo lo que TÚ has cambiado: qué
+// cabecera de arriba has plegado y qué bloque de abajo has abierto. Al cerrarse
+// una pelea se olvida de los dos: baja a la pila como cualquier otra.
+const plegados = new Set();     // el bloque de arriba, si lo has plegado
+const desplegados = new Set();  // bloques de la pila que has abierto
+let nueva = null;            // la última en llegar, para el destello de entrada
+let dpsMap = {};             // dps de sesión por combatiente, del motor
 let flashUntil = 0;
 
+const rowKey = (fightKey, name) => `${fightKey}\u0000${name}`;
+
+/**
+ * El ritmo que se enseña en la línea de una fila, y de dónde sale.
+ *
+ * En la pelea viva, los últimos 20 segundos: es lo único que describe lo que
+ * está pasando ahora. En una cerrada, el dps de esa pelea. Nunca la media de
+ * la sesión dentro del bloque de un combate — eso es la cifra de arriba.
+ */
+function rateFor(r, live) {
+  const v = live ? (dpsMap[r.name]?.w20 || null) : (r.dps || null);
+  return v ? `${n0(v)} dps` : '';
+}
+
 function bar(row, widthPct) {
-  const tot = row.types.reduce((a, [, v]) => a + v, 0) || 1;
+  const tot = (row.types ?? []).reduce((a, [, v]) => a + v, 0) || 1;
   return `<div class="bar" style="width:${Math.max(3, widthPct).toFixed(1)}%">${
-    row.types.map(([ty, v]) => `<div class="seg ${typeClass(ty)}" style="width:${(v / tot * 100).toFixed(2)}%"></div>`).join('')
+    (row.types ?? []).map(([ty, v]) => `<div class="seg ${typeClass(ty)}" style="width:${(v / tot * 100).toFixed(2)}%"></div>`).join('')
   }</div>`;
 }
 
-function detail(r) {
+function detail(r, live) {
   const kv = [
     `${t('row.damage')} <b>${n0(r.damage)}</b>`,
-    // El dps sobre los segundos en que realmente pegó: sobre la sesión entera
-    // sería una cifra sin sentido, con todo el tiempo parado dentro.
+    // En la viva caben las tres lecturas, cada una con su etiqueta: la de la
+    // sesión por abatido y las dos ventanas móviles. En una pelea cerrada sólo
+    // tiene sentido la suya.
     (() => {
+      if (!live) return r.dps ? `dps <b>${n0(r.dps)}</b>` : '';
       const d = dpsMap[r.name];
       if (!d) return '';
       const parts = [];
@@ -55,8 +109,8 @@ function detail(r) {
   return `<div class="ov-det"><div class="ov-det-kv">${kv.replace(/(<\/b>)(?=\S)/g, '$1 ')}</div>${abil}</div>`;
 }
 
-function rowHTML(r, rank, self, dead, maxDmg) {
-  const isOpen = open.has(r.name);
+function rowHTML(r, rank, self, dead, maxDmg, fightKey, live) {
+  const isOpen = openRows.has(rowKey(fightKey, r.name));
   return `<div class="ov-row ${dead ? 'dead' : ''} ${isOpen ? 'open' : ''}" data-name="${esc(r.name)}">
       <div class="ov-top">
         <span class="ov-rank">${rank}</span>
@@ -65,40 +119,103 @@ function rowHTML(r, rank, self, dead, maxDmg) {
           title="${r.petOf ? esc(t('row.petOf', { who: r.petOf })) : ''}">${esc(r.name)}${
           r.petOf ? ` <span class="dim">(${esc(r.petOf)})</span>` : ''}</span>
         <span class="ov-dps num">${n0(r.damage)}</span>
-        <span class="ov-rate num">${(() => {
-          const d = dpsMap[r.name];
-          if (!d) return '';
-          // Preferimos el medido por enemigo abatido; si aún no hay ninguno,
-          // los últimos 20 segundos.
-          const v = d.kill ?? (d.w20 || null);
-          return v ? `${n0(v)} dps` : '';
-        })()}</span>
+        <span class="ov-rate num">${rateFor(r, live)}</span>
         <span class="ov-pct">${Math.round(r.share * 100)}%</span>
       </div>
       ${bar(r, maxDmg ? (r.damage / maxDmg) * 100 : 0)}
-      ${isOpen ? detail(r) : ''}
+      ${isOpen ? detail(r, live) : ''}
     </div>`;
 }
 
-// Lo último pintado en cada columna, para poder repintar al desplegar una fila
-// sin esperar al siguiente envío del motor.
-const painted = new Map();
-let dpsMap = {};      // DPS por combatiente, del motor
-
-function renderColumn(host, rows, self, deadMap) {
-  painted.set(host.id, { rows, self, deadMap });
-  if (!rows.length) { host.innerHTML = `<div class="ov-empty">${esc(t('ov.noCombat'))}</div>`; return; }
+function columnHTML(rows, self, dead, fightKey, live) {
+  if (!rows.length) return `<div class="ov-empty">${esc(t('ov.noCombat'))}</div>`;
   const maxDmg = Math.max(...rows.map((r) => r.damage), 1);
-  const scroll = host.scrollTop;
-  host.innerHTML = rows.map((r, i) => rowHTML(r, i + 1, self, deadMap[r.name] !== undefined, maxDmg)).join('');
-  host.scrollTop = scroll;
-  host.querySelectorAll('.ov-row').forEach((el) => el.addEventListener('click', () => {
-    const nm = el.dataset.name;
-    open.has(nm) ? open.delete(nm) : open.add(nm);
-    host.dataset.sig = '';
-    const p = painted.get(host.id);
-    if (p) renderColumn(host, p.rows, p.self, p.deadMap);   // respuesta inmediata
+  return rows.map((r, i) => rowHTML(r, i + 1, self, dead[r.name] !== undefined, maxDmg, fightKey, live)).join('');
+}
+
+/** Un combate: cabecera siempre, cuerpo sólo si está desplegado. */
+function fightHTML(f, self, { live = false, open = false } = {}) {
+  const dead = f.dead ?? {};
+  const rows = f.rows ?? [];
+  const allies = rows.filter((r) => r.side !== 'enemy');
+  // Vivos primero por daño; los caídos debajo, del más reciente al más antiguo.
+  const enemies = rows.filter((r) => r.side === 'enemy').sort((a, b) => {
+    const da = dead[a.name], db = dead[b.name];
+    if ((da === undefined) !== (db === undefined)) return da === undefined ? -1 : 1;
+    if (da !== undefined) return db - da;
+    return b.damage - a.damage;
+  }).slice(0, MAX_ENEMIES);
+
+  const cuerpo = open ? `<div class="ovf-cols">
+      <div class="ovf-col">
+        <div class="ovf-colh"><span class="eyebrow">${esc(t('side.allies'))}</span><span class="n">${n0(f.total)}</span></div>
+        ${columnHTML(allies, self, dead, f.key, live)}
+      </div>
+      <div class="ovf-col">
+        <div class="ovf-colh"><span class="eyebrow">${esc(t('side.enemies'))}</span><span class="n">${n0(f.enemyTotal)}</span></div>
+        ${columnHTML(enemies, self, dead, f.key, live)}
+      </div>
+    </div>` : '';
+
+  return `<div class="ovf ${live ? 'live' : ''} ${f.key === nueva ? 'nueva' : ''}" data-key="${esc(f.key)}">
+      <div class="ovf-h">
+        <span class="ovf-caret">${open ? '▼' : '▶'}</span>
+        <span class="ovf-label">${esc(f.label ?? t('fight.skirmish'))}</span>
+        <span class="ovf-tot num">${n0(f.total)}</span>
+        <span class="ovf-dur num">${secs(f.duration)}</span>
+      </div>${cuerpo}</div>`;
+}
+
+/**
+ * Pincha en una cabecera y se pliega o despliega; pincha en una fila y se abre
+ * su desglose. Se repinta en el sitio para que la respuesta sea inmediata y no
+ * haya que esperar al siguiente envío del motor.
+ */
+function wire(host, repintar, cabeza = false) {
+  host.querySelectorAll('.ovf-h').forEach((el) => el.addEventListener('click', () => {
+    const k = el.parentElement.dataset.key;
+    const s = cabeza ? plegados : desplegados;
+    s.has(k) ? s.delete(k) : s.add(k);
+    repintar();
   }));
+  host.querySelectorAll('.ov-row').forEach((el) => el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const k = rowKey(el.closest('.ovf').dataset.key, el.dataset.name);
+    openRows.has(k) ? openRows.delete(k) : openRows.add(k);
+    repintar();
+  }));
+}
+
+/** El bloque de arriba: la pelea viva, o la última cerrada si no hay ninguna. */
+function renderHead(f, self, live) {
+  const host = $('oLive');
+  if (!f) {
+    if (host.dataset.sig !== 'vacio') { host.dataset.sig = 'vacio'; host.innerHTML = ''; }
+    return;
+  }
+  // Nace abierto; se pliega sólo si lo has plegado tú.
+  const open = !plegados.has(f.key);
+  // El dps queda FUERA de la firma: cambia cada segundo y reconstruiría el
+  // bloque sin parar, perdiendo el clic a medias. Se refresca en su sitio.
+  const sig = JSON.stringify([f.key, live, open, (f.rows ?? []).map((r) => [r.name, r.damage]),
+    [...openRows], f.duration, f.label, nueva]);
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+  host.innerHTML = fightHTML(f, self, { live, open });
+  wire(host, () => { host.dataset.sig = ''; renderHead(f, self, live); }, true);
+}
+
+/** La pila de abajo: las cerradas que no están arriba. */
+function renderClosed(headKey, self) {
+  const host = $('oClosed');
+  const lista = closed.filter((f) => f.key !== headKey).slice(0, VISIBLES);
+  const sig = JSON.stringify([lista.map((f) => f.key), [...desplegados], [...openRows], nueva]);
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+  host.innerHTML = lista.length
+    ? lista.map((f) => fightHTML(f, self, { live: false, open: desplegados.has(f.key) })).join('')
+    : (headKey ? '' : `<div class="ov-empty">${esc(t('ov.noFights'))}</div>`);
+  wire(host, () => { host.dataset.sig = ''; renderClosed(headKey, self); });
 }
 
 const KILL_MS = 7000;         // cuánto se queda la tarjeta al caer un enemigo
@@ -129,27 +246,32 @@ function renderKill(k) {
   setTimeout(() => { if (killShown === id) renderKill(null); }, KILL_MS + 100);
 }
 
-function showFinal(f) {
-  const el = $('oFinal');
+/**
+ * La tira de sesión: tu daño acumulado y tu dps por abatido.
+ *
+ * Por abatido y no sobre el reloj: la sesión son horas, y la mayor parte no
+ * estás pegando. Dividir el daño entre el tiempo de sesión daría una cifra que
+ * no describe nada. Ésta es la media de las ventanas medidas en cada enemigo
+ * que ha caído, que es lo que el motor ya lleva contado.
+ */
+function renderSession(S, self) {
+  const el = $('oSession');
   if (!el) return;
-  el.innerHTML = `<div class="eyebrow">${esc(f.label ?? t('fight.skirmish'))}</div>
-    <b>${n0(f.raidDps)}</b> <span class="eyebrow">dps · ${secs(f.duration)}</span>`;
-  el.style.display = 'block';
-  flashUntil = Date.now() + 4000;
-  setTimeout(() => { if (Date.now() >= flashUntil) el.style.display = 'none'; }, 4100);
+  const mio = (S?.rows ?? []).find((r) => r.name === self);
+  const kill = dpsMap[self]?.kill ?? null;
+  const sig = `${mio?.damage ?? 0}|${Math.round(kill ?? 0)}|${self}`;
+  if (el.dataset.sig === sig) return;
+  el.dataset.sig = sig;
+  el.innerHTML = `<span class="eyebrow">${esc(t('ov.session'))}</span>
+    <span class="who">${esc(self ?? '')}</span>
+    <span class="tot num">${n0(mio?.damage ?? 0)}</span>
+    <span class="rate">${kill ? `${n0(kill)} dps · ${esc(t('ov.dpsKill'))}` : ''}</span>`;
 }
 
 window.eql.onSnapshot((snap) => {
-  // El overlay muestra la SESIÓN acumulada, no la pelea suelta: sólo se pone a
-  // cero con el botón de reset.
-  const S = snap.session;
   const live = snap.current;
-
-  const liveId = live?.id ?? null;
-  if (lastFightId !== null && liveId === null && snap.history[0]) showFinal(snap.history[0]);
-  lastFightId = liveId;
-
   renderKill(snap.lastKill);
+  dpsMap = snap.sessionDps ?? {};
 
   const root = document.querySelector('.ov');
   if (root) {
@@ -157,53 +279,34 @@ window.eql.onSnapshot((snap) => {
     root.classList.toggle('flash', Date.now() < flashUntil);
   }
 
-  $('oAlliesH').textContent = t('side.allies');
-  $('oEnemiesH').textContent = t('side.enemies');
   $('oReset').textContent = t('ov.reset');
   $('oPass').title = t('ov.passThrough');
   $('oClose').title = t('ov.close');
 
-  if (!S || !S.rows.length) {
-    $('oMeta').textContent = '';
-    renderColumn($('oAllies'), [], snap.self, {});
-    renderColumn($('oEnemies'), [], snap.self, {});
-    return;
-  }
+  const S = snap.session;
+  renderSession(S, snap.self);
 
-  dpsMap = snap.sessionDps ?? {};
-  const dead = S.dead ?? {};
-  const allies = S.rows.filter((r) => r.side !== 'enemy');
-  // Vivos primero por daño; los caídos debajo, del más reciente al más antiguo,
-  // y sólo se conservan los últimos veinte.
-  const enemies = S.rows.filter((r) => r.side === 'enemy').sort((a, b) => {
-    const da = dead[a.name], db = dead[b.name];
-    if ((da === undefined) !== (db === undefined)) return da === undefined ? -1 : 1;
-    if (da !== undefined) return db - da;
-    return b.damage - a.damage;
-  }).slice(0, MAX_ENEMIES);
-
-  const live10 = allies.reduce((a, r) => a + (dpsMap[r.name]?.w10 ?? 0), 0);
+  const live10 = (S?.rows ?? []).filter((r) => r.side !== 'enemy')
+    .reduce((a, r) => a + (dpsMap[r.name]?.w10 ?? 0), 0);
   $('oMeta').textContent = live10 > 0
-    ? `${n0(live10)} dps · ${n0(S.total)} · ${secs(S.duration)}`
-    : `${n0(S.total)} · ${secs(S.duration)}`;
-  $('oAlliesN').textContent = n0(S.total);
-  $('oEnemiesN').textContent = n0(S.enemyTotal);
+    ? `${n0(live10)} dps · ${n0(S?.total ?? 0)} · ${secs(S?.duration ?? 0)}`
+    : `${n0(S?.total ?? 0)} · ${secs(S?.duration ?? 0)}`;
 
-  // El dps NO entra en la firma: cambia cada segundo y reconstruiría la columna
-  // sin parar, perdiendo el clic. Se actualiza en su sitio, más abajo.
-  const sigA = JSON.stringify([allies.map((r) => [r.name, r.damage]), [...open]]);
-  const sigE = JSON.stringify([enemies.map((r) => [r.name, r.damage, dead[r.name]]), [...open]]);
-  if ($('oAllies').dataset.sig !== sigA) { $('oAllies').dataset.sig = sigA; renderColumn($('oAllies'), allies, snap.self, dead); }
-  if ($('oEnemies').dataset.sig !== sigE) { $('oEnemies').dataset.sig = sigE; renderColumn($('oEnemies'), enemies, snap.self, dead); }
+  // Arriba va la viva; si no hay ninguna, la última que terminó. Y esa se
+  // quita de la pila de abajo: durante medio segundo el motor puede tener la
+  // pelea ya cerrada y el snapshot todavía con la viva, y saldría dos veces.
+  const head = live ?? closed[0] ?? null;
+  renderHead(head, snap.self, !!live);
+  renderClosed(head?.key ?? null, snap.self);
 
-  // Refresco del ritmo sin reconstruir nada.
-  for (const host of [$('oAllies'), $('oEnemies')]) {
-    host?.querySelectorAll('.ov-row').forEach((el) => {
-      const d = dpsMap[el.dataset.name];
+  // Refresco del ritmo sin reconstruir nada: sólo en el bloque vivo, que es el
+  // único donde la cifra cambia sola.
+  if (live) {
+    $('oLive')?.querySelectorAll('.ov-row').forEach((el) => {
       const cell = el.querySelector('.ov-rate');
       if (!cell) return;
-      const v = d ? (d.kill ?? (d.w20 || null)) : null;
-      const txt = v ? `${n0(v)} dps` : '';
+      const d = dpsMap[el.dataset.name];
+      const txt = d?.w20 ? `${n0(d.w20)} dps` : '';
       if (cell.textContent !== txt) cell.textContent = txt;
     });
   }
@@ -213,6 +316,52 @@ window.eql.onSnapshot((snap) => {
     : null;
   const ad = $('oAdvice');
   if (ad) { ad.textContent = tip ?? ''; ad.style.display = tip ? 'block' : 'none'; }
+});
+
+/** Una pelea que acaba de cerrarse entra por arriba y empuja a las demás. */
+function apilar(f) {
+  if (!f?.key) return;
+  if (closed.some((x) => x.key === f.key)) return;
+  closed.unshift(f);
+  if (closed.length > VISIBLES + 2) closed.length = VISIBLES + 2;
+  // Baja a la pila como una más: se olvida de que estuvo arriba plegada o de
+  // que la abriste en su día.
+  plegados.delete(f.key);
+  desplegados.delete(f.key);
+  nueva = f.key;
+  flashUntil = Date.now() + 4000;
+  // El destello sólo marca la entrada: si se quedara puesto, cada repintado
+  // posterior lo relanzaría.
+  setTimeout(() => {
+    if (nueva !== f.key) return;
+    nueva = null;
+    $('oLive').dataset.sig = ''; $('oClosed').dataset.sig = '';
+  }, 1200);
+  $('oLive').dataset.sig = '';
+  $('oClosed').dataset.sig = '';
+}
+
+window.eql.onFightClosed?.(apilar);
+window.eql.overlayFights?.().then((list) => {
+  // Un overlay abierto a mitad de sesión arranca con lo que ya hay apilado.
+  // Se añade lo que falte en vez de sustituir: entre pedirlo y recibirlo puede
+  // haber terminado una pelea, y sustituir la borraría.
+  if (!Array.isArray(list) || !list.length) return;
+  const hay = new Set(closed.map((f) => f.key));
+  closed = [...closed, ...list.filter((f) => f?.key && !hay.has(f.key))]
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0)).slice(0, VISIBLES + 2);
+  $('oClosed').dataset.sig = '';
+}).catch(() => { /* sin nada apilado todavía */ });
+
+window.eql.onSessionCleared?.(() => {
+  closed = [];
+  plegados.clear();
+  desplegados.clear();
+  openRows.clear();
+  nueva = null;
+  $('oLive').dataset.sig = '';
+  $('oClosed').dataset.sig = '';
+  $('oSession').dataset.sig = '';
 });
 
 // El overlay entero recupera el ratón al pasar por encima.
@@ -226,17 +375,20 @@ root?.addEventListener('mouseleave', () => window.eql.overlayHover(false));
 
 $('oClose')?.addEventListener('click', () => window.eql.closeOverlay());
 $('oPass')?.addEventListener('click', () => window.eql.toggleClickThrough());
-$('oReset')?.addEventListener('click', () => {
-  open.clear();
-  $('oAllies').dataset.sig = ''; $('oEnemies').dataset.sig = '';
-  window.eql.resetSession();
-});
+// Borrón y cuenta nueva: la pila de combates y el acumulado de la sesión. El
+// motor avisa por 'session:cleared' y el vaciado se hace allí, para que valga
+// igual si el reset se pide desde la ventana principal.
+$('oReset')?.addEventListener('click', () => window.eql.resetSession());
 
+const repintarTodo = () => {
+  for (const id of ['oLive', 'oClosed', 'oSession']) { const el = $(id); if (el) el.dataset.sig = ''; }
+};
 window.eql.onTheme((th) => { document.documentElement.dataset.theme = th; });
-window.eql.onLang((c) => { setLang(c); $('oAllies').dataset.sig = ''; $('oEnemies').dataset.sig = ''; });
+window.eql.onLang((c) => { setLang(c); repintarTodo(); });
 window.eql.getConfig().then((c) => {
   document.documentElement.dataset.theme = c.theme ?? 'dark';
   setLang(c.lang ?? 'es');
+  repintarTodo();
 });
 window.eql.onOverlayState(({ clickThrough }) => {
   const lk = $('oPass');

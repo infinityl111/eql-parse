@@ -186,6 +186,12 @@ async function boot() {
   import('../src/wiki.js').then(({ WikiClient }) => { wiki = new WikiClient(app.getPath('userData')); });
   triggerDefs = loadTriggers() ?? STARTER_TRIGGERS;
   engine.triggers.load(triggerDefs);
+  // Una pelea cerrada va al overlay por su propio canal y no en el snapshot:
+  // ocupa demasiado para mandarla dos veces por segundo cuando sólo cambia al
+  // terminar un combate.
+  engine.on('encounter', (f) => {
+    if (f && overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send('fight:closed', f);
+  });
   // Sólo habla la ventana principal, para no oír el aviso dos veces.
   engine.on('alert', (a) => {
     if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('alert', { ...a, speak: cfg.tts.enabled ? a.speak : null });
@@ -396,7 +402,17 @@ ipcMain.handle('history:stats', () => engine.storeStats());
 // Catalogo de hechizos construido desde el historico, con los cooldowns medidos.
 ipcMain.handle('catalog:spells', (_e, q) => engine.spellCatalog(q ?? {}));
 
-ipcMain.handle('session:reset', () => engine.resetSession());
+ipcMain.handle('session:reset', () => {
+  const r = engine.resetSession();
+  // El reset puede venir del overlay o de la ventana principal: se avisa a las
+  // dos, o la que no lo pidió se queda con la pila de combates de antes.
+  send('session:cleared', null);
+  return r;
+});
+
+// Un overlay que se abre a mitad de sesión arranca con lo que ya hay apilado:
+// si no, no enseñaría nada hasta que terminase el siguiente combate.
+ipcMain.handle('overlay:fights', () => engine?.closedFights ?? []);
 
 ipcMain.handle('overlay:open', () => { createOverlay(); return true; });
 ipcMain.handle('overlay:close', () => { overlayWin?.close(); return true; });

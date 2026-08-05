@@ -282,7 +282,8 @@ const ES = {
   'cat.nuke': 'Los que tú añadas abajo',
 
   // ── Overlay ──
-  'ov.noCombat': 'Sin combate', 'ov.reset': 'reiniciar', 'ov.dpsKill': 'por abatido', 'ov.killed': 'abatido', 'voice.voice': 'Voz', 'voice.rate': 'Velocidad', 'voice.volume': 'Volumen', 'voice.default': 'Voz por defecto del sistema', 'voice.moreVoices': 'Para tener voces de otros idiomas: Configuración → Hora e idioma → Idioma y región → Agregar idioma, y en Opciones de ese idioma marca Voz. Reinicia la aplicación después. Las voces «naturales» del Narrador no valen: Windows no las abre a otras aplicaciones.', 'voice.matching': 'Del idioma activo', 'voice.others': 'Otros idiomas', 'ov.clicksGame': 'clics al juego',
+  'ov.noCombat': 'Sin combate', 'ov.reset': 'reiniciar', 'ov.dpsKill': 'por abatido', 'ov.killed': 'abatido',
+  'ov.session': 'sesión', 'ov.noFights': 'Ningún combate todavía', 'voice.voice': 'Voz', 'voice.rate': 'Velocidad', 'voice.volume': 'Volumen', 'voice.default': 'Voz por defecto del sistema', 'voice.moreVoices': 'Para tener voces de otros idiomas: Configuración → Hora e idioma → Idioma y región → Agregar idioma, y en Opciones de ese idioma marca Voz. Reinicia la aplicación después. Las voces «naturales» del Narrador no valen: Windows no las abre a otras aplicaciones.', 'voice.matching': 'Del idioma activo', 'voice.others': 'Otros idiomas', 'ov.clicksGame': 'clics al juego',
   'ov.clicksOverlay': 'clics al overlay', 'ov.close': 'Cerrar el overlay',
   'ov.passThrough': 'Dejar pasar los clics al juego',
 
@@ -692,7 +693,8 @@ const EN = {
   'cat.escape': 'Escape', 'cat.resurrect': 'Resurrect', 'cat.dispel': 'Dispel',
   'cat.nuke': 'The ones you add below',
 
-  'ov.noCombat': 'No combat', 'ov.reset': 'reset', 'ov.dpsKill': 'per kill', 'ov.killed': 'killed', 'voice.voice': 'Voice', 'voice.rate': 'Rate', 'voice.volume': 'Volume', 'voice.default': 'System default voice', 'voice.moreVoices': 'To get voices in other languages: Settings -> Time & language -> Language & region -> Add a language, then tick Speech in that language\u2019s options. Restart the app afterwards. Narrator\u2019s natural voices will not work: Windows does not open them to other apps.', 'voice.matching': 'Current language', 'voice.others': 'Other languages', 'ov.clicksGame': 'clicks to game',
+  'ov.noCombat': 'No combat', 'ov.reset': 'reset', 'ov.dpsKill': 'per kill', 'ov.killed': 'killed',
+  'ov.session': 'session', 'ov.noFights': 'No fights yet', 'voice.voice': 'Voice', 'voice.rate': 'Rate', 'voice.volume': 'Volume', 'voice.default': 'System default voice', 'voice.moreVoices': 'To get voices in other languages: Settings -> Time & language -> Language & region -> Add a language, then tick Speech in that language\u2019s options. Restart the app afterwards. Narrator\u2019s natural voices will not work: Windows does not open them to other apps.', 'voice.matching': 'Current language', 'voice.others': 'Other languages', 'ov.clicksGame': 'clicks to game',
   'ov.clicksOverlay': 'clicks to overlay', 'ov.close': 'Close the overlay',
   'ov.passThrough': 'Let clicks through to the game',
 
@@ -1344,7 +1346,8 @@ const FR = {
   'cat.escape': 'Fuite', 'cat.resurrect': 'R\u00e9surrection', 'cat.dispel': 'Dissipation',
   'cat.nuke': 'Ceux que tu ajoutes ci-dessous',
 
-  'ov.noCombat': 'Hors combat', 'ov.reset': 'remise à zéro', 'ov.dpsKill': 'par abattu', 'ov.killed': 'abattu', 'ov.clicksGame': 'clics vers le jeu',
+  'ov.noCombat': 'Hors combat', 'ov.reset': 'remise à zéro', 'ov.dpsKill': 'par abattu', 'ov.killed': 'abattu',
+  'ov.session': 'session', 'ov.noFights': 'Aucun combat pour l’instant', 'ov.clicksGame': 'clics vers le jeu',
   'ov.clicksOverlay': 'clics vers la surcouche', 'ov.close': 'Fermer la surcouche',
   'ov.passThrough': 'Laisser passer les clics vers le jeu',
 
@@ -1841,7 +1844,8 @@ const DE = {
   'cat.escape': 'Flucht', 'cat.resurrect': 'Wiederbeleben', 'cat.dispel': 'Bannen',
   'cat.nuke': 'Die, die du unten eintr\u00e4gst',
 
-  'ov.noCombat': 'Kein Kampf', 'ov.reset': 'zurücksetzen', 'ov.dpsKill': 'pro Kill', 'ov.killed': 'erlegt', 'ov.clicksGame': 'Klicks ans Spiel',
+  'ov.noCombat': 'Kein Kampf', 'ov.reset': 'zurücksetzen', 'ov.dpsKill': 'pro Kill', 'ov.killed': 'erlegt',
+  'ov.session': 'Sitzung', 'ov.noFights': 'Noch keine Kämpfe', 'ov.clicksGame': 'Klicks ans Spiel',
   'ov.clicksOverlay': 'Klicks ans Overlay', 'ov.close': 'Overlay schlie\u00dfen',
   'ov.passThrough': 'Klicks ans Spiel durchlassen',
 
@@ -2338,7 +2342,8 @@ const PT = {
   'cat.escape': 'Fuga', 'cat.resurrect': 'Ressuscitar', 'cat.dispel': 'Dissipar',
   'cat.nuke': 'Os que acrescentares abaixo',
 
-  'ov.noCombat': 'Sem combate', 'ov.reset': 'reiniciar', 'ov.dpsKill': 'por abatido', 'ov.killed': 'abatido', 'ov.clicksGame': 'cliques para o jogo',
+  'ov.noCombat': 'Sem combate', 'ov.reset': 'reiniciar', 'ov.dpsKill': 'por abatido', 'ov.killed': 'abatido',
+  'ov.session': 'sessão', 'ov.noFights': 'Nenhum combate ainda', 'ov.clicksGame': 'cliques para o jogo',
   'ov.clicksOverlay': 'cliques para a sobreposi\u00e7\u00e3o', 'ov.close': 'Fechar a sobreposi\u00e7\u00e3o',
   'ov.passThrough': 'Deixar passar os cliques para o jogo',
 
