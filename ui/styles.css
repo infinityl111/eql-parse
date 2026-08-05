@@ -720,3 +720,12 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
   background: transparent; color: var(--dim);
 }
 .excl-btn:hover { border-color: var(--t-ds); color: var(--t-ds); }
+.trio-conf {
+  margin-top: 10px; padding: 8px 10px;
+  border: 1px solid var(--t-ds); border-radius: 4px;
+}
+.trio-conf-h { font-size: 11px; color: var(--t-ds); margin-bottom: 6px; }
+.trio-conf-row {
+  display: grid; grid-template-columns: 1fr 2fr; gap: 8px;
+  font-size: 11px; padding: 2px 0;
+}

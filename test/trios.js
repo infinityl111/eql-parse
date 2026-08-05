@@ -10,6 +10,7 @@ import { Parser } from '../src/parser.js';
 import { EncounterTracker } from '../src/encounter.js';
 import { Engine } from '../src/engine.js';
 import { normalizeTrios, trioAt, conflicts } from '../src/trios.js';
+import { proofOf, ownersOf } from '../src/classes.js';
 
 let failed = 0;
 const ok = (cond, label, extra = '') => {
@@ -132,13 +133,21 @@ console.log('\ncambiar de trío borra el nivel heredado');
 
 console.log('\nla inferencia por hechizos se calla dentro de un tramo');
 {
+  // El hechizo tiene que ser de una clase que NO esté en el trío declarado.
+  // La primera versión de este test usaba Burnout, que es de mago, con un
+  // trío que llevaba mago: se salía por «esa clase ya está» y pasaba sin
+  // ejercitar la regla. Pasar por el motivo equivocado es no pasar.
   const tabla = normalizeTrios([{ at: ms(0), classes: ['SHD', 'DRU', 'MAG'], level: 50 }]);
+  const fuera = ownersOf.byClass('SHM').find((s) => proofOf(s) === 'SHM');
+  ok(!!fuera && !['SHD', 'DRU', 'MAG'].includes(proofOf(fuera)),
+    'el hechizo de prueba es de una clase ausente del trío', `${fuera} -> ${proofOf(fuera)}`);
   const { e } = correr(tabla, [[10, 'You slash a gorgon for 100 points of damage.']]);
   const avisos = [];
   e.on('alert', (a) => avisos.push(a));
-  e.classProof({ t: (ms(20)) / 1000, ability: 'Burnout' });   // exclusivo de mago
+  e.classProof({ t: ms(20) / 1000, ability: fuera });
   ok(e.whoClasses.join('/') === 'SHD/DRU/MAG',
     'un hechizo no cambia lo que declaraste', e.whoClasses.join('/'));
+  ok(e.level === 50, 'ni te borra el nivel declarado', String(e.level));
   ok(avisos.length === 0, 'y no te da la lata pidiendo /who', `${avisos.length}`);
 }
 

@@ -207,5 +207,24 @@ console.log('\nal releer el log no se avisa de nada');
   ok(alertas.length === 0, 'reconstruir el histórico no dispara avisos', `${alertas.length}`);
 }
 
+
+// ── La etiqueta de procedencia no puede mentir ───────────────────────────
+console.log('\nla interfaz dice de dónde salió el trío');
+{
+  // whoClasses ya no viene sólo de un /who: lo escriben también la tabla
+  // manual y la inferencia. Si las tres dicen «leídas de tu /who», se pierde
+  // justo la distinción que este programa existe para conservar.
+  const { e: e1 } = motor();
+  e1.whoClasses = ['SHD','DRU','MAG']; e1.classSourceAt = '/who';
+  ok(e1.classSource === 'who', 'un /who se declara como /who', e1.classSource);
+
+  const { e: e2 } = motor();
+  e2.whoClasses = ['SHM','DRU','MAG']; e2.classSourceAt = 'inferido';
+  ok(e2.classSource === 'hechizos', 'lo deducido se declara deducido', e2.classSource);
+
+  const { e: e3 } = motor();
+  e3.whoClasses = ['SHD','MAG','DRU']; e3.classSourceAt = 'manual';
+  ok(e3.classSource === 'tabla', 'lo declarado se declara declarado', e3.classSource);
+}
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

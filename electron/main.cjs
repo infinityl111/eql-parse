@@ -288,6 +288,33 @@ ipcMain.handle('trios:set', (_e, lista) => {
   return { trios: engine.setTrios(cfg.trios), needsRebuild: true };
 });
 
+/**
+ * Dónde tu tabla y el log no dicen lo mismo.
+ *
+ * Lo manual manda sobre todo, y por eso hace falta esto: si te equivocas al
+ * declarar un tramo no hay nada que te corrija. Se señala, no se decide.
+ *
+ * Se relee el log en vez de guardar los hitos porque al arrancar se reanuda
+ * por donde iba, así que los /who de ayer no vuelven a pasar por el motor.
+ * Son dos expresiones regulares sobre el fichero: es barato y siempre completo.
+ */
+ipcMain.handle('trios:conflicts', async () => {
+  if (!cfg.trios?.length || !cfg.logPath || !fs.existsSync(cfg.logPath)) return [];
+  const { normalizeTrios, conflicts } = await import('../src/trios.js');
+  const { Parser } = await import('../src/parser.js');
+  const self = cfg.self ?? path.basename(cfg.logPath).split('_')[1] ?? null;
+  const p = new Parser({ self });
+  const hitos = [];
+  for (const l of fs.readFileSync(cfg.logPath, 'latin1').split(/\r?\n/)) {
+    if (!/^\[.{24}\] \[\d+ /.test(l)) continue;      // sólo las líneas de /who
+    const ev = p.parse(l);
+    if (ev?.kind === 'who' && ev.who === self && ev.classes?.length) {
+      hitos.push({ at: ev.t * 1000, level: ev.level, classes: ev.classes });
+    }
+  }
+  return conflicts(normalizeTrios(cfg.trios), hitos);
+});
+
 ipcMain.handle('config:set', (_e, patch) => {
   cfg = { ...cfg, ...patch };
   saveConfig(cfg);

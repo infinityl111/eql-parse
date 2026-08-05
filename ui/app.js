@@ -862,6 +862,7 @@ async function renderNarrate(host) {
         </div>`).join('')
       : `<span class="hint">${esc(t('trio.empty'))}</span>`}</div>
     <button class="petbtn" id="trioAdd" style="margin-top:8px">${esc(t('trio.add'))}</button>
+    <div id="trioConf"></div>
 
     <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('excl.title'))}</div>
     <div class="hint">${esc(t('excl.note'))}</div>
@@ -892,12 +893,34 @@ async function renderNarrate(host) {
     await window.eql.setNarrate(next);
   };
   host.querySelectorAll('input').forEach((el) => el.addEventListener('change', save));
+  // Dónde tu tabla y el log no dicen lo mismo. Se señala, no se decide: lo
+  // manual manda a propósito, y sólo tú sabes cuál de los dos está mal.
+  const pintarConflictos = async () => {
+    const host2 = $('trioConf');
+    if (!host2) return;
+    const c = await window.eql.trioConflicts?.().catch(() => []) ?? [];
+    if (!c.length) { host2.innerHTML = ''; return; }
+    host2.innerHTML = `<div class="trio-conf">
+      <div class="trio-conf-h">${esc(t('trio.conflictTitle', { n: c.length }))}</div>
+      ${c.map((x) => `<div class="trio-conf-row">
+        <span class="trio-from">${esc(new Date(x.at).toLocaleString())}</span>
+        <span>${esc(t('trio.conflictRow', {
+          log: x.dice.map((k) => t(`cl.${k}`)).join('/'),
+          you: x.declaras.map((k) => t(`cl.${k}`)).join('/'),
+        }))}</span>
+      </div>`).join('')}
+      <div class="hint">${esc(t('trio.conflictNote'))}</div>
+    </div>`;
+  };
+  pintarConflictos();
+
   const guardarTrios = async (lista) => {
     const r = await window.eql.setTrios(lista);
     state.cfg.trios = r.trios;
     state.needsRebuild = r.needsRebuild;
     showTrioRebuild();
     renderApp();
+    pintarConflictos();
   };
   host.querySelector('#trioAdd')?.addEventListener('click', async () => {
     const cls = prompt(t('trio.askClasses'), 'SHD/MAG/DRU');

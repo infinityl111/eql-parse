@@ -492,6 +492,10 @@ export class Engine extends EventEmitter {
     const clase = proofOf(ev.ability);
     if (!clase) return;
     this.lastProof.set(clase, ev.t);
+    // Dentro de un tramo declarado a mano, la inferencia se calla: tú estabas
+    // allí y un hechizo no te va a contradecir. Se anota que la clase se vio,
+    // por si el tramo termina y hay que volver a deducir.
+    if (this.trioActive) return;
     const trio = this.whoClasses;
     if (!trio?.length || trio.includes(clase)) return;
 
@@ -753,9 +757,21 @@ export class Engine extends EventEmitter {
     return inferClasses([...this.seenStances], [...this.seenInvocations]).classes;
   }
 
-  /** De dónde salen las clases, para que la interfaz lo diga sin engañar. */
+  /**
+   * De dónde salen las clases, para que la interfaz lo diga sin engañar.
+   *
+   * `whoClasses` ya no viene sólo de un /who: también lo escriben la tabla
+   * declarada a mano y la inferencia por hechizos exclusivos. Devolver 'who'
+   * en los tres casos hacía que la etiqueta dijera «leídas de tu /who» sobre
+   * un trío deducido, que es justo la distinción que este programa existe
+   * para no perder.
+   */
   get classSource() {
-    if (this.whoClasses?.length) return 'who';
+    if (this.whoClasses?.length) {
+      if (this.classSourceAt === 'manual') return 'tabla';
+      if (this.classSourceAt === 'inferido') return 'hechizos';
+      return 'who';
+    }
     if (this.classes?.length) return 'manual';
     const r = inferClasses([...this.seenStances], [...this.seenInvocations]);
     return r.classes.length ? (r.confident ? 'deducidas' : 'parciales') : 'desconocidas';
