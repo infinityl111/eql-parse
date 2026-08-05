@@ -10,7 +10,7 @@
     "store:check": "node bin/store-check.js",
     "store:rebuild": "node bin/store-rebuild.js",
     "live": "node bin/live.js",
-    "test": "node test/smoke.js && node test/stances.js && node test/bridge.js && node test/store.js && node test/combat.js && node test/survival.js && node test/zones.js && node test/classes.js",
+    "test": "node test/smoke.js && node test/stances.js && node test/bridge.js && node test/store.js && node test/combat.js && node test/survival.js && node test/zones.js && node test/classes.js && node test/trios.js",
     "dist": "electron-builder --win --x64"
   },
   "build": {

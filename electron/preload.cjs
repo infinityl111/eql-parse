@@ -63,5 +63,6 @@ contextBridge.exposeInMainWorld('eql', {
   migration: () => ipcRenderer.invoke('store:migration'),
   spellCatalog: (q) => ipcRenderer.invoke('catalog:spells', q),
   setExcluded: (name, on) => ipcRenderer.invoke('excluded:set', { name, on }),
+  setTrios: (lista) => ipcRenderer.invoke('trios:set', lista),
   rebuildStore: () => ipcRenderer.invoke('store:rebuild'),
 });

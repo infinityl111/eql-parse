@@ -10,7 +10,7 @@ const TRIGGERS = () => path.join(app.getPath('userData'), 'triggers.json');
 const DEFAULTS = {
   logPath: null, self: null, idleSec: 20, fromStart: false,
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
-  skipVersion: null, mergePets: false, myPets: [], notPets: [], fpsWarned: false, excluded: [],
+  skipVersion: null, trios: [], mergePets: false, myPets: [], notPets: [], fpsWarned: false, excluded: [],
   tts: { enabled: true, voice: null, rate: 1, volume: 1 },
   sound: { enabled: true, volume: 0.5 },
 };
@@ -197,6 +197,7 @@ async function boot() {
   startPush();
 
   if (cfg.classes?.length) engine.setClasses(cfg.classes);
+  engine.setTrios(cfg.trios ?? []);
   if (cfg.narrate) engine.setNarrate(cfg.narrate);
   engine.setLang(cfg.lang ?? 'es');
   if (cfg.logPath && fs.existsSync(cfg.logPath)) {
@@ -232,8 +233,10 @@ app.on('will-quit', () => {
 ipcMain.handle('config:get', () => cfg);
 
 ipcMain.handle('narrate:get', async () => {
-  const { DEFAULT_NARRATE } = await import('../src/narrator.js');
-  return { ...DEFAULT_NARRATE, ...(cfg.narrate ?? {}) };
+  // Grupo a grupo, no plano: si no, cada casilla nueva sale desmarcada para
+  // quien ya tenga configuración guardada. Ver mergeNarrate().
+  const { mergeNarrate } = await import('../src/narrator.js');
+  return mergeNarrate(cfg.narrate);
 });
 
 ipcMain.handle('narrate:set', (_e, n) => {
@@ -270,6 +273,19 @@ ipcMain.handle('classes:set', (_e, list) => {
   saveConfig(cfg);
   engine.setClasses(cfg.classes);
   return cfg.classes;
+});
+
+/**
+ * La tabla de tríos declarada a mano.
+ *
+ * Es la fuente de verdad de arriba: manda sobre el /who y sobre la inferencia
+ * por hechizos, porque tú estabas allí y el log no. Cambiarla no reescribe el
+ * histórico: hace falta una reconstrucción, y se dice al devolver.
+ */
+ipcMain.handle('trios:set', (_e, lista) => {
+  cfg.trios = Array.isArray(lista) ? lista : [];
+  saveConfig(cfg);
+  return { trios: engine.setTrios(cfg.trios), needsRebuild: true };
 });
 
 ipcMain.handle('config:set', (_e, patch) => {
@@ -430,7 +446,7 @@ ipcMain.handle('store:rebuild', async () => {
   engine.detach();
   let r;
   try {
-    r = await rebuildStore({ dir, logPath, self: cfg.self, idleSec: cfg.idleSec ?? 20 });
+    r = await rebuildStore({ dir, logPath, self: cfg.self, idleSec: cfg.idleSec ?? 20, trios: cfg.trios ?? [] });
   } catch (err) {
     r = { ok: false, reason: 'error-de-lectura', error: err.message };
   }

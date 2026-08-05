@@ -51,7 +51,14 @@ console.log(`  log       ${logPath}`);
 console.log(`  personaje ${self ?? '(desconocido)'}\n`);
 console.log('  releyendo el log…\n');
 
-const r = await rebuildStore({ dir, logPath, self, idleSec: 20 });
+// La tabla de tríos que declaraste a mano vive en la configuración de la
+// aplicación: sin ella la reconstrucción recalcularía el nivel sin tu palabra.
+let trios = [];
+try { trios = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')).trios ?? []; }
+catch { /* sin configuración: sólo lo que diga el log */ }
+if (trios.length) console.log(`  tríos declarados a mano: ${trios.length}`);
+
+const r = await rebuildStore({ dir, logPath, self, idleSec: 20, trios });
 
 if (!r.ok) {
   const porQue = {

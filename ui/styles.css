@@ -691,3 +691,32 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .flt input:focus { outline: none; border-color: var(--t-cold); }
 .foe-det-l.sub { padding-left: 16px; font-size: 10.5px; color: var(--bone-faint); }
 .foe-det-l.sub b { min-width: 52px; }
+
+/* ── Tríos declarados a mano ─────────────────────────────────────────── */
+/* El botón va junto a los tres desplegables de clase, no enterrado en
+   Ajustes: cambiar de trío es el gesto del 90% de las veces. */
+.trio-now {
+  font-size: 9px; padding: 3px 8px; margin-left: 8px;
+  border: 1px solid var(--line); border-radius: 4px;
+  background: transparent; color: var(--dim); cursor: pointer;
+  letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+}
+.trio-now:hover { color: var(--fg); border-color: var(--fg); }
+.trio-tbl { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.trio-row {
+  display: grid; grid-template-columns: 1fr 1.2fr .9fr auto;
+  gap: 8px; align-items: center; font-size: 11px;
+  padding: 5px 8px; border: 1px solid var(--line); border-radius: 4px;
+}
+.trio-from, .trio-lvl { color: var(--dim); }
+.excl-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.excl-item {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
+  padding: 3px 8px; border: 1px solid var(--line); border-radius: 4px;
+}
+.excl-btn {
+  font-size: 10px; padding: 4px 9px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 4px;
+  background: transparent; color: var(--dim);
+}
+.excl-btn:hover { border-color: var(--t-ds); color: var(--t-ds); }

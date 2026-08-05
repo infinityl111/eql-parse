@@ -20,7 +20,7 @@ import { FightStore, STORE_VERSION } from './store.js';
 
 const FICHEROS = ['fights.ndjson', 'fights.idx'];
 
-export async function rebuildStore({ dir, logPath, self = null, idleSec = 20 } = {}) {
+export async function rebuildStore({ dir, logPath, self = null, idleSec = 20, trios = [] } = {}) {
   if (!dir) return { ok: false, reason: 'sin-carpeta' };
   if (!logPath || !fs.existsSync(logPath)) return { ok: false, reason: 'sin-log' };
 
@@ -54,6 +54,9 @@ export async function rebuildStore({ dir, logPath, self = null, idleSec = 20 } =
   const engine = new Engine();
   try {
     engine.setStorePath(dir);
+    // Lo que declaraste a mano tiene que estar puesto ANTES de releer, o el
+    // nivel de cada pelea se recalcula sin ello.
+    engine.setTrios(trios);
     await engine.attach(logPath, { self, fromStart: true, idleSec });
     // attach() no resuelve hasta haber leído todo lo pendiente, pero la última
     // pelea queda abierta: se cierra con un reloj muy por delante.

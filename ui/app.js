@@ -850,6 +850,19 @@ async function renderNarrate(host) {
     </div>
     <div class="hint">${esc(t('voice.moreVoices'))}</div>
 
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('trio.title'))}</div>
+    <div class="hint">${esc(t('trio.note'))}</div>
+    <div class="trio-tbl" id="trioTbl">${(state.cfg.trios ?? []).length
+      ? (state.cfg.trios ?? []).map((r, i) => `<div class="trio-row">
+          <span class="trio-from">${r.at == null ? esc(t('trio.always'))
+            : esc(new Date(r.at).toLocaleString())}</span>
+          <span class="trio-cls"><b>${r.classes.map((c) => esc(t(`cl.${c}`))).join(' · ')}</b></span>
+          <span class="trio-lvl">${r.level == null ? esc(t('trio.fromLog')) : esc(t('trio.level', { n: r.level }))}</span>
+          <button class="petbtn" data-trio-del="${i}">${esc(t('trio.del'))}</button>
+        </div>`).join('')
+      : `<span class="hint">${esc(t('trio.empty'))}</span>`}</div>
+    <button class="petbtn" id="trioAdd" style="margin-top:8px">${esc(t('trio.add'))}</button>
+
     <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('excl.title'))}</div>
     <div class="hint">${esc(t('excl.note'))}</div>
     <div class="excl-list" id="exclList">${(state.cfg.excluded ?? []).length
@@ -879,6 +892,37 @@ async function renderNarrate(host) {
     await window.eql.setNarrate(next);
   };
   host.querySelectorAll('input').forEach((el) => el.addEventListener('change', save));
+  const guardarTrios = async (lista) => {
+    const r = await window.eql.setTrios(lista);
+    state.cfg.trios = r.trios;
+    state.needsRebuild = r.needsRebuild;
+    showTrioRebuild();
+    renderApp();
+  };
+  host.querySelector('#trioAdd')?.addEventListener('click', async () => {
+    const cls = prompt(t('trio.askClasses'), 'SHD/MAG/DRU');
+    if (!cls) return;
+    const classes = cls.toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+    if (classes.length !== 3) { alert(t('trio.needThree')); return; }
+    const fecha = prompt(t('trio.askFrom'), new Date().toISOString().slice(0, 16).replace('T', ' '));
+    if (fecha === null) return;
+    // Vacío quiere decir «desde siempre»: cubre las peleas anteriores a tu
+    // primer /who, que si no se quedan sin nivel para siempre.
+    let at = null;
+    if (fecha.trim()) {
+      at = new Date(fecha.trim().replace(' ', 'T')).getTime();
+      if (!Number.isFinite(at)) { alert(t('trio.badDate')); return; }
+    }
+    const nivel = prompt(t('trio.askLevel'), '');
+    if (nivel === null) return;
+    const lvl = nivel.trim() ? Number(nivel.trim()) : null;
+    if (lvl !== null && !(lvl > 0 && lvl < 200)) { alert(t('trio.badLevel')); return; }
+    await guardarTrios([...(state.cfg.trios ?? []), { at, classes, level: lvl }]);
+  });
+  host.querySelectorAll('[data-trio-del]').forEach((el) => el.addEventListener('click', async () => {
+    const i = Number(el.dataset.trioDel);
+    await guardarTrios((state.cfg.trios ?? []).filter((_, k) => k !== i));
+  }));
   host.querySelectorAll('[data-restore]').forEach((el) => el.addEventListener('click', async () => {
     state.cfg.excluded = await window.eql.setExcluded(el.dataset.restore, false);
     state.rowNodes.clear();
@@ -1042,6 +1086,26 @@ function renderAdvice(snap) {
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
 
+  const trioBtn = `<button class="trio-now" id="trioNow" title="${esc(t('trio.nowHint'))}">${esc(t('trio.now'))}</button>`;
+  // Se engancha en las dos ramas del panel: la normal y la de «faltan clases».
+  // Declarar el trío es justo lo que hace falta cuando aún no se sabe cuál es.
+  const engancharTrio = () => host.querySelector('#trioNow')?.addEventListener('click', async () => {
+    const classes = [...host.querySelectorAll('.cls')].map((x) => x.value).filter(Boolean);
+    if (classes.length !== 3) { alert(t('trio.needThree')); return; }
+    // El nivel es opcional a propósito: si lo dejas vacío manda lo que diga el
+    // log dentro del tramo, que es lo correcto mientras estés subiendo.
+    const nivel = prompt(t('trio.askLevel'), String(state.snap?.level ?? ''));
+    if (nivel === null) return;
+    const lvl = nivel.trim() ? Number(nivel.trim()) : null;
+    if (lvl !== null && !(lvl > 0 && lvl < 200)) { alert(t('trio.badLevel')); return; }
+    const r = await window.eql.setTrios([...(state.cfg.trios ?? []), { at: Date.now(), classes, level: lvl }]);
+    state.cfg.trios = r.trios;
+    state.needsRebuild = r.needsRebuild;
+    showTrioRebuild();
+    host.dataset.sig = '';
+    renderApp();
+  });
+
   const sel = (i) => `<select class="cls" data-i="${i}">${classList().map(([k, v]) =>
     `<option value="${k}"${(classes[i] ?? '') === k ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
 
@@ -1062,10 +1126,12 @@ function renderAdvice(snap) {
       <div class="adv-head">
         <span class="eyebrow">${t('adv.title')}</span>
         <span class="adv-classes">${sel(0)}${sel(1)}${sel(2)}</span>
+        ${trioBtn}
       </div>
       <div class="adv-verdict">${t('adv.needClasses')}</div>
       <div class="hint">${esc(t('adv.needClassesHint'))}</div>
     </div>`;
+    engancharTrio();
     host.querySelectorAll('.cls').forEach((el) => el.addEventListener('change', async () => {
       await window.eql.setClasses([...host.querySelectorAll('.cls')].map((x) => x.value));
       host.dataset.sig = '';
@@ -1091,6 +1157,7 @@ function renderAdvice(snap) {
       <span class="src eyebrow">${snap.classSource && snap.classSource !== 'desconocidas'
         ? esc(t(`adv.src.${snap.classSource}`)) : ''}</span>
       <span class="adv-classes">${sel(0)}${sel(1)}${sel(2)}</span>
+      ${trioBtn}
     </div>
     ${conflictBox}
     ${liveBox}
@@ -1136,6 +1203,7 @@ function renderAdvice(snap) {
     <div class="hint" style="margin-top:10px">${esc(t('adv.footnote'))}</div>
   </div>`;
 
+  engancharTrio();
   host.querySelectorAll('.cls').forEach((el) => el.addEventListener('change', async () => {
     const list = [...host.querySelectorAll('.cls')].map((x) => x.value);
     await window.eql.setClasses(list);
@@ -1960,6 +2028,43 @@ $('tabCombat').addEventListener('click', () => setView('combat'));
 $('tabTriggers').addEventListener('click', async () => { await initTriggers(); setView('triggers'); });
 
 window.eql.onLang((c) => { setLang(c); applyLangToChrome(); renderLangPicker(); });
+
+/**
+ * Aviso de que has tocado la tabla de tríos y el histórico no lo sabe.
+ *
+ * Cambiar la tabla sólo afecta a lo que venga a partir de ahora: las peleas
+ * guardadas conservan el nivel con el que se cerraron. Decirlo importa porque
+ * el fallo es silencioso — los números siguen ahí, con el mismo aspecto de
+ * siempre, sólo que con el nivel de antes.
+ */
+function showTrioRebuild() {
+  if (!state.needsRebuild) return;
+  const bar = $('migBar');
+  if (!bar) return;
+  bar.innerHTML = `<div class="mig-h">${esc(t('trio.title'))}</div>
+    <p>${esc(t('trio.rebuild'))}</p>
+    <div class="mig-btns">
+      <button class="primary" id="trioGo">${esc(t('mig.button'))}</button>
+      <button id="trioLater">${esc(t('mig.later'))}</button>
+    </div>`;
+  bar.style.display = 'block';
+  $('trioLater').addEventListener('click', () => {
+    state.needsRebuild = false;
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  });
+  $('trioGo').addEventListener('click', async () => {
+    const b = $('trioGo');
+    b.disabled = true;
+    b.textContent = t('mig.working');
+    $('trioLater').disabled = true;
+    const r = await window.eql.rebuildStore().catch(() => null);
+    state.needsRebuild = false;
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    if (r?.ok) { state.summary = null; state.rowNodes.clear(); renderApp(); }
+  });
+}
 
 /**
  * Aviso de que el histórico se guardó con cifras incorrectas.

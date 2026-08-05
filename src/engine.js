@@ -15,6 +15,7 @@ import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCA
 import { parseZone } from './zones.js';
 import { catalog } from './catalog.js';
 import { proofOf } from './classes.js';
+import { normalizeTrios, trioAt } from './trios.js';
 import { t } from './i18n.js';
 import { baseSpell } from './spells.js';
 
@@ -122,6 +123,9 @@ export class Engine extends EventEmitter {
     this.classSourceAt = null;    // de dónde salió el trío: /who, inferido o manual
     this.petPrompted = new Set();  // nombres por los que ya se ha pedido el comando
     this.whoSeen = new Set();      // jugadores de los que hay un /who: no son desconocidos
+    this.trios = [];              // tabla declarada a mano; manda sobre todo
+    this.trioIdx = 0;
+    this.trioActive = null;
     this.knownPets = new Set();  // todas las vistas alguna vez, entre sesiones
     this.petsSaved = 0;
     this.notMine = new Set();    // aliados que ya dijiste que no son tuyos
@@ -149,6 +153,10 @@ export class Engine extends EventEmitter {
     this.server = server;
     this.seq = 0;
     this.error = null;
+    // La tabla manual se reproduce desde el principio: al releer el log los
+    // tramos tienen que aplicarse en su momento, no todos de golpe al final.
+    this.trioIdx = 0;
+    this.trioActive = null;
 
     this.parser = new Parser({ self: this.self });
     this.narrator.setSelf(this.self);
@@ -199,84 +207,7 @@ export class Engine extends EventEmitter {
     this.tailer.on('line', (l) => {
       const ev = this.parser.parse(l, this.seq++);
       if (!ev) return;
-      if (ev.kind === 'pet_claim' || ev.kind === 'pet_leader' || ev.kind === 'pet_order') {
-        this.narrator.setPets([...this.parser.pets.keys()]);
-        if (this.tracker) this.tracker.petNames = new Set(this.parser.pets.keys());
-      }
-      if (ev.kind === 'stance' && ev.stance) this.seenStances.add(ev.stance);
-      if (ev.kind === 'invocation' && ev.invocation) this.seenInvocations.add(ev.invocation);
-      this.#cooldown(ev);
-      // El /who de tu propio personaje es la única fuente que no admite dudas.
-      if (ev.kind === 'who' && ev.who) this.whoSeen.add(ev.who);
-      if (ev.kind === 'who' && ev.who === (this.self ?? 'You') && ev.classes?.length) {
-        const changed = this.whoClasses && this.whoClasses.join() !== ev.classes.join();
-        this.whoClasses = ev.classes;
-        this.whoAt = ev.t;
-        this.level = ev.level;
-        // Un /who nuevo es la verdad: se descarta lo anterior y lo observado.
-        if (changed || this.classes?.length) {
-          this.classes = null;
-          this.seenStances.clear();
-          this.seenInvocations.clear();
-        }
-        this.classConflict = null;
-        this.#markLevel(ev.level, ev.classes);
-      }
-      // La subida de nivel es una afirmación absoluta y gratis, y en EQL el
-      // nivel baja al cambiar una clase por otra más baja: es la otra mitad de
-      // la línea de tiempo, junto al /who.
-      if (ev.kind === 'levelup' && ev.level) this.#markLevel(ev.level, null);
-      if (ev.kind === 'cast' && ev.source === (this.self ?? 'You') && ev.ability) this.classProof(ev);
-      if (ev.kind === 'stance' && ev.stance) this.#checkConflict('stance', ev.stance);
-      if (ev.kind === 'invocation' && ev.invocation) this.#checkConflict('invocation', ev.invocation);
-      // Golpes recientes de todo el mundo, para el DPS de los últimos segundos.
-      if (ev.amount > 0 && ev.source && !this.backfilling) {
-        this.recentHits.push({ t: ev.t, name: ev.source, amount: ev.amount });
-        const cut = ev.t - 20;
-        while (this.recentHits.length && this.recentHits[0].t < cut) this.recentHits.shift();
-      }
-
-      // Ventana móvil: sólo DAÑO que te entra, en bruto.
-      //
-      // La comprobación del tipo es imprescindible: las curaciones también
-      // traen cantidad y te tienen a ti como objetivo. Sin ella, cada Drain
-      // Spirit que te cura se contaba como daño mágico recibido, y el consejo
-      // te pedía Mage Hunter justo cuando más daño mágico estabas haciendo tú.
-      if (ev.amount > 0 && DAMAGE_KINDS.has(ev.kind) && ev.target === (this.self ?? 'You')) {
-        // Se guardan las dos cifras: `raw` es la reconstrucción sin postura, que
-        // es con lo que se comparan las posturas entre sí, y `amt` el daño que
-        // de verdad recibiste, que es con lo que se decide si vale la pena
-        // molestarte. Con Evasive las dos se separan por un factor de veinte.
-        this.recent.push({ t: ev.t, school: ev.school, raw: ev.rawAmount ?? ev.amount, amt: ev.amount });
-        const cut = ev.t - this.windowSec;
-        while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
-      }
-      // Los golpes que te FALLAN también entran en la ventana. Una postura que
-      // evade no reduce daño: quita golpes, así que se puntúa contando ataques,
-      // y sin los fallos no se sabe cuántos ataques hubo.
-      if (ev.kind === 'miss' && ev.target === (this.self ?? 'You')) {
-        this.recent.push({ t: ev.t, school: 'melee', raw: 0, amt: 0, miss: true });
-        const cut = ev.t - this.windowSec;
-        while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
-      }
-      this.tracker.feed(ev);
-      this.session?.feed(ev);
-      if (ev.kind === 'death' && ev.victim && !this.backfilling) this.#makeKillCard(ev);
-      // Durante la lectura del histórico no se habla ni se disparan avisos: son
-      // sucesos de hace horas. La guarda anterior miraba el estado, que pasaba
-      // a "monitorizando" en el primer volcado, a mitad de la lectura.
-      this.narrator.feed(ev);
-      if (ev.amount && ev.source && ev.source !== (this.self ?? 'You') && ev.target === (this.self ?? 'You')) {
-        this.narrator.add(ev.source);
-      }
-      // Enemigo = a quien pegas tú o tu mascota. Es el filtro que evita
-      // que los hechizos de tus compañeros de grupo se anuncien.
-      if (ev.amount && ev.target && (ev.source === (this.self ?? 'You') || this.parser.pets.has(ev.source))) {
-        this.foes.add(ev.target);
-        this.narrator.setFoes([...this.foes]);
-      }
-      // ev.raw es la línea sin la marca de tiempo, la reconozca el parser o no.
-      if (!this.backfilling) this.triggers.match(ev.raw, ev.t);
+      this.feedEvent(ev);
     });
     this.tailer.on('waiting', () => { this.status = 'missing'; });
     this.tailer.on('flush', () => { this.status = 'monitoring'; });
@@ -369,6 +300,153 @@ export class Engine extends EventEmitter {
       stance: this.parser?.stance ?? null,
       invocation: this.parser?.invocation ?? null,
     };
+  }
+
+  /**
+   * Un evento ya interpretado, con todo lo que hay que hacer con él.
+   *
+   * Vive fuera del bucle del lector para que se pueda alimentar a mano: es
+   * la única forma de probar la línea de tiempo del nivel y del trío sin
+   * un fichero de log de verdad detrás.
+   */
+  feedEvent(ev) {
+    if (!ev) return;
+    if (ev.kind === 'pet_claim' || ev.kind === 'pet_leader' || ev.kind === 'pet_order') {
+      this.narrator.setPets([...this.parser.pets.keys()]);
+      if (this.tracker) this.tracker.petNames = new Set(this.parser.pets.keys());
+    }
+    if (ev.kind === 'stance' && ev.stance) this.seenStances.add(ev.stance);
+    if (ev.kind === 'invocation' && ev.invocation) this.seenInvocations.add(ev.invocation);
+    this.#cooldown(ev);
+    // Lo que declaraste a mano va por delante de todo lo demás.
+    this.#applyTrios(ev.t);
+    // El /who de tu propio personaje es la única fuente que no admite dudas.
+    if (ev.kind === 'who' && ev.who) this.whoSeen.add(ev.who);
+    if (ev.kind === 'who' && ev.who === (this.self ?? 'You') && ev.classes?.length) {
+      const man = this.trioActive;
+      const changed = this.whoClasses && this.whoClasses.join() !== ev.classes.join();
+      // Un /who nuevo es la verdad: se descarta lo anterior y lo observado.
+      if (changed || this.classes?.length) {
+        this.classes = null;
+        this.seenStances.clear();
+        this.seenInvocations.clear();
+      }
+      this.classConflict = null;
+      this.whoAt = ev.t;
+      // Dentro de un tramo declarado a mano, el /who no manda: describe un
+      // instante, y tú describiste el tramo entero. El nivel sólo lo respeta
+      // si el tramo no declaró uno.
+      if (!man) {
+        this.whoClasses = ev.classes;
+        this.level = ev.level;
+        this.#markLevel(ev.level, ev.classes);
+      } else if (man.level == null && ev.level) {
+        this.level = ev.level;
+        this.#markLevel(ev.level, null);
+      }
+    }
+    // La subida de nivel es una afirmación absoluta y gratis, y en EQL el
+    // nivel baja al cambiar una clase por otra más baja: es la otra mitad de
+    // la línea de tiempo, junto al /who.
+    if (ev.kind === 'levelup' && ev.level) this.#markLevel(ev.level, null);
+    if (ev.kind === 'cast' && ev.source === (this.self ?? 'You') && ev.ability) this.classProof(ev);
+    if (ev.kind === 'stance' && ev.stance) this.#checkConflict('stance', ev.stance);
+    if (ev.kind === 'invocation' && ev.invocation) this.#checkConflict('invocation', ev.invocation);
+    // Golpes recientes de todo el mundo, para el DPS de los últimos segundos.
+    if (ev.amount > 0 && ev.source && !this.backfilling) {
+      this.recentHits.push({ t: ev.t, name: ev.source, amount: ev.amount });
+      const cut = ev.t - 20;
+      while (this.recentHits.length && this.recentHits[0].t < cut) this.recentHits.shift();
+    }
+
+    // Ventana móvil: sólo DAÑO que te entra, en bruto.
+    //
+    // La comprobación del tipo es imprescindible: las curaciones también
+    // traen cantidad y te tienen a ti como objetivo. Sin ella, cada Drain
+    // Spirit que te cura se contaba como daño mágico recibido, y el consejo
+    // te pedía Mage Hunter justo cuando más daño mágico estabas haciendo tú.
+    if (ev.amount > 0 && DAMAGE_KINDS.has(ev.kind) && ev.target === (this.self ?? 'You')) {
+      // Se guardan las dos cifras: `raw` es la reconstrucción sin postura, que
+      // es con lo que se comparan las posturas entre sí, y `amt` el daño que
+      // de verdad recibiste, que es con lo que se decide si vale la pena
+      // molestarte. Con Evasive las dos se separan por un factor de veinte.
+      this.recent.push({ t: ev.t, school: ev.school, raw: ev.rawAmount ?? ev.amount, amt: ev.amount });
+      const cut = ev.t - this.windowSec;
+      while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
+    }
+    // Los golpes que te FALLAN también entran en la ventana. Una postura que
+    // evade no reduce daño: quita golpes, así que se puntúa contando ataques,
+    // y sin los fallos no se sabe cuántos ataques hubo.
+    if (ev.kind === 'miss' && ev.target === (this.self ?? 'You')) {
+      this.recent.push({ t: ev.t, school: 'melee', raw: 0, amt: 0, miss: true });
+      const cut = ev.t - this.windowSec;
+      while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
+    }
+    this.tracker.feed(ev);
+    this.session?.feed(ev);
+    if (ev.kind === 'death' && ev.victim && !this.backfilling) this.#makeKillCard(ev);
+    // Durante la lectura del histórico no se habla ni se disparan avisos: son
+    // sucesos de hace horas. La guarda anterior miraba el estado, que pasaba
+    // a "monitorizando" en el primer volcado, a mitad de la lectura.
+    this.narrator.feed(ev);
+    if (ev.amount && ev.source && ev.source !== (this.self ?? 'You') && ev.target === (this.self ?? 'You')) {
+      this.narrator.add(ev.source);
+    }
+    // Enemigo = a quien pegas tú o tu mascota. Es el filtro que evita
+    // que los hechizos de tus compañeros de grupo se anuncien.
+    if (ev.amount && ev.target && (ev.source === (this.self ?? 'You') || this.parser.pets.has(ev.source))) {
+      this.foes.add(ev.target);
+      this.narrator.setFoes([...this.foes]);
+    }
+    // ev.raw es la línea sin la marca de tiempo, la reconozca el parser o no.
+    if (!this.backfilling) this.triggers.match(ev.raw, ev.t);
+  }
+
+  /**
+   * Pone en vigor los renglones de la tabla manual que ya tocan.
+   *
+   * Se llama en cada evento con la hora del evento, así que al releer el log
+   * los tramos se aplican en su momento y no todos de golpe al final.
+   */
+  #applyTrios(tSec) {
+    if (!this.trios?.length) return;
+    const ms = tSec * 1000;
+    let cambio = false;
+    while (this.trioIdx < this.trios.length) {
+      const r = this.trios[this.trioIdx];
+      if (r.at != null && r.at > ms) break;
+      this.trioIdx++;
+      this.trioActive = r;
+      cambio = true;
+    }
+    if (!cambio) return;
+    const r = this.trioActive;
+    // Cambiar de trío BORRA el nivel heredado: en EQL el nivel efectivo es el
+    // de tu clase más baja, así que meter una clase nueva puede hundirlo. Si
+    // el renglón no declara nivel, se queda sin nivel hasta el primer hito de
+    // dentro del tramo, en vez de arrastrar una mentira del tramo anterior.
+    this.level = r.level ?? null;
+    this.whoClasses = r.classes.slice();
+    this.classSourceAt = 'manual';
+    this.classPrompt = null;
+    this.promptedClass = null;
+    this.classConflict = null;
+    this.classes = null;
+    this.seenStances.clear();
+    this.seenInvocations.clear();
+    for (const tr of [this.tracker, this.session]) {
+      if (!tr) continue;
+      tr.level = this.level;
+      tr.classes = r.classes.slice();
+    }
+  }
+
+  /** La tabla que declaras a mano. Manda sobre el /who y sobre la inferencia. */
+  setTrios(lista) {
+    this.trios = normalizeTrios(lista);
+    this.trioIdx = 0;
+    this.trioActive = null;
+    return this.trios;
   }
 
   /**

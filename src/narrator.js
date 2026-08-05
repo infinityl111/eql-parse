@@ -45,6 +45,30 @@ export const DEFAULT_NARRATE = {
   bigCritFactor: 2.5,   // un golpe se anuncia si supera 2,5 veces tu media
 };
 
+/**
+ * Mezcla configuraciones de voz con la de fábrica, GRUPO A GRUPO.
+ *
+ * La mezcla plana —`{ ...DEFAULT_NARRATE, ...guardada }`— era un fallo
+ * silencioso: sustituye el grupo entero, así que cada casilla nueva que se
+ * añadiera nacía apagada para todo el que ya tuviera un fichero de
+ * configuración, aunque su valor de fábrica fuese encendida. No se notaba,
+ * porque una función que no avisa se parece mucho a una que no existe.
+ *
+ * Vive aquí y se usa desde el proceso principal y desde el narrador: había
+ * una copia en cada sitio y las dos estaban mal de la misma forma.
+ */
+export function mergeNarrate(...fuentes) {
+  const out = { ...DEFAULT_NARRATE };
+  for (const f of fuentes) {
+    for (const [grupo, valor] of Object.entries(f ?? {})) {
+      out[grupo] = valor && typeof valor === 'object' && !Array.isArray(valor)
+        ? { ...out[grupo], ...valor }
+        : valor;
+    }
+  }
+  return out;
+}
+
 /** Cómo se enuncia cada canal. El verbo dice de dónde viene sin nombrarlo. */
 const FRAME = (channel, who, msg) => t(`say.${channel}`, { who, msg });
 
@@ -81,7 +105,7 @@ export class Narrator extends EventEmitter {
     this.lastCast = new Map();
   }
 
-  setConfig(c) { this.config = { ...DEFAULT_NARRATE, ...this.config, ...c }; }
+  setConfig(c) { this.config = mergeNarrate(this.config, c); }
   setSelf(s) { this.self = s; }
   setPets(list) { this.pets = new Set(list ?? []); }
   setFoes(list) { this.foes = new Set(list ?? []); }

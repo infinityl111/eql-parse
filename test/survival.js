@@ -6,7 +6,7 @@
  * texto, esta prueba se entera antes que el usuario.
  */
 import { Parser } from '../src/parser.js';
-import { Narrator } from '../src/narrator.js';
+import { Narrator, DEFAULT_NARRATE } from '../src/narrator.js';
 import { setLang } from '../src/i18n.js';
 
 setLang('es');
@@ -155,6 +155,21 @@ console.log('\n«ese bicho te ve» va aparte y sí se deduplica');
   const d = narrar([[0, linea], [1, linea], [1, linea], [2, linea]], cfg);
   ok(d.length === 1, 'encendida, cuatro repeticiones en dos segundos son un aviso', `${d.length}`);
   ok(!d[0].priority, 'y no corta: no es un peligro sobrevenido');
+}
+
+
+// ── Opciones nuevas en una configuración vieja ───────────────────────────
+console.log('\nuna casilla nueva no llega apagada a quien ya tenía configuración');
+{
+  // La clase de fallo: la mezcla plana sustituía el grupo entero, así que
+  // cada opción que se añadiera después nacía apagada para todo el mundo,
+  // en silencio. Una función que no avisa se parece a una que no existe.
+  const n = new Narrator();
+  n.setConfig({ combat: { stance: false } });   // configuración de hace tres versiones
+  ok(n.config.combat.stance === false, 'lo que guardaste se respeta', String(n.config.combat.stance));
+  ok(n.config.combat.petprompt === DEFAULT_NARRATE.combat.petprompt,
+    'y lo que no guardaste coge el valor de fábrica', String(n.config.combat.petprompt));
+  ok(n.config.survival !== undefined, 'los grupos que faltan aparecen enteros');
 }
 
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
