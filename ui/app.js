@@ -1124,18 +1124,28 @@ function renderHead(snap) {
 const LEVEL_ICON = { bad: '!', warn: '·', info: 'i', good: '✓' };
 
 function renderAnalysis(snap) {
-  const host = $('mainPane') ?? $('rows');
   const f = fightFor(snap);
+  const host = $('anView');
   const back = `<button id="anBack">← ${esc(t('tab.combat'))}</button>`;
+
+  // Sin esta guarda el snapshot de 250 ms rehacía la vista entera: el análisis
+  // se recalculaba cuatro veces por segundo y, como #anView es el contenedor
+  // que desplaza, el scroll volvía arriba en cuanto lo movías y no había forma
+  // de seleccionar un texto. Es el mismo patrón que ya guardan el asistente, la
+  // configuración, la pestaña de avisos y el resumen.
+  const sig = JSON.stringify([getLang(), f?.uid ?? 'live', f?.total, f?.duration, snap.classes]);
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+
   if (!f || f.duration < 30) {
-    $('anView').innerHTML = `<div class="analysis"><div class="an-head"><h2>${esc(t('an.title'))}</h2>${back}</div>
+    host.innerHTML = `<div class="analysis"><div class="an-head"><h2>${esc(t('an.title'))}</h2>${back}</div>
       <div class="hint">${esc(t('an.tooShort'))}</div></div>`;
     $('anBack').addEventListener('click', () => { state.view = 'combat'; renderApp(); });
     return;
   }
 
   const a = analyse(f, { self: snap.self, classes: snap.classes, pets: snap.pets });
-  if (!a) { $('anView').innerHTML = ''; return; }
+  if (!a) { host.innerHTML = ''; return; }
 
   const maxDps = Math.max(1, ...a.phases.map((p) => p.dps));
   const maxDtps = Math.max(1, ...a.phases.map((p) => p.dtps));
@@ -1162,7 +1172,7 @@ function renderAnalysis(snap) {
       ${x.impact ? `<div class="an-find-i">${esc(x.impact)}</div>` : ''}
     </div>`).join('') : `<div class="hint">${esc(t('an.noFindings'))}</div>`;
 
-  $('anView').innerHTML = `<div class="analysis">
+  host.innerHTML = `<div class="analysis">
     <div class="an-head">
       <div><h2>${esc(f.label ?? t('fight.skirmish'))}</h2>
         <div class="eyebrow">${secs(f.duration)} · ${n0(f.total)} · ${esc(f.zone ?? '')}</div></div>

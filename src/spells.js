@@ -27,6 +27,9 @@ const KEYS = {
   fear: ['fear', 'panic', 'terror', 'horrify', 'invoke fear', 'scream of'],
   root: ['root', 'ensnare', 'snare', 'immobiliz', 'paraly', 'engulfing dark',
          'cripple', 'slow', 'tagar', 'clinging darkness', 'bonds of'],
+  // Nota: `root` agrupa a propósito raíces y ralentizaciones, porque para
+  // avisarte por voz son la misma urgencia. Para el análisis NO son lo mismo:
+  // ver `controlKind`.
   summon: ['summon', 'call of', 'gather', 'reinforce'],
   escape: ['gate', 'evacuat', 'succor', 'translocate', 'teleport'],
   resurrect: ['resurrect', 'revive', 'reviviscence', 'convergence'],
@@ -50,6 +53,26 @@ export function classifySpell(name, opts = {}) {
   const extra = (opts.nukeNames ?? []).map(norm).filter(Boolean);
   if (extra.some((k) => n.includes(k))) return 'nuke';
   return null;
+}
+
+/**
+ * ¿Este hechizo te quita segundos de pelea, o sólo te empeora?
+ *
+ * El análisis afirma que cada efecto de control «son segundos sin pegar», y de
+ * un slow eso es falso: sigues pegando, más despacio. Contarlos juntos inflaba
+ * el hallazgo con una afirmación que no se sostiene.
+ *
+ *   'duro'   no puedes actuar o no puedes moverte: raíz, mez, miedo, encantar
+ *   'blando' sigues peleando peor: ralentizar, debilitar
+ */
+const BLANDOS = ['slow', 'cripple', 'tagar'];
+
+export function controlKind(nameOrCat, ability) {
+  const cat = nameOrCat;
+  if (cat === 'charm' || cat === 'fear' || cat === 'mez') return 'duro';
+  if (cat !== 'root') return null;
+  const n = norm(ability ?? '');
+  return BLANDOS.some((k) => n.includes(k)) ? 'blando' : 'duro';
 }
 
 /** Nombres de bicho más cortos al hablarlos: "a fire giant warrior" -> "fire giant warrior". */

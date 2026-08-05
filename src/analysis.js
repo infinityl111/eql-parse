@@ -1,5 +1,6 @@
 import { t } from './i18n.js';
 import { availableFor, normStance, STANCES } from './stances.js';
+import { controlKind } from './spells.js';
 
 /**
  * Análisis posterior a una pelea grande.
@@ -24,7 +25,12 @@ function fullSeries(f) {
   const by = new Map((f.series ?? []).map((p) => [p.s, p]));
   const out = [];
   for (let i = 0; i <= f.duration; i++) {
-    out.push(by.get(i) ?? { s: i, dmg: 0, taken: 0, heal: 0, tMelee: 0, tSpell: 0 });
+    // `mine` tiene que ir en el relleno como los demás. Sin él, los segundos
+    // vacíos daban `undefined`, que no es `=== 0` ni `> 0`, así que el corte de
+    // fase por «dejaste de pegar» no se disparaba nunca en un silencio de
+    // verdad: sólo si en esos segundos pasaba algo más. Justo al revés de lo
+    // que se busca, que es el hueco en el que no pasa nada.
+    out.push(by.get(i) ?? { s: i, dmg: 0, taken: 0, heal: 0, tMelee: 0, tSpell: 0, mine: 0 });
   }
   return out;
 }
@@ -150,8 +156,11 @@ export function analyse(f, ctx = {}) {
   // ── 1. Tiempo muerto ───────────────────────────────
   // El hueco sin pegar es la pérdida más grande y la más fácil de corregir.
   if (mine && f.duration >= 20) {
-    const idle = f.duration + 1 - (mine.hitSec ?? mine.activeSec);
-    const share = idle / (f.duration + 1);
+    // `duration` ya es la convención inclusiva (último - primero + 1), así que
+    // sumarle otro uno contaba un segundo parado de más en todas las peleas:
+    // con uptime perfecto salía «1 segundo sin pegar».
+    const idle = Math.max(0, f.duration - (mine.hitSec ?? mine.activeSec));
+    const share = idle / f.duration;
     if (share > 0.15) {
       const lost = Math.round(idle * (mine.damage / Math.max(1, mine.hitSec ?? mine.activeSec)));
       add({
@@ -202,7 +211,12 @@ export function analyse(f, ctx = {}) {
     const missShare = mine.misses / (mine.meleeHits + mine.misses);
     if (missShare > 0.35) {
       const lostSwings = Math.round(mine.misses - (mine.meleeHits + mine.misses) * 0.25);
-      const perHit = mine.meleeHits ? (mine.damage / mine.hits) : 0;
+      // Un swing fallado cuesta un GOLPE DE MELÉ, no un impacto medio de todo
+      // lo que haces. Dividir el daño total entre todos los impactos mete los
+      // hechizos dentro, y en un híbrido que hace la mitad del daño casteando
+      // eso infla el «daño perdido por fallar» sin que se note de dónde sale.
+      const meleeDmg = (mine.schools ?? []).find((s) => s.name === 'melee')?.sum ?? 0;
+      const perHit = mine.meleeHits ? meleeDmg / mine.meleeHits : 0;
       add({
         id: 'accuracy', level: missShare > 0.5 ? 'bad' : 'warn',
         title: t('an.accuracy'),
@@ -226,7 +240,11 @@ export function analyse(f, ctx = {}) {
   }
 
   // ── 5. Control perdido: charm, fear, mez ───────────
-  const control = enemyCasts.filter((c) => ['charm', 'fear', 'mez', 'root'].includes(c.cat));
+  // Sólo lo que de verdad te quita segundos de pelea. Una ralentización entra
+  // en la misma categoría de aviso que una raíz porque avisa igual de urgente,
+  // pero el impacto que se afirma aquí —«cada uno son segundos sin pegar»— de
+  // un slow es sencillamente falso: sigues pegando, más despacio.
+  const control = enemyCasts.filter((c) => controlKind(c.cat, c.ability) === 'duro');
   if (control.length >= 2) {
     add({
       id: 'control', level: 'warn', title: t('an.control'),

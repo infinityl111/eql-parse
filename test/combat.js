@@ -146,5 +146,62 @@ console.log('\ndaño sin atribuir');
   ok(gorgon?.taken === 1042, 'pero el que los recibe sí los contabiliza', String(gorgon?.taken));
 }
 
+// ── 5. Análisis: los huecos, el uptime y el daño perdido ─────────────────
+console.log('\nanálisis posterior');
+{
+  const { analyse } = await import('../src/analysis.js');
+
+  // Silencio REAL de 15 s: no pasa absolutamente nada en medio, y es más corto
+  // que la inactividad que cierra la pelea (20 s), así que sigue siendo UNA.
+  const guion = [];
+  for (let s = 0; s < 20; s++) guion.push([s, 'You slash a gorgon for 100 points of damage.']);
+  for (let s = 35; s < 70; s++) guion.push([s, 'You slash a gorgon for 100 points of damage.']);
+  const f = correr(guion);
+  ok(f.duration === 70, 'sigue siendo una sola pelea', `${f.duration}s`);
+  const a = analyse(f, { self: 'Campeon', classes: ['WAR'] });
+  const corta = a.phases.some((p) => Math.abs(p.from - 20) <= 1 || Math.abs(p.to - 20) <= 1);
+  ok(corta, 'se corta una fase donde dejas de pegar', a.phases.map((p) => `${p.from}-${p.to}`).join(' '));
+  const hueco = a.phases.find((p) => p.from >= 19 && p.to <= 36);
+  ok(hueco && hueco.idle >= 12, 'y esa fase sale marcada como parada', `${hueco?.idle}s parado`);
+
+  // Uptime perfecto: ni un segundo de más.
+  const seguido = [];
+  for (let s = 0; s < 40; s++) seguido.push([s, 'You slash a gorgon for 100 points of damage.']);
+  const g = analyse(correr(seguido), { self: 'Campeon', classes: ['WAR'] });
+  const dt = g.findings.find((x) => x.id === 'downtime' || x.id === 'uptime');
+  ok(dt?.id === 'uptime', 'pegando sin parar no se reporta tiempo muerto', dt?.id);
+  ok(/100\s*%/.test(dt?.detail ?? ''), 'y el uptime es del 100%, no del 97%', dt?.detail);
+
+  // El daño perdido por fallar se mide en golpes de melé, no en el promedio de
+  // todo lo que haces: un híbrido que castea la mitad no puede inflar la cifra.
+  const hibrido = [];
+  for (let s = 0; s < 40; s++) {
+    hibrido.push([s, 'You slash a gorgon for 100 points of damage.']);
+    hibrido.push([s, 'You try to slash a gorgon, but a gorgon parries!']);
+    hibrido.push([s, 'Campeon hit a gorgon for 900 points of magic damage by Drain Spirit.']);
+  }
+  const h = analyse(correr(hibrido), { self: 'Campeon', classes: ['SHD'] });
+  const acc = h.findings.find((x) => x.id === 'accuracy');
+  const perdido = +(acc?.impact ?? '').replace(/[^\d]/g, '');
+  ok(acc, 'con 50% de fallos se avisa de la precisión');
+  // 40 fallos, 20 por encima del 25% esperado, a 100 por golpe de melé = 2.000.
+  // Con el promedio de todo el daño (500/golpe) salían 10.000.
+  ok(perdido > 0 && perdido < 4000,
+    'y el daño perdido se calcula con el golpe de melé, no con el promedio total',
+    `${perdido}`);
+}
+
+// ── 6. Un slow no es «segundos sin pegar» ────────────────────────────────
+console.log('\ncontrol recibido');
+{
+  const { controlKind } = await import('../src/spells.js');
+  ok(controlKind('root', 'Bonds of Force') === 'duro', 'una raíz es control duro');
+  ok(controlKind('root', 'Tagar’s Insects') === 'blando', 'una ralentización no');
+  ok(controlKind('root', 'Cripple') === 'blando', 'ni una debilitación');
+  ok(controlKind('mez', 'Mesmerize') === 'duro' && controlKind('fear', 'Invoke Fear') === 'duro',
+    'mez y miedo sí');
+  ok(controlKind('heal', 'Word of Healing') === null, 'y una curación no es control');
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);
