@@ -1372,10 +1372,14 @@ function diffBlocks(f) {
           <span>${esc(t('foe.maxHit'))} <b>${n0(d.maxHit)}</b></span>
           <span>${esc(t('foe.dealtYou'))} <b>${n0(d.taken)}</b></span>
         </div>
-        <div class="difcard-ab">${(d.abilities ?? []).slice(0, 6).map((x) =>
-          `<span><i class="seg ${typeClass(x.type)}"></i>${esc(x.name)} <b>${n0(x.sum)}</b></span>`).join('')}</div>
+        <div class="difcard-cast">${esc(t('foe.castIn', { n: d.fights }))}</div>
+        <div class="difcard-ab">${(d.abilities ?? []).slice(0, 8).map((x) =>
+          `<span title="${esc(t('foe.inFights', { n: x.inFights, total: d.fights }))}"><i class="seg ${typeClass(x.type)}"></i>${
+            esc(x.name)} <b>${n0(x.sum)}</b>${d.fights > 1
+              ? ` <span class="dim">${x.inFights}/${d.fights}</span>` : ''}</span>`).join('')}</div>
       </div>`).join('')}
     </div>
+    <div class="hint">${esc(t('foe.castNote'))}</div>
   </div>`;
 }
 

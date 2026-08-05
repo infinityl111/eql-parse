@@ -165,6 +165,23 @@ export function aggregate(fights, self = null) {
         damageTo: 0, taken: 0, hpSamples: [], abil: new Map(),
       };
       pd.fights += 1;
+      // En cuántos ENCUENTROS apareció cada habilidad, no sólo cuánto sumó.
+      //
+      // Es la evidencia en crudo y no se interpreta. En EQL las clases
+      // secundarias de un enemigo se sortean por instancia, así que dos
+      // encuentros con el mismo nombre pueden ser bichos distintos: medido en
+      // este log, Lord Nagafen lanzó los tres hechizos de Druida en D2 y
+      // ninguno en D3 pese a durar la pelea 182 segundos. Si fuera cosa de la
+      // dificultad las habilidades se añadirían, nunca se perderían.
+      //
+      // Y que una habilidad NO aparezca tampoco prueba que no la tenga: las
+      // notas de parche de EQL dicen que los NPC respetan tiempos de
+      // reutilización. Por eso se guarda «en cuántos de cuántos» y se deja que
+      // el que mira saque sus conclusiones.
+      for (const nombre of new Set((r.abilities ?? []).map((a) => a.name))) {
+        pd.abilFights = pd.abilFights ?? new Map();
+        pd.abilFights.set(nombre, (pd.abilFights.get(nombre) ?? 0) + 1);
+      }
       pd.taken += r.damage ?? 0;
       pd.maxHit = Math.max(pd.maxHit, r.max ?? 0);
       e.porDif.set(kd, pd);
@@ -283,7 +300,12 @@ export function aggregate(fights, self = null) {
               avg: Math.round(d.hpSamples.reduce((a, b) => a + b, 0) / d.hpSamples.length),
               min: Math.min(...d.hpSamples), max: Math.max(...d.hpSamples),
             } : null,
-            abilities: [...d.abil.values()].sort((a, b) => b.sum - a.sum).slice(0, 12),
+            // Cada habilidad con en cuántos encuentros salió: es lo que se
+            // puede afirmar. «Sus habilidades en D2» no; «lo que lanzó en los
+            // 2 encuentros de D2» sí.
+            abilities: [...d.abil.values()]
+              .map((a) => ({ ...a, inFights: d.abilFights?.get(a.name) ?? 0 }))
+              .sort((a, b) => b.sum - a.sum).slice(0, 12),
           }))
           .sort((a, b) => (a.diff ?? 99) - (b.diff ?? 99)),
         spells: [...(e.spells ?? new Map()).values()]
