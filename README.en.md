@@ -121,6 +121,60 @@ Every fight records what dropped, telling apart what you picked up, what
 auto-sold and what became an upgrade. Hovering shows the stat block in the
 game's own style, pulled from the wiki; clicking opens its page.
 
+### Level and classes: three sources, and an order between them
+
+![Class contradiction notice](docs/contradiccion.png)
+
+In EQL you can change your class trio, and the log **says so nowhere**. Since
+your effective level is that of your lowest class, a trio change can drop it
+from 50 to 24 without leaving a trace. Without solving this, comparing today's
+DPS against yesterday's means nothing.
+
+It is solved with three sources, and the label always says which one won:
+
+1. **What you declare by hand** — you were there and the log was not.
+2. **The `/who`** — true, but only of the instant you type it.
+3. **An exclusive spell** — proves that class was active. Never the level.
+
+If you cast a spell that only one class can cast and that class is not in your
+trio, the notice above appears with the spell and class named, and asks for a
+`/who`. The trio corrects itself; the level is **cleared**, because no spell
+proves a level. A spell shared by two classes proves nothing and stays quiet.
+
+### The trio table
+
+![Declared trio table](docs/trios.png)
+
+Your word beats the other two, including a later `/who`: that `/who` describes
+a later moment, not yours. The **"Changed trio"** button sits next to your
+classes, not buried in settings, because it is the gesture you will use 90% of
+the time. For past stretches, the full table with date, trio and level.
+
+The row's level is optional on purpose: leave it empty while you are levelling
+and the log's level-ups will rule inside that stretch.
+
+And because manual entries take priority, below the table you get **every time
+your table and the log disagree**. Nothing is corrected: it is shown, because
+if you get a date wrong there is nothing else to warn you.
+
+### Who is on your side
+
+![Unidentified allies](docs/sinidentificar.png)
+
+The EQL log does not say who is in your group: no invites, no joins, no
+leaves. So someone hitting your enemies is indistinguishable from a groupmate
+by any data.
+
+What can be asserted, is: **whoever heals an enemy is an enemy**, and the rule
+propagates to whoever heals the healer. The rest — players who did real damage
+but for whom there is not a single `/who` — goes in its own **"Unidentified"**
+section, neither deleted nor added to your side. With a "Not one of mine"
+button for the ones you know, remembered between sessions.
+
+In EQL your pet also gets a new name on every summon. When a new unidentified
+one shows up, you are asked for a `/pet who leader` once per name and session,
+with a checkbox to turn it off.
+
 ### Voice and alerts
 
 Reads incoming chat with a checkbox per channel and narrates combat:
@@ -138,7 +192,7 @@ Plus a regex trigger editor, GINA style, with timers and live testing.
 npm install
 npm start              # development
 npm run dist           # installer in dist/
-npm test               # 256 engine checks
+npm test               # 381 engine checks
 npm run calibrate -- "path\to\eqlog.txt" --self YourChar
 npm run store:check    # inspects the history without writing anything
 npm run store:rebuild  # rebuilds it by re-reading the log
@@ -153,6 +207,9 @@ src/store.js       fight store: append-only, never rewritten
 src/rebuild.js     history rebuild by re-reading the log
 src/aggregate.js   summing many fights, and the enemy dossier
 src/stances.js     stance and invocation data for all 16 classes
+src/classes.js     each class's exclusive spells, from the wiki
+src/trios.js       the trio table you declare by hand
+src/zones.js       zone, sub-zone and instance difficulty
 src/advisor.js     which stance suits, on damage reversed to raw
 src/analysis.js    post-fight analysis of long fights
 src/wiki.js        item tooltips and tactical notes from eqlwiki.com
@@ -179,6 +236,13 @@ where the program's limits come from, and none of them are papered over:
 - Each stance's cost tells you the price, **not whether you can pay it**.
 - The analysis will never say a heal came late: there's no health data.
 - Only **your** stance is known; nobody else's appears in the log.
+- **It does not say who is in your group.** Hence a separate section for those
+  who hit your enemies without any evidence they are yours, and a button for
+  you to settle it.
+- **It does not say when you change class trio, nor what level that leaves
+  you at.** It is deduced from the exclusive spells you cast, which prove the
+  class but never the level. For the level you need your own `/who` or the
+  manual table.
 - An enemy's health is an estimate from the damage it took to kill it, not an
   official figure.
 - Timestamps have one-second resolution, so on short fights DPS carries a large

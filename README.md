@@ -121,6 +121,61 @@ Cada pelea guarda lo que soltó, distinguiendo lo recogido, lo autovendido y las
 mejoras. Al pasar el ratón sale la ficha con el aspecto del juego, sacada de la
 wiki; al pulsar se abre su página.
 
+### Nivel y clases: tres fuentes, y un orden entre ellas
+
+![Aviso de contradicción de clase](docs/contradiccion.png)
+
+En EQL puedes cambiar tu trío de clases, y el log **no lo dice en ninguna
+parte**. Como el nivel efectivo es el de tu clase más baja, un cambio de trío
+puede hundirlo de 50 a 24 sin dejar rastro. Sin resolver esto, comparar tu DPS
+de hoy con el de ayer no significa nada.
+
+Se resuelve con tres fuentes, y la etiqueta siempre dice cuál mandó:
+
+1. **Lo que declaras a mano** — tú estabas allí y el log no.
+2. **El `/who`** — cierto, pero sólo del instante en que lo escribes.
+3. **Un hechizo exclusivo** — prueba que esa clase estaba activa. Nunca el nivel.
+
+Si lanzas un hechizo que sólo puede lanzar una clase que no consta en tu trío,
+sale el aviso de arriba con el nombre del hechizo y de la clase, y te pide un
+`/who`. El trío se corrige solo; el nivel **se borra**, porque ningún hechizo
+prueba un nivel. Un hechizo compartido por dos clases no prueba nada y se
+calla.
+
+### La tabla de tríos
+
+![Tabla de tríos declarados](docs/trios.png)
+
+Tu palabra manda sobre las otras dos, incluido un `/who` posterior: ese `/who`
+describe un momento posterior, no el tuyo. El botón **«Cambié de trío»** está
+junto a tus clases, no enterrado en ajustes, porque es el gesto del 90% de las
+veces. Para tramos pasados, la tabla completa con fecha, trío y nivel.
+
+El nivel del renglón es opcional a propósito: déjalo vacío mientras estés
+subiendo y mandarán las subidas de nivel del log dentro de ese tramo.
+
+Y como lo manual manda, debajo de la tabla se señalan **las veces que tu tabla
+y el log no dicen lo mismo**. No se corrige nada: se enseña, porque si te
+equivocas al declarar una fecha no hay nada más que te avise.
+
+### Quién es de los tuyos
+
+![Aliados sin identificar](docs/sinidentificar.png)
+
+El log de EQL no dice quién va en tu grupo: ni invitaciones, ni entradas, ni
+salidas. Así que alguien que pega a tus enemigos no se distingue de un
+compañero por ningún dato.
+
+Lo que sí se puede afirmar, se afirma: **quien cura a un enemigo es enemigo**,
+y la regla se propaga al que cura al que cura. El resto —jugadores que
+hicieron daño real pero de los que no hay ni un `/who`— va en su propia
+sección **«Sin identificar»**, ni borrado ni sumado a tu bando. Con un botón
+«No es de los míos» para los que tú sepas, que se recuerda entre sesiones.
+
+En EQL la mascota además cambia de nombre en cada invocación. Cuando aparece
+una nueva sin identificar, se te pide un `/pet who leader` una vez por nombre
+y sesión, con casilla para apagarlo.
+
 ### Voz y avisos
 
 Lee el chat entrante con una casilla por canal y comenta el combate: cambio de
@@ -139,7 +194,7 @@ temporizadores y prueba en vivo.
 npm install
 npm start              # desarrollo
 npm run dist           # instalador en dist/
-npm test               # 256 comprobaciones del motor
+npm test               # 381 comprobaciones del motor
 npm run calibrate -- "ruta\al\eqlog.txt" --self TuPJ
 npm run store:check    # revisa el histórico sin escribir nada
 npm run store:rebuild  # lo reconstruye releyendo el log
@@ -154,6 +209,9 @@ src/store.js       almacén de peleas: se añade al final, nunca se reescribe
 src/rebuild.js     reconstrucción del histórico releyendo el log
 src/aggregate.js   suma de varias peleas y expediente del enemigo
 src/stances.js     datos de posturas e invocaciones de las 16 clases
+src/classes.js     hechizos exclusivos de cada clase, del wiki
+src/trios.js       la tabla de tríos que declaras a mano
+src/zones.js       zona, sub-zona y dificultad de instancia
 src/advisor.js     qué postura conviene, con el daño revertido a bruto
 src/analysis.js    análisis posterior de peleas largas
 src/wiki.js        fichas de objeto y notas tácticas desde eqlwiki.com
@@ -180,6 +238,12 @@ ahí salen los límites del programa, y ninguno se disimula:
 - Los costes de cada postura dicen el precio, **no si puedes pagarlo**.
 - El análisis nunca dirá si una cura llegó tarde: no hay dato de vida.
 - Sólo se conoce **tu** postura; la de los demás no aparece.
+- **No dice quién va en tu grupo.** Por eso hay una sección aparte para los
+  que pegaron a tus enemigos sin que conste que son tuyos, y un botón para
+  resolverlo tú.
+- **No dice cuándo cambias de trío de clases, ni a qué nivel te deja.** Se
+  deduce de los hechizos exclusivos que lanzas, que prueban la clase pero
+  nunca el nivel. Para el nivel hace falta un `/who` tuyo o la tabla manual.
 - La vida de un enemigo es una estimación del daño que costó matarlo, no un
   dato oficial.
 - La marca de tiempo tiene resolución de un segundo, así que en peleas de
