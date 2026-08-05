@@ -88,19 +88,53 @@ console.log('\nqué tramo estaba en vigor');
 }
 
 // ── 2. El orden entre las tres fuentes ───────────────────────────────────
-console.log('\nlo declarado a mano manda sobre el /who');
+//
+// Esto CAMBIÓ, y a propósito. Antes lo declarado ganaba también a un /who
+// posterior que dijera otro trío. Visto en el log real: la tabla decía
+// SHD/DRU/MAG nivel 50 y el /who de las 23:51:47 decía SHD/SHM/MAG nivel 27.
+// Las peleas siguientes se guardaban a nivel 50, y el nivel es justo lo que
+// separa las marcas — se comparaban peleas de 27 contra récords de 50.
+//
+// La regla que ya estaba escrita en trios.js es la que decide: un renglón dice
+// «desde tal hora, esto», y eso NO puede mandar hacia el futuro. Una subida de
+// nivel dentro del tramo ya contaba, porque es un suceso. Un /who que desmiente
+// el trío es lo mismo: no contradice lo que declaraste del pasado, termina el
+// tramo.
+console.log('\nun /who posterior que desmiente el trío termina el tramo');
 {
   const tabla = normalizeTrios([{ at: ms(0), classes: ['SHD', 'DRU', 'MAG'], level: 50 }]);
   const { e } = correr(tabla, [
     [10, 'You slash a gorgon for 100 points of damage.'],
-    // Un /who POSTERIOR que dice otra cosa: describe un instante, y tú
-    // describiste el tramo entero. No debe ganar.
     [20, '[25 SHD/SHM/MAG] Campeon (Iksar) <Spain> ZONE: The Ruins of Old Guk 2 (gukbottom)  '],
   ]);
-  ok(e.whoClasses?.join('/') === 'SHD/DRU/MAG',
-    'el trío sigue siendo el que declaraste', e.whoClasses?.join('/'));
-  ok(e.level === 50, 'y el nivel también', String(e.level));
-  ok(e.classSourceAt === 'manual', 'la fuente queda marcada como manual', String(e.classSourceAt));
+  ok(e.whoClasses?.join('/') === 'SHD/SHM/MAG',
+    'manda el /who, que es una medida y es posterior', e.whoClasses?.join('/'));
+  ok(e.level === 25, 'con su nivel, no el declarado', String(e.level));
+  ok(e.classSourceAt === '/who', 'y la fuente lo dice', String(e.classSourceAt));
+  ok(e.classPrompt?.fuente === 'who', 'se te avisa de que la tabla se quedó vieja',
+    String(e.classPrompt?.fuente));
+  ok(e.classPrompt?.declarado?.join('/') === 'SHD/DRU/MAG'
+    && e.classPrompt?.trio.join('/') === 'SHD/SHM/MAG',
+    'diciendo las dos versiones');
+  ok(e.classPrompt?.atLog === ms(20), 'y con la hora del /who para el renglón nuevo',
+    String(e.classPrompt?.atLog));
+}
+
+console.log('\npero un /who que CONFIRMA el trío no toca nada');
+{
+  // La otra mitad. Si sólo se comprobara el caso que desmiente, un motor que
+  // tirase siempre la tabla pasaría la prueba igual.
+  const tabla = normalizeTrios([{ at: ms(0), classes: ['SHD', 'DRU', 'MAG'], level: 50 }]);
+  const { e } = correr(tabla, [
+    [10, 'You slash a gorgon for 100 points of damage.'],
+    // Mismo trío, nivel distinto: el nivel declarado sigue mandando. Si te
+    // equivocaste al declararlo, eso lo enseña conflicts() en Ajustes.
+    [20, '[25 SHD/DRU/MAG] Campeon (Iksar) <Spain> ZONE: The Ruins of Old Guk 2 (gukbottom)  '],
+  ]);
+  ok(e.whoClasses?.join('/') === 'SHD/DRU/MAG', 'el trío no se mueve', e.whoClasses?.join('/'));
+  ok(e.level === 50, 'y el nivel declarado tampoco', String(e.level));
+  ok(e.classSourceAt === 'manual', 'la fuente sigue siendo tu tabla', String(e.classSourceAt));
+  ok(e.classPrompt === null, 'y no se avisa de nada: no hay contradicción');
 }
 
 console.log('\nsi el tramo no declara nivel, el log lo pone');
@@ -131,8 +165,14 @@ console.log('\ncambiar de trío borra el nivel heredado');
   ok(e.whoClasses?.join('/') === 'SHD/SHM/MAG', 'con el trío nuevo puesto', e.whoClasses?.join('/'));
 }
 
-console.log('\nla inferencia por hechizos se calla dentro de un tramo');
+console.log('\ndentro de un tramo: lo declarado manda, pero la contradicción avisa');
 {
+  // Dos cosas que estaban soldadas y ahora van por separado:
+  //   reasignar el trío  — no, dentro de un tramo declarado tú estabas allí,
+  //   avisar             — sí, y aquí más que nunca: que lo declarado deje de
+  //                        corresponderse con la realidad es el único caso que
+  //                        no va a corregir nadie más.
+  //
   // El hechizo tiene que ser de una clase que NO esté en el trío declarado.
   // La primera versión de este test usaba Burnout, que es de mago, con un
   // trío que llevaba mago: se salía por «esa clase ya está» y pasaba sin
@@ -145,10 +185,66 @@ console.log('\nla inferencia por hechizos se calla dentro de un tramo');
   const avisos = [];
   e.on('alert', (a) => avisos.push(a));
   e.classProof({ t: ms(20) / 1000, ability: fuera });
+
+  // Lo que NO cambia.
   ok(e.whoClasses.join('/') === 'SHD/DRU/MAG',
     'un hechizo no cambia lo que declaraste', e.whoClasses.join('/'));
   ok(e.level === 50, 'ni te borra el nivel declarado', String(e.level));
-  ok(avisos.length === 0, 'y no te da la lata pidiendo /who', `${avisos.length}`);
+
+  // Lo que sí pasa: antes se salía antes de llegar aquí y con la tabla puesta
+  // el aviso no podía saltar NUNCA.
+  ok(avisos.length === 1, 'la contradicción avisa igualmente', `${avisos.length}`);
+  ok(e.classPrompt?.declarado?.join('/') === 'SHD/DRU/MAG',
+    'y el aviso dice qué declaraste, que es la mitad de la pregunta',
+    e.classPrompt?.declarado?.join('/'));
+  ok(e.classPrompt?.atLog === ms(20),
+    'fechado en el hechizo que lo demuestra, no en el instante de avisar',
+    String(e.classPrompt?.atLog));
+
+  // Cuál de las tres salió NO se sabe, y escribir en la tabla es escribir en la
+  // fuente de arriba: se ofrecen las tres salidas posibles y eliges tú. Antes
+  // de esto el heurístico «la que lleva más sin dar señales» elegía sola, y con
+  // tres clases sin señales elegía la primera del trío — es decir, al azar.
+  const cand = e.classPrompt?.candidatos ?? [];
+  ok(cand.length === 3, 'se ofrecen las tres salidas posibles', String(cand.length));
+  ok(cand.map((c) => c.clase).sort().join('/') === 'DRU/MAG/SHD',
+    'una por cada clase declarada', cand.map((c) => c.clase).join('/'));
+  ok(cand.every((c) => c.trio.includes('SHM') && c.trio.length === 3
+    && !c.trio.includes(c.clase)),
+    'y cada una propone el trío que resulta de quitar ESA clase');
+  ok(cand.every((c) => c.visto === null), 'sin señales de ninguna, y se dice');
+
+  // Una vez por contradicción: el mismo cambio no se pregunta dos veces.
+  e.classProof({ t: ms(30) / 1000, ability: fuera });
+  ok(avisos.length === 1, 'y no se repite por cada hechizo', `${avisos.length}`);
+}
+
+console.log('\nun hechizo compartido no contradice nada');
+{
+  // Regeneration la tienen druida y chamán. Lanzarla con un trío que lleva
+  // druida no demuestra que hayas cambiado: no prueba nada, y callar es la
+  // respuesta correcta. Este es el caso que hay que distinguir del de arriba,
+  // porque desde fuera se parecen —lanzas algo «de chamán» y no salta nada— y
+  // el motivo es completamente distinto.
+  ok(ownersOf('Regeneration').sort().join('+') === 'DRU+SHM',
+    'Regeneration consta de druida y chamán', ownersOf('Regeneration').join('+'));
+  ok(proofOf('Regeneration') === null, 'así que no prueba ninguna clase');
+
+  const tabla = normalizeTrios([{ at: ms(0), classes: ['SHD', 'DRU', 'MAG'], level: 50 }]);
+  const { e } = correr(tabla, [[10, 'You slash a gorgon for 100 points of damage.']]);
+  const avisos = [];
+  e.on('alert', (a) => avisos.push(a));
+  e.classProof({ t: ms(20) / 1000, ability: 'Regeneration' });
+  ok(avisos.length === 0, 'y no se avisa de nada', `${avisos.length}`);
+  ok(e.classPrompt === null, 'ni queda pregunta pendiente');
+
+  // Y sin tabla tampoco, que es la otra mitad: no es la tabla quien lo calla.
+  const { e: e2 } = correr([], [[10, 'You slash a gorgon for 100 points of damage.']]);
+  e2.whoClasses = ['SHD', 'DRU', 'MAG'];
+  const avisos2 = [];
+  e2.on('alert', (a) => avisos2.push(a));
+  e2.classProof({ t: ms(20) / 1000, ability: 'Regeneration' });
+  ok(avisos2.length === 0, 'sin tabla tampoco: lo compartido nunca prueba', `${avisos2.length}`);
 }
 
 console.log('\nsin tabla, todo sigue como estaba');

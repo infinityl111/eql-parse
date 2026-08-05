@@ -1034,19 +1034,89 @@ function renderClassPrompt(snap) {
   if (!host) return;
   const p = snap.classPrompt;
   const viejo = snap.classSourceAt === 'inferido';
-  const sig = p ? `c|${p.spell}|${p.clase}` : (viejo ? 'stale' : '');
+  const sig = p ? `c|${p.spell}|${p.clase}|${(p.declarado ?? []).join('')}` : (viejo ? 'stale' : '');
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
-  if (!sig) { host.innerHTML = ''; return; }
+  // Si ya dijiste que no a ESTA contradicción, no se vuelve a plantear. Otra
+  // distinta sí: es otra pregunta.
+  if (!sig || sig === state.dismissedPrompt) { host.innerHTML = ''; return; }
+
+  // Dos avisos distintos con la misma forma.
+  //
+  // Si el trío venía del log, la inferencia ya lo ha corregido sola y lo único
+  // que falta es un /who que lo confirme con nivel. Si lo declaraste tú, no se
+  // ha tocado nada —tu tabla manda— y lo que hace falta es que decidas: aquí se
+  // dice qué se ha medido y se ofrece el renglón nuevo hecho.
+  const dec = p?.declarado ?? null;
+  const hora = (ms) => (ms ? new Date(ms).toLocaleTimeString() : null);
+  const nom = (l) => l.map((c) => t(`cl.${c}`)).join('/');
+  // Tres avisos con la misma forma y motivos distintos:
+  //   sin `declarado`  — el trío venía del log, la inferencia ya lo corrigió y
+  //                      sólo falta un /who que lo confirme con nivel.
+  //   fuente 'hechizo' — tu tabla manda y no se ha tocado nada; cuál de las
+  //                      tres sale no se mide, así que lo eliges tú.
+  //   fuente 'who'     — el juego ha dado el trío entero y el nivel, ya se ha
+  //                      tomado, y lo que falta es que la tabla lo recoja.
+  const porWho = dec && p.fuente === 'who';
 
   host.innerHTML = `<div class="pethint">
-    <div class="pethint-main">${esc(p
-      ? t('cls.contradiction', { spell: p.spell, cls: t(`cl.${p.clase}`) })
-      : t('cls.stale'))}</div>
-    <div class="pethint-cmd">/who</div>
-    ${p ? `<div class="pethint-sub">${esc(t('cls.inferred'))}: ${
-      p.trio.map((c) => esc(t(`cl.${c}`))).join(' · ')}</div>` : ''}
+    <div class="pethint-main">${esc(!p ? t('cls.stale')
+      : porWho ? t('cls.whoBeatsTable', { trio: nom(dec), who: nom(p.trio) })
+        : dec ? t('cls.contradictionTable', { spell: p.spell, cls: t(`cl.${p.clase}`), trio: nom(dec) })
+          : t('cls.contradiction', { spell: p.spell, cls: t(`cl.${p.clase}`) }))}</div>
+    ${dec ? '' : '<div class="pethint-cmd">/who</div>'}
+    ${p ? `<div class="pethint-sub">${esc(dec ? t('cls.tableAsk') : t('cls.inferred'))}: ${
+      p.trio.map((c) => esc(t(`cl.${c}`))).join(' · ')}${
+      porWho && p.nivel ? ` · ${esc(p.declaradoNivel && p.declaradoNivel !== p.nivel
+        ? t('cls.levelWas', { antes: p.declaradoNivel, ahora: p.nivel })
+        : `${t('cls.level')} ${p.nivel}`)}` : ''}</div>` : ''}
+    ${porWho ? `
+      <div class="pethint-sub">${esc(t('cls.whoWhy'))}</div>
+      <div class="pethint-btns">
+        <button class="petbtn yes clsSale" data-trio="${esc(p.trio.join(','))}"
+          data-level="${p.nivel ?? ''}">${esc(t('cls.tableUpdate'))}</button>
+        <button class="petbtn no" id="clsSkip">${esc(t('cls.dismiss'))}</button>
+      </div>`
+    : dec ? `
+      <div class="pethint-sub">${esc(t('cls.tableWins'))}</div>
+      <div class="pethint-sub">${esc(p.desde
+        ? t('cls.tableWindow', { desde: hora(p.desde), hasta: hora(p.atLog) })
+        : t('cls.tableWindowOpen', { hasta: hora(p.atLog) }))}</div>
+      <div class="pethint-sub">${esc(t('cls.whichLeft', { cls: t(`cl.${p.clase}`) }))}</div>
+      <div class="pethint-btns">${(p.candidatos ?? []).map((c) => `
+        <span class="petcand">
+          <b>${esc(t(`cl.${c.clase}`))}</b>
+          <span class="dim">${esc(c.visto
+            ? t('cls.lastSeen', { when: hora(c.visto) })
+            : t('cls.neverSeen'))}</span>
+          <button class="petbtn yes clsSale" data-trio="${esc(c.trio.join(','))}" data-level=""
+            >${esc(t('cls.tableUpdate'))}</button>
+        </span>`).join('')}
+        <button class="petbtn no" id="clsSkip">${esc(t('cls.dismiss'))}</button>
+      </div>` : ''}
   </div>`;
+
+  // El renglón se añade con la hora del hechizo que lo demuestra, no con la de
+  // ahora: entre que cambiaste y que pulsas esto pueden haber pasado peleas, y
+  // fecharlo al pulsar dejaría fuera justo las que motivaron el aviso.
+  //
+  // Y sin nivel: cambiar de trío puede hundirlo —manda la clase más baja— así
+  // que heredar el del tramo anterior sería justo la mentira que la tabla
+  // existe para no contar. Se queda desconocido hasta el primer /who.
+  host.querySelectorAll('.clsSale').forEach((el) => el.addEventListener('click', async () => {
+    const classes = el.dataset.trio.split(',');
+    const r = await window.eql.setTrios([...(state.cfg.trios ?? []),
+      { at: p.atLog, classes, level: null, note: `${p.spell} -> ${t(`cl.${p.clase}`)}` }]);
+    state.cfg.trios = r.trios;
+    state.needsRebuild = r.needsRebuild;
+    showTrioRebuild();
+    host.dataset.sig = '';
+    renderApp();
+  }));
+  host.querySelector('#clsSkip')?.addEventListener('click', () => {
+    state.dismissedPrompt = sig;
+    host.innerHTML = '';
+  });
 }
 
 // ═══════════ Mascota sin identificar ═══════════

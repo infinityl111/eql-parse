@@ -404,13 +404,33 @@ export class Engine extends EventEmitter {
       }
       this.classConflict = null;
       this.whoAt = ev.t;
-      // Dentro de un tramo declarado a mano, el /who no manda: describe un
-      // instante, y tú describiste el tramo entero. El nivel sólo lo respeta
-      // si el tramo no declaró uno.
-      if (!man) {
+      // Un renglón de la tabla dice «desde las 12:31, esto», y eso vale hacia
+      // adelante hasta que algo lo desmienta. Un /who POSTERIOR que dice otro
+      // trío es exactamente eso: no contradice lo que declaraste del pasado,
+      // termina el tramo. Una declaración abierta hacia el futuro no puede
+      // ganarle a una medida tomada después.
+      //
+      // Antes ganaba la tabla y el /who se tiraba entero, clases y nivel. Medido
+      // en el log real: la tabla decía SHD/DRU/MAG nivel 50 y el /who de las
+      // 23:51:47 decía SHD/SHM/MAG nivel 27. Las peleas siguientes se guardaban
+      // a nivel 50 — y el nivel es justo lo que separa las marcas, así que se
+      // comparaban peleas de 27 contra récords de 50.
+      //
+      // Esto NO es lo mismo que la inferencia por hechizos, que sigue sin tocar
+      // un tramo declarado: allí hay que adivinar cuál de las tres sale, y aquí
+      // el juego te da el trío entero y el nivel. No hay nada que suponer.
+      const desmiente = man && ev.classes.join() !== man.classes.join();
+      if (!man || desmiente) {
         this.whoClasses = ev.classes;
         this.level = ev.level;
         this.#markLevel(ev.level, ev.classes);
+        // El tramo declarado queda superado desde aquí. Los renglones
+        // posteriores de la tabla siguen aplicándose cuando les toque:
+        // `#applyTrios` los pone en vigor por su hora, no por esta marca.
+        if (desmiente) {
+          this.trioActive = null;
+          this.#staleTable(man, ev);
+        }
       } else if (man.level == null && ev.level) {
         this.level = ev.level;
         this.#markLevel(ev.level, null);
@@ -558,45 +578,130 @@ export class Engine extends EventEmitter {
    * Y el NIVEL deja de ser fiable: lo marca la clase más baja del trío, así que
    * cambiar una clase lo cambia. Se pone a desconocido hasta que un /who o una
    * subida lo digan. No se hereda.
+   *
+   * SÓLO PRUEBA LO EXCLUSIVO. Un hechizo que tengan dos clases no demuestra
+   * cuál de las dos llevas, y `proofOf` devuelve null: Regeneration la tienen
+   * druida y chamán, así que lanzarla no dice nada y aquí no pasa nada. Eso no
+   * es un fallo del aviso — es la diferencia entre medir y suponer.
    */
   classProof(ev) {
     const clase = proofOf(ev.ability);
     if (!clase) return;
     this.lastProof.set(clase, ev.t);
-    // Dentro de un tramo declarado a mano, la inferencia se calla: tú estabas
-    // allí y un hechizo no te va a contradecir. Se anota que la clase se vio,
-    // por si el tramo termina y hay que volver a deducir.
-    if (this.trioActive) return;
     const trio = this.whoClasses;
     if (!trio?.length || trio.includes(clase)) return;
 
-    const sale = trio.filter((c) => c !== clase)
-      .sort((a, b) => (this.lastProof.get(a) ?? -1) - (this.lastProof.get(b) ?? -1))[0];
+    // Cuál de las tres salió NO se sabe. Se ordenan por cuánto llevan sin dar
+    // señales, que es lo único que hay, pero eso es un orden de sospecha y no
+    // una respuesta: una clase puede llevar media hora sin aparecer sólo porque
+    // lanzas pocos hechizos suyos.
+    const orden = trio.filter((c) => c !== clase)
+      .sort((a, b) => (this.lastProof.get(a) ?? -1) - (this.lastProof.get(b) ?? -1));
+    const sale = orden[0];
     if (!sale) return;
 
     const nuevo = trio.map((c) => (c === sale ? clase : c));
-    this.#markLevel(null, nuevo, 'inferido');
-    this.level = null;
-    for (const tr of [this.tracker, this.session]) if (tr) tr.level = null;
 
-    // El aviso: sólo aquí tiene sentido pedir el comando, porque es el
-    // instante exacto en que la aplicación sabe que su información está vieja.
+    // Reasignar el trío y avisar de la contradicción son dos cosas distintas, y
+    // estaban soldadas: dentro de un tramo declarado a mano se salía antes de
+    // llegar al aviso, así que con la tabla puesta la contradicción NO PODÍA
+    // saltar nunca. Justo al revés de lo que hace falta — que lo declarado deje
+    // de corresponderse con la realidad es el caso en que más falta hace saberlo,
+    // porque nada más lo va a corregir.
+    //
+    //   Reasignar  — sólo si el trío venía del /who o de la inferencia. Lo que
+    //                declaraste a mano no se toca: tú estabas allí.
+    //   Avisar     — siempre. Cambia el texto, no el hecho.
+    const declarado = this.trioActive ? trio.slice() : null;
+    if (!declarado) {
+      this.#markLevel(null, nuevo, 'inferido');
+      // Y el NIVEL deja de ser fiable: lo marca la clase más baja del trío.
+      this.level = null;
+      for (const tr of [this.tracker, this.session]) if (tr) tr.level = null;
+    }
+
     // Una vez por contradicción, no por hechizo: si juegas toda la tarde con
     // druida, con decirlo una vez basta hasta que escribas /who o cambies otra
     // vez. Y en pantalla, no por voz: escribirlo treinta segundos después no
     // cuesta nada, y la voz está reservada a lo que cambia lo que haces ya.
-    const clave = `${clase}|${nuevo.join('/')}`;
+    const clave = `${clase}|${nuevo.join('/')}|${declarado ? 'declarado' : 'deducido'}`;
     if (this.promptedClass === clave) return;
     this.promptedClass = clave;
-    this.classPrompt = { spell: ev.ability, clase, trio: nuevo, sale, at: Date.now() };
+    this.classPrompt = {
+      fuente: 'hechizo',
+      spell: ev.ability, clase, trio: nuevo, sale, at: Date.now(),
+      // El trío que declaraste, si lo que se contradice es tu tabla. `null`
+      // significa que el trío venía del log y ya se ha corregido solo.
+      declarado,
+      // CUÁNDO empezar el tramo nuevo si aceptas la corrección. Es la hora del
+      // hechizo que lo demuestra: el último instante en que se puede afirmar
+      // que ya habías cambiado. Medido, no supuesto.
+      atLog: Math.round(ev.t * 1000),
+      // Y el otro extremo de la ventana: la última vez que se demostró que la
+      // clase que sale seguía puesta. El cambio ocurrió entre las dos, y no se
+      // puede afinar más sin inventarlo.
+      desde: this.lastProof.has(sale) ? Math.round(this.lastProof.get(sale) * 1000) : null,
+      // Las tres salidas posibles, con lo que se sabe de cada una, ordenadas por
+      // sospecha. Si hay que ESCRIBIR en tu tabla —la fuente de arriba— no vale
+      // colar una suposición por un botón: lo medido es que {clase} está dentro,
+      // y cuál sale lo dices tú. Sin tabla no hace falta: allí el trío deducido
+      // se marca como deducido y la interfaz ya no lo presenta como un hecho.
+      candidatos: declarado ? orden.map((c) => ({
+        clase: c,
+        visto: this.lastProof.has(c) ? Math.round(this.lastProof.get(c) * 1000) : null,
+        trio: trio.map((x) => (x === c ? clase : x)),
+      })) : null,
+    };
     if (!this.backfilling) {
       this.emit('alert', {
         id: 'class-contradiction', name: 'clases',
         speak: null,                            // en pantalla, no hablado
-        text: t('cls.contradiction', { spell: ev.ability, cls: t(`cl.${clase}`) }),
+        text: declarado
+          ? t('cls.contradictionTable', {
+            spell: ev.ability, cls: t(`cl.${clase}`),
+            trio: declarado.map((c) => t(`cl.${c}`)).join('/'),
+          })
+          : t('cls.contradiction', { spell: ev.ability, cls: t(`cl.${clase}`) }),
         sound: null, color: '#6FC7D8', holdMs: 12000, at: Date.now(),
       });
     }
+  }
+
+  /**
+   * Tu tabla dice una cosa y tu /who, posterior, dice otra.
+   *
+   * El /who ya se ha tomado arriba. Esto sólo te lo cuenta y te deja el renglón
+   * preparado, y hace falta: si la tabla se queda como está, la próxima vez que
+   * se relea el log volverá a pisar al /who y las peleas se guardarán otra vez
+   * con el trío y el nivel viejos. Lo que arregla el histórico no es este aviso,
+   * es que el renglón acabe escrito.
+   */
+  #staleTable(man, ev) {
+    const clave = `who|${man.classes.join('/')}|${ev.classes.join('/')}|${Math.round(ev.t)}`;
+    if (this.promptedClass === clave) return;
+    this.promptedClass = clave;
+    this.classPrompt = {
+      fuente: 'who',
+      spell: null, clase: null, sale: null, candidatos: null,
+      // Aquí no hay nada que adivinar: el juego da el trío entero y el nivel.
+      trio: ev.classes.slice(),
+      nivel: ev.level ?? null,
+      declarado: man.classes.slice(),
+      declaradoNivel: man.level ?? null,
+      atLog: Math.round(ev.t * 1000),
+      desde: man.at ?? null,
+      at: Date.now(),
+    };
+    if (this.backfilling) return;
+    this.emit('alert', {
+      id: 'class-contradiction', name: 'clases',
+      speak: null,                            // en pantalla, no hablado
+      text: t('cls.whoBeatsTable', {
+        trio: man.classes.map((c) => t(`cl.${c}`)).join('/'),
+        who: ev.classes.map((c) => t(`cl.${c}`)).join('/'),
+      }),
+      sound: null, color: '#6FC7D8', holdMs: 12000, at: Date.now(),
+    });
   }
 
   /**
