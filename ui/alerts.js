@@ -37,6 +37,15 @@ export function playSound(kind, volume = 0.5) {
 
 let queued = 0;
 let voices = [];
+/**
+ * Mientras suena un aviso prioritario, nadie lo corta.
+ *
+ * Los avisos de combate cancelan lo que se esté diciendo, y con razón: uno
+ * tardío no sirve. Pero eso significa que un comentario de dps puede pisar un
+ * «te han invocado» a mitad de palabra, y ése sí que no se puede perder. Los de
+ * supervivencia cortan a todos y no los corta nadie hasta que terminan.
+ */
+let speakingPriority = false;
 function loadVoices() { voices = window.speechSynthesis?.getVoices() ?? []; return voices; }
 loadVoices();
 if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = loadVoices;
@@ -45,7 +54,10 @@ export function listVoices() { return (voices.length ? voices : loadVoices()).ma
 
 export function speak(text, opts = {}) {
   if (!text || !window.speechSynthesis) return;
-  if (opts.queue) {
+  // Nada pisa a un aviso de supervivencia mientras suena, ni siquiera otro que
+  // corte. Sólo otro de supervivencia, porque entonces la cosa ha empeorado.
+  if (speakingPriority && !opts.priority) return;
+  if (opts.queue && !opts.priority) {
     // El chat se encola: cortar a mitad de frase lo hace ininteligible.
     // Pero con cola larga llegaría tarde, así que se descarta el exceso.
     if (window.speechSynthesis.pending && queued >= 3) return;
@@ -61,7 +73,16 @@ export function speak(text, opts = {}) {
   else u.lang = opts.speech ?? 'es-ES';
   u.rate = opts.rate ?? 1;
   u.volume = opts.volume ?? 1;
-  if (opts.queue) u.onend = u.onerror = () => { queued = Math.max(0, queued - 1); };
+  if (opts.priority) {
+    speakingPriority = true;
+    // Con red: si la voz falla o el navegador no emite `end`, la bandera no se
+    // puede quedar puesta o enmudecería todo lo demás para siempre.
+    const soltar = () => { speakingPriority = false; };
+    u.onend = u.onerror = soltar;
+    setTimeout(soltar, Math.max(3000, text.length * 120));
+  } else if (opts.queue) {
+    u.onend = u.onerror = () => { queued = Math.max(0, queued - 1); };
+  }
   window.speechSynthesis.speak(u);
 }
 

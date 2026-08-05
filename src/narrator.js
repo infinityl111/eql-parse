@@ -25,6 +25,18 @@ export const DEFAULT_NARRATE = {
   combat: {
     stance: true, deaths: true, adds: true, summary: true, petdeath: true,
     resist: false, interrupt: true, levelup: true, bigcrit: true, loot: false,
+    seeinvis: false,
+  },
+  /**
+   * Supervivencia: sucesos donde un segundo de retraso cuesta el personaje.
+   *
+   * Van todos activados por defecto y cortan por delante de cualquier otra voz,
+   * incluida la del combate. Y NO se deduplican: si la invisibilidad se te cae
+   * dos veces en un minuto, las dos veces importan.
+   */
+  survival: {
+    feign: true, invisFading: true, invisGone: true, levitateFading: true,
+    summoned: true, invuln: true, unconscious: true, forgotten: true,
   },
   enemyCast: { ...DEFAULT_CAST_CATEGORIES },
   nukeNames: [],
@@ -83,13 +95,62 @@ export class Narrator extends EventEmitter {
    */
   setMuted(v) {
     this.muted = !!v;
-    if (!v) { this.lastStance = null; this.lastChat = null; this.lastCast.clear(); }
+    if (!v) {
+      this.lastStance = null; this.lastChat = null; this.lastCast.clear();
+      // Al salir del silencio se olvida también la racha de avisos de caída:
+      // si no, la primera racha en vivo podría venir ya con el cupo gastado por
+      // una de hace horas leída durante el arranque.
+      this.levWarns = 0; this.levAt = null; this.lastSeeInvis = null;
+    }
   }
 
   #say(speak, opts = {}) {
     if (!speak || this.muted) return;
     this.emit('say', { speak, text: opts.text ?? null, kind: opts.kind ?? 'info',
-      color: opts.color ?? null, queue: !!opts.queue, holdMs: opts.holdMs ?? 3000 });
+      color: opts.color ?? null, queue: !!opts.queue, holdMs: opts.holdMs ?? 3000,
+      // Prioridad: corta lo que se esté diciendo y no lo corta nadie mientras
+      // suena. Un aviso de supervivencia pisado por un comentario de dps llega
+      // igual que si no hubiera llegado.
+      priority: !!opts.priority });
+  }
+
+  /**
+   * Avisos de supervivencia.
+   *
+   * Sin deduplicación por tiempo, a propósito: estos sucesos importan cada vez
+   * que pasan. La única excepción es la levitación, que el juego avisa dos o
+   * tres veces cada seis segundos; la tercera llega en el mismo segundo que la
+   * caída y ya no sirve para nada, así que se corta a las dos primeras.
+   */
+  #survival(ev) {
+    const cfg = this.config.survival;
+    if (!cfg || !ev.what) return false;
+
+    // Fin de la racha de avisos de caída: al aterrizar se reinicia la cuenta.
+    if (ev.what === 'levitateGone') { this.levWarns = 0; return false; }
+    if (!cfg[ev.what]) return false;
+
+    if (ev.what === 'levitateFading') {
+      // Una racha nueva empieza cuando han pasado más de 20 s desde el último
+      // aviso: los del juego van cada seis.
+      if (ev.t - (this.levAt ?? -99) > 20) this.levWarns = 0;
+      this.levAt = ev.t;
+      if ((this.levWarns ?? 0) >= 2) return false;
+      this.levWarns = (this.levWarns ?? 0) + 1;
+    }
+
+    // «Tus enemigos te han olvidado» no es una alarma: es la buena noticia de
+    // que ya puedes moverte. Se encola y se dice con voz normal.
+    if (ev.what === 'forgotten') {
+      this.#say(t('sv.forgotten'), { kind: 'info', queue: true, text: t('sv.forgotten'), holdMs: 3500 });
+      return true;
+    }
+
+    this.#say(t(`sv.${ev.what}`), {
+      kind: 'bad', color: '#B0555F', priority: true, holdMs: 5000,
+      text: t(`sv.${ev.what}`).toUpperCase(),
+    });
+    return true;
   }
 
   /** Una línea ya parseada. Devuelve true si ha dicho algo. */
@@ -98,9 +159,20 @@ export class Narrator extends EventEmitter {
     const c = this.config;
 
     if (ev.kind === 'chat') return this.#chat(ev);
+    // Antes que nada: es lo que no puede llegar tarde.
+    if (ev.kind === 'survival') return this.#survival(ev);
 
     if (!c.combat) return false;
     switch (ev.kind) {
+      case 'seeinvis':
+        // Sale de un /con que escribes tú, no es un peligro sobrevenido, y el
+        // juego la repite cuatro veces en dos segundos: se deduplica.
+        if (!c.combat.seeinvis) return false;
+        if (ev.t - (this.lastSeeInvis ?? -99) < 30) return false;
+        this.lastSeeInvis = ev.t;
+        this.#say(t('sv.seeinvis'), { kind: 'warn', color: '#E08A4B', text: t('sv.seeinvis') });
+        return true;
+
       case 'death':
         if (ev.victim === this.self) {
           if (!c.combat.deaths) return false;
@@ -121,8 +193,19 @@ export class Narrator extends EventEmitter {
         return true;
 
       case 'interrupt':
-        if (!c.combat.interrupt) return false;
         if (ev.source && ev.source !== this.self && ev.source !== 'You') return false;
+        // Que te corten el Feign Death no es un casteo perdido más: creías estar
+        // tumbado y sigues de pie. Es la forma de fallo más frecuente de las dos
+        // que tiene en el log (10 interrupciones frente a 3 roturas).
+        if (/feign death/i.test(ev.ability ?? '')) {
+          if (!this.config.survival?.feign) return false;
+          this.#say(t('sv.feignInterrupted'), {
+            kind: 'bad', color: '#B0555F', priority: true, holdMs: 5000,
+            text: t('sv.feignInterrupted').toUpperCase(),
+          });
+          return true;
+        }
+        if (!c.combat.interrupt) return false;
         this.#say(t('say.interrupted'), { kind: 'warn', text: t('say.interrupted').toUpperCase() });
         return true;
 

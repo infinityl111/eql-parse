@@ -149,11 +149,61 @@ const rules = [
   { kind: 'death', hint: 'slain', re: /^You have slain (.+?)!$/, map: (m) => ({ victim: m[1], killer: 'You' }) },
   // Tu propia muerte usa "have", no "has": sin esta regla no se contaba.
   { kind: 'death', hint: 'slain', re: /^You have been slain by (.+?)!$/, map: (m) => ({ victim: 'You', killer: m[1] }) },
-  // EQL parece usar esto en vez de la muerte clásica. Sin verificar del todo.
-  { kind: 'death', hint: 'knocked unconscious', unverified: true,
-    re: /^You have been knocked unconscious!$/, map: () => ({ victim: 'You', killer: null }) },
   { kind: 'death', hint: 'slain', re: /^(.+?) has been slain by (.+?)!$/, map: (m) => ({ victim: m[1], killer: m[2] }) },
   { kind: 'death', hint: ' died', re: /^(.+?) died\.$/, map: (m) => ({ victim: m[1], killer: null }) },
+
+  // ═══ SUPERVIVENCIA ═══
+  //
+  // Sucesos donde un segundo de retraso cuesta el personaje. Todas estas líneas
+  // están verificadas contra un log real de 62.080 líneas; al lado de cada una,
+  // cuántas veces aparece en él.
+  //
+  // `You have been knocked unconscious!` estaba aquí como muerte, y NO lo es:
+  // es el aviso previo. Siempre lo sigue, en el mismo segundo, «You have been
+  // slain by X!» o «You died.», así que contaba cada muerte tuya dos veces —9
+  // reales, 18 contadas—. Como aviso llega tarde para salvarte, pero explica lo
+  // que acaba de pasar cuando la pantalla se pone gris.
+  { kind: 'survival', hint: 'knocked unconscious', what: 'unconscious',   // 10x
+    re: /^You have been knocked unconscious!$/, map: () => ({}) },
+
+  // Feign Death roto por un hechizo: estabas tumbado y ya no.
+  { kind: 'survival', hint: 'feigning death', what: 'feign',              //  3x
+    re: /^You are no longer feigning death, because a spell hit you\.$/, map: () => ({}) },
+
+  // Invisibilidad. Hay DOS sistemas y sólo uno avisa antes de caerse:
+  //   skin tingle  → «starting to appear» 6 s antes → «stops tingling»
+  //   vanish       → «appear», sin aviso ninguno
+  // En 25 ciclos del log, 24 cayeron sin previo aviso. Por eso se avisa también
+  // de la caída en sí: para Camouflage es la única señal que existe.
+  { kind: 'survival', hint: 'starting to appear', what: 'invisFading',    //  1x
+    re: /^You feel yourself starting to appear\.$/, map: () => ({}) },
+  { kind: 'survival', hint: 'stops tingling', what: 'invisGone',          //  5x
+    re: /^Your skin stops tingling\.$/, map: () => ({}) },
+  { kind: 'survival', hint: 'You appear', what: 'invisGone',              // 20x
+    re: /^You appear\.$/, map: () => ({}) },
+
+  // Levitación. Avisa dos o tres veces cada 6 s y cierra con «no longer
+  // levitate»: entre 6 y 12 segundos de margen. Tres de las nueve rachas del
+  // log, en The Plane of Sky, donde el suelo está muy lejos.
+  { kind: 'survival', hint: 'about to fall', what: 'levitateFading',      // 27x
+    re: /^You feel as if you are about to fall\.$/, map: () => ({}) },
+  { kind: 'survival', hint: 'longer levitate', what: 'levitateGone',      // 10x
+    re: /^You can no longer levitate\.$/, map: () => ({}) },
+
+  { kind: 'survival', hint: 'been summoned', what: 'summoned',            // 25x
+    re: /^You have been summoned!$/, map: () => ({}) },
+  { kind: 'survival', hint: 'invulnerability fades', what: 'invuln',      //  1x
+    re: /^Your invulnerability fades\.$/, map: () => ({}) },
+
+  // Ésta no es una alarma: es la buena noticia de que ya puedes moverte. Llega
+  // uno o dos minutos después del Feign Death, no en el momento.
+  { kind: 'survival', hint: 'forgotten you', what: 'forgotten',           // 13x
+    re: /^Your enemies have forgotten you!$/, map: () => ({}) },
+
+  // Sale de un /con que escribes tú, no es un peligro sobrevenido, y se repite
+  // cuatro veces en dos segundos. Va por su cuenta y con deduplicación.
+  { kind: 'seeinvis', hint: 'can see you',                                //  4x
+    re: /^You suspect that this being can see you\.$/, map: () => ({}) },
 
   // ═══ ESTADOS, PROCS, MASCOTA ═══
   { kind: 'stun', hint: 'stunned', re: /^You are stunned!$/, map: () => ({ target: 'You', on: true }) },
@@ -262,9 +312,6 @@ const rules = [
   { kind: 'noise', hint: 'feet come free', re: /^Your feet come free\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'life force drain', re: /^You feel your life force drain away\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'enveloped by lava', re: /^You are enveloped by lava\.$/, map: () => ({}) },
-  { kind: 'noise', hint: 'You vanish', re: /^You vanish\.$/, map: () => ({}) },
-  { kind: 'noise', hint: 'You appear', re: /^You appear\.$/, map: () => ({}) },
-  { kind: 'noise', hint: 'can see you', re: /^You suspect that this being can see you\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'Zone Safe Point', re: /^Returning to Zone Safe Point/, map: () => ({}) },
   { kind: 'noise', hint: 'spirit of wolf', re: /^You feel the spirit of wolf enter you\.$/, map: () => ({}) },
   { kind: 'knockdown', hint: 'fallen to the ground', re: /^(.+?) has fallen to the ground\.$/, map: (m) => ({ who: m[1] }) },
@@ -277,7 +324,6 @@ const rules = [
   { kind: 'noise', hint: 'ability point', re: /^You have gained an ability point!/, map: () => ({}) },
   { kind: 'noise', hint: "can't reach", re: /^You can't reach that, get closer\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'stunned too recently', re: /^Your target has been stunned too recently/, map: () => ({}) },
-  { kind: 'noise', hint: 'forgotten you', re: /^Your enemies have forgotten you!$/, map: () => ({}) },
   { kind: 'noise', hint: 'no longer diseased', re: /^(?:You are|.+? is) no longer (?:diseased|poisoned)\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'winces', re: /^(.+?) (?:winces|goes berserk|writhes in the grip of agony|floats into the air)\.$/, map: (m) => ({ who: m[1] }) },
   { kind: 'noise', hint: 'feet', re: /^Your feet (?:adhere to the ground|leave the ground|come free)\.$/, map: () => ({}) },

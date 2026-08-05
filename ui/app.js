@@ -746,7 +746,8 @@ function updateTip() {
 // ═══════════ Ajustes de voz ═══════════
 const NARRATE_CHAT = ['tell','group','guild','raid','say','ooc','shout','auction','channel'].map((k) => [k, () => t(`ch.${k}`)]);
 const NARRATE_CAST = ['heal','charm','mez','fear','root','summon','escape','resurrect','dispel','nuke'].map((k) => [k, () => t(`cat.${k}`)]);
-const NARRATE_COMBAT = ['stance','deaths','petdeath','adds','summary','interrupt','resist','bigcrit','levelup','loot'].map((k) => [k, () => t(`cb.${k}`)]);
+const NARRATE_COMBAT = ['stance','deaths','petdeath','adds','summary','interrupt','resist','bigcrit','levelup','loot','seeinvis'].map((k) => [k, () => t(`cb.${k}`)]);
+const NARRATE_SURVIVAL = ['feign','invisFading','invisGone','levitateFading','summoned','invuln','unconscious','forgotten'].map((k) => [k, () => t(`cb.${k}`)]);
 
 async function renderNarrate(host) {
   const n = await window.eql.getNarrate();
@@ -754,7 +755,11 @@ async function renderNarrate(host) {
   const box = (group, key, label) => `<label class="chk">
     <input type="checkbox" data-g="${group}" data-k="${key}"${n[group]?.[key] ? ' checked' : ''}> ${esc(label)}</label>`;
   host.innerHTML = `<div class="narrate">
-    <div class="sec-title eyebrow">${t('voice.readChat')}</div>
+    <div class="sec-title eyebrow">${esc(t('sv.title'))}</div>
+    <div class="chks">${NARRATE_SURVIVAL.map(([k, l]) => box('survival', k, l())).join('')}</div>
+    <div class="hint">${esc(t('sv.hint'))}</div>
+
+    <div class="sec-title eyebrow" style="margin-top:16px">${t('voice.readChat')}</div>
     <div class="chks">${NARRATE_CHAT.map(([k, l]) => box('chat', k, l())).join('')}</div>
     <div class="hint">${esc(t('voice.chatHint'))}</div>
 
@@ -810,7 +815,8 @@ async function renderNarrate(host) {
   </div>`;
 
   const save = async () => {
-    const next = { ...n, chat: { ...n.chat }, combat: { ...n.combat }, enemyCast: { ...n.enemyCast } };
+    const next = { ...n, chat: { ...n.chat }, combat: { ...n.combat },
+      enemyCast: { ...n.enemyCast }, survival: { ...n.survival } };
     host.querySelectorAll('input[type=checkbox]').forEach((el) => {
       next[el.dataset.g][el.dataset.k] = el.checked;
     });
@@ -1691,7 +1697,8 @@ $('btnSetup').addEventListener('contextmenu', (e) => { e.preventDefault(); openW
 // ═══════════ Avisos ═══════════
 const showBanner = mountBanner();
 window.eql.onAlert((a) => {
-  if (a.speak) speak(a.speak, { ...(state.cfg.tts ?? {}), speech: langInfo().speech, queue: a.queue });
+  if (a.speak) speak(a.speak, { ...(state.cfg.tts ?? {}), speech: langInfo().speech,
+    queue: a.queue, priority: a.priority });
   if (a.sound && state.cfg.sound?.enabled !== false) playSound(a.sound, state.cfg.sound?.volume ?? 0.5);
   showBanner(a);
 });

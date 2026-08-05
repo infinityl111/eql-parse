@@ -72,7 +72,13 @@ export class Parser {
         const m = rule.re.exec(body);
         if (!m) continue;
         this.parsed++;
-        return this.#post({ t, seq, kind: rule.kind, raw: body, ...rule.map(m) });
+        const ev = { t, seq, kind: rule.kind, raw: body, ...rule.map(m) };
+        // `what` distingue variantes dentro de un mismo `kind` sin multiplicar
+        // los kinds: los avisos de supervivencia son todos 'survival' y se
+        // separan por aquí. Va declarado en la regla, junto al kind, porque es
+        // parte de qué ES la línea y no de lo que se extrae de ella.
+        if (rule.what) ev.what = rule.what;
+        return this.#post(ev);
       }
     }
     this.unrecognized++;

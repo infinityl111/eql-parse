@@ -43,26 +43,31 @@ import path from 'node:path';
 const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
 
 /**
- * Versión del formato del almacén.
+ * Generación de los datos guardados. NO es la versión de la aplicación.
  *
- * Subir esto declara que lo guardado por versiones anteriores no describe lo
- * que pasó y hay que releer el log. No es un número de formato de fichero: los
- * ficheros de la 1.0.x se leen perfectamente, lo que pasa es que su CONTENIDO
- * era incorrecto —muertes que no se contaron, peleas duplicadas, mitigación de
- * Evasive mal aplicada—, y eso no se arregla leyendo mejor.
+ * Son dos preguntas distintas y conviene no mezclarlas: «qué versión es esto»
+ * la contesta package.json, y «lo que hay en disco describe lo que pasó» la
+ * contesta este número. Un arreglo de interfaz sube la primera y no debería
+ * obligar a nadie a releer su log; un arreglo del parser sube ésta aunque la
+ * versión no cambie.
+ *
+ * Se sube cuando lo guardado por la generación anterior es incorrecto y no se
+ * puede arreglar leyéndolo mejor:
+ *
+ *   1  (implícita)  todo lo anterior a que esta marca existiera. Muertes sin
+ *                   contar, peleas duplicadas, identidades que se tapaban,
+ *                   vida estimada multiplicada, Evasive mal calculada.
+ *   2               `You have been knocked unconscious!` se contaba como una
+ *                   muerte además de la línea de muerte real que siempre la
+ *                   sigue: cada muerte tuya valía por dos.
  */
-export const STORE_VERSION = '1.1.0';
+export const STORE_VERSION = 2;
 const META = 'store.json';
 
-/** Compara 1.2.10 con 1.3.0 sin traerse una librería para tres números. */
-export function olderThan(a, b) {
-  const pa = String(a ?? '0').replace(/^v/, '').split('.').map(Number);
-  const pb = String(b ?? '0').replace(/^v/, '').split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) < (pb[i] || 0)) return true;
-    if ((pa[i] || 0) > (pb[i] || 0)) return false;
-  }
-  return false;
+/** Generación de un almacén ya marcado. Lo que no sea un número es anterior. */
+export function generacion(meta) {
+  const v = Number(meta?.version);
+  return Number.isFinite(v) ? v : 0;
 }
 
 export class FightStore {
@@ -105,7 +110,7 @@ export class FightStore {
     const from = m?.version ?? null;
     if (!fights) return { needed: false, from, fights, current: STORE_VERSION };
     return {
-      needed: from === null || olderThan(from, STORE_VERSION),
+      needed: generacion(m) < STORE_VERSION,
       from, fights, current: STORE_VERSION,
     };
   }
