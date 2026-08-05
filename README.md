@@ -137,10 +137,12 @@ temporizadores y prueba en vivo.
 
 ```
 npm install
-npm start          # desarrollo
-npm run dist       # instalador en dist/
-npm test           # prueba del motor
+npm start              # desarrollo
+npm run dist           # instalador en dist/
+npm test               # 256 comprobaciones del motor
 npm run calibrate -- "ruta\al\eqlog.txt" --self TuPJ
+npm run store:check    # revisa el histórico sin escribir nada
+npm run store:rebuild  # lo reconstruye releyendo el log
 ```
 
 ```
@@ -149,6 +151,7 @@ src/patterns.js    diccionario de patrones, calibrado contra logs reales
 src/parser.js      línea -> evento normalizado
 src/encounter.js   segmentación de peleas y agregación
 src/store.js       almacén de peleas: se añade al final, nunca se reescribe
+src/rebuild.js     reconstrucción del histórico releyendo el log
 src/aggregate.js   suma de varias peleas y expediente del enemigo
 src/stances.js     datos de posturas e invocaciones de las 16 clases
 src/advisor.js     qué postura conviene, con el daño revertido a bruto
@@ -184,6 +187,10 @@ ahí salen los límites del programa, y ninguno se disimula:
   convención de GamParse y ACT, `total / (último − primero + 1)`.
 - El daño de escudo sin posesivo (`shards of ice`) no se puede atribuir y se
   deja aparte en vez de adjudicarlo a alguien.
+- Con una postura de evasión puesta no se puede saber cuánto daño entraría sin
+  ella: el log no distingue un esquive de postura de una parada normal, y lo
+  que se ve es sólo el 5% de ataques que se colaron. Ahí se enseña el reparto,
+  pero no se recomienda nada.
 
 ---
 

@@ -136,10 +136,12 @@ Plus a regex trigger editor, GINA style, with timers and live testing.
 
 ```
 npm install
-npm start          # development
-npm run dist       # installer in dist/
-npm test           # engine test
+npm start              # development
+npm run dist           # installer in dist/
+npm test               # 256 engine checks
 npm run calibrate -- "path\to\eqlog.txt" --self YourChar
+npm run store:check    # inspects the history without writing anything
+npm run store:rebuild  # rebuilds it by re-reading the log
 ```
 
 ```
@@ -148,6 +150,7 @@ src/patterns.js    pattern dictionary, calibrated against real logs
 src/parser.js      line -> normalised event
 src/encounter.js   fight segmentation and aggregation
 src/store.js       fight store: append-only, never rewritten
+src/rebuild.js     history rebuild by re-reading the log
 src/aggregate.js   summing many fights, and the enemy dossier
 src/stances.js     stance and invocation data for all 16 classes
 src/advisor.js     which stance suits, on damage reversed to raw
@@ -183,6 +186,10 @@ where the program's limits come from, and none of them are papered over:
   `total / (last − first + 1)`.
 - Shield damage without a possessive (`shards of ice`) can't be attributed, so
   it's kept separate rather than pinned on someone.
+- While an evasion stance is active there's no way to know how much damage
+  would come in without it: the log doesn't distinguish a stance evade from an
+  ordinary parry, and what you see is only the 5% of attacks that got through.
+  There the split is shown, but nothing is recommended.
 
 ---
 
