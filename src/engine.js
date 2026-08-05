@@ -15,7 +15,7 @@ import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCA
 import { parseZone } from './zones.js';
 import { catalog } from './catalog.js';
 import { proofOf } from './classes.js';
-import { normalizeTrios, trioAt } from './trios.js';
+import { normalizeTrios } from './trios.js';
 import { t } from './i18n.js';
 import { baseSpell } from './spells.js';
 
