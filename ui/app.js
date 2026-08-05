@@ -528,25 +528,32 @@ function renderRows(snap) {
 
   // Cabecera al pasar de los tuyos a los enemigos: sin ella parecen el mismo
   // reparto, que es justo lo que confundía en el resumen.
-  const hasFoes = f.rows.some((r) => r.side === 'enemy');
-  const hasAllies = f.rows.some((r) => r.side !== 'enemy');
+  // Los sin identificar van en su propio grupo, no bajo «Los tuyos». Hicieron
+  // daño real y se quedan, pero el log de EQL no dice quién va en tu grupo, así
+  // que meterlos con los tuyos afirmaría algo que nadie ha comprobado.
+  const grupo = (r) => (r.side === 'enemy' ? 'enemy' : r.unidentified ? 'unknown' : 'ally');
+  const ROTULO = { enemy: 'side.enemies', ally: 'side.allies', unknown: 'side.unknownAllies' };
+  const grupos = new Set(f.rows.map(grupo));
   let lastSide = null;
 
   let rankAlly = 0, rankFoe = 0;
-  f.rows.forEach((r, i) => {
+  const ORDEN = { ally: 0, unknown: 1, enemy: 2 };
+  [...f.rows].sort((a, b) => ORDEN[grupo(a)] - ORDEN[grupo(b)]).forEach((r, i) => {
     seen.add(r.name);
     let node = state.rowNodes.get(r.name);
     if (!node) { node = buildRow(r.name); state.rowNodes.set(r.name, node); }
     updateRow(node, r, snap, live, r.side === 'enemy' ? ++rankFoe : ++rankAlly);
-    if (hasFoes && hasAllies && r.side !== lastSide) {
-      lastSide = r.side;
-      let h = state.sideHeads.get(r.side);
+    const g = grupo(r);
+    if (grupos.size > 1 && g !== lastSide) {
+      lastSide = g;
+      let h = state.sideHeads.get(g);
       if (!h) {
         h = document.createElement('div');
         h.className = 'side-head eyebrow';
-        state.sideHeads.set(r.side, h);
+        state.sideHeads.set(g, h);
       }
-      h.textContent = t(r.side === 'enemy' ? 'side.enemies' : 'side.allies');
+      h.textContent = t(ROTULO[g]);
+      h.title = g === 'unknown' ? t('side.unknownNote') : '';
       host.appendChild(h);
     }
     host.appendChild(node.el);
