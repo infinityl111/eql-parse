@@ -1,6 +1,6 @@
 {
   "name": "eql-parse",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "type": "module",
   "description": "Parser DPS en tiempo real para EverQuest Legends — <SPAIN> Guild",
   "main": "electron/main.cjs",

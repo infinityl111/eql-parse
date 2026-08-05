@@ -150,6 +150,7 @@ export class Encounter {
     this.deadAt = new Map();       // nombre -> segundo en que cayó
     this.loot = [];                // {item, from, sold, upgraded, t}
     this.spellVsFoe = new Map();   // 'enemigo|hechizo' -> {landed, resisted}
+    this.foesSeen = new Set();     // a quién estáis pegando en esta pelea
     this.targetFirst = new Map();  // nombre -> primer segundo en que le pegaron
     this.resistsSuffered = 0;
     this.casts = [];           // {t, source, ability, cat} — el análisis filtra por bando
@@ -287,11 +288,33 @@ export class EncounterTracker extends EventEmitter {
     const isCombat = DAMAGE_KINDS.has(ev.kind) || ev.kind === 'miss' || ev.kind === 'heal' || ev.kind === 'death';
     if (!isCombat) return;
 
+    // ── Filtro de relevancia ──────────────────────────────────────────────
+    //
+    // El log ve TODO lo que pasa a tu alrededor, incluido un desconocido
+    // matando bichos a diez metros. Sin este filtro su pelea entra en la tuya
+    // y falsea el reparto entero.
+    //
+    // Cuenta un suceso si toca a los tuyos (tú o tus mascotas) o a alguien a
+    // quien los tuyos ya estáis pegando. Con eso los compañeros de grupo
+    // entran solos al golpear vuestro objetivo, y el de al lado no.
+    const mine = this.#mine();
+    // Sin saber quién eres no hay nada que filtrar: se acepta todo antes que
+    // descartar la pelea entera. Pasa en pruebas y si el personaje aún no se
+    // ha deducido del nombre del fichero.
+    const rel = (n) => n && (mine.has(n) || this.current?.foesSeen?.has(n));
+    if (mine.size && !rel(ev.source) && !rel(ev.target)) return;
+
+    // Y una pelea sólo se abre cuando estáis metidos vosotros.
     if (Number.isFinite(this.idleSec) && this.current && ev.t - this.current.end > this.idleSec) this.#close();
     if (!this.current) {
+      if (mine.size && !mine.has(ev.source) && !mine.has(ev.target)) return;
       this.current = new Encounter(this.nextId++, ev.t, this.zone);
       this.emit('open', this.current);
     }
+
+    // A quién estáis pegando: define qué es «vuestra» pelea a partir de ahora.
+    if (ev.amount > 0 && ev.target && mine.has(ev.source)) this.current.foesSeen.add(ev.target);
+    if (ev.amount > 0 && ev.source && mine.has(ev.target)) this.current.foesSeen.add(ev.source);
     const enc = this.current;
     enc.end = Math.max(enc.end, ev.t);
 
@@ -347,8 +370,17 @@ export class EncounterTracker extends EventEmitter {
     enc.spellVsFoe.set(k, e);
   }
 
+  /** Tú y tus mascotas. */
+  #mine() {
+    const m = new Set(this.petNames ?? []);
+    if (this.self) m.add(this.self);
+    return m;
+  }
+
   #close() {
     if (!this.current) return;
+    // Si la pelea empezó antes de saber la zona, se pone la conocida al cerrar.
+    if (!this.current.zone && this.zone) this.current.zone = this.zone;
     const enc = this.current;
     enc.closed = true;
     this.current = null;
