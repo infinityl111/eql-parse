@@ -62,5 +62,6 @@ contextBridge.exposeInMainWorld('eql', {
   // Migración del almacén al formato de la 1.1.0.
   migration: () => ipcRenderer.invoke('store:migration'),
   spellCatalog: (q) => ipcRenderer.invoke('catalog:spells', q),
+  setExcluded: (name, on) => ipcRenderer.invoke('excluded:set', { name, on }),
   rebuildStore: () => ipcRenderer.invoke('store:rebuild'),
 });

@@ -10,7 +10,7 @@ const TRIGGERS = () => path.join(app.getPath('userData'), 'triggers.json');
 const DEFAULTS = {
   logPath: null, self: null, idleSec: 20, fromStart: false,
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
-  skipVersion: null, mergePets: false, myPets: [], notPets: [], fpsWarned: false,
+  skipVersion: null, mergePets: false, myPets: [], notPets: [], fpsWarned: false, excluded: [],
   tts: { enabled: true, voice: null, rate: 1, volume: 1 },
   sound: { enabled: true, volume: 0.5 },
 };
@@ -396,6 +396,16 @@ ipcMain.handle('pets:names', (_e, { name, on }) => {
   cfg.myPets = [...my]; cfg.notPets = [...not];
   saveConfig(cfg);
   return { myPets: cfg.myPets, notPets: cfg.notPets };
+});
+
+// Combatientes que has dicho que no son tuyos. Se aplica al MOSTRAR, no al
+// guardar: vale para todo el historico sin reconstruir y se puede deshacer.
+ipcMain.handle('excluded:set', (_e, { name, on }) => {
+  const s = new Set(cfg.excluded ?? []);
+  if (on) s.add(name); else s.delete(name);
+  cfg.excluded = [...s];
+  saveConfig(cfg);
+  return cfg.excluded;
 });
 
 ipcMain.handle('pets:merge', (_e, v) => { cfg.mergePets = !!v; saveConfig(cfg); return cfg.mergePets; });

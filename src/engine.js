@@ -14,6 +14,8 @@ import { aggregate, mergePets, ensureSides } from './aggregate.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
 import { parseZone } from './zones.js';
 import { catalog } from './catalog.js';
+import { proofOf } from './classes.js';
+import { t } from './i18n.js';
 import { baseSpell } from './spells.js';
 
 /**
@@ -113,6 +115,13 @@ export class Engine extends EventEmitter {
     // es una línea suelta que no pertenece a ninguna pelea, así que si no se
     // anota al pasar se pierde.
     this.cooldowns = new Map();
+    // Última vez que cada clase se demostró con un hechizo exclusivo suyo.
+    this.lastProof = new Map();
+    this.classPrompt = null;      // contradicción pendiente de que escribas /who
+    this.promptedClass = null;    // para no repetir el aviso por cada hechizo
+    this.classSourceAt = null;    // de dónde salió el trío: /who, inferido o manual
+    this.petPrompted = new Set();  // nombres por los que ya se ha pedido el comando
+    this.whoSeen = new Set();      // jugadores de los que hay un /who: no son desconocidos
     this.knownPets = new Set();  // todas las vistas alguna vez, entre sesiones
     this.petsSaved = 0;
     this.notMine = new Set();    // aliados que ya dijiste que no son tuyos
@@ -163,6 +172,7 @@ export class Engine extends EventEmitter {
         if (this.history.length > 60) this.history.length = 60;
         this.saveStore();
       }
+      this.petPrompt(f);
       this.emit('encounter');
     });
     this.tracker.on('open', () => { this.foes.clear(); this.narrator.fightStart(); });
@@ -197,6 +207,7 @@ export class Engine extends EventEmitter {
       if (ev.kind === 'invocation' && ev.invocation) this.seenInvocations.add(ev.invocation);
       this.#cooldown(ev);
       // El /who de tu propio personaje es la única fuente que no admite dudas.
+      if (ev.kind === 'who' && ev.who) this.whoSeen.add(ev.who);
       if (ev.kind === 'who' && ev.who === (this.self ?? 'You') && ev.classes?.length) {
         const changed = this.whoClasses && this.whoClasses.join() !== ev.classes.join();
         this.whoClasses = ev.classes;
@@ -215,6 +226,7 @@ export class Engine extends EventEmitter {
       // nivel baja al cambiar una clase por otra más baja: es la otra mitad de
       // la línea de tiempo, junto al /who.
       if (ev.kind === 'levelup' && ev.level) this.#markLevel(ev.level, null);
+      if (ev.kind === 'cast' && ev.source === (this.self ?? 'You') && ev.ability) this.classProof(ev);
       if (ev.kind === 'stance' && ev.stance) this.#checkConflict('stance', ev.stance);
       if (ev.kind === 'invocation' && ev.invocation) this.#checkConflict('invocation', ev.invocation);
       // Golpes recientes de todo el mundo, para el DPS de los últimos segundos.
@@ -366,13 +378,71 @@ export class Engine extends EventEmitter {
    * trae sólo el nivel. Cada pelea se queda con lo que hubiera cuando se abrió;
    * las anteriores al primer hito se quedan sin nivel, y eso se dice.
    */
-  #markLevel(level, classes) {
+  #markLevel(level, classes, fuente = '/who') {
     if (level) this.level = level;
-    if (classes?.length) this.whoClasses = classes;
+    if (classes?.length) {
+      this.whoClasses = classes;
+      this.classSourceAt = fuente;
+      // Un /who resuelve la contradicción: vuelve a haber información fresca.
+      if (fuente === '/who') { this.classPrompt = null; this.promptedClass = null; }
+    }
     for (const tr of [this.tracker, this.session]) {
       if (!tr) continue;
       if (level) tr.level = level;
       if (classes?.length) tr.classes = classes;
+    }
+  }
+
+  /**
+   * Un hechizo exclusivo de una clase demuestra que esa clase está en el trío
+   * AHORA. Si no consta, el trío ha cambiado y lo que sabíamos ya no vale.
+   *
+   * Esto es lo único continuo que hay: en EQL se cambia de trío y el log no lo
+   * dice en ninguna parte. Medido en un log real, entre un cambio y el /who que
+   * lo confirmó pasaron dos horas y cuarto, y 32 peleas quedaron guardadas con
+   * el trío y el nivel equivocados. Con esta señal se arreglan solas.
+   *
+   * Cuál salió del trío no se sabe con certeza: se toma la que lleva más tiempo
+   * sin dar señales, que es la única candidata razonable, y se marca el origen
+   * como inferido para que la interfaz no lo presente como un hecho.
+   *
+   * Y el NIVEL deja de ser fiable: lo marca la clase más baja del trío, así que
+   * cambiar una clase lo cambia. Se pone a desconocido hasta que un /who o una
+   * subida lo digan. No se hereda.
+   */
+  classProof(ev) {
+    const clase = proofOf(ev.ability);
+    if (!clase) return;
+    this.lastProof.set(clase, ev.t);
+    const trio = this.whoClasses;
+    if (!trio?.length || trio.includes(clase)) return;
+
+    const sale = trio.filter((c) => c !== clase)
+      .sort((a, b) => (this.lastProof.get(a) ?? -1) - (this.lastProof.get(b) ?? -1))[0];
+    if (!sale) return;
+
+    const nuevo = trio.map((c) => (c === sale ? clase : c));
+    this.#markLevel(null, nuevo, 'inferido');
+    this.level = null;
+    for (const tr of [this.tracker, this.session]) if (tr) tr.level = null;
+
+    // El aviso: sólo aquí tiene sentido pedir el comando, porque es el
+    // instante exacto en que la aplicación sabe que su información está vieja.
+    // Una vez por contradicción, no por hechizo: si juegas toda la tarde con
+    // druida, con decirlo una vez basta hasta que escribas /who o cambies otra
+    // vez. Y en pantalla, no por voz: escribirlo treinta segundos después no
+    // cuesta nada, y la voz está reservada a lo que cambia lo que haces ya.
+    const clave = `${clase}|${nuevo.join('/')}`;
+    if (this.promptedClass === clave) return;
+    this.promptedClass = clave;
+    this.classPrompt = { spell: ev.ability, clase, trio: nuevo, sale, at: Date.now() };
+    if (!this.backfilling) {
+      this.emit('alert', {
+        id: 'class-contradiction', name: 'clases',
+        speak: null,                            // en pantalla, no hablado
+        text: t('cls.contradiction', { spell: ev.ability, cls: t(`cl.${clase}`) }),
+        sound: null, color: '#6FC7D8', holdMs: 12000, at: Date.now(),
+      });
     }
   }
 
@@ -464,6 +534,25 @@ export class Engine extends EventEmitter {
       if (!ours.has(r.name)) continue;
       for (const [n] of r.byTarget ?? []) if (!ours.has(n)) foes.add(n);
     }
+
+    // Quien CURA a un enemigo es enemigo.
+    //
+    // La regla de arriba clasifica por daño, y un sanador enemigo que nunca te
+    // toca y al que nunca tocas se cae por el hueco y aterriza en aliados por
+    // defecto. Pasó de verdad: «a ghoul savant» curó 104 a un wan ghoul knight
+    // y salía en «Los tuyos», igual que «a zol ghoul knight pet» curando a los
+    // suyos. Y no valía la regla de «cero daño = fuera», porque curar es hacer
+    // algo: los habría borrado en vez de reclasificarlos.
+    //
+    // Se repite hasta que no cambie nada, por si un sanador cura a otro.
+    for (let vuelta = 0; vuelta < 4; vuelta++) {
+      let nuevos = 0;
+      for (const r of rows) {
+        if (foes.has(r.name) || ours.has(r.name)) continue;
+        if ((r.healByTarget ?? []).some(([n]) => foes.has(n))) { foes.add(r.name); nuevos++; }
+      }
+      if (!nuevos) break;
+    }
     return foes;
   }
 
@@ -542,8 +631,16 @@ export class Engine extends EventEmitter {
         const base = enemy ? foeTotal : allyTotal;
         // La marca va en la fila y no en una lista aparte: las mascotas cambian
         // de nombre en cada invocación y el histórico no sabría reconocerlas.
+        // «Sin identificar»: pegó a tus enemigos, pero no consta que sea tuyo.
+        // Ni tú, ni mascota confirmada, ni nadie de quien haya un /who. El log
+        // de EQL no dice quién va en tu grupo —comprobado: ni invitaciones, ni
+        // entradas, ni salidas—, así que esto no se puede resolver solo y lo
+        // honesto es enseñarlo aparte en vez de sumarlo a tu bando.
+        const desconocido = !enemy && r.name !== me && !petSet.has(r.name)
+          && !this.parser?.otherPets.has(r.name) && !this.whoSeen.has(r.name);
         return {
           ...this.#row(r), side: enemy ? 'enemy' : 'ally',
+          unidentified: desconocido,
           pet: !enemy && r.name !== me && petSet.has(r.name),
           // Mascota de otro jugador: se nombra con su dueño y nunca se funde
           // con las tuyas ni se pregunta por ella.
@@ -875,6 +972,36 @@ export class Engine extends EventEmitter {
    * En EQL la mascota cambia de nombre en cada invocación, así que no vale
    * memorizarlos: hay que pedirle al usuario un /pet who leader.
    */
+  /**
+   * Pedir /pet who leader, y sólo cuando de verdad hace falta.
+   *
+   * En EQL la mascota cambia de nombre en CADA invocación y el log no lo dice.
+   * Medido en un log real de 27 horas: 18 mascotas distintas en combate y sólo
+   * 4 `/pet who leader`. Las otras 14 nunca se confirmaron.
+   *
+   * El disparador NO es la muerte: sólo 2 de esas 18 apariciones vinieron
+   * después de que muriera una conocida. El que cubre los casos es «aparece un
+   * aliado sin identificar pegando a tus enemigos», que es justo cuando la
+   * aplicación no sabe qué está viendo.
+   *
+   * Una vez por nombre y por sesión: si la mascota muere tres veces en una
+   * pelea no se dice tres veces, y si la apagas no se dice ninguna.
+   */
+  petPrompt(enc) {
+    if (this.backfilling) return;
+    if (this.narrator.config?.combat?.petprompt === false) return;
+    const h = this.#petHint(enc);
+    const nuevo = (h?.candidates ?? []).find((n) => !this.petPrompted.has(n));
+    if (!nuevo) return;
+    this.petPrompted.add(nuevo);
+    this.emit('alert', {
+      id: 'pet-unknown', name: 'mascota',
+      speak: null,                            // en pantalla, no hablado
+      text: t('pet.prompt', { who: nuevo }),
+      sound: null, color: '#6FC7D8', holdMs: 12000, at: Date.now(),
+    });
+  }
+
   #petHint(enc) {
     if (!enc?.rows) return null;
     const me = this.self ?? 'You';
@@ -922,6 +1049,8 @@ export class Engine extends EventEmitter {
       sessionDps: this.#sessionDps(),
       advice: this.#advice(current ?? this.history[0]),
       petHint: this.#petHint(current ?? this.history[0]),
+      classPrompt: this.classPrompt,
+      classSourceAt: this.classSourceAt,
       currentPet: this.parser?.currentPet ?? null,
       live: (() => { const l = this.#live(); this.narrator.stance(l); return l; })(),
     };

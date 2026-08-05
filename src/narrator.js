@@ -25,7 +25,7 @@ export const DEFAULT_NARRATE = {
   combat: {
     stance: true, deaths: true, adds: true, summary: true, petdeath: true,
     resist: false, interrupt: true, levelup: true, bigcrit: true, loot: false,
-    seeinvis: false,
+    seeinvis: false, petprompt: true,
   },
   /**
    * Supervivencia: sucesos donde un segundo de retraso cuesta el personaje.

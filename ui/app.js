@@ -89,13 +89,15 @@ async function renderWizard() {
         classList().map(([k, v]) => `<option value="${k}"${(w.classes?.[i] ?? '') === k ? ' selected' : ''}>${esc(v)}</option>`).join('')
       }</select>`).join('')}</div>
       <p class="hint">${esc(t('wz.4.who'))}</p>
-      <div class="wz-who" id="wzWho">${esc(t('wz.4.waiting'))}</div>`,
+      <div class="wz-who" id="wzWho">${esc(t('wz.4.waiting'))}</div>
+      <p class="hint" style="margin-top:12px">${esc(t('wz.classNote'))}</p>`,
 
     5: () => `<h1>${esc(t('wz.5.title'))}</h1>
       <p>${esc(t('wz.5.body'))}</p>
       <div class="sec-title eyebrow">${esc(t('wz.5.cmd'))}</div>
       <div class="wz-cmd">/pet who leader</div>
-      <p>${esc(t('wz.5.body2'))}</p>`,
+      <p>${esc(t('wz.5.body2'))}</p>
+      <p class="hint">${esc(t('wz.petNote'))}</p>`,
 
     6: () => `<h1>${esc(t('wz.6.title'))}</h1>
       <p>${esc(t('wz.6.body'))}</p>
@@ -249,9 +251,25 @@ function petNames() {
 }
 const isMyPet = (name) => petNames().includes(name);
 
+/**
+ * Los que has dicho que no son tuyos.
+ *
+ * Se aplica al MOSTRAR y no al guardar: así vale para todo el histórico sin
+ * reconstruir nada y se puede deshacer desde Ajustes. Hace falta porque el log
+ * de EQL no dice quién va en tu grupo —ni invitaciones, ni entradas, ni
+ * salidas—, así que un jugador que pega a tus enemigos no se distingue de un
+ * compañero por ningún dato. Siempre habrá excepciones que sólo tú sabes.
+ */
+const excluidos = () => new Set(state.cfg.excluded ?? []);
+
 function withPets(f) {
-  if (!f || !state.cfg.mergePets) return f;
-  return { ...f, rows: mergePets(f.rows, t('pets.merged'), petNames(), state.snap?.self, state.cfg.notPets ?? []) };
+  if (!f) return f;
+  const fuera = excluidos();
+  let rows = fuera.size ? f.rows.filter((r) => !fuera.has(r.name)) : f.rows;
+  if (state.cfg.mergePets) {
+    rows = mergePets(rows, t('pets.merged'), petNames(), state.snap?.self, state.cfg.notPets ?? []);
+  }
+  return rows === f.rows ? f : { ...f, rows };
 }
 
 // La pelea elegida se identifica por `uid` (el byte donde empieza en disco), no
@@ -439,7 +457,17 @@ function buildRow(name) {
     detail: el.querySelector('.detail-slot'),
     sig: '',
   };
-  el.addEventListener('click', () => {
+  el.addEventListener('click', async (e) => {
+    const btn = e.target.closest?.('.excl-btn');
+    if (btn) {
+      e.stopPropagation();
+      state.cfg.excluded = await window.eql.setExcluded(btn.dataset.excl, true);
+      state.rowNodes.clear();
+      if ($('rows')) $('rows').innerHTML = '';
+      state.summary = null;
+      renderApp();
+      return;
+    }
     state.expanded.has(name) ? state.expanded.delete(name) : state.expanded.add(name);
     state.detailStamp.delete(name);
     hideTip();
@@ -642,7 +670,14 @@ function detailHTML(r) {
     </div>
     <div class="hint">${esc(t('det.paceNote'))}</div>`);
 
-  return `<div class="detail">${composition}${abilities}${targets}${stanceSec}${offence}${defence}${healing}${activity}</div>`;
+  // Sacar a alguien de tu bando. Va aquí, al desplegar la fila, porque es
+  // donde estás mirando sus cifras y decidiendo que no pintan nada.
+  const excluir = r.name === state.snap?.self ? '' : `<div class="sec">
+    <button class="excl-btn" data-excl="${esc(r.name)}">${esc(t('excl.remove'))}</button>
+    ${r.unidentified ? `<span class="hint">${esc(t('side.unknownNote'))}</span>` : ''}
+  </div>`;
+
+  return `<div class="detail">${composition}${abilities}${targets}${stanceSec}${offence}${defence}${healing}${activity}${excluir}</div>`;
 }
 
 // ═══════════ Tooltip de hover ═══════════
@@ -754,7 +789,7 @@ function updateTip() {
 // ═══════════ Ajustes de voz ═══════════
 const NARRATE_CHAT = ['tell','group','guild','raid','say','ooc','shout','auction','channel'].map((k) => [k, () => t(`ch.${k}`)]);
 const NARRATE_CAST = ['heal','charm','mez','fear','root','summon','escape','resurrect','dispel','nuke'].map((k) => [k, () => t(`cat.${k}`)]);
-const NARRATE_COMBAT = ['stance','deaths','petdeath','adds','summary','interrupt','resist','bigcrit','levelup','loot','seeinvis'].map((k) => [k, () => t(`cb.${k}`)]);
+const NARRATE_COMBAT = ['stance','deaths','petdeath','adds','summary','interrupt','resist','bigcrit','levelup','loot','seeinvis','petprompt'].map((k) => [k, () => t(`cb.${k}`)]);
 const NARRATE_SURVIVAL = ['feign','invisFading','invisGone','levitateFading','summoned','invuln','unconscious','forgotten'].map((k) => [k, () => t(`cb.${k}`)]);
 
 async function renderNarrate(host) {
@@ -815,6 +850,13 @@ async function renderNarrate(host) {
     </div>
     <div class="hint">${esc(t('voice.moreVoices'))}</div>
 
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('excl.title'))}</div>
+    <div class="hint">${esc(t('excl.note'))}</div>
+    <div class="excl-list" id="exclList">${(state.cfg.excluded ?? []).length
+      ? (state.cfg.excluded ?? []).map((x) => `<span class="excl-item"><b>${esc(x)}</b>
+          <button class="petbtn" data-restore="${esc(x)}">${esc(t('excl.restore'))}</button></span>`).join('')
+      : `<span class="hint">${esc(t('excl.empty'))}</span>`}</div>
+
     <div class="narrate-row">
       <label class="eyebrow">${t('voice.cut')}
         <input type="number" id="nMax" min="40" max="400" value="${n.maxChars}" style="width:70px" ${t('voice.chars')}</label>
@@ -837,6 +879,12 @@ async function renderNarrate(host) {
     await window.eql.setNarrate(next);
   };
   host.querySelectorAll('input').forEach((el) => el.addEventListener('change', save));
+  host.querySelectorAll('[data-restore]').forEach((el) => el.addEventListener('click', async () => {
+    state.cfg.excluded = await window.eql.setExcluded(el.dataset.restore, false);
+    state.rowNodes.clear();
+    state.summary = null;
+    renderApp();
+  }));
   host.querySelector('#nTest').addEventListener('click', () => {
     const tts = { voice: host.querySelector('#nVoice').value || null,
       rate: +host.querySelector('#nRate').value, volume: +host.querySelector('#nVol').value };
@@ -894,6 +942,36 @@ function chartHTML(f) {
       <span class="chart-legend eyebrow">${legend}${taken ? `<span><i class="dash"></i>${t('chart.taken')}</span>` : ''}</span>
       <span class="eyebrow">${secs(dur)}</span>
     </div>
+  </div>`;
+}
+
+// ═══════════ Clases que no cuadran ═══════════
+/**
+ * Un hechizo que sólo puede lanzar una clase que no está en tu trío.
+ *
+ * En EQL puedes cambiar de trío y el log no lo dice en ninguna parte, así que
+ * esto es lo único que delata el cambio. Se deduce el trío al vuelo, pero el
+ * NIVEL no se puede deducir de nada: por eso el aviso pide /who en vez de
+ * quedarse callado. En pantalla y no por voz, porque no cambia lo que haces
+ * en los próximos tres segundos.
+ */
+function renderClassPrompt(snap) {
+  const host = $('clsPrompt');
+  if (!host) return;
+  const p = snap.classPrompt;
+  const viejo = snap.classSourceAt === 'inferido';
+  const sig = p ? `c|${p.spell}|${p.clase}` : (viejo ? 'stale' : '');
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+  if (!sig) { host.innerHTML = ''; return; }
+
+  host.innerHTML = `<div class="pethint">
+    <div class="pethint-main">${esc(p
+      ? t('cls.contradiction', { spell: p.spell, cls: t(`cl.${p.clase}`) })
+      : t('cls.stale'))}</div>
+    <div class="pethint-cmd">/who</div>
+    ${p ? `<div class="pethint-sub">${esc(t('cls.inferred'))}: ${
+      p.trio.map((c) => esc(t(`cl.${c}`))).join(' · ')}</div>` : ''}
   </div>`;
 }
 
@@ -1279,7 +1357,12 @@ function renderSummary() {
     ${state.filter.foe ? foeDossier(a) : ''}
 
     <div class="sec-title eyebrow" style="margin-top:20px">${esc(t('side.allies'))}</div>
-    ${a.rows.filter((r) => r.side !== 'enemy').map((r) => sumRow(r, maxDmg)).join('')}
+    ${a.rows.filter((r) => r.side !== 'enemy' && !r.unidentified).map((r) => sumRow(r, maxDmg)).join('')}
+
+    ${a.rows.some((r) => r.side !== 'enemy' && r.unidentified) ? `
+      <div class="sec-title eyebrow" style="margin-top:20px">${esc(t('side.unknownAllies'))}</div>
+      <div class="hint">${esc(t('side.unknownNote'))}</div>
+      ${a.rows.filter((r) => r.side !== 'enemy' && r.unidentified).map((r) => sumRow(r, maxDmg)).join('')}` : ''}
 
     <div class="sec-title eyebrow" style="margin-top:20px">${esc(t('sum.byFoe'))}</div>
     ${a.foes.map((f) => `<div class="foe-row" data-foe="${esc(f.name)}">
@@ -1694,7 +1777,7 @@ function renderApp() {
   }
   if (!$('rows')) {
     $('bodyGrid').innerHTML = `<aside id="fightList"></aside>
-      <main><div id="timers"></div><div id="fightHead"></div><div id="petHint"></div><div id="advice"></div><div id="rows"></div>
+      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div id="rows"></div>
       <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div></main>`;
     state.rowNodes.clear();
   }
@@ -1702,6 +1785,8 @@ function renderApp() {
   renderTimers(state.snap);
   renderHead(state.snap);
   renderPetHint(state.snap);
+
+  renderClassPrompt(state.snap);
   renderAdvice(state.snap);
   renderRows(state.snap);
 }
@@ -1776,7 +1861,7 @@ function renderLangPicker() {
     close();
     applyLangToChrome();
     state.rowNodes.clear();
-    ['fightHead', 'advice', 'petHint', 'fightList'].forEach((id) => { const n = $(id); if (n) n.dataset.sig = ''; });
+    ['fightHead', 'advice', 'petHint', 'clsPrompt', 'fightList'].forEach((id) => { const n = $(id); if (n) n.dataset.sig = ''; });
     if ($('rows')) $('rows').innerHTML = '';
     if (state.view === 'triggers') $('bodyGrid').innerHTML = '';
     renderLangPicker();
