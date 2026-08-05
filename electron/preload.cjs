@@ -44,4 +44,22 @@ contextBridge.exposeInMainWorld('eql', {
   wikiMob: (name) => ipcRenderer.invoke('wiki:mob', name),
   onSnapshot: (fn) => ipcRenderer.on('snapshot', (_e, s) => fn(s)),
   onOverlayState: (fn) => ipcRenderer.on('overlay:state', (_e, s) => fn(s)),
+
+  // Fusión de mascotas. La interfaz la llamaba sin `?.`, así que el conmutador
+  // lanzaba TypeError, no se guardaba la preferencia y el resto del manejador
+  // (limpiar las filas y repintar) no llegaba a ejecutarse.
+  setMergePets: (v) => ipcRenderer.invoke('pets:merge', v),
+
+  // Aviso de versión nueva. El proceso principal consultaba GitHub y enviaba
+  // 'update' desde la 1.0.4, y la interfaz tenía el cartel entero montado,
+  // pero por aquí no pasaba el puente: como se llamaban con `?.`, la función
+  // llevaba dos versiones muerta sin dar un solo error.
+  getUpdate: () => ipcRenderer.invoke('update:get'),
+  onUpdate: (fn) => ipcRenderer.on('update', (_e, u) => fn(u)),
+  openUpdate: () => ipcRenderer.invoke('update:open'),
+  skipUpdate: (v) => ipcRenderer.invoke('update:skip', v),
+
+  // Migración del almacén al formato de la 1.1.0.
+  migration: () => ipcRenderer.invoke('store:migration'),
+  rebuildStore: () => ipcRenderer.invoke('store:rebuild'),
 });

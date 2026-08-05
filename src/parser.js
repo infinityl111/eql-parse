@@ -244,7 +244,10 @@ export class Parser {
       const red = mitigationFor(this.stance, ev.school);
       ev.rawAmount = red > 0 && red < 1 ? ev.amount / (1 - red) : ev.amount;
     }
-    ev.pet = ev.source && this.pets.has(ev.source) ? this.pets.get(ev.source) : null;
+    // Aquí había un `ev.pet = dueño de ev.source`, que pisaba el nombre de la
+    // mascota que traen los eventos pet_*. No lo leía nadie —quien mira si una
+    // fila es mascota usa la marca de la fila, no la del evento— y dejaba una
+    // trampa puesta para el siguiente que leyera `ev.pet` fuera del switch.
     return ev;
   }
 

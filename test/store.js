@@ -172,5 +172,69 @@ console.log('\nposturas que evaden');
   ok(enEvasive.verdict === null, 'y no se dictamina nada');
 }
 
+// ── 6. Migración: detectar almacenes de versiones anteriores ──────────────
+console.log('\nmigración del almacén');
+{
+  const { STORE_VERSION, olderThan } = await import('../src/store.js');
+
+  ok(olderThan('1.0.7', '1.1.0') && olderThan('1.0.9', '1.1.0'), '1.0.x es anterior a 1.1.0');
+  ok(!olderThan('1.1.0', '1.1.0') && !olderThan('1.2.0', '1.1.0'), 'y 1.1.0 o posterior no');
+
+  // Almacén vacío: nada que corregir, aunque no tenga marca.
+  const vacio = tmp();
+  const s0 = new FightStore(vacio); s0.load();
+  ok(s0.migration().needed === false, 'un almacén vacío no pide migración');
+  fs.rmSync(vacio, { recursive: true, force: true });
+
+  // Almacén con peleas y sin marca: es de la 1.0.x.
+  const viejo = tmp();
+  const s1 = new FightStore(viejo);
+  s1.append(fight(1, 'un gorgon', 500), 1_000_000);
+  s1.append(fight(2, 'otro gorgon', 700), 1_100_000);
+  const s2 = new FightStore(viejo); s2.load();
+  const m = s2.migration();
+  ok(m.needed === true, 'con peleas y sin marca, hay que migrar');
+  ok(m.from === null && m.fights === 2, 'y se sabe de dónde viene y cuántas son',
+    `${m.from} · ${m.fights} peleas`);
+
+  // Una vez marcado, no se vuelve a preguntar.
+  s2.stamp(STORE_VERSION);
+  const s3 = new FightStore(viejo); s3.load();
+  ok(s3.migration().needed === false, 'tras marcarlo ya no pide migración');
+  ok(s3.meta()?.version === STORE_VERSION, 'y la marca dice la versión', s3.meta()?.version);
+
+  // Marcado con una versión anterior a la actual: vuelve a pedirla.
+  s3.stamp('1.0.9');
+  const s4 = new FightStore(viejo); s4.load();
+  ok(s4.migration().needed === true, 'una marca anterior a la actual vuelve a pedir migración');
+  fs.rmSync(viejo, { recursive: true, force: true });
+}
+
+// ── 7. La reconstrucción no puede llevarse por delante el histórico ───────
+console.log('\nred de seguridad de la reconstrucción');
+{
+  const { rebuildStore } = await import('../src/rebuild.js');
+  const dir = tmp();
+  const s = new FightStore(dir);
+  for (let i = 1; i <= 4; i++) s.append(fight(i, `bicho ${i}`, 1000), 3_000_000 + i * 1000);
+  const antes = fs.readFileSync(path.join(dir, 'fights.ndjson'), 'utf8');
+
+  // Sin log no se toca nada.
+  const r1 = await rebuildStore({ dir, logPath: path.join(dir, 'no-existe.txt') });
+  ok(r1.ok === false && r1.reason === 'sin-log', 'sin log no se reconstruye', r1.reason);
+
+  // Con un log que ya no contiene esas peleas, se deshace y se devuelve todo.
+  const vacio = path.join(dir, 'eqlog_Nadie_servidor.txt');
+  fs.writeFileSync(vacio, '[Tue Aug 04 18:00:00 2026] You have entered Lower Guk.\n');
+  const r2 = await rebuildStore({ dir, logPath: vacio, self: 'Nadie' });
+  ok(r2.ok === false && r2.reason === 'sin-peleas',
+    'un log sin peleas no borra el histórico', r2.reason);
+  ok(fs.readFileSync(path.join(dir, 'fights.ndjson'), 'utf8') === antes,
+    'y los datos quedan exactamente como estaban');
+  const s5 = new FightStore(dir); s5.load();
+  ok(s5.index.length === 4, 'las cuatro peleas siguen ahí', String(s5.index.length));
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

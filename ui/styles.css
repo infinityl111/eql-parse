@@ -570,6 +570,18 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
           font-size: 12.5px; flex: none; }
 .updbar span { flex: 1; }
 .updbar button { font-size: 10px; }
+
+/* Aviso de que el histórico guardado no es de fiar. Ocupa varias líneas a
+   propósito: dice qué estaba mal, y eso no cabe en una barra de una línea. */
+.migbar { padding: 12px 18px; flex: none; font-size: 12.5px; line-height: 1.5;
+          background: rgba(224,138,75,.13); border-bottom: 1px solid var(--t-fire); }
+.migbar p { margin: 4px 0 0; max-width: 96ch; color: var(--bone-dim); }
+.migbar .mig-h { font-family: var(--display); font-size: 13px; letter-spacing: .04em;
+                 text-transform: uppercase; color: var(--t-fire); }
+.migbar .mig-h.bad { color: var(--t-ds); }
+.migbar .mig-fix { color: var(--bone-faint); }
+.migbar .mig-btns { display: flex; gap: 8px; margin-top: 10px; }
+.migbar button[disabled] { opacity: .55; cursor: default; }
 .chk.mini { display: inline-flex; align-items: center; gap: 5px; margin-left: 12px;
             font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
             color: var(--bone-faint); cursor: pointer; }

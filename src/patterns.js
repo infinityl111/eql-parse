@@ -267,7 +267,6 @@ const rules = [
   { kind: 'noise', hint: 'can see you', re: /^You suspect that this being can see you\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'Zone Safe Point', re: /^Returning to Zone Safe Point/, map: () => ({}) },
   { kind: 'noise', hint: 'spirit of wolf', re: /^You feel the spirit of wolf enter you\.$/, map: () => ({}) },
-  { kind: 'chat', hint: 'You say', re: /^You say,? '([\s\S]*)'$/, map: (m) => ({ from: 'You', channel: 'say' }) },
   { kind: 'knockdown', hint: 'fallen to the ground', re: /^(.+?) has fallen to the ground\.$/, map: (m) => ({ who: m[1] }) },
   { kind: 'buff_land', hint: 'feel', re: /^You feel (?:much better|resistant to .+|protected from .+|your strength return|a heal efflorescing within you)\.$/, map: () => ({}) },
   { kind: 'buff_land', hint: 'is resistant', re: /^(.+?) is (?:resistant to|protected from) (.+?)\.$/, map: (m) => ({ who: m[1], what: m[2] }) },

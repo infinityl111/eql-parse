@@ -47,6 +47,7 @@ let overlayWin = null;
 let pushTimer = null;
 let wiki = null;      // cliente de la wiki
 let latest = null;    // { version, url } si hay una versión más nueva publicada
+let migration = null; // { needed, from, fights } si el almacén es de una versión anterior
 
 const REPO = 'infinityl111/eql-parse-spain';
 
@@ -175,6 +176,13 @@ async function boot() {
   engine = new Engine();
   cfg = loadConfig();
   engine.setStorePath(app.getPath('userData'));
+
+  // ¿El almacén lo escribió una versión anterior? Entonces sus cifras no
+  // describen lo que pasó, y hay que decírselo al usuario dentro de la
+  // aplicación: quien tenga la 1.0.7 instalada no va a leer las notas.
+  // Un almacén vacío no tiene nada que corregir: se marca y en paz.
+  migration = engine.store.migration();
+  if (!migration.needed) engine.store.stamp();
   import('../src/wiki.js').then(({ WikiClient }) => { wiki = new WikiClient(app.getPath('userData')); });
   triggerDefs = loadTriggers() ?? STARTER_TRIGGERS;
   engine.triggers.load(triggerDefs);
@@ -389,6 +397,40 @@ ipcMain.handle('pets:names', (_e, { name, on }) => {
 });
 
 ipcMain.handle('pets:merge', (_e, v) => { cfg.mergePets = !!v; saveConfig(cfg); return cfg.mergePets; });
+
+// ── Migración del almacén ───────────────────────────────────────────────
+ipcMain.handle('store:migration', () => migration);
+
+/**
+ * Reconstruye el histórico desde el log, con el motor parado.
+ *
+ * Hay que soltar el lector antes: si sigue leyendo mientras se apartan los
+ * ficheros, la pelea en curso se guardaría en el almacén que acabamos de
+ * mover. Al terminar se vuelve a enganchar donde estaba.
+ */
+ipcMain.handle('store:rebuild', async () => {
+  const dir = app.getPath('userData');
+  const logPath = cfg.logPath;
+  if (!logPath || !fs.existsSync(logPath)) return { ok: false, reason: 'sin-log' };
+  const { rebuildStore } = await import('../src/rebuild.js');
+  const eraTicking = !!pushTimer;
+  clearInterval(pushTimer); pushTimer = null;    // nada de snapshots a medias
+  engine.detach();
+  let r;
+  try {
+    r = await rebuildStore({ dir, logPath, self: cfg.self, idleSec: cfg.idleSec ?? 20 });
+  } catch (err) {
+    r = { ok: false, reason: 'error-de-lectura', error: err.message };
+  }
+  // Pase lo que pase, la aplicación vuelve a funcionar.
+  try {
+    engine.setStorePath(dir);
+    await engine.attach(logPath, { ...cfg, fromStart: false });
+  } catch { /* el usuario puede reconectar a mano desde Cambiar log */ }
+  if (eraTicking) startPush();
+  if (r.ok) migration = { needed: false, from: r.version, fights: r.peleasDespues, current: r.version };
+  return r;
+});
 
 ipcMain.handle('update:get', () => (cfg.skipVersion === latest?.version ? null : latest));
 ipcMain.handle('update:open', () => { if (latest) shell.openExternal(latest.url); return true; });

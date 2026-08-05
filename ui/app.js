@@ -1220,10 +1220,7 @@ function renderSummary() {
   if (!a || !a.fights) {
     host.innerHTML = `<div class="empty"><h2>${esc(t('sum.empty'))}</h2>
       <button id="sumBack">${esc(t('sum.back'))}</button></div>`;
-    $('dosWiki')?.addEventListener('click', () => window.eql.openWiki(
-    a.foes.find((x) => x.name.toLowerCase().includes((state.filter.foe ?? '').toLowerCase()))?.name
-    ?? state.filter.foe));
-  $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
+    $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
     return;
   }
   const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
@@ -1293,6 +1290,14 @@ function renderSummary() {
   if (root && scroll) root.scrollTop = scroll;
 
   $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
+  // El botón de la ficha del enemigo. Su listener estaba registrado en la rama
+  // del resumen VACÍO, donde ese botón no existe: con `?.` no daba error y el
+  // botón se pintaba inerte.
+  $('dosWiki')?.addEventListener('click', () => {
+    const f = state.summary?.foes?.find((x) => x.name.toLowerCase()
+      .includes((state.filter.foe ?? '').toLowerCase()));
+    window.eql.openWiki(f?.name ?? state.filter.foe);
+  });
   $('sumMerge')?.addEventListener('change', async (e) => {
     state.cfg.mergePets = e.target.checked;
     await window.eql.setMergePets(e.target.checked);
@@ -1704,6 +1709,63 @@ $('tabTriggers').addEventListener('click', async () => { await initTriggers(); s
 
 window.eql.onLang((c) => { setLang(c); applyLangToChrome(); renderLangPicker(); });
 
+/**
+ * Aviso de que el histórico se guardó con cifras incorrectas.
+ *
+ * Va dentro de la aplicación y no en las notas de la versión porque quien
+ * tiene la 1.0.7 instalada no lee las notas: abre el programa, ve unos números
+ * y se los cree. Y son incorrectos de una forma que no se nota mirándolos.
+ */
+async function showMigration() {
+  const m = await window.eql.migration?.().catch(() => null);
+  if (!m?.needed) return;
+  const bar = $('migBar');
+  if (!bar) return;
+
+  const pintar = (html) => { bar.innerHTML = html; bar.style.display = 'block'; };
+  const cerrar = () => { bar.style.display = 'none'; bar.innerHTML = ''; };
+
+  pintar(`<div class="mig-h">${esc(t('mig.title'))}</div>
+    <p>${esc(t('mig.body', { n: m.fights }))}</p>
+    <p class="mig-fix">${esc(t('mig.fix'))}</p>
+    <div class="mig-btns">
+      <button class="primary" id="migGo">${esc(t('mig.button'))}</button>
+      <button id="migLater">${esc(t('mig.later'))}</button>
+    </div>`);
+
+  $('migLater').addEventListener('click', cerrar);
+  $('migGo').addEventListener('click', async () => {
+    const b = $('migGo');
+    b.disabled = true;
+    b.textContent = t('mig.working');
+    $('migLater').disabled = true;
+    const r = await window.eql.rebuildStore().catch((err) => ({ ok: false, reason: 'error-de-lectura', error: err.message }));
+    if (r?.ok) {
+      pintar(`<div class="mig-h">${esc(t('mig.doneTitle'))}</div>
+        <p>${esc(t('mig.done', { fights: n0(r.peleasDespues), kills: n0(r.abatidos),
+          lines: n0(r.lineas), secs: r.segundos.toFixed(1), backup: (r.copias ?? []).join(', ') }))}</p>
+        <div class="mig-btns"><button id="migOk">${esc(t('mig.later'))}</button></div>`);
+      $('migOk').addEventListener('click', cerrar);
+      // El histórico es otro: se descarta lo que la interfaz tuviera en memoria.
+      state.fightCache.clear();
+      state.summary = null;
+      state.selectedFight = 'live';
+      lastHistLen = -1;
+      refreshFights();
+    } else {
+      const motivo = t(`mig.fail.${r?.reason ?? 'error-de-lectura'}`);
+      pintar(`<div class="mig-h bad">${esc(t('mig.failTitle'))}</div>
+        <p>${esc(motivo)}</p>
+        <div class="mig-btns">
+          <button class="primary" id="migRetry">${esc(t('mig.button'))}</button>
+          <button id="migOk">${esc(t('mig.later'))}</button>
+        </div>`);
+      $('migOk').addEventListener('click', cerrar);
+      $('migRetry').addEventListener('click', () => showMigration());
+    }
+  });
+}
+
 /** Aviso de versión nueva. Sólo informa: la descarga la decides tú. */
 function showUpdate(u) {
   const bar = $('updBar');
@@ -1731,4 +1793,6 @@ window.eql.getConfig().then((c) => {
   applyLangToChrome();
   refreshFights();
   if (!c.logPath) renderApp();
+  // Después del asistente: al primer arranque no hay histórico que corregir.
+  if (c.onboarded) showMigration();
 });

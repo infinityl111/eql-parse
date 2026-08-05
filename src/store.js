@@ -42,6 +42,29 @@ import path from 'node:path';
 /** Identidad lógica de una pelea: estable aunque se reimporte el log. */
 const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
 
+/**
+ * Versión del formato del almacén.
+ *
+ * Subir esto declara que lo guardado por versiones anteriores no describe lo
+ * que pasó y hay que releer el log. No es un número de formato de fichero: los
+ * ficheros de la 1.0.x se leen perfectamente, lo que pasa es que su CONTENIDO
+ * era incorrecto —muertes que no se contaron, peleas duplicadas, mitigación de
+ * Evasive mal aplicada—, y eso no se arregla leyendo mejor.
+ */
+export const STORE_VERSION = '1.1.0';
+const META = 'store.json';
+
+/** Compara 1.2.10 con 1.3.0 sin traerse una librería para tres números. */
+export function olderThan(a, b) {
+  const pa = String(a ?? '0').replace(/^v/, '').split('.').map(Number);
+  const pb = String(b ?? '0').replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) < (pb[i] || 0)) return true;
+    if ((pa[i] || 0) > (pb[i] || 0)) return false;
+  }
+  return false;
+}
+
 export class FightStore {
   constructor(dir) {
     this.dir = dir;
@@ -52,6 +75,39 @@ export class FightStore {
     this.byUid = new Map();
     this.seen = new Map();  // identidad lógica -> resumen, para no duplicar
     this.dropped = 0;       // duplicados descartados al cargar
+  }
+
+  /** Con qué versión se escribió lo que hay guardado. */
+  meta() {
+    try { return JSON.parse(fs.readFileSync(path.join(this.dir, META), 'utf8')); }
+    catch { return null; }
+  }
+
+  stamp(version = STORE_VERSION) {
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      fs.writeFileSync(path.join(this.dir, META),
+        JSON.stringify({ version, at: Date.now() }, null, 2));
+      return true;
+    } catch { return false; }
+  }
+
+  /**
+   * ¿Hay que releer el log?
+   *
+   * Sólo si ya hay peleas guardadas: un almacén vacío no tiene nada que
+   * corregir, se marca y en paz. Sin marca y con peleas dentro significa que lo
+   * escribió una versión anterior a que la marca existiera, o sea la 1.0.x.
+   */
+  migration() {
+    const m = this.meta();
+    const fights = this.index.length;
+    const from = m?.version ?? null;
+    if (!fights) return { needed: false, from, fights, current: STORE_VERSION };
+    return {
+      needed: from === null || olderThan(from, STORE_VERSION),
+      from, fights, current: STORE_VERSION,
+    };
   }
 
   /** Resumen: lo justo para la lista y los filtros. */
