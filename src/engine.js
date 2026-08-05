@@ -818,7 +818,17 @@ export class Engine extends EventEmitter {
     if (!enc) return null;
     const t = enc.totals();
     const me = this.self ?? 'You';
-    const petSet = new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? [])]);
+    // Las mascotas de ESTA sesión, si se sabe cuál es la tuya ahora mismo.
+    //
+    // `knownPets` acumula entre sesiones para que el histórico de ayer reconozca
+    // a las de ayer, y para eso está bien. Pero aplicada a la pelea de ahora
+    // convierte en tuya a la mascota de otro que reutilice un nombre viejo: los
+    // nombres salen de una lista cerrada y se reciclan. Sólo se usa como
+    // respaldo cuando no consta ninguna de esta sesión —justo después de
+    // reabrir la aplicación con la mascota ya invocada—, que es el único caso
+    // en que aporta algo que no sepamos ya.
+    const deAhora = new Set(this.parser?.pets.keys() ?? []);
+    const petSet = deAhora.size ? deAhora : new Set(this.knownPets);
     const foeSet = this.#sides(t.rows, me, petSet);
     const allyRows = t.rows.filter((r) => !foeSet.has(r.name));
     const foeRows = t.rows.filter((r) => foeSet.has(r.name));

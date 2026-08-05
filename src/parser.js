@@ -85,6 +85,33 @@ export class Parser {
     return { t, seq, kind: 'unknown', raw: body };
   }
 
+  /**
+   * Tu mascota es la de AHORA, no todas las que has tenido.
+   *
+   * En EQL el nombre sale de una lista cerrada y se recicla entre jugadores: el
+   * mismo nombre que fue tuyo hace cuatro horas puede ser el de la mascota de
+   * otro cuando la tuya ya se llama de otra forma. Al no retirar nunca los
+   * viejos, cualquier cosa que tocara ese nombre entraba en el filtro de
+   * relevancia como tuya.
+   *
+   * Medido en un log real: `Jobarn` fue tuya a las 20:07 y a las 23:51
+   * invocaste `Kabarer`. A las 00:01 apareció otro `Jobarn`, el de `Krumka`, y
+   * se guardó una pelea entera en la que tú no estabas — su dueño, su mascota y
+   * el bicho— como si fuera tuya.
+   *
+   * Sólo se tiene una a la vez, así que confirmar una nueva retira la anterior.
+   * Las tres señales que llegan aquí son inequívocas en el instante en que
+   * ocurren: «My leader is <tú>», «told you 'Attacking… Master'» y tus propias
+   * órdenes. Lo que se corrige no es la señal, es darla por buena para siempre.
+   */
+  #ownPet(name) {
+    if (!name) return;
+    if (this.currentPet && this.currentPet !== name) this.pets.delete(this.currentPet);
+    this.pets.set(name, this.self ?? 'You');
+    this.petMaybe.delete(name);
+    this.currentPet = name;
+  }
+
   /** Marca manual desde la interfaz, cuando el log no lo aclara. */
   markPet(name) {
     if (!name) return;
@@ -151,14 +178,12 @@ export class Parser {
 
       case 'pet_claim':
         // Lo que te responde con "Master" obedece órdenes tuyas.
-        this.pets.set(ev.pet, this.self ?? 'You');
-        this.currentPet = ev.pet;
+        this.#ownPet(ev.pet);
         break;
 
       case 'pet_order':
         // Tú le has dado la orden, así que es tuya.
-        this.pets.set(ev.pet, this.self ?? 'You');
-        this.currentPet = ev.pet;
+        this.#ownPet(ev.pet);
         break;
 
       case 'pet_maybe':
@@ -169,8 +194,7 @@ export class Parser {
       case 'pet_leader':
         // La única fuente inequívoca de a quién pertenece una mascota.
         if (ev.leader === (this.self ?? 'You') || ev.leader === 'You') {
-          this.pets.set(ev.pet, this.self ?? 'You');
-          this.currentPet = ev.pet;
+          this.#ownPet(ev.pet);
           this.otherPets.delete(ev.pet);
         } else {
           // Es de otro jugador: se anota para nombrarla bien y no preguntarla.

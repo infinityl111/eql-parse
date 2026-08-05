@@ -203,5 +203,61 @@ console.log('\ncontrol recibido');
   ok(controlKind('heal', 'Word of Healing') === null, 'y una curación no es control');
 }
 
+// ── Los nombres de mascota se reciclan entre jugadores ────────────────────
+//
+// Fallo real y medido. En EQL el nombre de la mascota sale de una lista cerrada
+// y cambia en cada invocación, así que el nombre que fue tuyo hace horas puede
+// ser el de la mascota de otro jugador después. `parser.pets` no retiraba
+// ninguno, y el filtro de relevancia daba por tuyo cualquier nombre de la
+// lista: se guardó una pelea entera SIN TI dentro —el otro jugador, su mascota
+// y el bicho— porque su mascota reutilizaba un nombre que había sido tuyo.
+console.log('\nuna mascota vieja deja de ser tuya al invocar otra');
+{
+  const p = new Parser({ self: 'Campeon' });
+  const línea = (s, txt) => p.parse(`${stamp(s)} ${txt}`, 0);
+
+  línea(0, "Jobarn says, 'My leader is Campeon.'");
+  ok(p.pets.has('Jobarn') && p.currentPet === 'Jobarn', 'la primera es tuya');
+
+  línea(100, "Kabarer says, 'My leader is Campeon.'");
+  ok(p.pets.has('Kabarer') && p.currentPet === 'Kabarer', 'la nueva es tuya');
+  ok(!p.pets.has('Jobarn'),
+    'y la anterior deja de serlo: sólo se tiene una a la vez',
+    [...p.pets.keys()].join(', '));
+
+  // La mitad que prueba que sirve de algo: con el nombre viejo suelto, la pelea
+  // de un desconocido no puede abrirse como tuya.
+  const guion = [
+    [200, 'Krumka slashes a froglok shin knight for 300 points of damage.'],
+    [201, 'Jobarn pierces a froglok shin knight for 100 points of damage.'],
+    [202, 'a froglok shin knight hits Krumka for 50 points of damage.'],
+    [230, 'a froglok shin knight has been slain by Krumka!'],
+  ];
+  const tracker = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+  tracker.petNames = new Set(p.pets.keys());        // como hace el motor
+  for (const [s, txt] of guion) {
+    const ev = p.parse(`${stamp(s)} ${txt}`, 0);
+    if (ev) tracker.feed(ev);
+  }
+  tracker.tick(1e12);
+  ok(tracker.history.length === 0,
+    'la pelea de un desconocido con una mascota de nombre reciclado no se abre',
+    `${tracker.history.length} peleas`);
+
+  // Y con la mascota de verdad sí, que es lo que no se puede romper.
+  const t2 = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+  t2.petNames = new Set(p.pets.keys());
+  for (const [s, txt] of [
+    [300, 'Kabarer pierces a froglok shin knight for 100 points of damage.'],
+    [301, 'You slash a froglok shin knight for 200 points of damage.'],
+    [330, 'a froglok shin knight has been slain by Campeon!'],
+  ]) {
+    const ev = p.parse(`${stamp(s)} ${txt}`, 0);
+    if (ev) t2.feed(ev);
+  }
+  t2.tick(1e12);
+  ok(t2.history.length === 1, 'y la tuya con tu mascota actual sí', `${t2.history.length}`);
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);
