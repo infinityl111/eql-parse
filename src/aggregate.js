@@ -143,14 +143,25 @@ export function aggregate(fights, self = null) {
         c.sum += a.sum; c.n += a.n; c.max = Math.max(c.max, a.max ?? 0);
         e.abil.set(a.name, c);
       }
-      if ((f.kills ?? []).includes(r.name)) {
-        e.kills += 1;
-        // Vida estimada: lo que costó tumbarlo en esa pelea. El log no da la
-        // vida de nadie, pero el daño total hasta su muerte es una cota muy
-        // buena. Se guarda cada muestra para poder ver la dispersión.
-        const dealt = (f.rows ?? []).filter((x) => x.side !== 'enemy')
-          .reduce((n, x) => n + ((x.targets ?? []).find((tg) => tg.name === r.name)?.sum ?? 0), 0);
-        if (dealt > 0) e.hpSamples.push(Math.round(dealt));
+      // Cuántas veces cayó: `kills` trae un nombre por muerte, así que matarlo
+      // tres veces en una pelea son tres. Antes se contaba una.
+      const caidas = (f.kills ?? []).filter((x) => x === r.name).length;
+      if (caidas > 0) {
+        e.kills += caidas;
+        // Vida estimada: lo que costó tumbarlo. El log no da la vida de nadie,
+        // pero el daño hasta su muerte es una cota muy buena. Cada muerte deja
+        // su propia muestra, medida en el instante en que cayó.
+        const muestras = f.hpSamples?.[r.name];
+        if (muestras?.length) {
+          for (const m of muestras) if (m > 0) e.hpSamples.push(Math.round(m));
+        } else {
+          // Peleas guardadas antes de que se midiera al caer: sólo se puede
+          // usar el daño total, y sólo vale si cayó una vez. Con más muertes la
+          // suma describiría a los tres juntos, así que no se usa.
+          const dealt = (f.rows ?? []).filter((x) => x.side !== 'enemy')
+            .reduce((n, x) => n + ((x.targets ?? []).find((tg) => tg.name === r.name)?.sum ?? 0), 0);
+          if (dealt > 0 && caidas === 1) e.hpSamples.push(Math.round(dealt));
+        }
       }
       for (const l of f.loot ?? []) {
         const item = typeof l === 'string' ? l : l.item;

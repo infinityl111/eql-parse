@@ -148,6 +148,14 @@ export class Encounter {
     this.stanceSpans = [];          // [{from, to, stance}] franja de postura
     this.targetTotals = new Map();  // para nombrar la pelea
     this.deadAt = new Map();       // nombre -> segundo en que cayó
+    // Lo que costó tumbar a cada enemigo, una muestra por muerte. Se anota al
+    // caer y no al acabar la pelea: si el mismo bicho cae tres veces, sumar el
+    // daño de las tres y llamarlo «su vida» la triplica.
+    this.hpSamples = new Map();    // nombre -> [daño hasta cada muerte]
+    this.deathBase = new Map();    // nombre -> daño acumulado en su muerte anterior
+    // Daño real que no se puede atribuir a nadie: escudos sin posesivo
+    // («shards of ice»). No entra en el total de nadie ni en el del grupo.
+    this.unattributed = 0;
     this.loot = [];                // {item, from, sold, upgraded, t}
     this.spellVsFoe = new Map();   // 'enemigo|hechizo' -> {landed, resisted}
     this.foesSeen = new Set();     // a quién estáis pegando en esta pelea
@@ -257,7 +265,7 @@ export class EncounterTracker extends EventEmitter {
     if (this.current) {
       // Sólo cuenta como resistencia sufrida si el lanzador eras tú o tu mascota.
       if (ev.kind === 'resist') {
-        if (ev.caster === this.self || this.petNames?.has(ev.caster)) {
+        if (this.#mine().has(ev.caster)) {
           this.current.resistsSuffered++;
           // Contra QUIÉN y con QUÉ hechizo: es lo que permite saber después a
           // qué es resistente cada bicho, medido en tus propias peleas.
@@ -269,10 +277,6 @@ export class EncounterTracker extends EventEmitter {
         this.current.casts.push({ t: Math.round(ev.t - this.current.start), source: ev.source, ability: ev.ability, cat: ev.castCat });
       }
       else if (ev.kind === 'stance' && ev.stance) this.current.stancesSeen.add(ev.stance);
-      // Un hechizo tuyo que sí entró, para saber la proporción.
-      if (ev.kind === 'spell' && ev.ability && ev.target && ev.source === this.self) {
-        this.#tally(this.current, ev.target, ev.ability, 'landed', ev.invocation);
-      }
       else if (ev.kind === 'invocation' && ev.invocation) this.current.invocationsSeen.add(ev.invocation);
     }
 
@@ -302,11 +306,26 @@ export class EncounterTracker extends EventEmitter {
     // descartar la pelea entera. Pasa en pruebas y si el personaje aún no se
     // ha deducido del nombre del fichero.
     const rel = (n) => n && (mine.has(n) || this.current?.foesSeen?.has(n));
-    if (mine.size && !rel(ev.source) && !rel(ev.target)) return;
+    // Las muertes no traen `source` ni `target`, sino `victim` y `killer`: hay
+    // que mirar los cuatro. Mirando sólo los dos primeros se descartaban TODAS
+    // las muertes, y con ellas los abatidos, las bajas, el nombre de la pelea y
+    // la vida estimada del enemigo, que se deduce de lo que costó tumbarlo.
+    //
+    // Y en una muerte cuenta también quien ya esté peleando: un compañero de
+    // grupo no es tuyo ni es enemigo, así que sin esto su caída no se contaba
+    // aunque llevara toda la pelea pegando a tu objetivo.
+    const enPelea = (nm) => nm && !!this.current?.combatants?.has(nm);
+    const relevante = ev.kind === 'death'
+      ? (rel(ev.victim) || rel(ev.killer) || enPelea(ev.victim) || enPelea(ev.killer))
+      : (rel(ev.source) || rel(ev.target));
+    if (mine.size && !relevante) return;
 
     // Y una pelea sólo se abre cuando estáis metidos vosotros.
     if (Number.isFinite(this.idleSec) && this.current && ev.t - this.current.end > this.idleSec) this.#close();
     if (!this.current) {
+      // Una muerte suelta no abre pelea: sin golpes previos no hay nada que
+      // contar, y la de un desconocido a diez metros no es asunto tuyo.
+      if (ev.kind === 'death') return;
       if (mine.size && !mine.has(ev.source) && !mine.has(ev.target)) return;
       this.current = new Encounter(this.nextId++, ev.t, this.zone);
       this.emit('open', this.current);
@@ -319,9 +338,15 @@ export class EncounterTracker extends EventEmitter {
     enc.end = Math.max(enc.end, ev.t);
 
     if (DAMAGE_KINDS.has(ev.kind) && ev.amount > 0) {
-      if (ev.source) enc.actor(ev.source).addDamage(ev);
+      // Un escudo de daño sin posesivo no dice de quién es. Adjudicárselo a un
+      // combatiente llamado «Unknown» lo metía en el total del grupo y diluía
+      // el porcentaje de todos los demás: se aparta, que es lo que promete el
+      // README, y el que lo recibe sí lo contabiliza.
+      const huerfano = ev.confidence === 'none' && ev.source === 'Unknown';
+      if (huerfano) enc.unattributed += ev.amount;
+      else if (ev.source) enc.actor(ev.source).addDamage(ev);
       if (ev.target) enc.actor(ev.target).addTaken(ev);
-      enc.tick(ev.t, 'dmg', ev.amount);
+      if (!huerfano) enc.tick(ev.t, 'dmg', ev.amount);
       if (ev.source === this.self) enc.tick(ev.t, 'mine', ev.amount);
       if (ev.target === this.self) {
         // Bruto y separado por escuela: sin esto no se puede juzgar la
@@ -335,6 +360,18 @@ export class EncounterTracker extends EventEmitter {
         enc.targetTotals.set(ev.target, b + ev.amount);
         if (!enc.targetFirst.has(ev.target)) enc.targetFirst.set(ev.target, ev.t);
       }
+      // Un hechizo vuestro que sí entró, para saber la proporción contra ese
+      // enemigo. Va AQUÍ y no en el bloque de señales de arriba porque aquél
+      // exige que la pelea ya esté abierta, y el primer hechizo de la pelea es
+      // justo el que la abre: se perdía siempre, y como las resistencias no
+      // abren pelea, el porcentaje de resistencia salía inflado.
+      //
+      // Cuenta tú y tus mascotas, igual que el lado de las resistencias. Antes
+      // sólo contaba lo tuyo, así que todo lo que lanzara la mascota salía con
+      // 0 aciertos y N resistencias: un 100% de resistencia que no existía.
+      if (ev.kind === 'spell' && ev.ability && ev.target && mine.has(ev.source)) {
+        this.#tally(enc, ev.target, ev.ability, 'landed', ev.invocation);
+      }
       if (ev.stance) enc.markStance(ev.t, ev.stance);
     } else if (ev.kind === 'miss') {
       if (ev.source) enc.actor(ev.source).addMissDealt(ev);
@@ -345,8 +382,21 @@ export class EncounterTracker extends EventEmitter {
       if (ev.target) enc.actor(ev.target).addHealTaken(ev);
     } else if (ev.kind === 'death') {
       enc.kills.push({ t: ev.t, victim: ev.victim, killer: ev.killer });
-      if (ev.victim) enc.deadAt.set(ev.victim, Math.max(0, Math.round(ev.t - enc.start)));
-      if (ev.victim) enc.actor(ev.victim).deaths++;
+      if (ev.victim) {
+        enc.deadAt.set(ev.victim, Math.max(0, Math.round(ev.t - enc.start)));
+        enc.actor(ev.victim).deaths++;
+        // Lo que costó ESTA muerte: el daño acumulado contra él menos el que ya
+        // llevaba cuando cayó la vez anterior. Sin restar, matar tres veces al
+        // mismo bicho daba una «vida» del triple.
+        const acumulado = enc.targetTotals.get(ev.victim) ?? 0;
+        const coste = acumulado - (enc.deathBase.get(ev.victim) ?? 0);
+        if (coste > 0) {
+          const muestras = enc.hpSamples.get(ev.victim) ?? [];
+          muestras.push(Math.round(coste));
+          enc.hpSamples.set(ev.victim, muestras);
+        }
+        enc.deathBase.set(ev.victim, acumulado);
+      }
       if (this.closeOnDeath) this.#close();
       return;
     }

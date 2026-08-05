@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld('eql', {
   openOverlay: () => ipcRenderer.invoke('overlay:open'),
   resetSession: () => ipcRenderer.invoke('session:reset'),
   queryHistory: (q) => ipcRenderer.invoke('history:query', q),
-  getFight: (id) => ipcRenderer.invoke('history:fight', id),
+  getFight: (uid) => ipcRenderer.invoke('history:fight', uid),
   foeList: (sinceMs) => ipcRenderer.invoke('history:foes', sinceMs),
   aggregate: (q) => ipcRenderer.invoke('history:aggregate', q),
   storeStats: () => ipcRenderer.invoke('history:stats'),

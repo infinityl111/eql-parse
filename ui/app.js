@@ -254,18 +254,24 @@ function withPets(f) {
   return { ...f, rows: mergePets(f.rows, t('pets.merged'), petNames(), state.snap?.self, state.cfg.notPets ?? []) };
 }
 
+// La pelea elegida se identifica por `uid` (el byte donde empieza en disco), no
+// por `id`: el `id` vuelve a empezar en 1 en cada arranque y se repite entre
+// sesiones. La viva no tiene uid, y eso es justo lo que la distingue.
+const isLive = (f) => !!f && f.uid == null;
+
 function fightFor(snap) {
-  if (state.selectedFight === 'live') return snap.current ?? state.fightCache.get(state.fights[0]?.id) ?? null;
+  if (state.selectedFight === 'live') return snap.current ?? state.fightCache.get(state.fights[0]?.uid) ?? null;
   // Las cerradas viven en disco: se piden por su identificador y se cachean.
   return state.fightCache.get(state.selectedFight) ?? snap.current ?? null;
 }
 
 /** Trae del disco la pelea elegida y la deja en caché. */
-async function loadFight(id) {
-  if (id === 'live' || state.fightCache.has(id)) return;
+async function loadFight(uid) {
+  if (uid === 'live' || state.fightCache.has(uid)) return;
   try {
-    const f = await window.eql.getFight?.(id);
-    if (f) { state.fightCache.set(id, f); renderApp(); }
+    const f = await window.eql.getFight?.(uid);
+    // Se anota el uid en la pelea traída: es lo que la distingue de la viva.
+    if (f) { state.fightCache.set(uid, { ...f, uid }); renderApp(); }
   } catch (err) { console.error('pelea:', err); }
 }
 
@@ -286,8 +292,8 @@ async function refreshFights() {
   const list = $('fightList');
   if (list) list.dataset.sig = '';
   // Si lo que estaba abierto se ha quedado fuera del filtro, abrimos lo primero.
-  if (state.selectedFight !== 'live' && !state.fights.some((f) => f.id === state.selectedFight)) {
-    state.selectedFight = state.fights[0] ? state.fights[0].id : 'live';
+  if (state.selectedFight !== 'live' && !state.fights.some((f) => f.uid === state.selectedFight)) {
+    state.selectedFight = state.fights[0] ? state.fights[0].uid : 'live';
   }
   if (state.selectedFight !== 'live') await loadFight(state.selectedFight);
   renderApp();
@@ -296,8 +302,8 @@ async function refreshFights() {
 const TRIVIAL = (f) => f.duration < 3 || f.total < 500;
 
 function fightCard(f, live) {
-  const active = live ? state.selectedFight === 'live' : state.selectedFight === f.id;
-  return `<div class="fight ${live ? 'live' : ''} ${active ? 'active' : ''}" data-id="${f.id}" data-live="${live ? 1 : 0}">
+  const active = live ? state.selectedFight === 'live' : state.selectedFight === f.uid;
+  return `<div class="fight ${live ? 'live' : ''} ${active ? 'active' : ''}" data-uid="${f.uid}" data-live="${live ? 1 : 0}">
     <div class="fight-name">${esc(f.label ?? t('fight.skirmish'))}</div>
     <div class="fight-sub">
       <span class="num strong foe">${n0(f.enemyDps ?? 0)}</span><span class="u">dps</span>
@@ -377,14 +383,14 @@ function renderFightList(snap) {
     renderApp();
   });
   list.querySelectorAll('.fight').forEach((el) => {
-    const id = el.dataset.live === '1' ? null : +el.dataset.id;
-    const f = id === null ? snap.current : state.fights.find((x) => x.id === id);
+    const uid = el.dataset.live === '1' ? null : +el.dataset.uid;
+    const f = uid === null ? snap.current : state.fights.find((x) => x.uid === uid);
     if (!f?.loot?.length) return;
     el.addEventListener('mouseenter', () => showLootTip(f));
     el.addEventListener('mouseleave', hideTip);
   });
   list.querySelectorAll('.fight').forEach((el) => el.addEventListener('click', async () => {
-    state.selectedFight = el.dataset.live === '1' ? 'live' : +el.dataset.id;
+    state.selectedFight = el.dataset.live === '1' ? 'live' : +el.dataset.uid;
     state.rowNodes.clear();
     if ($('rows')) $('rows').innerHTML = '';
     await loadFight(state.selectedFight);
@@ -481,7 +487,7 @@ function renderRows(snap) {
   const f = withPets(fightFor(snap));
   const host = $('rows');
   if (!f) { host.innerHTML = ''; state.rowNodes.clear(); return; }
-  const live = !!snap.current && f.id === snap.current.id;
+  const live = isLive(f);
   const seen = new Set();
 
   // Cabecera al pasar de los tuyos a los enemigos: sin ella parecen el mismo
@@ -938,7 +944,7 @@ function renderAdvice(snap) {
 
   const conflict = snap.classConflict && state.dismissedConflict !== JSON.stringify(snap.classConflict)
     ? snap.classConflict : null;
-  const sig = JSON.stringify([getLang(), f?.id, a?.incoming, a?.current,
+  const sig = JSON.stringify([getLang(), f.uid ?? 'live', a?.incoming, a?.current,
     a?.defence.map((d) => d.prevented), classes, conflict,
     live && [live.kind, live.bestKey, live.suggest]]);
   if (host.dataset.sig === sig) return;
@@ -997,9 +1003,12 @@ function renderAdvice(snap) {
     ${conflictBox}
     ${liveBox}
     ${a.incoming.total ? `
-      <div class="adv-verdict">${esc(a.verdict ?? '')}</div>
+      <div class="adv-verdict">${esc(a.lowSample
+        ? t('adv.lowSample', { n: a.incoming.hits })
+        : (a.verdict ?? ''))}</div>
       <div class="kv">
-        <span>${esc(t('adv.incoming'))} <b>${n0(a.incoming.total)}</b></span>
+        <span>${esc(t('adv.taken'))} <b>${n0(a.incoming.observed)}</b></span>
+        <span title="${esc(t('adv.rawNote', { n: a.incoming.hits }))}">${esc(t('adv.incoming'))} <b>${n0(a.incoming.total)}</b></span>
         <span>${esc(t('adv.split'))} <b>${kind}</b></span>
         <span>${esc(t('adv.melee'))} <b>${n0(a.incoming.melee)}</b></span>
         <span>${esc(t('adv.magic'))} <b>${n0(a.incoming.spell)}</b></span>
@@ -1072,8 +1081,8 @@ function renderHead(snap) {
       <p>${t('fight.noneHint')}</p></div>`;
     return;
   }
-  const live = !!snap.current && f.id === snap.current.id;
-  const sig = `${f.id}|${f.total}|${f.duration}|${live}|${f.series?.length ?? 0}`;
+  const live = isLive(f);
+  const sig = `${f.uid ?? 'live'}|${f.total}|${f.duration}|${live}|${f.series?.length ?? 0}`;
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
 

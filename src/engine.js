@@ -219,7 +219,19 @@ export class Engine extends EventEmitter {
       // Spirit que te cura se contaba como daño mágico recibido, y el consejo
       // te pedía Mage Hunter justo cuando más daño mágico estabas haciendo tú.
       if (ev.amount > 0 && DAMAGE_KINDS.has(ev.kind) && ev.target === (this.self ?? 'You')) {
-        this.recent.push({ t: ev.t, school: ev.school, raw: ev.rawAmount ?? ev.amount });
+        // Se guardan las dos cifras: `raw` es la reconstrucción sin postura, que
+        // es con lo que se comparan las posturas entre sí, y `amt` el daño que
+        // de verdad recibiste, que es con lo que se decide si vale la pena
+        // molestarte. Con Evasive las dos se separan por un factor de veinte.
+        this.recent.push({ t: ev.t, school: ev.school, raw: ev.rawAmount ?? ev.amount, amt: ev.amount });
+        const cut = ev.t - this.windowSec;
+        while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
+      }
+      // Los golpes que te FALLAN también entran en la ventana. Una postura que
+      // evade no reduce daño: quita golpes, así que se puntúa contando ataques,
+      // y sin los fallos no se sabe cuántos ataques hubo.
+      if (ev.kind === 'miss' && ev.target === (this.self ?? 'You')) {
+        this.recent.push({ t: ev.t, school: 'melee', raw: 0, amt: 0, miss: true });
         const cut = ev.t - this.windowSec;
         while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
       }
@@ -409,22 +421,33 @@ export class Engine extends EventEmitter {
       // Matar a un enemigo y perder a un tuyo son cosas distintas: si se
       // mezclan, una pelea donde caíste dos veces se titula "Campeon ×2".
       dead: Object.fromEntries(enc.deadAt ?? new Map()),
+      // Una muestra de vida por muerte, medida al caer cada uno.
+      hpSamples: Object.fromEntries(enc.hpSamples ?? new Map()),
+      // Daño real que no se puede adjudicar a nadie. Fuera de los totales.
+      unattributed: enc.unattributed ?? 0,
       loot: (enc.loot ?? []).slice(0, 200),
       spellVsFoe: [...(enc.spellVsFoe ?? new Map()).values()],
-      kills: enc.kills.filter((k) => k.victim !== me && !petSet.has(k.victim)).map((k) => k.victim),
+      // Abatido = uno del bando enemigo. Antes bastaba con «no eres tú ni tu
+      // mascota», y en cuanto empezaron a contarse las muertes de los
+      // compañeros de grupo, la caída de un aliado se apuntaba como una presa.
+      kills: enc.kills.filter((k) => foeSet.has(k.victim)).map((k) => k.victim),
       // Los totales del grupo son sólo de los tuyos; el enemigo va aparte.
       total: allyTotal,
       raidDps: allyTotal / t.duration,
       enemyTotal: foeTotal,
       enemyDps: foeTotal / t.duration,
-      losses: enc.kills.filter((k) => k.victim === me || petSet.has(k.victim)).map((k) => k.victim),
+      // Baja = de los vuestros: tú, tus mascotas o cualquier aliado que estaba
+      // en la pelea. Lo que no se puede clasificar no se cuenta como ninguna
+      // de las dos cosas antes que contarlo mal.
+      losses: enc.kills.filter((k) => k.victim === me || petSet.has(k.victim)
+        || (!foeSet.has(k.victim) && t.rows.some((r) => r.name === k.victim))).map((k) => k.victim),
       series: [...(enc.series ?? new Map()).values()].sort((a, b) => a.s - b.s),
       stanceSpans: (enc.stanceSpans ?? []).map((x, i, arr) => ({
         ...x, to: i === arr.length - 1 ? Math.max(x.to, enc.end - enc.start) : x.to,
       })),
       label: (() => {
         // Nombre de la pelea: el enemigo abatido, nunca los tuyos.
-        const foesDown = enc.kills.filter((k) => k.victim !== me && !petSet.has(k.victim));
+        const foesDown = enc.kills.filter((k) => foeSet.has(k.victim));
         if (foesDown.length) {
           const c = {};
           for (const k of foesDown) c[k.victim] = (c[k.victim] ?? 0) + 1;
@@ -526,10 +549,18 @@ export class Engine extends EventEmitter {
     const cut = now - this.windowSec;
     const win = this.recent.filter((r) => r.t >= cut);
     if (!win.length) return null;
-    let melee = 0, spell = 0;
-    for (const r of win) (r.school === 'melee' ? (melee += r.raw) : (spell += r.raw));
+    let melee = 0, spell = 0, observed = 0, hits = 0, landedMelee = 0, missedMelee = 0;
+    for (const r of win) {
+      if (r.miss) { missedMelee++; continue; }
+      hits++;
+      if (r.school === 'melee') { melee += r.raw; landedMelee++; } else spell += r.raw;
+      observed += r.amt ?? r.raw;
+    }
+    if (!hits) return null;
     const total = melee + spell;
-    const l = liveAdvice({ melee, spell, total, seconds: this.windowSec, hits: win.length },
+    const l = liveAdvice(
+      { melee, spell, total, observed, seconds: this.windowSec, hits,
+        landedMelee, meleeSwings: landedMelee + missedMelee },
       { classes: this.activeClasses, stance: this.parser?.stance });
     if (!l) return null;
 
@@ -600,15 +631,18 @@ export class Engine extends EventEmitter {
     if (!this.store) return [];
     return this.store.filter(q);
   }
-  getFight(id) { return this.store?.get(id) ?? null; }
+  /** @param {number} uid  byte de inicio del registro, no el `id` de la pelea. */
+  getFight(uid) { return this.store?.get(uid) ?? null; }
 
   /** Todas las peleas del tramo sumadas en un solo desglose. */
   aggregate(q = {}) {
     if (!this.store) return null;
     const list = this.store.filter({ ...q, limit: q.limit ?? 300 });
     const pets = [...new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? []), ...(q.myPets ?? [])])];
+    // Por `uid` y no por `id`: el `id` se repite entre sesiones, así que leer
+    // por él devolvía varias veces la misma pelea reciente y ninguna antigua.
     const full = list.map((sm) => {
-      const f = this.store.get(sm.id);
+      const f = this.store.get(sm.uid);
       // Las peleas guardadas antes de que existiera el bando se recalculan.
       return f ? ensureSides({ ...f, at: sm.at }, this.self, pets) : null;
     }).filter(Boolean);
@@ -635,6 +669,9 @@ export class Engine extends EventEmitter {
     const me = this.self ?? 'You';
     const pets = new Set(this.parser?.pets.keys() ?? []);
     if (ev.victim === me || pets.has(ev.victim)) return;      // los tuyos no
+    // Ni los compañeros de grupo: la tarjeta es el reparto de un enemigo que
+    // cae, no el de cualquiera que muera cerca.
+    if (this.foes.size && !this.foes.has(ev.victim)) return;
 
     const first = enc.targetFirst.get(ev.victim) ?? enc.start;
     const secs = Math.max(1, Math.round(ev.t - first) + 1);

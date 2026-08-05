@@ -3,6 +3,9 @@ import { STANCES, INVOCATIONS, availableFor, normStance, normInvocation, CLASS_N
 
 const pct = (v) => `${Math.round(v * 100)}%`;
 
+/** Impactos recibidos por debajo de los cuales no se dictamina nada. */
+const MIN_HITS_FOR_VERDICT = 8;
+
 /**
  * Analiza una pelea y recomienda postura e invocación.
  *
@@ -30,17 +33,52 @@ export function advise(row, ctx = {}) {
   }
   const incoming = melee + spell;
 
+  // ── Evasión: se mide contando golpes, no escalando daño ──
+  //
+  // Una postura que evita no reduce el golpe: lo quita entero. Así que lo que
+  // ahorraría no es una fracción del daño recibido, sino
+  //     golpes que te habrían entrado × daño medio por golpe.
+  //
+  // Los dos factores se miden en el log: los golpes que entraron traen su
+  // cuenta en `rawTakenByType`, y los que fallaron están en `defense`. De ahí
+  // sale también la tasa base a la que te entran los golpes sin postura, que es
+  // lo que permite comparar evadir con mitigar en la misma escala.
+  const meleeRaw = raw.find((t) => t.name === 'melee' || t.name === 'physical');
+  const landedMelee = meleeRaw?.n ?? 0;
+  const avoidedMelee = (row.defense ?? []).reduce((a, d) => a + (Array.isArray(d) ? d[1] : d.n ?? 0), 0);
+  const meleeSwings = landedMelee + avoidedMelee;
+  const avgMeleeHit = landedMelee ? melee / landedMelee : 0;
+  // Tasa a la que te entran los golpes AHORA. Sólo describe la tasa base si la
+  // postura activa no evade; si evade, esta cifra ya lleva su 95% dentro y no
+  // se puede separar sin un tramo fuera de esa postura.
+  const landRate = meleeSwings ? landedMelee / meleeSwings : 0;
+  const activeEvades = !!STANCES[normStance(ctx.stance)]?.evade?.melee;
+  // Con la postura activa evadiendo no hay forma de saber cuánto te entraría
+  // sin ella: el log no distingue un esquive de postura de una parada normal.
+  const unknownBase = activeEvades && landedMelee > 0;
+
   // ── Defensa: cuánto habría evitado cada postura ──────
   const defence = stances
-    .filter((s) => (s.mit.melee || s.mit.spell))
+    .filter((s) => (s.mit.melee || s.mit.spell || s.evade?.melee || s.evade?.spell))
     .map((s) => {
-      const prevented = melee * s.mit.melee + spell * s.mit.spell;
+      // Mitigar: una fracción de cada golpe que entra.
+      let prevented = melee * (s.mit.melee ?? 0) + spell * (s.mit.spell ?? 0);
+      let approx = false;
+      // Evadir: los golpes que dejarían de entrar, por su daño medio.
+      if (s.evade?.melee && meleeSwings > 0) {
+        // De los golpes que te entran ahora, cuántos seguirían entrando con
+        // esta postura: evade el 95% de TODOS los ataques, no sólo de los que
+        // habrían acertado.
+        const entrarian = meleeSwings * (1 - s.evade.melee);
+        prevented += Math.max(0, (landedMelee - entrarian) * avgMeleeHit);
+        approx = unknownBase;
+      }
       let endurance = 0, mana = 0;
       if (s.costModel === 'mitigated') endurance = prevented;
       else if (s.costModel === 'split') { endurance = prevented / 2; mana = prevented / 2; }
       else if (s.costModel === 'evaded2') endurance = prevented * 2;
       return {
-        key: s.key, label: s.label, prevented, endurance, mana,
+        key: s.key, label: s.label, prevented, endurance, mana, approx,
         share: incoming ? prevented / incoming : 0,
         perEndurance: endurance ? prevented / endurance : Infinity,
         noteKey: s.noteKey, costModel: s.costModel,
@@ -100,11 +138,25 @@ export function advise(row, ctx = {}) {
   }).sort((a, b) => b.score - a.score);
 
   // ── Resumen ──────────────────────────────────────────
+  //
+  // El daño entrante se reconstruye dividiendo cada golpe por lo que la postura
+  // activa mitigaba, así que la reconstrucción sólo vale lo que valga la muestra
+  // de golpes que la sostiene. Con Evasive al 95% el bruto sale de un puñado de
+  // impactos multiplicados por veinte: dos golpes bastaban para pintar una tabla
+  // de miles de puntos con aspecto de medición firme. Con muestra corta se
+  // enseña el reparto, pero no se dictamina.
+  const landed = (row.takenByType ?? []).reduce((a, x) => a + (x.n ?? 0), 0);
+  const lowSample = landed > 0 && landed < MIN_HITS_FOR_VERDICT;
+
   const best = defence[0];
   const current = normStance(ctx.stance);
   const cur = defence.find((d) => d.key === current);
   let verdict = null;
-  if (best && incoming > 0) {
+  // Con una postura de evasión activa no se dictamina: lo que ves en el log es
+  // el 5% de los ataques que se te colaron, y el log no distingue un esquive de
+  // postura de una parada normal, así que no hay forma de saber cuánto te
+  // entraría sin ella. Hace falta un tramo fuera de esa postura.
+  if (best && incoming > 0 && !lowSample && !unknownBase) {
     const gain = cur ? best.prevented - cur.prevented : best.prevented;
     if (cur && best.key === current) {
       verdict = t('adv.alreadyBest', { stance: best.label });
@@ -118,10 +170,18 @@ export function advise(row, ctx = {}) {
 
   return {
     classes, classNames: classes.map((c) => CLASS_NAMES[c] ?? c),
-    incoming: { melee, spell, total: incoming, meleeShare: incoming ? melee / incoming : 0 },
+    incoming: {
+      melee, spell, total: incoming, meleeShare: incoming ? melee / incoming : 0,
+      // Lo que recibiste de verdad, junto a la reconstrucción: sin las dos, el
+      // «daño entrante (bruto)» no se puede contrastar con nada.
+      observed: row.taken ?? 0, hits: landed,
+      // Golpes de melé: los que entraron, los que fallaron y a qué ritmo entran.
+      // Es lo que sostiene la puntuación de las posturas que evaden.
+      meleeSwings, landedMelee, avoidedMelee, landRate,
+    },
     defence, offence, invocations: invAdvice.slice(0, 4),
     current: { stance: ctx.stance ?? null, invocation: ctx.invocation ?? null },
-    verdict,
+    lowSample, unknownBase, verdict,
   };
 }
 
@@ -164,23 +224,43 @@ export { STANCES, INVOCATIONS };
  * un porcentaje enorme. Un cambio de postura cuesta 6 segundos de reutilización
  * y tu atención en mitad de la pelea, así que hace falta que el daño medido sea
  * de verdad y que la ganancia sea apreciable en valor absoluto.
+ *
+ * El mínimo va sobre el daño RECIBIDO, no sobre el reconstruido. Sobre el
+ * reconstruido, una postura de evasión al 95% multiplica la ventana por veinte
+ * y cruzaba el umbral con sesenta puntos de daño real: la guarda existía pero
+ * era veinte veces más floja justo para las clases que llevan Evasive.
+ *
+ * La ganancia sí es directamente comparable: es una diferencia entre daños
+ * recibidos —raw·(mit_mejor − mit_actual)— así que ya está en puntos reales.
  */
-const LIVE_MIN_RAW = 1200;   // daño bruto mínimo en la ventana
+const LIVE_MIN_TAKEN = 1200; // daño RECIBIDO mínimo en la ventana
 const LIVE_MIN_HITS = 5;     // golpes mínimos recibidos
 const LIVE_MIN_GAIN = 350;   // ganancia mínima en puntos, no sólo en porcentaje
 
 export function liveAdvice(win, ctx = {}) {
-  const { melee = 0, spell = 0, total = 0, seconds = 20, hits = 0 } = win;
+  const { melee = 0, spell = 0, total = 0, seconds = 20, hits = 0, observed = total,
+    landedMelee = 0, meleeSwings = 0 } = win;
   if (total <= 0) return null;
   const { stances } = availableFor(ctx.classes ?? []);
-  const usable = stances.filter((s) => s.mit.melee || s.mit.spell);
+  const usable = stances.filter((s) => s.mit.melee || s.mit.spell || s.evade?.melee || s.evade?.spell);
   if (!usable.length) return null;
 
-  const scored = usable.map((s) => ({
-    key: s.key, label: s.label,
-    prevented: melee * s.mit.melee + spell * s.mit.spell,
-    costModel: s.costModel,
-  })).sort((a, b) => b.prevented - a.prevented);
+  const avgMeleeHit = landedMelee ? melee / landedMelee : 0;
+  const scored = usable.map((s) => {
+    let prevented = melee * (s.mit.melee ?? 0) + spell * (s.mit.spell ?? 0);
+    // Evadir se cuenta en golpes, no en daño: ver el bloque equivalente de
+    // advise() para el porqué.
+    if (s.evade?.melee && meleeSwings > 0) {
+      const entrarian = meleeSwings * (1 - s.evade.melee);
+      prevented += Math.max(0, (landedMelee - entrarian) * avgMeleeHit);
+    }
+    return { key: s.key, label: s.label, prevented, costModel: s.costModel };
+  }).sort((a, b) => b.prevented - a.prevented);
+
+  // Con una postura de evasión puesta, lo que se ve es el 5% de los ataques que
+  // se colaron y no hay forma de saber cuánto entraría sin ella: se informa del
+  // reparto, pero no se sugiere cambiar.
+  const activeEvades = !!STANCES[normStance(ctx.stance)]?.evade?.melee;
 
   const best = scored[0];
   const cur = normStance(ctx.stance);
@@ -194,17 +274,20 @@ export function liveAdvice(win, ctx = {}) {
   const worth = total ? gain / total : 0;
 
   return {
-    melee, spell, total, seconds, meleeShare, kind,
-    dps: total / seconds,
+    melee, spell, total, observed, seconds, meleeShare, kind,
+    // El ritmo que se enseña es el que estás recibiendo de verdad, no el
+    // reconstruido: es lo que el jugador puede contrastar con su barra de vida.
+    dps: observed / seconds,
     best: best.label, bestKey: best.key,
     current: ctx.stance ?? null,
     alreadyBest: curScore?.key === best.key,
     gain, worth,
     hits,
     // Sin muestra suficiente se informa del reparto, pero no se sugiere nada.
-    enoughSample: total >= LIVE_MIN_RAW && hits >= LIVE_MIN_HITS,
-    suggest: !!curScore && curScore.key !== best.key
-      && total >= LIVE_MIN_RAW && hits >= LIVE_MIN_HITS
+    enoughSample: observed >= LIVE_MIN_TAKEN && hits >= LIVE_MIN_HITS,
+    unknownBase: activeEvades,
+    suggest: !!curScore && curScore.key !== best.key && !activeEvades
+      && observed >= LIVE_MIN_TAKEN && hits >= LIVE_MIN_HITS
       && worth >= 0.08 && gain >= LIVE_MIN_GAIN,
     scored,
     text: t('ov.brief', { kind: t(`adv.kind.${kind}`), stance: best.label,

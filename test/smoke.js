@@ -28,7 +28,9 @@ const L = [
 ];
 
 const parser = new Parser({ self: 'Miguel' });
-const tracker = new EncounterTracker({ idleSec: 20 });
+// Con `self`, como en producción. Sin él, el filtro de relevancia se desactiva
+// entero: esta prueba pasaba con las muertes rotas justo por eso.
+const tracker = new EncounterTracker({ self: 'Miguel', idleSec: 20 });
 const t = new LogTailer(F, { pollMs: 20 });
 let seq = 0;
 t.on('line', (l) => tracker.feed(parser.parse(l, seq++)));

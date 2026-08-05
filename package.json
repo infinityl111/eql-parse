@@ -7,8 +7,10 @@
   "scripts": {
     "start": "electron .",
     "calibrate": "node bin/calibrate.js",
+    "store:check": "node bin/store-check.js",
+    "store:rebuild": "node bin/store-rebuild.js",
     "live": "node bin/live.js",
-    "test": "node test/smoke.js",
+    "test": "node test/smoke.js && node test/store.js && node test/combat.js",
     "dist": "electron-builder --win --x64"
   },
   "build": {

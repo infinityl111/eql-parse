@@ -192,7 +192,9 @@ async function boot() {
   if (cfg.narrate) engine.setNarrate(cfg.narrate);
   engine.setLang(cfg.lang ?? 'es');
   if (cfg.logPath && fs.existsSync(cfg.logPath)) {
-    engine.attach(cfg.logPath, cfg).catch(() => {});
+    // Al arrancar se reanuda por donde iba; la relectura completa sólo ocurre
+    // si la pides a mano, o sola la primera vez (lo decide engine.attach).
+    engine.attach(cfg.logPath, { ...cfg, fromStart: false }).catch(() => {});
   }
 
   globalShortcut.register('Control+Alt+O', () => {
@@ -318,10 +320,14 @@ ipcMain.handle('log:browse', async () => {
 });
 
 ipcMain.handle('log:attach', async (_e, { logPath, self, fromStart, idleSec }) => {
-  cfg = { ...cfg, logPath, self: self || null, fromStart: !!fromStart, idleSec: idleSec ?? cfg.idleSec };
+  // `fromStart` es una ACCIÓN, no una preferencia, y por eso no se guarda.
+  // Guardándola, marcar una vez «leer el registro entero» hacía que cada
+  // arranque posterior releyera el log completo y volviera a añadir todas las
+  // peleas al almacén, multiplicando el histórico en cada apertura.
+  cfg = { ...cfg, logPath, self: self || null, fromStart: false, idleSec: idleSec ?? cfg.idleSec };
   saveConfig(cfg);
   try {
-    return await engine.attach(logPath, cfg);
+    return await engine.attach(logPath, { ...cfg, fromStart: !!fromStart });
   } catch (err) {
     return { status: 'error', error: err.message };
   }
@@ -330,7 +336,9 @@ ipcMain.handle('log:attach', async (_e, { logPath, self, fromStart, idleSec }) =
 ipcMain.handle('log:detach', () => { engine.detach(); return engine.describe(); });
 
 ipcMain.handle('history:query', (_e, q) => engine.queryHistory(q ?? {}));
-ipcMain.handle('history:fight', (_e, id) => engine.getFight(id));
+// `uid` (byte de inicio del registro), no el `id` de la pelea: el id se repite
+// entre sesiones y devolvía la pelea equivocada.
+ipcMain.handle('history:fight', (_e, uid) => engine.getFight(uid));
 ipcMain.handle('history:aggregate', (_e, q) => engine.aggregate(q ?? {}));
 ipcMain.handle('history:foes', (_e, sinceMs) => engine.foeList(sinceMs));
 ipcMain.handle('history:stats', () => engine.storeStats());

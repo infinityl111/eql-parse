@@ -55,8 +55,20 @@ export const STANCES = {
     costModel: 'split', classes: ['CLR','DRU','ENC','MAG','NEC','SHM','WIZ'],
     noteKey: 'sn.channeler',
   },
+  // Evasive NO mitiga: evita el golpe entero. El wiki de EQL es literal —
+  // «You have a 95% chance to evade all incoming attacks», «each point of
+  // damage evaded costs 2 endurance».
+  //
+  // La diferencia no es de matiz. Un golpe que aparece en el log estando en
+  // Evasive es uno que NO se evitó, y llegó sin mitigar: revertirlo dividiendo
+  // entre (1 - 0,95) le inventa veinte veces el daño que tuvo. Por eso el 0,95
+  // vive en `evade` y `mit` está a cero: `mitigationFor` sólo mira `mit`, así
+  // que ningún golpe recibido en Evasive se reconstruye.
+  //
+  // Lo que evita Evasive se mide contando golpes, no escalando daño: los
+  // esquivados aparecen en el log como fallos, y el advisor los usa.
   evasive: {
-    label: 'Evasive', mit: { melee: 0.95, spell: 0.00 }, evade: 0.95,
+    label: 'Evasive', mit: { melee: 0.00, spell: 0.00 }, evade: { melee: 0.95, spell: 0.00 },
     costModel: 'evaded2', classes: ['BRD','MNK','RNG','BST','ROG'],
     noteKey: 'sn.evasive',
   },
