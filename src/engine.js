@@ -889,7 +889,15 @@ export class Engine extends EventEmitter {
         }
         const foes = [...enc.targetTotals].filter(([n]) => n !== (this.self ?? 'You'));
         foes.sort((a, b) => b[1] - a[1]);
-        return foes.length ? foes[0][0] : null;
+        if (foes.length) return foes[0][0];
+        // Y si no llegaste a pegar a nadie, el que te pegó a ti.
+        //
+        // Sin esto se quedaban sin nombre y la lista las enseñaba como
+        // «escaramuza»: ocho en un almacén real, y ninguna era una escaramuza.
+        // Una donde un gigante de fuego y King Tranix te meten 4.310 puntos sin
+        // que devuelvas uno es una muerte o una huida, y es justo la que
+        // quieres poder encontrar. `foeRows` ya viene ordenada por daño.
+        return foeRows.find((r) => r.damage > 0)?.name ?? null;
       })(),
 
       resistsSuffered: enc.resistsSuffered,

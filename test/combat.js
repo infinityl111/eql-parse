@@ -259,5 +259,36 @@ console.log('\nuna mascota vieja deja de ser tuya al invocar otra');
   ok(t2.history.length === 1, 'y la tuya con tu mascota actual sí', `${t2.history.length}`);
 }
 
+// ── El nombre de una pelea en la que no llegaste a pegar ──────────────────
+console.log('\nnombre de la pelea');
+{
+  // Lo normal: manda el abatido.
+  const a = correr([
+    [0, 'You slash a gorgon for 500 points of damage.'],
+    [1, 'You have slain a gorgon!'],
+  ]);
+  ok(a.label === 'a gorgon', 'el enemigo abatido da nombre a la pelea', a.label);
+
+  // Si no cae ninguno, aquel al que más pegaste.
+  const b = correr([
+    [0, 'You slash a gorgon for 500 points of damage.'],
+    [1, 'You slash a rat for 10 points of damage.'],
+  ]);
+  ok(b.label === 'a gorgon', 'si no cae ninguno, al que más pegaste', b.label);
+
+  // Y si no pegaste a nadie, el que te pegó a ti. Antes se quedaba sin nombre
+  // y la lista la enseñaba como «escaramuza», que es lo que menos era.
+  const c = correr([
+    [0, 'a fire giant warrior hits Campeon for 3838 points of damage.'],
+    [1, 'King Tranix hits Campeon for 472 points of damage.'],
+    [2, 'You have been slain by a fire giant warrior!'],
+  ]);
+  ok(c.label === 'a fire giant warrior', 'quien más te pegó da nombre a la pelea', String(c.label));
+  ok(c.total === 0 && c.enemyTotal === 4310,
+    'sin inventarte daño tuyo por ponerle nombre', `${c.total} / ${c.enemyTotal}`);
+  ok(c.losses.length === 1 && c.kills.length === 0,
+    'y sigue contando como baja, no como abatido');
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);
