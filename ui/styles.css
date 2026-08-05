@@ -582,6 +582,43 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .migbar .mig-fix { color: var(--bone-faint); }
 .migbar .mig-btns { display: flex; gap: 8px; margin-top: 10px; }
 .migbar button[disabled] { opacity: .55; cursor: default; }
+
+/* ── Fichas por dificultad del expediente ────────────── */
+.difgrid { display: grid; gap: 10px; margin-top: 8px;
+           grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.difcard { background: var(--slate-850); border-left: 2px solid var(--t-fire); padding: 8px 11px; }
+.difcard-h { font-family: var(--display); font-size: 11px; letter-spacing: .08em;
+             text-transform: uppercase; color: var(--t-fire); margin-bottom: 5px; }
+.difcard-kv { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px;
+              color: var(--bone-faint); }
+.difcard-kv b { color: var(--bone); font-family: var(--mono); }
+.difcard-ab { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px 10px;
+              font-size: 10.5px; color: var(--bone-faint); }
+.difcard-ab b { color: var(--bone-dim); font-family: var(--mono); }
+
+/* ── Catálogo de hechizos ───────────────────────────── */
+.cat-head, .cat-row { display: grid; align-items: center; gap: 8px; padding: 4px 0;
+  grid-template-columns: minmax(150px,2fr) 84px 54px 64px 92px 84px 58px 72px; }
+.cat-head { border-bottom: 1px solid var(--slate-700); margin-top: 14px;
+            font-family: var(--display); font-size: 9.5px; letter-spacing: .1em;
+            text-transform: uppercase; color: var(--bone-faint); }
+.cat-head .r, .cat-row .num { text-align: right; }
+.cat-row { border-bottom: 1px solid rgba(36,44,58,.45); font-size: 12px; }
+.cat-row:hover { background: rgba(255,255,255,.03); }
+.cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Marca de que algo se ha usado poco: no es un dato firme, y se ve que no lo es. */
+.est { font-style: italic; color: var(--bone-faint); cursor: help; }
+/* Y por debajo del mínimo, ni número: el hueco explica qué falta. */
+.gap { color: var(--bone-faint); cursor: help; border-bottom: 1px dotted var(--bone-faint); }
+.tagx { font-size: 10px; color: var(--t-poison); cursor: help; }
+
+/* ── Mejores marcas, agrupadas por nivel ─────────────── */
+.marks { margin-top: 10px; }
+.marks-h { display: flex; align-items: baseline; gap: 12px; padding: 4px 0;
+           border-bottom: 1px solid var(--slate-700); }
+.marks-h span:first-child { font-family: var(--display); font-size: 11px;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--t-cold); }
+.marks-h .num { margin-left: auto; font-family: var(--mono); font-size: 11.5px; }
 .chk.mini { display: inline-flex; align-items: center; gap: 5px; margin-left: 12px;
             font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
             color: var(--bone-faint); cursor: pointer; }

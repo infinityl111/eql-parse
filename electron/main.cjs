@@ -350,6 +350,8 @@ ipcMain.handle('history:fight', (_e, uid) => engine.getFight(uid));
 ipcMain.handle('history:aggregate', (_e, q) => engine.aggregate(q ?? {}));
 ipcMain.handle('history:foes', (_e, sinceMs) => engine.foeList(sinceMs));
 ipcMain.handle('history:stats', () => engine.storeStats());
+// Catalogo de hechizos construido desde el historico, con los cooldowns medidos.
+ipcMain.handle('catalog:spells', (_e, q) => engine.spellCatalog(q ?? {}));
 
 ipcMain.handle('session:reset', () => engine.resetSession());
 

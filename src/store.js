@@ -60,8 +60,14 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  *   2               `You have been knocked unconscious!` se contaba como una
  *                   muerte además de la línea de muerte real que siempre la
  *                   sigue: cada muerte tuya valía por dos.
+ *   3               Los avisos de subárea («has entrado en un sitio donde no
+ *                   funciona la levitación») se guardaban como zona y
+ *                   machacaban la real, y con ella la dificultad de la
+ *                   instancia. El 23% de las peleas de un log real tenía la
+ *                   zona destruida. Además la dificultad pasa a ser un campo
+ *                   propio, que es lo que permite separar el expediente.
  */
-export const STORE_VERSION = 2;
+export const STORE_VERSION = 3;
 const META = 'store.json';
 
 /** Generación de un almacén ya marcado. Lo que no sea un número es anterior. */
@@ -121,6 +127,11 @@ export class FightStore {
       // `uid` identifica; `id` sólo se conserva para mostrarlo y exportarlo.
       uid: off, id: f.id, at, off, len,
       label: f.label, zone: f.zone,
+      // La dificultad va también en el índice: el filtro y el expediente la
+      // necesitan sin abrir cada pelea del disco.
+      zoneBase: f.zoneBase ?? null, diff: f.diff ?? null, diffTag: f.diffTag ?? null,
+      // El nivel también: emparejar las mejores marcas sin él no significa nada.
+      level: f.level ?? null,
       duration: f.duration, total: f.total, raidDps: f.raidDps,
       enemyTotal: f.enemyTotal, enemyDps: f.enemyDps,
       healing: f.healing, kills: f.kills, losses: f.losses,

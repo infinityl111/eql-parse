@@ -12,6 +12,9 @@ import { setLang } from './i18n.js';
 import { FightStore } from './store.js';
 import { aggregate, mergePets, ensureSides } from './aggregate.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
+import { parseZone } from './zones.js';
+import { catalog } from './catalog.js';
+import { baseSpell } from './spells.js';
 
 /**
  * Dónde buscar el log.
@@ -106,6 +109,10 @@ export class Engine extends EventEmitter {
     // DPS con sentido: por enemigo abatido, desde el primer golpe hasta que cae.
     this.killAgg = new Map();   // nombre -> {damage, seconds, kills}
     this.recentHits = [];       // {t, name, amount} de los últimos 20 s
+    // Cooldowns medidos y usos, acumulados al leer. El aviso de reutilización
+    // es una línea suelta que no pertenece a ninguna pelea, así que si no se
+    // anota al pasar se pierde.
+    this.cooldowns = new Map();
     this.knownPets = new Set();  // todas las vistas alguna vez, entre sesiones
     this.petsSaved = 0;
     this.notMine = new Set();    // aliados que ya dijiste que no son tuyos
@@ -188,6 +195,7 @@ export class Engine extends EventEmitter {
       }
       if (ev.kind === 'stance' && ev.stance) this.seenStances.add(ev.stance);
       if (ev.kind === 'invocation' && ev.invocation) this.seenInvocations.add(ev.invocation);
+      this.#cooldown(ev);
       // El /who de tu propio personaje es la única fuente que no admite dudas.
       if (ev.kind === 'who' && ev.who === (this.self ?? 'You') && ev.classes?.length) {
         const changed = this.whoClasses && this.whoClasses.join() !== ev.classes.join();
@@ -201,8 +209,12 @@ export class Engine extends EventEmitter {
           this.seenInvocations.clear();
         }
         this.classConflict = null;
+        this.#markLevel(ev.level, ev.classes);
       }
-      if (ev.kind === 'class_change') this.classConflict = { reason: 'message', raw: ev.raw };
+      // La subida de nivel es una afirmación absoluta y gratis, y en EQL el
+      // nivel baja al cambiar una clase por otra más baja: es la otra mitad de
+      // la línea de tiempo, junto al /who.
+      if (ev.kind === 'levelup' && ev.level) this.#markLevel(ev.level, null);
       if (ev.kind === 'stance' && ev.stance) this.#checkConflict('stance', ev.stance);
       if (ev.kind === 'invocation' && ev.invocation) this.#checkConflict('invocation', ev.invocation);
       // Golpes recientes de todo el mundo, para el DPS de los últimos segundos.
@@ -347,6 +359,58 @@ export class Engine extends EventEmitter {
     };
   }
 
+  /**
+   * Un hito de la línea de tiempo del nivel.
+   *
+   * Dos fuentes: el /who, que trae nivel y clases, y la subida de nivel, que
+   * trae sólo el nivel. Cada pelea se queda con lo que hubiera cuando se abrió;
+   * las anteriores al primer hito se quedan sin nivel, y eso se dice.
+   */
+  #markLevel(level, classes) {
+    if (level) this.level = level;
+    if (classes?.length) this.whoClasses = classes;
+    for (const tr of [this.tracker, this.session]) {
+      if (!tr) continue;
+      if (level) tr.level = level;
+      if (classes?.length) tr.classes = classes;
+    }
+  }
+
+  /**
+   * Cooldowns y usos, anotados al vuelo.
+   *
+   * El aviso da el tiempo que FALTA, no el cooldown entero, así que el máximo
+   * observado es una cota inferior. Y el aviso nombra la habilidad sin rango
+   * («Harm Touch») mientras que el daño la nombra con él («Harm Touch X»): sin
+   * quitar el numeral, los usos no se cruzan con el cooldown y el
+   * aprovechamiento sale a cero.
+   */
+  #cooldown(ev) {
+    if (ev.kind === 'ability_cd' && ev.ability) {
+      const base = baseSpell(ev.ability);
+      const t = String(ev.left ?? '');
+      const h = /(\d+)\s*hour/.exec(t), m = /(\d+)\s*minute/.exec(t), s = /(\d+)\s*second/.exec(t);
+      const secs = (h ? +h[1] * 3600 : 0) + (m ? +m[1] * 60 : 0) + (s ? +s[1] : 0);
+      const e = this.cooldowns.get(base) ?? { name: base, seconds: 0, attempts: 0, uses: 0 };
+      e.attempts++;
+      if (secs > e.seconds) e.seconds = secs;
+      this.cooldowns.set(base, e);
+    } else if ((ev.kind === 'cast' || ev.kind === 'spell' || ev.kind === 'dot')
+        && ev.ability && ev.source === (this.self ?? 'You')) {
+      const base = baseSpell(ev.ability);
+      const e = this.cooldowns.get(base) ?? { name: base, seconds: 0, attempts: 0, uses: 0 };
+      e.uses++;
+      this.cooldowns.set(base, e);
+    } else return;
+    for (const e of this.cooldowns.values()) {
+      e.source = e.attempts >= 3 ? 'medido' : e.attempts ? 'una sola muestra' : null;
+      // Sin rastro de uso no hay aprovechamiento que calcular, y eso NO es un
+      // cero: Companion's Fury avisa 283 veces de que no está lista y no deja
+      // ni una línea al usarse. Decir «no se puede saber» es la respuesta.
+      e.countable = e.uses > 0;
+    }
+  }
+
   /** Cierra peleas por inactividad y avanza los temporizadores. */
   tick() {
     this.tracker?.tick(Date.now() / 1000);
@@ -413,9 +477,18 @@ export class Engine extends EventEmitter {
     const foeRows = t.rows.filter((r) => foeSet.has(r.name));
     const allyTotal = allyRows.reduce((a, r) => a + r.damage, 0);
     const foeTotal = foeRows.reduce((a, r) => a + r.damage, 0);
+    // La zona se descompone al guardar y no al leer: la dificultad cambia de
+    // verdad lo que es un enemigo, así que tiene que ser un campo de la pelea y
+    // no un trozo de texto dentro del nombre.
+    const z = parseZone(enc.zone);
     return {
       id: enc.id,
       zone: enc.zone,
+      zoneBase: z.base, zoneMode: z.mode, diff: z.diff, diffTag: z.tag,
+      // Nivel y clases de ESTA pelea. `null` significa que no se sabe, y se
+      // enseña como tal: no se hereda del hito siguiente ni del actual.
+      level: enc.level ?? null,
+      classesAt: enc.classes ?? null,
       duration: t.duration,
       healing: t.healing,
       // Matar a un enemigo y perder a un tuyo son cosas distintas: si se
@@ -653,6 +726,63 @@ export class Engine extends EventEmitter {
       q.mergePets ? full.map((f) => ({ ...f, rows: mergePets(f.rows, q.petLabel, known, this.self, q.notPets ?? []) })) : full,
       this.self);
   }
+  /**
+   * Catálogo de tus hechizos desde el histórico, con los cooldowns medidos.
+   *
+   * Los cooldowns se acumulan en vivo según pasan los avisos: el histórico
+   * guarda peleas, no líneas sueltas, así que la única forma de tenerlos es ir
+   * anotándolos al leer.
+   */
+  spellCatalog(q = {}) {
+    if (!this.store) return { spells: [], cooldowns: [] };
+    const list = this.store.filter({ ...q, limit: q.limit ?? 300 });
+    const full = list.map((sm) => {
+      const f = this.store.get(sm.uid);
+      return f ? { ...f, uid: sm.uid, at: sm.at } : null;
+    }).filter(Boolean);
+    return {
+      spells: catalog(full, this.self, this.cooldowns),
+      cooldowns: [...this.cooldowns.values()].sort((a, b) => b.attempts - a.attempts),
+      marks: this.#marks(full),
+      fights: full.length,
+    };
+  }
+
+  /**
+   * Tus mejores marcas, agrupadas por nivel.
+   *
+   * Sin agrupar no dicen nada: medido en un log real, la mediana de dps cae de
+   * 127 a 44 al bajar de nivel 50 a 25. Compararte hoy contra el récord de
+   * cuando ibas a 50 sólo informa de que ya no vas a 50.
+   *
+   * Las peleas sin nivel conocido van en su propio grupo y se dice que lo es.
+   */
+  #marks(fights) {
+    const me = this.self ?? 'You';
+    const grupos = new Map();
+    for (const f of fights) {
+      if ((f.duration ?? 0) < 30) continue;
+      const row = (f.rows ?? []).find((r) => r.name === me);
+      if (!row || !(row.damage > 0)) continue;
+      const k = f.level ?? 'sin nivel';
+      if (!grupos.has(k)) grupos.set(k, []);
+      grupos.get(k).push({
+        dps: row.dps, damage: row.damage, duration: f.duration,
+        label: f.label, zone: f.zone, diff: f.diff ?? null, diffTag: f.diffTag ?? null,
+        at: f.at ?? null, uid: f.uid ?? null,
+      });
+    }
+    return [...grupos].map(([level, list]) => {
+      list.sort((a, b) => b.dps - a.dps);
+      const med = list[Math.floor(list.length / 2)]?.dps ?? 0;
+      return {
+        level: level === 'sin nivel' ? null : level,
+        fights: list.length, best: list[0]?.dps ?? 0, median: med,
+        top: list.slice(0, 5),
+      };
+    }).sort((a, b) => (b.level ?? -1) - (a.level ?? -1));
+  }
+
   foeList(sinceMs) { return this.store?.foeList(sinceMs) ?? []; }
   storeStats() { return this.store?.stats() ?? null; }
 

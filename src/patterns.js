@@ -220,19 +220,48 @@ const rules = [
   { kind: 'ability_cd', hint: 'again in', re: /^You can use the ability (.+?) again in (.+?)\.$/, map: (m) => ({ ability: m[1], left: m[2] }) },
 
   // ═══ CONTEXTO ═══
-  // Mensaje de cambio de clase. El texto exacto de EQL está sin verificar:
-  // si no casa, el detector de contradicción lo pilla igual por las posturas.
-  {
-    kind: 'class_change', hint: 'class', unverified: true,
-    re: /^You (?:are now|have become|now serve) (?:an? )?(.+?)(?: class)?\.$/,
-    map: (m) => ({ raw: m[1] }),
-  },
+  //
+  // Aquí había una regla `class_change` marcada como no verificada, esperando
+  // un mensaje de cambio de clase. No existe: en 63.000 líneas de log real,
+  // con un cambio de clase dentro, no casó ni una vez. Marcarla como no
+  // verificada no bastaba — una regla que nunca casa da falsa sensación de
+  // cobertura, y de paso su expresión regular habría casado con «You are now
+  // A.F.K.» de no ser porque el `hint` la salvaba por casualidad.
+  //
+  // Lo que sí deja huella es esto: al cambiar de clase se compra y se escribe
+  // el libro de hechizos entero de la clase nueva, 22 seguidos en 80 segundos.
+  // Se guarda como dato. NO se infiere de aquí ningún cambio de clase: una
+  // ráfaga de escrituras lo sugiere, no lo declara, y llega tarde de todas
+  // formas. Quien declara las clases es el /who.
+  { kind: 'scribe', hint: 'finished scribing', re: /^You have finished scribing (.+?)\.$/, map: (m) => ({ ability: m[1] }) },
+
+  // El nivel, dicho en absoluto y gratis. En EQL el nivel efectivo es el de la
+  // clase más baja del trío, así que cambiar una clase por otra más baja te
+  // baja el nivel entero: es una variable de la pelea, no del personaje.
+  { kind: 'levelup', hint: 'Welcome to level', re: /^You have gained a level! Welcome to level (\d+)!$/, map: (m) => ({ level: +m[1] }) },
   // "[50 SHD/DRU/MAG] Campeon (Erudite)" — la fuente fiable de tus clases.
+  // El prefijo opcional es para las líneas de quien está ausente, que llegan
+  // como " AFK [35 WAR/SHM/NEC] Thalix": anclando en `^\[` se perdían 6 de las
+  // 57 del log, y con ellas sus clases.
   {
     kind: 'who', hint: '] ',
-    re: /^\[(\d+) ([A-Za-z]{2,4})(?:\/([A-Za-z]{2,4}))?(?:\/([A-Za-z]{2,4}))?\] (\S+)/,
-    map: (m) => ({ level: +m[1], classes: [m[2], m[3], m[4]].filter(Boolean).map((x) => x.toUpperCase()), who: m[5] }),
+    re: /^\s*(?:AFK\s+)?\[(\d+) ([A-Za-z]{2,4})(?:\/([A-Za-z]{2,4}))?(?:\/([A-Za-z]{2,4}))?\] (\S+)(?:\s+\(([^)]+)\))?(?:\s+<([^>]+)>)?/,
+    map: (m) => ({
+      level: +m[1], classes: [m[2], m[3], m[4]].filter(Boolean).map((x) => x.toUpperCase()),
+      who: m[5], race: m[6] ?? null, guild: m[7] ?? null,
+    }),
   },
+  // Zona y subárea comparten mensaje, y distinguirlas importa: el 23% de las
+  // peleas de un log real tenían como zona «an area where levitation effects do
+  // not function», que es un aviso de subárea DENTRO del Plano del Cielo y
+  // machacaba la zona de verdad, llevándose con ella la dificultad.
+  //
+  // Se distinguen por la mayúscula: los nombres de zona son nombres propios
+  // —«The Plane of Sky», «Nagafen's Lair»— y el aviso de subárea es una frase.
+  // En las 15 zonas distintas del log de calibración, la única en minúscula es
+  // la subárea. Si algún día aparece una subárea capitalizada, se colará: por
+  // eso la zona se conserva y sólo se ignora el cambio, que es el daño menor.
+  { kind: 'subarea', hint: 'have entered', re: /^You have entered ([a-z].*?)\.$/, map: (m) => ({ area: m[1] }) },
   { kind: 'zone', hint: 'have entered', re: /^You have entered (.+?)\.$/, map: (m) => ({ zone: m[1] }) },
   { kind: 'xp', hint: 'experience', re: /^You gain (?:party |raid )?experience/, map: () => ({}) },
   { kind: 'skillup', hint: 'become better at', re: /^You have become better at (.+?)! \((\d+)\)$/, map: (m) => ({ skill: m[1], value: +m[2] }) },

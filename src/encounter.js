@@ -136,9 +136,20 @@ class Combatant {
 }
 
 export class Encounter {
-  constructor(id, startT, zone) {
+  constructor(id, startT, zone, ctx = {}) {
     this.id = id;
     this.zone = zone;
+    // Nivel y clases EN ESTA PELEA, no los de ahora. En EQL el nivel efectivo
+    // es el de la clase más baja del trío, así que meter una clase baja te
+    // baja el nivel entero: medido en un log real, la mediana de dps cayó de
+    // 127 a 44 al pasar de nivel 50 a 25. Comparar peleas de los dos periodos
+    // sin distinguirlos no informa de nada.
+    //
+    // Si no se sabe, se queda en null y se dice. No se hereda hacia atrás: las
+    // peleas anteriores al primer /who no tienen nivel conocido, y fingir que
+    // sí sería justo lo que este programa no hace.
+    this.level = ctx.level ?? null;
+    this.classes = ctx.classes ?? null;
     this.start = startT;
     this.end = startT;
     this.combatants = new Map();
@@ -255,11 +266,21 @@ export class EncounterTracker extends EventEmitter {
     this.history = [];
     this.nextId = 1;
     this.zone = null;
+    // Los pone el motor según van llegando los hitos: /who y subidas de nivel.
+    // Cada pelea se queda con los que hubiera al abrirse.
+    this.level = null;
+    this.classes = null;
   }
 
   feed(ev) {
     if (!ev) return;
     if (ev.kind === 'zone') { this.zone = ev.zone; this.#close(); return; }
+    // Una subárea NO es un cambio de zona: «You have entered an area where
+    // levitation effects do not function» pasa dentro del Plano del Cielo y,
+    // tratándola como zona, se llevaba por delante la zona real y su
+    // dificultad. Se anota por si sirve, pero no cierra la pelea ni sustituye
+    // nada.
+    if (ev.kind === 'subarea') { this.subarea = ev.area; return; }
 
     // Señales que alimentan el consejo de invocación. No abren pelea por sí solas.
     if (this.current) {
@@ -327,7 +348,8 @@ export class EncounterTracker extends EventEmitter {
       // contar, y la de un desconocido a diez metros no es asunto tuyo.
       if (ev.kind === 'death') return;
       if (mine.size && !mine.has(ev.source) && !mine.has(ev.target)) return;
-      this.current = new Encounter(this.nextId++, ev.t, this.zone);
+      this.current = new Encounter(this.nextId++, ev.t, this.zone,
+        { level: this.level ?? null, classes: this.classes ?? null });
       this.emit('open', this.current);
     }
 

@@ -325,7 +325,8 @@ function renderFightList(snap) {
       ${state.foes.map((f) => `<option value="${esc(f.name)}">${f.n}</option>`).join('')}
     </datalist>
   </div>
-  <button class="sumbtn" id="btnSummary">${esc(t('sum.open'))}</button>`);
+  <button class="sumbtn" id="btnSummary">${esc(t('sum.open'))}</button>
+  <button class="sumbtn" id="btnCatalog">${esc(t('cat.open'))}</button>`);
 
   const shown = state.showAll ? state.fights : state.fights.filter((f) => !TRIVIAL(f));
   const hidden = state.fights.length - shown.length;
@@ -372,6 +373,13 @@ function renderFightList(snap) {
     if (state.filter.foe === e.target.value) return;
     state.filter.foe = e.target.value;
     refreshFights();
+  });
+  $('btnCatalog')?.addEventListener('click', async () => {
+    const r = RANGES.find((x) => x.key === state.filter.range);
+    state.catalog = await window.eql.spellCatalog?.({ sinceMs: r?.ms ?? null }) ?? null;
+    state.view = 'catalog';
+    $('bodyGrid').innerHTML = '';
+    renderApp();
   });
   $('btnSummary')?.addEventListener('click', async () => {
     const r = RANGES.find((x) => x.key === state.filter.range);
@@ -1099,7 +1107,10 @@ function renderHead(snap) {
     <div class="head-top">
       <div>
         <div class="head-title">${esc(f.label ?? t('fight.skirmish'))}</div>
-        <div class="eyebrow">${live ? t('fight.live') : t('fight.closed')} · ${esc(f.zone ?? t('fight.unknownZone'))}</div>
+        <div class="eyebrow">${live ? t('fight.live') : t('fight.closed')} · ${esc(f.zone ?? t('fight.unknownZone'))}${
+          f.diff !== null && f.diff !== undefined ? ` · D${f.diff}${f.diffTag ? ' ' + esc(f.diffTag) : ''}` : ''}
+          · ${f.level ? esc(t('lvl.level', { n: f.level }))
+            : `<span class="gap" title="${esc(t('lvl.unknownNote'))}">${esc(t('lvl.unknown'))}</span>`}</div>
       </div>
       <div class="head-actions">
         ${!live ? `<button class="primary" id="btnAnalyse">${t('an.button')}</button>
@@ -1335,6 +1346,39 @@ function renderSummary() {
  * Expediente completo de un enemigo, cuando lo has elegido en el filtro.
  * Junta lo medido en tus peleas con lo que cuenta la wiki.
  */
+/**
+ * Fichas por dificultad.
+ *
+ * Sólo aparecen si de verdad has peleado con ese bicho en más de una: si no,
+ * repetirían la cabecera. Y llevan lo que cambia —vida, golpe máximo,
+ * habilidades— y no las resistencias, que se han medido y apenas se distinguen.
+ */
+function diffBlocks(f) {
+  const ds = (f.dificultades ?? []).filter((d) => d.fights > 0);
+  if (ds.length < 2) return '';
+  const nombre = (d) => (d.diff === null ? t('foe.noDiff') : `D${d.diff}${d.tag ? ' ' + d.tag : ''}`);
+  return `<div class="dos-block">
+    <div class="eyebrow">${esc(t('foe.byDiff'))} · ${esc(t('foe.measured'))}</div>
+    <div class="hint">${esc(t('foe.diffNote'))}</div>
+    <div class="difgrid">
+      ${ds.map((d) => `<div class="difcard">
+        <div class="difcard-h">${esc(nombre(d))}</div>
+        <div class="difcard-kv">
+          <span><b>${d.fights}</b> ${esc(t('sum.fights', { n: d.fights }))}</span>
+          ${d.kills ? `<span><b>${d.kills}</b> ${esc(t('metric.kills', { n: d.kills }))}</span>` : ''}
+          ${d.hp ? `<span>${esc(t('foe.hp'))} <b>${n0(d.hp.avg)}</b>${
+            d.hp.n > 1 ? ` <span class="dim">${n0(d.hp.min)}–${n0(d.hp.max)}</span>` : ''}</span>`
+            : `<span class="dim">${esc(t('foe.hp'))} —</span>`}
+          <span>${esc(t('foe.maxHit'))} <b>${n0(d.maxHit)}</b></span>
+          <span>${esc(t('foe.dealtYou'))} <b>${n0(d.taken)}</b></span>
+        </div>
+        <div class="difcard-ab">${(d.abilities ?? []).slice(0, 6).map((x) =>
+          `<span><i class="seg ${typeClass(x.type)}"></i>${esc(x.name)} <b>${n0(x.sum)}</b></span>`).join('')}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
 function foeDossier(a) {
   const f = a.foes.find((x) => x.name.toLowerCase().includes(state.filter.foe.toLowerCase()))
     ?? a.foes[0];
@@ -1362,7 +1406,14 @@ function foeDossier(a) {
     ${f.hp ? `<div class="hint">${esc(t('foe.hpNote'))} ${esc(t('foe.hpFrom', { n: f.hp.n }))}: ${
       n0(f.hp.min)} – ${n0(f.hp.max)}</div>` : ''}
 
+    ${diffBlocks(f)}
+
     ${spells.length ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.weak'))} · ${esc(t('foe.measured'))}</div>
+      ${(f.dificultades ?? []).length > 1 ? `<div class="hint">${esc(t('foe.resistNote'))}</div>` : ''}
+      ${(f.levels ?? []).length > 1 || (f.levels ?? []).length && f.someWithoutLevel
+        ? `<div class="hint">${esc(t('lvl.mixed', {
+            levels: [...(f.levels ?? []), ...(f.someWithoutLevel ? [t('lvl.unknown')] : [])].join(', ') }))}</div>`
+        : ''}
       ${spells.map((x) => `<div class="foe-det-l">
         <span>${esc(x.spell)}</span>
         <b class="${x.rate >= 0.6 ? 'bad' : x.rate <= 0.2 ? 'good' : ''}">${Math.round((1 - x.rate) * 100)}%</b>
@@ -1449,6 +1500,105 @@ function sumRowDetail(r) {
   </div>`;
 }
 
+// ═══════════ Catálogo de hechizos ═══════════
+/**
+ * Marcas de fiabilidad, las tres que acordamos:
+ *   medido     sale de tus peleas
+ *   consultado sale de la wiki  (va en su propio bloque, nunca en la misma tabla)
+ *   estimado   sale de tus peleas pero con poca muestra: cursiva, tilde y de
+ *              dónde sale al pasar el ratón
+ * Y por debajo del mínimo no se enseña el número: se explica qué falta. Un
+ * hueco explicado informa; un número con un 65% de error desinforma.
+ */
+const MIN_USOS = 8;
+const est = (valor, desde) =>
+  `<i class="est" title="${esc(desde)}">~${valor}</i>`;
+const hueco = (need, have) =>
+  `<span class="gap" title="${esc(t('est.needMore', { need, have }))}">—</span>`;
+
+function renderCatalog() {
+  const c = state.catalog;
+  const host = $('bodyGrid');
+  if (!c) { host.innerHTML = `<div class="empty"><h2>${esc(t('cat.title'))}</h2>
+    <button id="catBack">${esc(t('sum.back'))}</button></div>`;
+    $('catBack').addEventListener('click', () => { state.view = 'combat'; host.innerHTML = ''; renderApp(); });
+    return; }
+
+  // Sólo se enseña «efectivo» si aporta algo: mientras todo entre al 100% es
+  // una columna que repite a la de al lado.
+  const hayResistencias = c.spells.some((s) => s.landRate !== null && s.landRate < 0.995);
+
+  const fila = (s) => {
+    const pocos = s.uses < MIN_USOS;
+    const desde = t('est.from', { fights: s.fights, secs: s.uses });
+    const medio = pocos ? est(n0(s.avg), desde) : `<b>${n0(s.avg)}</b>`;
+    return `<div class="cat-row">
+      <span class="cat-name">${esc(s.name)}${s.unresistable
+        ? ` <span class="tagx" title="${esc(t('cat.unresistable'))}">∅</span>` : ''}</span>
+      <span><i class="seg ${typeClass(s.types[0])}"></i>${esc(s.types[0] ?? '—')}</span>
+      <span class="num">${n0(s.uses)}</span>
+      <span class="num">${medio}</span>
+      <span class="num dim">${n0(s.min)}–${n0(s.max)}</span>
+      <span class="num">${s.crits ? `${s.crits} · ${pct(s.critRate)}` : '—'}</span>
+      <span class="num">${s.landRate === null ? '—'
+        : (s.landed + s.resisted) < 4 ? hueco(4, s.landed + s.resisted)
+          : `${Math.round(s.landRate * 100)}%`}</span>
+      ${hayResistencias ? `<span class="num">${s.effective === null ? '—' : n0(s.effective)}</span>` : ''}
+      <span class="num dim">${s.cooldown ? secs(s.cooldown) : '—'}</span>
+    </div>`;
+  };
+
+  const cds = (c.cooldowns ?? []).filter((x) => x.seconds > 0);
+  host.innerHTML = `<div class="summary" id="catRoot">
+    <div class="sum-head">
+      <h2>${esc(t('cat.title'))}</h2>
+      <button id="catBack">${esc(t('sum.back'))}</button>
+    </div>
+    <div class="hint">${esc(t('cat.note'))}</div>
+
+    <div class="cat-head">
+      <span>${esc(t('cat.spell'))}</span><span>${esc(t('cat.type'))}</span>
+      <span class="r">${esc(t('cat.uses'))}</span><span class="r">${esc(t('cat.avg'))}</span>
+      <span class="r">${esc(t('cat.range'))}</span><span class="r">${esc(t('cat.crit'))}</span>
+      <span class="r">${esc(t('cat.lands'))}</span>
+      ${hayResistencias ? `<span class="r">${esc(t('det.dmg'))}</span>` : ''}
+      <span class="r">${esc(t('cat.cooldown'))}</span>
+    </div>
+    ${c.spells.map(fila).join('')}
+
+    ${(c.marks ?? []).length ? `
+      <div class="sec-title eyebrow" style="margin-top:22px">${esc(t('marks.title'))}</div>
+      <div class="hint">${esc(t('marks.note'))}</div>
+      ${c.marks.map((g) => `<div class="marks">
+        <div class="marks-h">
+          <span>${g.level === null ? esc(t('lvl.unknown')) : esc(t('lvl.level', { n: g.level }))}</span>
+          <span class="dim">${g.fights} ${esc(t('sum.fights', { n: g.fights }))}</span>
+          <span class="num">${esc(t('marks.best'))} <b>${n0(g.best)}</b> dps</span>
+          <span class="num dim">${esc(t('marks.median'))} ${n0(g.median)}</span>
+        </div>
+        ${g.level === null ? `<div class="hint">${esc(t('lvl.unknownNote'))}</div>` : ''}
+        ${g.top.map((x) => `<div class="foe-det-l">
+          <b>${n0(x.dps)}</b>
+          <span class="dim">${secs(x.duration)}</span>
+          <span>${esc(x.label ?? t('fight.skirmish'))}</span>
+          <span class="dim">${esc(x.zone ?? '')}${x.diff !== null ? ` · D${x.diff}` : ''}</span>
+        </div>`).join('')}
+      </div>`).join('')}` : ''}
+
+    ${cds.length ? `<div class="sec-title eyebrow" style="margin-top:22px">${esc(t('cat.cdTitle'))}</div>
+      <div class="hint">${esc(t('cat.cdNote'))}</div>
+      ${cds.map((x) => `<div class="foe-det-l">
+        <span>${esc(x.name)}</span>
+        <b>${secs(x.seconds)}</b>
+        <span class="dim">${x.attempts} ${esc(t('cat.cdAttempts'))}${
+          x.source === 'una sola muestra' ? ` · ${esc(t('cat.oneSample'))}` : ''}</span>
+        <span class="${x.countable ? 'dim' : 'gap'}" ${x.countable ? '' : `title="${esc(t('cat.notCountable'))}"`}>${
+          x.countable ? `${n0(x.uses)} ${esc(t('cat.cdUses'))}` : esc(t('cat.notCountable'))}</span>
+      </div>`).join('')}` : ''}
+  </div>`;
+  $('catBack').addEventListener('click', () => { state.view = 'combat'; host.innerHTML = ''; renderApp(); });
+}
+
 /** Quién le hizo qué a ese enemigo, sacado del reparto por objetivo. */
 const mobCache = new Map();
 
@@ -1492,6 +1642,12 @@ function foeDetail(a, f) {
 }
 
 function renderApp() {
+  if (state.view === 'catalog') {
+    // Misma guarda que el resumen: es una vista con su propio scroll y el
+    // snapshot de 250 ms la reconstruiría entera.
+    if (!$('catRoot')) renderCatalog();
+    return;
+  }
   if (state.view === 'summary') {
     // Sólo se monta una vez. Sin esta guarda el snapshot de 250 ms reconstruye
     // la vista entera y el scroll vuelve arriba en cuanto lo mueves.

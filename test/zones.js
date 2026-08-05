@@ -1,0 +1,169 @@
+/**
+ * Zonas, dificultad y nivel.
+ *
+ * Las tres cosas que hacen que un enemigo del expediente sea comparable con
+ * otro. Todas las líneas de aquí salen de un log real de EQL.
+ */
+import { Parser } from '../src/parser.js';
+import { EncounterTracker } from '../src/encounter.js';
+import { Engine } from '../src/engine.js';
+import { parseZone, labelDiff } from '../src/zones.js';
+import { aggregate } from '../src/aggregate.js';
+
+let failed = 0;
+const ok = (cond, label, extra = '') => {
+  console.log(`  ${cond ? 'ok  ' : 'MAL '}${label}${extra ? ` — ${extra}` : ''}`);
+  if (!cond) failed++;
+};
+const stamp = (s) => {
+  const d = new Date(2026, 7, 4, 12, 0, 0);
+  d.setSeconds(d.getSeconds() + s);
+  const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  const p = (v) => String(v).padStart(2, '0');
+  return `[${wd} ${mo} ${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} ${d.getFullYear()}]`;
+};
+
+// ── 1. Descomponer el nombre de zona ─────────────────────────────────────
+console.log('\nnombre de zona -> base, modo y dificultad');
+{
+  const c = (z) => parseZone(z);
+  ok(c("Nagafen's Lair - Solo 2 (Adaptive)").diff === 2, 'Solo 2 (Adaptive) es D2');
+  ok(c("Nagafen's Lair - Solo 3 (Fused)").diff === 3, 'Solo 3 (Fused) es D3');
+  ok(c("Nagafen's Lair - Solo 3 (Fused)").base === "Nagafen's Lair", 'y la base queda limpia');
+  ok(c("Nagafen's Lair - Solo 3 (Fused)").mode === 'Solo', 'con su modo');
+
+  // LA TRAMPA: aquí el 2 es parte del nombre de la zona, no una dificultad.
+  // El /who la llama gukbottom, así que «The Ruins of Old Guk 2» es el nombre.
+  const guk = c('The Ruins of Old Guk 2 (Adaptive)');
+  ok(guk.base === 'The Ruins of Old Guk 2', 'el 2 de «Old Guk 2» se queda en el nombre', guk.base);
+  ok(guk.diff === 2, 'y la dificultad sale de la etiqueta, no del número');
+  ok(c('The Ruins of Old Guk 2').diff === null,
+    'sin etiqueta, un número suelto NO es una dificultad', String(c('The Ruins of Old Guk 2').diff));
+
+  ok(c('The Ruins of Old Paineel - Solo').diff === null, 'un modo sin número ni etiqueta no inventa dificultad');
+  ok(c('The Plane of Sky').diff === null && c('The Plane of Sky').base === 'The Plane of Sky',
+    'el mundo abierto se queda como está');
+  ok(labelDiff(3, 'Fused') === 'D3 Fused' && labelDiff(null, null) === null, 'la etiqueta corta');
+}
+
+// ── 2. Una subárea no es un cambio de zona ───────────────────────────────
+console.log('\nsubáreas');
+{
+  const p = new Parser({ self: 'Campeon' });
+  const zona = p.parse(`${stamp(0)} You have entered The Plane of Sky.`);
+  const sub = p.parse(`${stamp(1)} You have entered an area where levitation effects do not function.`);
+  ok(zona.kind === 'zone' && zona.zone === 'The Plane of Sky', 'una zona es una zona');
+  ok(sub.kind === 'subarea', 'y una frase en minúscula es una subárea', sub.kind);
+  ok(p.zone === 'The Plane of Sky', 'la subárea NO machaca la zona del parser', p.zone);
+
+  const tr = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+  tr.feed(zona); tr.feed(sub);
+  ok(tr.zone === 'The Plane of Sky', 'ni la del agregador', tr.zone);
+}
+
+// ── 3. Nivel y clases, guardados en la pelea ─────────────────────────────
+console.log('\nnivel de la pelea');
+{
+  const correr = (guion) => {
+    const p = new Parser({ self: 'Campeon' });
+    const tr = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+    const e = new Engine();
+    e.self = 'Campeon'; e.parser = p; e.tracker = tr;
+    for (const [s, l] of guion) {
+      const ev = p.parse(`${stamp(s)} ${l}`);
+      if (ev?.kind === 'who' && ev.who === 'Campeon') { tr.level = ev.level; tr.classes = ev.classes; }
+      if (ev?.kind === 'levelup') tr.level = ev.level;
+      tr.feed(ev);
+    }
+    return e.snapshot().current;
+  };
+
+  // Sin ningún hito antes: no se sabe, y no se inventa.
+  const sinNivel = correr([[0, 'You slash a gorgon for 100 points of damage.']]);
+  ok(sinNivel.level === null, 'una pelea antes del primer /who no tiene nivel', String(sinNivel.level));
+
+  // Con /who antes: nivel y clases de ese momento.
+  const con = correr([
+    [0, '[50 SHD/DRU/MAG] Campeon (Iksar) <Spain> ZONE: The Plane of Sky (airplane)'],
+    [1, 'You slash a gorgon for 100 points of damage.'],
+  ]);
+  ok(con.level === 50, 'con /who antes, la pelea guarda el nivel', String(con.level));
+  ok(con.classesAt?.join('/') === 'SHD/DRU/MAG', 'y las clases de entonces', con.classesAt?.join('/'));
+
+  // Y la subida de nivel también cuenta como hito.
+  const subida = correr([
+    [0, '[50 SHD/DRU/MAG] Campeon (Iksar) <Spain> ZONE: The Plane of Sky (airplane)'],
+    [1, 'You have gained a level! Welcome to level 25!'],
+    [2, 'You slash a gorgon for 100 points of damage.'],
+  ]);
+  ok(subida.level === 25, 'una subida de nivel actualiza el nivel', String(subida.level));
+  ok(subida.classesAt?.join('/') === 'SHD/DRU/MAG', 'y no toca las clases, que no las dice');
+}
+
+// ── 4. El /who con AFK y sin él ──────────────────────────────────────────
+console.log('\nlectura del /who');
+{
+  const p = new Parser({ self: 'Campeon' });
+  const normal = p.parse(`${stamp(0)} [50 SHD/DRU/MAG] Campeon (Iksar) <Spain> ZONE: New Sebilis Expedition (newsebexp)`);
+  ok(normal?.kind === 'who' && normal.level === 50, 'un /who normal se lee');
+  ok(normal.race === 'Iksar' && normal.guild === 'Spain', 'con raza y hermandad', `${normal.race} · ${normal.guild}`);
+  // Ésta se perdía: el prefijo AFK lleva un espacio delante y el patrón anclaba en ^\[
+  const afk = p.parse(`${stamp(1)}  AFK [35 WAR/SHM/NEC] Thalix (Iksar)  ZONE: New Sebilis Expedition (newsebexp)`);
+  ok(afk?.kind === 'who' && afk.who === 'Thalix', 'y el de alguien ausente también', afk?.who);
+  ok(afk?.classes.join('/') === 'WAR/SHM/NEC', 'con sus clases', afk?.classes.join('/'));
+}
+
+// ── 5. class_change fuera; scribe como dato ──────────────────────────────
+console.log('\ncambio de clase');
+{
+  const p = new Parser({ self: 'Campeon' });
+  // No existe mensaje de cambio de clase: en 63.000 líneas reales, cero.
+  ok(p.parse(`${stamp(0)} You are now an elemental.`)?.kind !== 'class_change',
+    'no se inventa un cambio de clase donde no lo hay');
+  ok(p.parse(`${stamp(1)} You are now A.F.K. (Away From Keyboard).`)?.kind !== 'class_change',
+    'ni con el aviso de ausencia');
+  // Lo que sí deja huella es escribir el libro de la clase nueva.
+  const sc = p.parse(`${stamp(2)} You have finished scribing Togor's Insects.`);
+  ok(sc?.kind === 'scribe' && sc.ability === "Togor's Insects",
+    'escribir un hechizo se reconoce, como dato', `${sc?.kind}/${sc?.ability}`);
+}
+
+// ── 6. El expediente, separado por dificultad y avisando del nivel ───────
+console.log('\nexpediente por dificultad');
+{
+  const pelea = (diff, tag, level, vida, maxHit, hab) => ({
+    duration: 40, total: vida, kills: ['Magus Rokyl'], losses: [], loot: [], spellVsFoe: [],
+    diff, diffTag: tag, level, hpSamples: { 'Magus Rokyl': [vida] },
+    rows: [
+      { name: 'Campeon', side: 'ally', damage: vida, taken: 0, healingDone: 0, hits: 10,
+        meleeHits: 10, misses: 0, crits: 0, flurries: 0, ripostes: 0, deaths: 0, max: 100,
+        activeSec: 40, types: [], abilities: [], targets: [{ name: 'Magus Rokyl', sum: vida }], takenBySource: [] },
+      { name: 'Magus Rokyl', side: 'enemy', damage: 3000, taken: vida, healingDone: 0, hits: 20,
+        meleeHits: 20, misses: 0, crits: 0, flurries: 0, ripostes: 0, deaths: 0, max: maxHit,
+        activeSec: 40, types: [], abilities: hab.map((h) => ({ name: h, type: 'magic', sum: 100, n: 1, max: 100 })),
+        targets: [], takenBySource: [] },
+    ],
+  });
+  // Las cifras son las medidas de verdad en el log: D2 14.688, D3 23.295.
+  const ag = aggregate([
+    pelea(2, 'Adaptive', 50, 14688, 204, ['hits']),
+    pelea(3, 'Fused', 50, 23295, 744, ['hits', 'Ice Comet', 'Force']),
+  ], 'Campeon');
+  const rokyl = ag.foes.find((f) => f.name === 'Magus Rokyl');
+
+  ok(rokyl.dificultades.length === 2, 'salen dos fichas, una por dificultad');
+  const d2 = rokyl.dificultades.find((d) => d.diff === 2);
+  const d3 = rokyl.dificultades.find((d) => d.diff === 3);
+  ok(d2.hp.avg === 14688 && d3.hp.avg === 23295,
+    'cada una con su vida, sin promediar', `${d2.hp.avg} y ${d3.hp.avg}`);
+  ok(rokyl.hp.avg === 18992,
+    'la cifra conjunta sigue ahí y sigue sin describir a ninguno', String(rokyl.hp.avg));
+  ok(d2.maxHit === 204 && d3.maxHit === 744, 'y su golpe máximo');
+  ok(d3.abilities.some((a) => a.name === 'Ice Comet') && !d2.abilities.some((a) => a.name === 'Ice Comet'),
+    'los hechizos que sólo tiene en D3 no se le atribuyen en D2');
+  ok(rokyl.levels.join(',') === '50', 'se anota con qué niveles has peleado');
+}
+
+console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
+process.exit(failed ? 1 : 0);

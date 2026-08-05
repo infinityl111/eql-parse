@@ -75,6 +75,24 @@ export function controlKind(nameOrCat, ability) {
   return BLANDOS.some((k) => n.includes(k)) ? 'blando' : 'duro';
 }
 
+/**
+ * Nombre sin el rango.
+ *
+ * EQL numera los rangos con romanos —«Harm Touch V», «Harm Touch X»— pero el
+ * aviso de reutilización nombra la habilidad a secas: «You can use the ability
+ * Harm Touch again in…». Sin quitar el numeral, el cooldown medido y los usos
+ * medidos no se pueden cruzar y el aprovechamiento sale a cero.
+ *
+ * El numeral sólo se quita si va al final y es un romano de verdad: hay
+ * hechizos que acaban en número («Torn Page of Magi`kot pg. 3») y no son rangos.
+ */
+const ROMANO = /\s+(X{0,3}(?:IX|IV|V?I{0,3}))$/;
+export function baseSpell(name) {
+  const s = String(name ?? '').trim();
+  const m = ROMANO.exec(s);
+  return m && m[1] ? s.slice(0, m.index) : s;
+}
+
 /** Nombres de bicho más cortos al hablarlos: "a fire giant warrior" -> "fire giant warrior". */
 export function shortName(name) {
   return String(name ?? '').replace(/^(an?|the) /i, '');

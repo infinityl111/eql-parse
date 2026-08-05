@@ -131,23 +131,60 @@ export function aggregate(fights, self = null) {
       const e = foes.get(r.name) ?? {
         name: r.name, fights: 0, kills: 0, damageTo: 0, seconds: 0, taken: 0, deaths: 0,
         maxHit: 0, hpSamples: [], zones: new Set(), abil: new Map(), loot: new Map(),
+        porDif: new Map(), niveles: new Set(), sinNivel: false,
       };
       e.fights += 1;
       e.seconds += f.duration ?? 0;
       e.taken += r.damage ?? 0;                 // lo que ESE enemigo repartió
       e.maxHit = Math.max(e.maxHit, r.max ?? 0);
       if (f.zone) e.zones.add(f.zone);
+
+      // ── Lo que SÍ se separa por dificultad ────────────────────────────
+      //
+      // Medido en un log real: Magus Rokyl en D3 tiene un 59% más de vida que
+      // en D2, pega 3,6 veces más fuerte y lanza dos hechizos que en D2 no
+      // tiene. La media de los dos no describe a ninguno.
+      //
+      // Las resistencias NO se separan, y es una decisión medida, no un
+      // olvido: en ese mismo log todo entra al 100% en las dos dificultades y
+      // la única diferencia (95% contra 86%) sale de 14 intentos. Partirlas
+      // fragmentaría una muestra que ya es corta a cambio de nada.
+      //
+      // Por nivel tampoco se separa, y por la misma razón medida: sólo dos
+      // enemigos coinciden en los dos periodos de nivel del log, y la única
+      // celda que difiere sale de dos intentos. Pero sí se anota con qué
+      // niveles has peleado contra él, para poder avisar de que están
+      // mezcladas — que es lo único que se puede afirmar hoy.
+      if (f.level) e.niveles.add(f.level);
+      else e.sinNivel = true;
+
+      const d = f.diff ?? null;
+      const kd = d === null ? 'sin marca' : `D${d}`;
+      const pd = e.porDif.get(kd) ?? {
+        diff: d, tag: f.diffTag ?? null, fights: 0, kills: 0, maxHit: 0,
+        damageTo: 0, taken: 0, hpSamples: [], abil: new Map(),
+      };
+      pd.fights += 1;
+      pd.taken += r.damage ?? 0;
+      pd.maxHit = Math.max(pd.maxHit, r.max ?? 0);
+      e.porDif.set(kd, pd);
+
       // Con qué te pega: sus habilidades, sumadas de todas las peleas.
       for (const a of r.abilities ?? []) {
         const c = e.abil.get(a.name) ?? { name: a.name, type: a.type, sum: 0, n: 0, max: 0 };
         c.sum += a.sum; c.n += a.n; c.max = Math.max(c.max, a.max ?? 0);
         e.abil.set(a.name, c);
+        const cd2 = pd.abil.get(a.name) ?? { name: a.name, type: a.type, sum: 0, n: 0, max: 0 };
+        cd2.sum += a.sum; cd2.n += a.n; cd2.max = Math.max(cd2.max, a.max ?? 0);
+        pd.abil.set(a.name, cd2);
       }
       // Cuántas veces cayó: `kills` trae un nombre por muerte, así que matarlo
       // tres veces en una pelea son tres. Antes se contaba una.
       const caidas = (f.kills ?? []).filter((x) => x === r.name).length;
       if (caidas > 0) {
         e.kills += caidas;
+        pd.kills += caidas;
+        for (const m of f.hpSamples?.[r.name] ?? []) if (m > 0) pd.hpSamples.push(Math.round(m));
         // Vida estimada: lo que costó tumbarlo. El log no da la vida de nadie,
         // pero el daño hasta su muerte es una cota muy buena. Cada muerte deja
         // su propia muestra, medida en el instante en que cayó.
@@ -174,7 +211,10 @@ export function aggregate(fights, self = null) {
       if (r.side === 'enemy') continue;
       for (const tg of r.targets ?? []) {
         const e = foes.get(tg.name);
-        if (e) e.damageTo += tg.sum;
+        if (!e) continue;
+        e.damageTo += tg.sum;
+        const pd = e.porDif.get(f.diff === null || f.diff === undefined ? 'sin marca' : `D${f.diff}`);
+        if (pd) pd.damageTo += tg.sum;
       }
     }
 
@@ -223,6 +263,8 @@ export function aggregate(fights, self = null) {
         dps: e.seconds ? e.damageTo / e.seconds : 0,
         // Qué hechizos tuyos entran contra él y cuáles resiste, medido.
         zones: [...(e.zones ?? [])],
+        levels: [...(e.niveles ?? [])].sort((a, b) => a - b),
+        someWithoutLevel: !!e.sinNivel,
         abilities: [...(e.abil ?? new Map()).values()].sort((a, b) => b.sum - a.sum).slice(0, 15),
         lootList: [...(e.loot ?? new Map())].sort((a, b) => b[1] - a[1]).map(([item, n]) => ({ item, n })),
         hp: e.hpSamples?.length ? {
@@ -230,6 +272,20 @@ export function aggregate(fights, self = null) {
           avg: Math.round(e.hpSamples.reduce((a, b) => a + b, 0) / e.hpSamples.length),
           min: Math.min(...e.hpSamples), max: Math.max(...e.hpSamples),
         } : null,
+        // Una ficha por dificultad, ordenadas. Cuando hay más de una, la de
+        // arriba deja de tener sentido y la interfaz enseña éstas.
+        dificultades: [...(e.porDif ?? new Map()).values()]
+          .map((d) => ({
+            diff: d.diff, tag: d.tag, fights: d.fights, kills: d.kills,
+            maxHit: d.maxHit, damageTo: d.damageTo, taken: d.taken,
+            hp: d.hpSamples.length ? {
+              n: d.hpSamples.length,
+              avg: Math.round(d.hpSamples.reduce((a, b) => a + b, 0) / d.hpSamples.length),
+              min: Math.min(...d.hpSamples), max: Math.max(...d.hpSamples),
+            } : null,
+            abilities: [...d.abil.values()].sort((a, b) => b.sum - a.sum).slice(0, 12),
+          }))
+          .sort((a, b) => (a.diff ?? 99) - (b.diff ?? 99)),
         spells: [...(e.spells ?? new Map()).values()]
           .map((c) => ({
             ...c,
