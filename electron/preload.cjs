@@ -67,6 +67,8 @@ contextBridge.exposeInMainWorld('eql', {
   migration: () => ipcRenderer.invoke('store:migration'),
   spellCatalog: (q) => ipcRenderer.invoke('catalog:spells', q),
   setExcluded: (name, on) => ipcRenderer.invoke('excluded:set', { name, on }),
+  setCompanion: (name, on) => ipcRenderer.invoke('companions:set', { name, on }),
+  setPetOwner: (pet, owner) => ipcRenderer.invoke('pet:owner', { pet, owner }),
   setTrios: (lista) => ipcRenderer.invoke('trios:set', lista),
   trioConflicts: () => ipcRenderer.invoke('trios:conflicts'),
   rebuildStore: () => ipcRenderer.invoke('store:rebuild'),

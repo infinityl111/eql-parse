@@ -398,5 +398,194 @@ console.log('\npila de combates del overlay');
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+// ── 10. Compañeros de grupo declarados ───────────────────────────────────
+//
+// El registro de EQL no dice quién va en tu grupo: se buscó y no hay ninguna
+// señal —ni invitaciones, ni entradas, ni salidas—, así que un jugador que pega
+// a tus enemigos no se distingue de uno que pasaba por allí. Declararlo es la
+// única vía, y de ahí salen dos cosas: deja de contarse como «sin identificar»
+// y se puede filtrar el histórico por con quién jugaste.
+console.log('\nfiltro por compañero de grupo');
+{
+  const dir = tmp();
+  const s = new FightStore(dir);
+  /** Pelea con los aliados que se le digan. */
+  const conAliados = (id, foe, dmg, aliados) => ({
+    ...fight(id, foe, dmg),
+    rows: [
+      ...fight(id, foe, dmg).rows,
+      ...aliados.map((n) => ({ name: n, side: 'ally', damage: 100, taken: 0, healingDone: 0,
+        hits: 5, meleeHits: 5, misses: 0, crits: 0, flurries: 0, ripostes: 0, deaths: 0,
+        max: 30, activeSec: 40, types: [['melee', 100]], abilities: [], targets: [], takenBySource: [] })),
+    ],
+  });
+  s.append(conAliados(1, 'bicho solo', 900, []), 8_000_000);
+  s.append(conAliados(2, 'bicho con uno', 900, ['Notarino']), 8_001_000);
+  s.append(conAliados(3, 'bicho con los dos', 900, ['Notarino', 'Kalforgelp']), 8_002_000);
+  s.append(conAliados(4, 'bicho con el otro', 900, ['Kalforgelp']), 8_003_000);
+
+  ok(s.filter({}).length === 4, 'cuatro peleas guardadas');
+  ok(s.index[0].allies.includes('Campeon'), 'el índice guarda quién estuvo de tu lado',
+    s.index[0].allies.join(', '));
+
+  const uno = s.filter({ mates: ['Notarino'] });
+  ok(uno.length === 2, 'con uno marcado: las peleas donde estuvo', `${uno.length}`);
+
+  // La decisión que importa: varios marcados es «estuvieron TODOS», no
+  // «alguno». Con «alguno» saldrían tres y el reparto por persona se calcularía
+  // sobre peleas a las que faltaba uno, que es justo lo que no se puede
+  // comparar.
+  const dos = s.filter({ mates: ['Notarino', 'Kalforgelp'] });
+  ok(dos.length === 1, 'con dos marcados: sólo donde estuvieron los dos', `${dos.length}`);
+  ok(dos[0].label === 'bicho con los dos', 'y es la que toca', dos[0].label);
+
+  ok(s.filter({ mates: ['Nadie'] }).length === 0, 'alguien que no estuvo no devuelve nada');
+  ok(s.filter({ mates: [] }).length === 4, 'sin nadie marcado no se filtra nada');
+  // Se compone con los filtros que ya había.
+  ok(s.filter({ mates: ['Notarino'], foe: 'con los dos' }).length === 1,
+    'y se combina con el filtro por enemigo');
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// ── 11. Índices anteriores a que existiera `allies` se rellenan solos ─────
+//
+// El índice es dato DERIVADO: el .ndjson es la fuente y no se toca. Por eso
+// esto no pide releer el log ni avisar a nadie. Medido sobre un almacén real de
+// 160 peleas y 2,5 MB: 34 ms.
+console.log('\nrelleno del índice sin reconstruir');
+{
+  const dir = tmp();
+  const s = new FightStore(dir);
+  const conAliado = (id, foe) => {
+    const f = fight(id, foe, 900);
+    f.rows.push({ name: 'Notarino', side: 'ally', damage: 100, taken: 0, healingDone: 0,
+      hits: 5, meleeHits: 5, misses: 0, crits: 0, flurries: 0, ripostes: 0, deaths: 0,
+      max: 30, activeSec: 40, types: [], abilities: [], targets: [], takenBySource: [] });
+    return f;
+  };
+  s.append(conAliado(1, 'un gorgon'), 7_000_000);
+  s.append(conAliado(2, 'otro gorgon'), 7_001_000);
+
+  // Se quita `allies` del índice, como lo escribían las versiones anteriores.
+  const idxPath = path.join(dir, 'fights.idx');
+  const datosAntes = fs.readFileSync(path.join(dir, 'fights.ndjson'), 'utf8');
+  fs.writeFileSync(idxPath, fs.readFileSync(idxPath, 'utf8').split('\n').filter(Boolean)
+    .map((l) => { const o = JSON.parse(l); delete o.allies; return JSON.stringify(o); }).join('\n') + '\n');
+  ok(!JSON.parse(fs.readFileSync(idxPath, 'utf8').split('\n')[0]).allies,
+    'el índice de partida no tiene `allies`');
+
+  const s2 = new FightStore(dir);
+  ok(s2.load() === 2, 'se cargan las dos peleas');
+  ok(s2.index.every((x) => Array.isArray(x.allies)), 'y todas reciben `allies` al cargar');
+  ok(s2.filter({ mates: ['Notarino'] }).length === 2,
+    'así que se puede filtrar por compañero sin reconstruir nada');
+  ok(fs.readFileSync(path.join(dir, 'fights.ndjson'), 'utf8') === datosAntes,
+    'el fichero de datos no se ha tocado: sólo se ha recalculado el resumen');
+
+  // Y queda escrito, para no repetirlo en cada arranque.
+  const s3 = new FightStore(dir); s3.load();
+  ok(s3.index.every((x) => Array.isArray(x.allies)), 'el índice reescrito ya lo trae');
+  ok(s3.get(s3.index[0].uid)?.label === 'otro gorgon',
+    'y los registros se siguen leyendo por su posición', s3.get(s3.index[0].uid)?.label);
+
+  // Un registro ilegible no puede inventarse una lista vacía: eso afirmaría que
+  // no había nadie. Se queda sin `allies` y el filtro lo descarta.
+  const s4 = new FightStore(dir);
+  s4.load();
+  s4.index[0].allies = undefined;
+  ok(s4.filter({ mates: ['Notarino'] }).length === 1,
+    'una pelea de la que no se sabe quién estuvo no cuela en el filtro');
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// ── 12. Selección a mano de un grupo de peleas ───────────────────────────
+//
+// Los filtros describen un criterio; esto describe una lista. Sirve para lo
+// que ningún criterio acierta: «estas seis de aquí», la sesión que acabas de
+// jugar y que no cae en un tramo redondo ni comparte enemigo.
+console.log('\nselección a mano de peleas');
+{
+  const dir = tmp();
+  const s = new FightStore(dir);
+  const uids = [];
+  for (let i = 1; i <= 6; i++) uids.push(s.append(fight(i, `bicho ${i}`, 100 * i), 6_000_000 + i * 1000).uid);
+
+  const tres = s.filter({ uids: [uids[0], uids[2], uids[4]] });
+  ok(tres.length === 3, 'devuelve exactamente las pedidas', `${tres.length}`);
+  ok(tres.map((x) => x.label).sort().join(',') === 'bicho 1,bicho 3,bicho 5',
+    'y son las que se pidieron', tres.map((x) => x.label).join(','));
+
+  // Lo que decide el diseño: una selección a mano MANDA sobre los criterios.
+  // Si no, elegir seis peleas y tener el tramo en «última hora» te quitaría
+  // las que están fuera, y tú ya habías dicho cuáles querías.
+  const conFiltros = s.filter({
+    uids: [uids[0], uids[1]], sinceMs: 1, foe: 'no existe', mates: ['Nadie'],
+  });
+  ok(conFiltros.length === 2,
+    'el tramo, el enemigo y los compañeros no le quitan nada', `${conFiltros.length}`);
+
+  // Y sin selección, los criterios siguen mandando como siempre.
+  ok(s.filter({ uids: [] }).length === 6, 'sin selección no cambia nada');
+  ok(s.filter({ foe: 'bicho 4' }).length === 1, 'y el filtro por enemigo sigue vivo');
+  // Un uid que ya no existe no inventa una pelea.
+  ok(s.filter({ uids: [uids[0], 999999] }).length === 1,
+    'un identificador que no está se ignora, no falla');
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
+// ── 13. La mascota de otro jugador, asignada a mano ──────────────────────
+//
+// En EQL la mascota cambia de nombre en cada invocación y el nombre sale de una
+// lista cerrada, así que la de otro jugador aparece como un desconocido más.
+// Decir de quién es la saca de «sin identificar», y plegarla dentro de su dueño
+// es lo único que permite comparar personas: medido en un almacén real, una
+// mascota sin asignar se llevaba el 20% del daño de un tramo, y ese 20% era de
+// alguien.
+console.log('\nmascota ajena asignada a su dueño');
+{
+  const { ownerPets, mergeOwnerPets } = await import('../src/aggregate.js');
+  const fila = (name, damage, extra = {}) => ({
+    name, side: 'ally', damage, taken: 0, healingDone: 0, hits: 10, meleeHits: 10,
+    misses: 0, crits: 0, flurries: 0, ripostes: 0, deaths: 0, max: 100, activeSec: 40,
+    share: damage / 1000, types: [['melee', damage]],
+    abilities: [{ name: 'golpe', type: 'melee', sum: damage, n: 10, max: 100 }],
+    targets: [{ name: 'a gorgon', sum: damage }], ...extra,
+  });
+  const filas = [fila('Campeon', 500), fila('Notarino', 300), fila('Gobobn', 200),
+    { ...fila('a gorgon', 0), side: 'enemy' }];
+  filas[2].unidentified = true;
+
+  // Asignar: rótulo y salida de «sin identificar». Ni una cifra se mueve.
+  const conDueño = ownerPets(filas, { Gobobn: 'Notarino' });
+  const g = conDueño.find((r) => r.name === 'Gobobn');
+  ok(g.petOf === 'Notarino', 'la mascota queda a nombre de su dueño', g.petOf);
+  ok(g.unidentified === false, 'y deja de estar sin identificar');
+  ok(g.damage === 200 && conDueño.find((r) => r.name === 'Notarino').damage === 300,
+    'asignarla no mueve ninguna cifra');
+
+  // Plegar: ahora sí se suma, y donde toca.
+  const plegado = mergeOwnerPets(conDueño);
+  ok(!plegado.some((r) => r.name === 'Gobobn'), 'plegada, su fila desaparece');
+  const n = plegado.find((r) => r.name === 'Notarino');
+  ok(n.damage === 500, 'y su daño entra en el de su dueño', String(n.damage));
+  ok(n.mergedPets === 1 && n.mergedPetsFrom[0] === 'Gobobn',
+    'diciendo cuántas y cuáles, para que no parezca todo suyo');
+  ok(Math.abs(n.share - 0.5) < 1e-9, 'el reparto también se suma', String(n.share));
+  ok(n.hits === 20 && n.abilities[0].n === 20, 'y los golpes y habilidades');
+  ok(plegado.find((r) => r.name === 'Campeon').damage === 500, 'a nadie más le toca nada');
+  ok(plegado.find((r) => r.name === 'a gorgon'), 'y el enemigo sigue donde estaba');
+
+  // Un dueño que no está en la pelea no puede recibir nada: sería inventar una
+  // fila. La mascota se queda suelta con su rótulo.
+  const sinDueño = mergeOwnerPets(ownerPets(filas, { Gobobn: 'Kalforgelp' }));
+  ok(sinDueño.some((r) => r.name === 'Gobobn'),
+    'si el dueño no está en la pelea, la mascota se queda como está');
+  ok(sinDueño.length === filas.length, 'y no aparece ninguna fila nueva');
+
+  // Sin asignaciones no se toca nada, ni se copian las filas.
+  ok(ownerPets(filas, {}) === filas, 'sin asignaciones se devuelven las mismas filas');
+  ok(mergeOwnerPets(filas) === filas, 'y sin dueños tampoco hay nada que plegar');
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

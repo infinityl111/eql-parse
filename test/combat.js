@@ -290,5 +290,67 @@ console.log('\nnombre de la pelea');
     'y sigue contando como baja, no como abatido');
 }
 
+// ── Un compañero declarado clasifica, pero NO abre peleas ─────────────────
+//
+// La línea que no se puede cruzar. `#mine()` —tú y tus mascotas— decide si una
+// pelea SE ABRE. Tu mascota pegando eres tú pegando; tu compañero pegando no lo
+// es. Si un compañero declarado entrara ahí, su pelea al otro lado de la sala
+// se guardaría como tuya: el mismo fallo que dieron los nombres de mascota
+// reciclados, pero declarado y permanente.
+console.log('\ncompañeros de grupo declarados');
+{
+  const conCompaneros = (guion, mates) => {
+    const parser = new Parser({ self: 'Campeon' });
+    const tracker = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+    const engine = new Engine();
+    engine.self = 'Campeon';
+    engine.parser = parser;
+    engine.tracker = tracker;
+    engine.setCompanions(mates);
+    for (const [s, l] of guion) tracker.feed(parser.parse(`${stamp(s)} ${l}`));
+    return { f: engine.snapshot().current, tracker, engine };
+  };
+
+  // Sin declarar: sale como «sin identificar», que es lo correcto mientras no
+  // se sepa qué es.
+  const sin = conCompaneros([
+    [0, 'You slash a gorgon for 500 points of damage.'],
+    [1, 'Notarino pierces a gorgon for 300 points of damage.'],
+  ], []);
+  const antes = sin.f.rows.find((r) => r.name === 'Notarino');
+  ok(antes?.side === 'ally', 'sin declarar ya está en tu bando', antes?.side);
+  ok(antes?.unidentified === true, 'pero marcado como sin identificar');
+
+  // Declarado: deja de estarlo, y NO cambia ninguna cifra.
+  const con = conCompaneros([
+    [0, 'You slash a gorgon for 500 points of damage.'],
+    [1, 'Notarino pierces a gorgon for 300 points of damage.'],
+  ], ['Notarino']);
+  const desp = con.f.rows.find((r) => r.name === 'Notarino');
+  ok(desp?.unidentified === false, 'declarado deja de estar sin identificar');
+  ok(desp?.side === 'ally', 'y sigue en tu bando');
+  ok(con.f.total === sin.f.total && con.f.raidDps === sin.f.raidDps,
+    'declararlo NO mueve ninguna cifra de la pelea',
+    `${sin.f.total} -> ${con.f.total}`);
+  ok(con.f.enemyTotal === sin.f.enemyTotal, 'ni las del enemigo');
+
+  // Lo que no puede pasar bajo ningún concepto: que su pelea sea la tuya.
+  const ajena = conCompaneros([
+    [0, 'Notarino pierces a froglok for 300 points of damage.'],
+    [1, 'a froglok hits Notarino for 50 points of damage.'],
+    [2, 'a froglok has been slain by Notarino!'],
+  ], ['Notarino']);
+  ajena.tracker.tick(1e12);
+  ok(ajena.tracker.history.length === 0,
+    'una pelea suya en la que no estás NO se abre como tuya',
+    `${ajena.tracker.history.length} peleas`);
+
+  // Y no se le vuelve a preguntar si es una mascota: ya lo has contestado.
+  const hint = ajena.engine.snapshot().petHint;
+  const preguntados = hint?.candidates ?? [];
+  ok(!preguntados.includes('Notarino'),
+    'ni se pregunta si es tu mascota', preguntados.join(', ') || 'no se pregunta nada');
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

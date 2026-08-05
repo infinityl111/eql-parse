@@ -10,7 +10,7 @@ import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
 import { setLang } from './i18n.js';
 import { FightStore } from './store.js';
-import { aggregate, mergePets, ensureSides } from './aggregate.js';
+import { aggregate, mergePets, mergeOwnerPets, ownerPets, ensureSides } from './aggregate.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
 import { parseZone } from './zones.js';
 import { catalog } from './catalog.js';
@@ -170,6 +170,20 @@ export class Engine extends EventEmitter {
     this.knownPets = new Set();  // todas las vistas alguna vez, entre sesiones
     this.petsSaved = 0;
     this.notMine = new Set();    // aliados que ya dijiste que no son tuyos
+    // Compañeros de grupo declarados por ti.
+    //
+    // El log de EQL no dice quién va en tu grupo —ni invitaciones, ni entradas,
+    // ni salidas: se buscó y no hay nada—, así que un jugador que pega a tus
+    // enemigos no se distingue de uno que pasaba por allí. Declararlo es la
+    // única vía.
+    //
+    // ESTO NO ENTRA EN #mine(). Ahí sólo van tú y tus mascotas, porque #mine()
+    // decide si una pelea SE ABRE, y tu mascota pegando eres tú pegando
+    // mientras que tu compañero pegando no lo es. Metiéndolos ahí, una pelea
+    // suya al otro lado de la sala se guardaría como tuya — el mismo fallo que
+    // dieron los nombres de mascota reciclados, pero declarado y permanente.
+    // Un compañero declarado dice QUIÉN ES, no que su pelea sea tuya.
+    this.companions = new Set();
     this.storePath = null;      // fichero de peleas guardadas
     this.store = null;
     this.history = [];          // peleas cerradas, la más reciente primero
@@ -916,7 +930,12 @@ export class Engine extends EventEmitter {
         // de EQL no dice quién va en tu grupo —comprobado: ni invitaciones, ni
         // entradas, ni salidas—, así que esto no se puede resolver solo y lo
         // honesto es enseñarlo aparte en vez de sumarlo a tu bando.
+        // Un compañero declarado deja de ser un desconocido: eso es justo lo
+        // que significa declararlo. No cambia de bando —ya estaba en el tuyo,
+        // como todo el que no es enemigo— ni mueve ninguna cifra: `total` y
+        // `raidDps` se calculan por `side` y nunca miran esta marca.
         const desconocido = !enemy && r.name !== me && !petSet.has(r.name)
+          && !this.companions.has(r.name)
           && !this.parser?.otherPets.has(r.name) && !this.whoSeen.has(r.name);
         return {
           ...this.#row(r), side: enemy ? 'enemy' : 'ally',
@@ -1112,8 +1131,16 @@ export class Engine extends EventEmitter {
     // Se pasan las mascotas conocidas ahora mismo: rescata las peleas guardadas
     // antes de que la marca existiera.
     const known = [...new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? []), ...(q.myPets ?? [])])];
+    // Quién es la mascota de quién se aplica AHORA, no como quedó guardado: lo
+    // declaras a mitad de sesión y las peleas de hace media hora se rotulan
+    // bien sin reconstruir nada.
+    const dueños = Object.fromEntries(this.parser?.otherPets ?? []);
+    const conDueño = full.map((f) => ({ ...f, rows: ownerPets(f.rows, dueños) }));
     return aggregate(
-      q.mergePets ? full.map((f) => ({ ...f, rows: mergePets(f.rows, q.petLabel, known, this.self, q.notPets ?? []) })) : full,
+      q.mergePets
+        ? conDueño.map((f) => ({ ...f,
+          rows: mergeOwnerPets(mergePets(f.rows, q.petLabel, known, this.self, q.notPets ?? [])) }))
+        : conDueño,
       this.self);
   }
   /**
@@ -1265,6 +1292,32 @@ export class Engine extends EventEmitter {
   /** «Ese no es mío»: deja de preguntarlo. */
   dismissPet(name) { this.notMine.add(name); this.parser?.petMaybe.delete(name); return true; }
 
+  /**
+   * «Esa mascota es de aquél», dicho a mano.
+   *
+   * Va al mismo sitio que lo que saca el `/pet who leader` de otro jugador, y
+   * por la misma razón: dura la sesión. Los nombres de mascota salen de una
+   * lista cerrada y se reciclan entre jugadores, así que la frase sólo es
+   * cierta mientras esa mascota esté invocada. Guardarla para siempre sería
+   * repetir el fallo que metía la pelea de otro en tu histórico.
+   */
+  assignPetOwner(pet, owner) {
+    if (!pet || !this.parser) return {};
+    if (owner) {
+      this.parser.otherPets.set(pet, owner);
+      // Deja de ser candidata a mascota tuya: ya sabemos de quién es.
+      this.parser.petMaybe.delete(pet);
+      this.parser.pets.delete(pet);
+    } else this.parser.otherPets.delete(pet);
+    return Object.fromEntries(this.parser.otherPets);
+  }
+
+  /** Los compañeros que has declarado. Los fija el proceso principal. */
+  setCompanions(list) {
+    this.companions = new Set((list ?? []).filter(Boolean));
+    return [...this.companions];
+  }
+
   markPet(name) { this.parser?.markPet(name); this.narrator.setPets([...(this.parser?.pets.keys() ?? [])]); }
   unmarkPet(name) { this.parser?.unmarkPet(name); this.narrator.setPets([...(this.parser?.pets.keys() ?? [])]); }
 
@@ -1315,6 +1368,9 @@ export class Engine extends EventEmitter {
     // mascota de otro: por eso hay que preguntarlo en vez de suponerlo.
     const candidates = enc.rows
       .filter((r) => r.name !== me && !known.has(r.name) && !this.notMine.has(r.name)
+        // Un compañero declarado no es una mascota sin identificar: preguntar
+        // por él sería preguntar algo que ya has contestado.
+        && !this.companions.has(r.name)
         && !this.parser?.otherPets.has(r.name) && r.damage > 0)
       .filter((r) => r.targets.some((t) => myFoes.has(t.name)))
       .filter((r) => !myFoes.has(r.name))

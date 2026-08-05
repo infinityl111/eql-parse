@@ -2,7 +2,7 @@ import { t, setLang, getLang, LANGS, langInfo, TRANSLATED } from '../src/i18n.js
 import { analyse } from '../src/analysis.js';
 import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
-import { mergePets } from '../src/aggregate.js';
+import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
 import { initTriggers, renderTriggers } from './triggers.js';
 import { mountBanner, speak, playSound, listVoices } from './alerts.js';
 
@@ -18,6 +18,8 @@ const $ = (id) => document.getElementById(id);
 const state = {
   snap: null,
   selectedFight: 'live',
+  picked: new Set(),      // peleas elegidas a mano, para verlas como una
+  pickAnchor: null,       // desde dónde extiende el rango Mayúsculas+clic
   expanded: new Set(),
   hover: null,
   setup: false,
@@ -27,7 +29,7 @@ const state = {
   sideHeads: new Map(),
   detailStamp: new Map(),
   showAll: false,
-  filter: { range: '24h', foe: '' },
+  filter: { range: '24h', foe: '', mates: [] },
   fights: [],
   fightCache: new Map(),
   foes: [],
@@ -262,12 +264,41 @@ const isMyPet = (name) => petNames().includes(name);
  */
 const excluidos = () => new Set(state.cfg.excluded ?? []);
 
+/**
+ * Los que has declarado compañeros de grupo.
+ *
+ * Es el espejo de la lista de arriba y funciona igual: se aplica al MOSTRAR, no
+ * al guardar. Por eso vale para todo el histórico sin reconstruir nada y se
+ * puede deshacer — declarar a alguien reclasifica al instante las peleas de
+ * ayer donde salía, y quitarlo las devuelve a como estaban.
+ *
+ * `unidentified` significa «no consta que sea tuyo». Declararlo es que conste,
+ * así que la marca se re-deriva aquí en vez de creerse la que quedó guardada.
+ */
+const companeros = () => new Set(state.cfg.companions ?? []);
+
+/** Aplica la declaración a unas filas, vengan de la pelea o del resumen. */
+function marcarCompaneros(rows) {
+  const amigos = companeros();
+  if (!amigos.size || !rows?.some((r) => amigos.has(r.name))) return rows;
+  return rows.map((r) => (amigos.has(r.name)
+    ? { ...r, unidentified: false, mate: true } : r));
+}
+
 function withPets(f) {
   if (!f) return f;
   const fuera = excluidos();
   let rows = fuera.size ? f.rows.filter((r) => !fuera.has(r.name)) : f.rows;
+  rows = marcarCompaneros(rows);
+  // De quién es cada mascota se aplica AHORA y no como quedó guardado: lo
+  // asignas a mitad de sesión y las peleas de hace media hora se rotulan bien.
+  rows = ownerPets(rows, state.snap?.petOwners ?? {});
   if (state.cfg.mergePets) {
     rows = mergePets(rows, t('pets.merged'), petNames(), state.snap?.self, state.cfg.notPets ?? []);
+    // La misma casilla pliega también la mascota de cada jugador dentro de él:
+    // es la misma pregunta —cuánto ha puesto cada persona— y de nada sirve
+    // juntar las tuyas si la de al lado sigue contando aparte.
+    rows = mergeOwnerPets(rows);
   }
   return rows === f.rows ? f : { ...f, rows };
 }
@@ -296,7 +327,8 @@ async function loadFight(uid) {
 /** Recarga el índice según el tramo y el enemigo elegidos. */
 async function refreshFights() {
   const r = RANGES.find((x) => x.key === state.filter.range);
-  const q = { sinceMs: r?.ms ?? null, foe: state.filter.foe || null, limit: 400 };
+  const q = { sinceMs: r?.ms ?? null, foe: state.filter.foe || null,
+    mates: state.filter.mates ?? [], limit: 400 };
   // Si el almacén falla o no está disponible, la aplicación sigue funcionando
   // con la sesión en curso: quedarse en blanco es mucho peor que sin histórico.
   try {
@@ -321,7 +353,9 @@ const TRIVIAL = (f) => f.duration < 3 || f.total < 500;
 
 function fightCard(f, live) {
   const active = live ? state.selectedFight === 'live' : state.selectedFight === f.uid;
-  return `<div class="fight ${live ? 'live' : ''} ${active ? 'active' : ''}" data-uid="${f.uid}" data-live="${live ? 1 : 0}">
+  const picked = !live && state.picked.has(f.uid);
+  return `<div class="fight ${live ? 'live' : ''} ${active ? 'active' : ''} ${
+    picked ? 'picked' : ''}" data-uid="${f.uid}" data-live="${live ? 1 : 0}">
     <div class="fight-name">${esc(f.label ?? t('fight.skirmish'))}</div>
     <div class="fight-sub">
       <span class="num strong foe">${n0(f.enemyDps ?? 0)}</span><span class="u">dps</span>
@@ -342,9 +376,29 @@ function renderFightList(snap) {
     <datalist id="foeList">
       ${state.foes.map((f) => `<option value="${esc(f.name)}">${f.n}</option>`).join('')}
     </datalist>
+    ${(state.cfg.companions ?? []).length ? `<div class="mates">
+      <span class="eyebrow">${esc(t('mate.filter'))}</span>
+      ${(state.cfg.companions ?? []).map((n) => `<button class="mate-chip ${
+        (state.filter.mates ?? []).includes(n) ? 'on' : ''}" data-mate="${esc(n)}"
+        >${esc(n)}</button>`).join('')}
+      ${(state.filter.mates ?? []).length > 1
+        ? `<span class="hint">${esc(t('mate.filterAll'))}</span>` : ''}
+    </div>` : ''}
   </div>
   <button class="sumbtn" id="btnSummary">${esc(t('sum.open'))}</button>
   <button class="sumbtn" id="btnCatalog">${esc(t('cat.open'))}</button>`);
+
+  // Selección a mano: manda sobre el tramo y el enemigo mientras esté puesta,
+  // así que tiene que verse y tiene que poder deshacerse de un clic.
+  if (state.picked.size) {
+    parts.push(`<div class="pick-bar">
+      <span class="eyebrow">${esc(t('pick.n', { n: state.picked.size }))}</span>
+      <button class="sumbtn" id="pickOpen">${esc(t('pick.open'))}</button>
+      <button class="pick-clear" id="pickClear">${esc(t('pick.clear'))}</button>
+    </div>`);
+  } else {
+    parts.push(`<div class="hint pick-hint">${esc(t('pick.hint'))}</div>`);
+  }
 
   const shown = state.showAll ? state.fights : state.fights.filter((f) => !TRIVIAL(f));
   const hidden = state.fights.length - shown.length;
@@ -374,6 +428,16 @@ function renderFightList(snap) {
   list.innerHTML = html;
 
   $('fltRange')?.addEventListener('change', (e) => { state.filter.range = e.target.value; refreshFights(); });
+  // Marcar varios es «estuvieron todos», no «alguno»: ver el porqué en
+  // FightStore.filter. Aquí sólo se recogen los marcados.
+  list.querySelectorAll('.mate-chip').forEach((el) => el.addEventListener('click', () => {
+    const n = el.dataset.mate;
+    const m = new Set(state.filter.mates ?? []);
+    m.has(n) ? m.delete(n) : m.add(n);
+    state.filter.mates = [...m];
+    state.summary = null;
+    refreshFights();
+  }));
   // Se espera a que dejes de escribir: filtrar en cada tecla releería el índice
   // entero con cada letra.
   let foeTimer = null;
@@ -394,14 +458,17 @@ function renderFightList(snap) {
   });
   $('btnCatalog')?.addEventListener('click', async () => {
     const r = RANGES.find((x) => x.key === state.filter.range);
-    state.catalog = await window.eql.spellCatalog?.({ sinceMs: r?.ms ?? null }) ?? null;
+    state.catalog = await window.eql.spellCatalog?.({ sinceMs: r?.ms ?? null,
+      mates: state.filter.mates ?? [] }) ?? null;
     state.view = 'catalog';
     $('bodyGrid').innerHTML = '';
     renderApp();
   });
   $('btnSummary')?.addEventListener('click', async () => {
     const r = RANGES.find((x) => x.key === state.filter.range);
+    state.summaryFrom = 'range';
     state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null,
+      mates: state.filter.mates ?? [],
       mergePets: !!state.cfg.mergePets, petLabel: t('pets.merged'),
       myPets: state.cfg.myPets ?? [], notPets: state.cfg.notPets ?? [] });
     state.view = 'summary';
@@ -415,13 +482,66 @@ function renderFightList(snap) {
     el.addEventListener('mouseenter', () => showLootTip(f));
     el.addEventListener('mouseleave', hideTip);
   });
-  list.querySelectorAll('.fight').forEach((el) => el.addEventListener('click', async () => {
-    state.selectedFight = el.dataset.live === '1' ? 'live' : +el.dataset.uid;
+  /**
+   * Elegir varias peleas a mano y verlas como una.
+   *
+   * Una «sesión» son combates seguidos, así que Mayúsculas+clic coge el rango
+   * desde la última que pinchaste: dos clics y tienes de la primera a la
+   * última. Ctrl+clic añade o quita una suelta, para corregir el rango. Un clic
+   * normal deshace la selección y abre esa pelea, como siempre.
+   *
+   * El orden del rango se lee del DOM y no del estado: lo que se selecciona es
+   * lo que ves, con el filtro y los menores ocultos que haya puestos en ese
+   * momento.
+   */
+  const enPantalla = () => [...list.querySelectorAll('.fight[data-live="0"]')].map((x) => +x.dataset.uid);
+
+  list.querySelectorAll('.fight').forEach((el) => el.addEventListener('click', async (e) => {
+    const viva = el.dataset.live === '1';
+    const uid = viva ? null : +el.dataset.uid;
+    // La pelea en curso no se puede seleccionar: aún no está guardada y no
+    // tiene identidad con la que pedirla.
+    if (!viva && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+      const orden = enPantalla();
+      if (e.shiftKey && state.pickAnchor != null && orden.includes(state.pickAnchor)) {
+        const a = orden.indexOf(state.pickAnchor);
+        const b = orden.indexOf(uid);
+        state.picked = new Set(orden.slice(Math.min(a, b), Math.max(a, b) + 1));
+      } else {
+        const p = new Set(state.picked);
+        p.has(uid) ? p.delete(uid) : p.add(uid);
+        state.picked = p;
+        state.pickAnchor = uid;
+      }
+      state.summary = null;
+      list.dataset.sig = '';
+      renderApp();
+      return;
+    }
+    state.picked = new Set();
+    state.pickAnchor = uid;
+    state.selectedFight = viva ? 'live' : uid;
     state.rowNodes.clear();
     if ($('rows')) $('rows').innerHTML = '';
     await loadFight(state.selectedFight);
     renderApp();
   }));
+  $('pickClear')?.addEventListener('click', () => {
+    state.picked = new Set();
+    state.summary = null;
+    list.dataset.sig = '';
+    if (state.view === 'summary') state.view = 'combat';
+    renderApp();
+  });
+  $('pickOpen')?.addEventListener('click', async () => {
+    state.summaryFrom = 'pick';
+    state.summary = await window.eql.aggregate({ uids: [...state.picked],
+      mergePets: state.cfg.mergePets, petLabel: t('pets.merged'),
+      myPets: state.cfg.myPets ?? [], notPets: state.cfg.notPets ?? [] });
+    state.view = 'summary';
+    $('bodyGrid').innerHTML = '';
+    renderApp();
+  });
   $('btnShowAll')?.addEventListener('click', () => { state.showAll = !state.showAll; list.dataset.sig = ''; renderApp(); });
 }
 
@@ -457,14 +577,35 @@ function buildRow(name) {
     detail: el.querySelector('.detail-slot'),
     sig: '',
   };
+  // El desplegable de dueño no es un clic en la fila: se atiende aparte para
+  // que elegir no despliegue ni pliegue nada.
+  el.addEventListener('change', async (e) => {
+    const sel = e.target.closest?.('.petof-sel');
+    if (!sel) return;
+    e.stopPropagation();
+    await window.eql.setPetOwner(sel.dataset.pet, sel.value || null);
+    state.rowNodes.clear();
+    if ($('rows')) $('rows').innerHTML = '';
+    state.summary = null;
+    renderApp();
+  });
+  el.addEventListener('click', (e) => { if (e.target.closest?.('.petof')) e.stopPropagation(); });
   el.addEventListener('click', async (e) => {
+    if (e.target.closest?.('.petof')) return;
     const btn = e.target.closest?.('.excl-btn');
     if (btn) {
       e.stopPropagation();
-      state.cfg.excluded = await window.eql.setExcluded(btn.dataset.excl, true);
+      const r = btn.dataset.mate
+        ? await window.eql.setCompanion(btn.dataset.mate, btn.dataset.on === '1')
+        : await window.eql.setExcluded(btn.dataset.excl, true);
+      state.cfg.excluded = r.excluded ?? state.cfg.excluded;
+      state.cfg.companions = r.companions ?? state.cfg.companions;
       state.rowNodes.clear();
       if ($('rows')) $('rows').innerHTML = '';
       state.summary = null;
+      // Declarar o retirar a alguien cambia qué peleas casan con el filtro de
+      // compañeros, así que la lista se vuelve a pedir.
+      if (btn.dataset.mate) refreshFights();
       renderApp();
       return;
     }
@@ -679,9 +820,34 @@ function detailHTML(r) {
 
   // Sacar a alguien de tu bando. Va aquí, al desplegar la fila, porque es
   // donde estás mirando sus cifras y decidiendo que no pintan nada.
-  const excluir = r.name === state.snap?.self ? '' : `<div class="sec">
+  //
+  // Y al lado, lo contrario: declararlo compañero. El log de EQL no da ninguna
+  // señal de grupo, así que decirlo tú es la única forma de que deje de salir
+  // como «sin identificar». No se ofrece para tus mascotas ni para las de otro
+  // jugador, que ya se saben lo que son.
+  const esMio = r.name === state.snap?.self || isMyPet(r.name);
+  const yaEs = companeros().has(r.name);
+  // Los jugadores que hay en esta pelea, para poder decir de quién es una
+  // mascota sin teclear nada. Se excluyen las mascotas —ni las tuyas ni las
+  // ajenas tienen mascota— y el propio combatiente.
+  const duenos = (state.snap?.current?.rows ?? fightFor(state.snap)?.rows ?? [])
+    .filter((x) => x.side !== 'enemy' && x.name !== r.name && !x.petOf && !isMyPet(x.name))
+    .map((x) => x.name);
+  const asignar = (esMio || !duenos.length) ? '' : `<label class="petof">
+    ${esc(t('pet.ownerOf'))}
+    <select class="petof-sel" data-pet="${esc(r.name)}">
+      <option value="">${esc(t('pet.ownerNone'))}</option>
+      ${duenos.map((n) => `<option value="${esc(n)}"${
+        r.petOf === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}
+    </select></label>`;
+  const excluir = esMio ? '' : `<div class="sec">
     <button class="excl-btn" data-excl="${esc(r.name)}">${esc(t('excl.remove'))}</button>
-    ${r.unidentified ? `<span class="hint">${esc(t('side.unknownNote'))}</span>` : ''}
+    ${r.petOf ? '' : `<button class="excl-btn mate" data-mate="${esc(r.name)}" data-on="${yaEs ? '0' : '1'}">${
+      esc(yaEs ? t('mate.remove') : t('mate.add'))}</button>`}
+    ${asignar}
+    ${r.petOf ? `<span class="hint">${esc(t('pet.ownedBy', { who: r.petOf }))}</span>`
+      : yaEs ? `<span class="hint">${esc(t('mate.declared'))}</span>`
+        : r.unidentified ? `<span class="hint">${esc(t('side.unknownNote'))}</span>` : ''}
   </div>`;
 
   return `<div class="detail">${composition}${abilities}${targets}${stanceSec}${offence}${defence}${healing}${activity}${excluir}</div>`;
@@ -878,6 +1044,13 @@ async function renderNarrate(host) {
           <button class="petbtn" data-restore="${esc(x)}">${esc(t('excl.restore'))}</button></span>`).join('')
       : `<span class="hint">${esc(t('excl.empty'))}</span>`}</div>
 
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('mate.title'))}</div>
+    <div class="hint">${esc(t('mate.note'))}</div>
+    <div class="excl-list" id="mateList">${(state.cfg.companions ?? []).length
+      ? (state.cfg.companions ?? []).map((x) => `<span class="excl-item mate"><b>${esc(x)}</b>
+          <button class="petbtn" data-unmate="${esc(x)}">${esc(t('mate.remove'))}</button></span>`).join('')
+      : `<span class="hint">${esc(t('mate.empty'))}</span>`}</div>
+
     <div class="narrate-row">
       <label class="eyebrow">${t('voice.cut')}
         <input type="number" id="nMax" min="40" max="400" value="${n.maxChars}" style="width:70px" ${t('voice.chars')}</label>
@@ -954,9 +1127,22 @@ async function renderNarrate(host) {
     await guardarTrios((state.cfg.trios ?? []).filter((_, k) => k !== i));
   }));
   host.querySelectorAll('[data-restore]').forEach((el) => el.addEventListener('click', async () => {
-    state.cfg.excluded = await window.eql.setExcluded(el.dataset.restore, false);
+    const r = await window.eql.setExcluded(el.dataset.restore, false);
+    state.cfg.excluded = r.excluded ?? r;
     state.rowNodes.clear();
     state.summary = null;
+    renderApp();
+  }));
+  host.querySelectorAll('[data-unmate]').forEach((el) => el.addEventListener('click', async () => {
+    const n = el.dataset.unmate;
+    const r = await window.eql.setCompanion(n, false);
+    state.cfg.companions = r.companions ?? [];
+    state.cfg.excluded = r.excluded ?? state.cfg.excluded;
+    // Quien deja de ser compañero deja de poder filtrar por él.
+    state.filter.mates = (state.filter.mates ?? []).filter((x) => x !== n);
+    state.rowNodes.clear();
+    state.summary = null;
+    refreshFights();
     renderApp();
   }));
   host.querySelector('#nTest').addEventListener('click', () => {
@@ -1478,7 +1664,9 @@ function renderTimers(snap) {
 
 /** Todas las peleas del tramo en un único desglose, desplegable por enemigo. */
 function renderSummary() {
-  const a = state.summary;
+  // La declaración se aplica también aquí, y por la misma razón que en la
+  // pelea: se guarda lo que se midió, y quién es cada uno lo dices tú después.
+  const a = state.summary && { ...state.summary, rows: marcarCompaneros(state.summary.rows) };
   const host = $('bodyGrid');
   if (!a || !a.fights) {
     host.innerHTML = `<div class="empty"><h2>${esc(t('sum.empty'))}</h2>
@@ -1492,7 +1680,7 @@ function renderSummary() {
   const scroll = host.querySelector('.summary')?.scrollTop ?? 0;
   host.innerHTML = `<div class="summary" id="sumRoot">
     <div class="sum-head">
-      <h2>${esc(t('sum.title'))}</h2>
+      <h2>${esc(state.summaryFrom === 'pick' ? t('pick.title') : t('sum.title'))}</h2>
       <label class="chk mini" id="sumMergeL" title="${esc(t('pets.mergeHint'))}">
         <input type="checkbox" id="sumMerge"${state.cfg.mergePets ? ' checked' : ''}> ${esc(t('pets.mergePets'))}
         <span class="dim">(${petNames().length})</span></label>
@@ -1513,7 +1701,7 @@ function renderSummary() {
       // Aliados que pegan a tus enemigos pero no sabemos quiénes son. En vez de
       // llenar la vista de casillas, se pide el comando que lo resuelve solo.
       const unknown = a.rows.filter((r) => r.side !== 'enemy' && r.name !== state.snap?.self
-        && !r.petOf && !r.merged && !isMyPet(r.name)).map((r) => r.name);
+        && !r.petOf && !r.merged && !isMyPet(r.name) && !r.mate).map((r) => r.name);
       if (!unknown.length) return '';
       return `<div class="pethint sum-pethint">
         <div class="pethint-main">${esc(t('pet.which'))}</div>
@@ -1571,7 +1759,9 @@ function renderSummary() {
     await window.eql.setMergePets(e.target.checked);
     const r = RANGES.find((x) => x.key === state.filter.range);
     state.openSumRows.clear();
+    state.summaryFrom = 'range';
     state.summary = await window.eql.aggregate({ sinceMs: r?.ms ?? null, foe: state.filter.foe || null,
+      mates: state.filter.mates ?? [],
       mergePets: e.target.checked, petLabel: t('pets.merged'),
       myPets: state.cfg.myPets ?? [], notPets: state.cfg.notPets ?? [] });
     renderSummary();

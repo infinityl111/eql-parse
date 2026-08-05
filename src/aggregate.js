@@ -71,6 +71,19 @@ function mergeRow(dst, r) {
   for (const [ty, v] of r.types ?? []) add(dst.byType, ty, v);
   for (const tg of r.targets ?? []) add(dst.byTarget, tg.name, tg.sum);
   for (const src of r.takenBySource ?? []) add(dst.takenBySource, src.name, src.sum);
+  // Quién ES cada uno no se suma, se arrastra: son propiedades del nombre y no
+  // de la pelea. Sin esto el resumen perdía el «(de Notarino)» y la marca de
+  // mascota en cuanto juntaba dos peleas, y una mascota recién asignada volvía
+  // a salir como un desconocido.
+  //
+  // `unidentified` va al revés que las demás: basta con que UNA pelea sepa
+  // quién es para que deje de ser un desconocido. Afirmar lo contrario sería
+  // dudar de algo que ya consta.
+  if (r.petOf && !dst.petOf) dst.petOf = r.petOf;
+  if (r.pet) dst.pet = true;
+  if (r.mate) dst.mate = true;
+  if (!r.unidentified) dst.unidentified = false;
+  else if (dst.unidentified === undefined) dst.unidentified = true;
 }
 
 function emptyRow(name, side) {
@@ -85,6 +98,7 @@ function finishRow(r, base) {
   const top = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
   return {
     name: r.name, side: r.side,
+    petOf: r.petOf ?? null, pet: !!r.pet, mate: !!r.mate, unidentified: !!r.unidentified,
     damage: r.damage, taken: r.taken, healingDone: r.healingDone,
     hits: r.hits, misses: r.misses, crits: r.crits, flurries: r.flurries,
     ripostes: r.ripostes, deaths: r.deaths, max: r.max, activeSec: r.activeSec,
@@ -379,4 +393,79 @@ export function mergePets(rows = [], label = 'Mascotas', known = [], self = null
   dst.types = [...ty.entries()].sort((a, b) => b[1] - a[1]);
   dst.targets = [...tg.entries()].sort((a, b) => b[1] - a[1]).map(([name, sum]) => ({ name, sum }));
   return [...rows.filter((r) => !isPet(r)), dst].sort((a, b) => b.damage - a.damage);
+}
+
+/**
+ * Quién es la mascota de quién, dicho por ti o sacado de un /pet who leader.
+ *
+ * Se aplica al MOSTRAR y no al guardar, como las exclusiones y los compañeros:
+ * una pelea guardada hace media hora se rotula bien en cuanto lo declaras, sin
+ * reconstruir nada. Y una mascota con dueño deja de estar «sin identificar»
+ * porque ya consta lo que es.
+ */
+export function ownerPets(rows = [], owners = {}) {
+  const m = owners instanceof Map ? owners : new Map(Object.entries(owners ?? {}));
+  if (!m.size || !rows.some((r) => m.has(r.name))) return rows;
+  return rows.map((r) => (m.has(r.name) && r.side !== 'enemy'
+    ? { ...r, petOf: m.get(r.name), unidentified: false } : r));
+}
+
+/**
+ * Pliega cada mascota ajena dentro de la fila de su dueño.
+ *
+ * Es la otra mitad de `mergePets`: aquella junta LAS TUYAS en una sola fila, y
+ * ésta mete la de cada jugador dentro de él. Las dos responden a la misma
+ * pregunta —«¿cuánto ha puesto cada persona?»— y por eso van con la misma
+ * casilla.
+ *
+ * Sólo se pliega si el dueño está en la pelea. Si no está, su mascota se queda
+ * como una fila propia con su rótulo: meterla en alguien que no aparece sería
+ * inventarse una fila.
+ */
+export function mergeOwnerPets(rows = []) {
+  const dueños = new Map();
+  for (const r of rows) if (r.side !== 'enemy') dueños.set(r.name, r);
+  const plegables = rows.filter((r) => r.side !== 'enemy' && r.petOf && dueños.has(r.petOf));
+  if (!plegables.length) return rows;
+
+  const porDueño = new Map();
+  for (const p of plegables) {
+    if (!porDueño.has(p.petOf)) porDueño.set(p.petOf, []);
+    porDueño.get(p.petOf).push(p);
+  }
+  const fuera = new Set(plegables.map((p) => p.name));
+  const salida = [];
+  for (const r of rows) {
+    if (fuera.has(r.name)) continue;
+    const suyas = porDueño.get(r.name);
+    if (!suyas) { salida.push(r); continue; }
+    const dst = { ...r, mergedPets: suyas.length, mergedPetsFrom: suyas.map((p) => p.name) };
+    const ab = new Map(); const ty = new Map(); const tg = new Map();
+    for (const a of dst.abilities ?? []) ab.set(`${a.name}\u0000${a.type ?? ''}`, { ...a });
+    for (const [k, v] of dst.types ?? []) ty.set(k, v);
+    for (const x of dst.targets ?? []) tg.set(x.name, x.sum);
+    for (const p of suyas) {
+      dst.damage += p.damage ?? 0; dst.taken += p.taken ?? 0;
+      dst.healingDone += p.healingDone ?? 0;
+      dst.hits += p.hits ?? 0; dst.meleeHits += p.meleeHits ?? 0; dst.misses += p.misses ?? 0;
+      dst.crits += p.crits ?? 0; dst.flurries += p.flurries ?? 0; dst.ripostes += p.ripostes ?? 0;
+      dst.deaths += p.deaths ?? 0; dst.activeSec += p.activeSec ?? 0;
+      dst.max = Math.max(dst.max ?? 0, p.max ?? 0);
+      dst.share = (dst.share ?? 0) + (p.share ?? 0);
+      for (const a of p.abilities ?? []) {
+        const k = `${a.name}\u0000${a.type ?? ''}`;
+        const c = ab.get(k) ?? { name: a.name, type: a.type, sum: 0, n: 0, max: 0 };
+        c.sum += a.sum; c.n += a.n; c.max = Math.max(c.max ?? 0, a.max ?? 0);
+        ab.set(k, c);
+      }
+      for (const [k, v] of p.types ?? []) ty.set(k, (ty.get(k) ?? 0) + v);
+      for (const x of p.targets ?? []) tg.set(x.name, (tg.get(x.name) ?? 0) + x.sum);
+    }
+    dst.accuracy = dst.meleeHits + dst.misses ? dst.meleeHits / (dst.meleeHits + dst.misses) : null;
+    dst.abilities = [...ab.values()].sort((a, b) => b.sum - a.sum);
+    dst.types = [...ty.entries()].sort((a, b) => b[1] - a[1]);
+    dst.targets = [...tg.entries()].sort((a, b) => b[1] - a[1]).map(([name, sum]) => ({ name, sum }));
+    salida.push(dst);
+  }
+  return salida.sort((a, b) => b.damage - a.damage);
 }

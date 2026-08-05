@@ -11,6 +11,7 @@ const DEFAULTS = {
   logPath: null, self: null, idleSec: 20, fromStart: false,
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
   skipVersion: null, trios: [], mergePets: false, myPets: [], notPets: [], fpsWarned: false, excluded: [],
+  companions: [],
   tts: { enabled: true, voice: null, rate: 1, volume: 1 },
   sound: { enabled: true, volume: 0.5 },
 };
@@ -204,6 +205,7 @@ async function boot() {
 
   if (cfg.classes?.length) engine.setClasses(cfg.classes);
   engine.setTrios(cfg.trios ?? []);
+  engine.setCompanions(cfg.companions ?? []);
   if (cfg.narrate) engine.setNarrate(cfg.narrate);
   engine.setLang(cfg.lang ?? 'es');
   if (cfg.logPath && fs.existsSync(cfg.logPath)) {
@@ -463,9 +465,31 @@ ipcMain.handle('excluded:set', (_e, { name, on }) => {
   const s = new Set(cfg.excluded ?? []);
   if (on) s.add(name); else s.delete(name);
   cfg.excluded = [...s];
+  // Las dos listas dicen lo contrario la una de la otra: nadie puede estar en
+  // ambas, o una fila seria a la vez «no es de los mios» y «es mi compañero».
+  if (on) cfg.companions = (cfg.companions ?? []).filter((x) => x !== name);
+  engine?.setCompanions(cfg.companions ?? []);
   saveConfig(cfg);
-  return cfg.excluded;
+  return { excluded: cfg.excluded, companions: cfg.companions ?? [] };
 });
+
+// Compañeros de grupo declarados. El log de EQL no da ninguna señal de grupo
+// —se busco y no hay— asi que declararlos es la unica via. Como las
+// exclusiones, se aplican al MOSTRAR y se recuerdan entre sesiones.
+ipcMain.handle('companions:set', (_e, { name, on }) => {
+  const s = new Set(cfg.companions ?? []);
+  if (on) s.add(name); else s.delete(name);
+  cfg.companions = [...s];
+  if (on) cfg.excluded = (cfg.excluded ?? []).filter((x) => x !== name);
+  engine?.setCompanions(cfg.companions);
+  saveConfig(cfg);
+  return { companions: cfg.companions, excluded: cfg.excluded ?? [] };
+});
+
+// «Esa mascota es de aquel», a mano. Dura la sesion, como el /pet who leader:
+// los nombres se reciclan entre jugadores y la frase solo vale mientras esa
+// mascota este invocada.
+ipcMain.handle('pet:owner', (_e, { pet, owner }) => engine.assignPetOwner(pet, owner));
 
 ipcMain.handle('pets:merge', (_e, v) => { cfg.mergePets = !!v; saveConfig(cfg); return cfg.mergePets; });
 

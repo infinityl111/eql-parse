@@ -23,6 +23,12 @@
   --t-spell:   #6D7A8C;
   --t-other:   #4E5868;
 
+  /* Alias que ya se usaban sin estar declarados: `border: 1px solid var(--line)`
+     con la variable indefinida invalida la declaración entera, así que el botón
+     de excluir llevaba tiempo pintándose sin borde y con el color heredado. */
+  --line: var(--slate-600);
+  --dim:  var(--bone-dim);
+
   --display: 'Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
   --mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
   --body: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
@@ -97,6 +103,18 @@ aside {
 .fight:hover { background: var(--slate-700); }
 .fight.active { border-left-color: var(--t-cold); background: var(--slate-700); }
 .fight.live { border-left-color: var(--t-poison); }
+/* Elegida a mano. Se distingue de `active` a propósito: `active` es la que
+   estás mirando y hay una sola; `picked` son las que vas a fundir en una. */
+.fight.picked { background: rgba(139,123,216,.16); box-shadow: inset 2px 0 0 var(--t-magic, #8B7BD8); }
+.fight.picked.active { background: rgba(139,123,216,.26); }
+.pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px;
+  background: rgba(139,123,216,.14); border-left: 2px solid #8B7BD8; }
+.pick-bar .eyebrow { font-size: 9px; }
+.pick-bar .sumbtn { margin: 0; flex: 1; }
+.pick-clear { font-size: 10px; padding: 4px 8px; cursor: pointer; background: transparent;
+  border: 1px solid var(--line); border-radius: 4px; color: var(--dim); }
+.pick-clear:hover { border-color: var(--t-ds); color: var(--t-ds); }
+.pick-hint { font-size: 10px; padding: 2px 8px 6px; margin: 0; }
 .fight-name { font-size: 12px; margin-bottom: 3px; }
 .fight-sub { display: flex; gap: 10px; font-size: 11px; color: var(--bone-dim); }
 
@@ -720,6 +738,22 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
   background: transparent; color: var(--dim);
 }
 .excl-btn:hover { border-color: var(--t-ds); color: var(--t-ds); }
+/* El de compañero es el contrario del de excluir, y se lee como tal: el mismo
+   botón, tirando a favor en vez de en contra. */
+.excl-btn.mate:hover { border-color: var(--t-poison); color: var(--t-poison); }
+.excl-item.mate { border-color: var(--t-poison); }
+
+/* Filtro por compañero, bajo el tramo y el enemigo. */
+.mates { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 6px; }
+.mates .eyebrow { font-size: 9px; }
+.mates .hint { flex-basis: 100%; font-size: 10px; margin: 0; }
+.mate-chip {
+  font-size: 10.5px; padding: 3px 8px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: transparent; color: var(--dim);
+}
+.mate-chip:hover { color: var(--bone); }
+.mate-chip.on { border-color: var(--t-poison); color: var(--t-poison); background: rgba(168,199,79,.12); }
 .trio-conf {
   margin-top: 10px; padding: 8px 10px;
   border: 1px solid var(--t-ds); border-radius: 4px;
@@ -729,3 +763,8 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
   display: grid; grid-template-columns: 1fr 2fr; gap: 8px;
   font-size: 11px; padding: 2px 0;
 }
+
+/* Asignar una mascota ajena a su dueño, en la fila desplegada. */
+.petof { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: var(--dim); }
+.petof-sel { font-size: 10px; padding: 3px 6px; background: var(--slate-800);
+  color: var(--bone); border: 1px solid var(--line); border-radius: 4px; }
