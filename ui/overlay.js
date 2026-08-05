@@ -189,11 +189,24 @@ window.eql.onSnapshot((snap) => {
   $('oAlliesN').textContent = n0(S.total);
   $('oEnemiesN').textContent = n0(S.enemyTotal);
 
-  const sigA = JSON.stringify([allies.map((r) => [r.name, r.damage,
-    Math.round(dpsMap[r.name]?.kill ?? dpsMap[r.name]?.w20 ?? 0)]), [...open]]);
+  // El dps NO entra en la firma: cambia cada segundo y reconstruiría la columna
+  // sin parar, perdiendo el clic. Se actualiza en su sitio, más abajo.
+  const sigA = JSON.stringify([allies.map((r) => [r.name, r.damage]), [...open]]);
   const sigE = JSON.stringify([enemies.map((r) => [r.name, r.damage, dead[r.name]]), [...open]]);
   if ($('oAllies').dataset.sig !== sigA) { $('oAllies').dataset.sig = sigA; renderColumn($('oAllies'), allies, snap.self, dead); }
   if ($('oEnemies').dataset.sig !== sigE) { $('oEnemies').dataset.sig = sigE; renderColumn($('oEnemies'), enemies, snap.self, dead); }
+
+  // Refresco del ritmo sin reconstruir nada.
+  for (const host of [$('oAllies'), $('oEnemies')]) {
+    host?.querySelectorAll('.ov-row').forEach((el) => {
+      const d = dpsMap[el.dataset.name];
+      const cell = el.querySelector('.ov-rate');
+      if (!cell) return;
+      const v = d ? (d.kill ?? (d.w20 || null)) : null;
+      const txt = v ? `${n0(v)} dps` : '';
+      if (cell.textContent !== txt) cell.textContent = txt;
+    });
+  }
 
   const tip = snap.live?.suggest
     ? `${t('say.switchTo', { stance: snap.live.best })} · ${t(`adv.kind.${KIND[snap.live.kind] ?? 'equilibrado'}`)}`
@@ -202,11 +215,14 @@ window.eql.onSnapshot((snap) => {
   if (ad) { ad.textContent = tip ?? ''; ad.style.display = tip ? 'block' : 'none'; }
 });
 
-// La barra recupera el ratón al pasar por encima, para poder usar los botones
-// incluso con el overlay en modo atravesable.
-const barEl = document.querySelector('.ov-bar');
-barEl?.addEventListener('mouseenter', () => window.eql.overlayHover(true));
-barEl?.addEventListener('mouseleave', () => window.eql.overlayHover(false));
+// El overlay entero recupera el ratón al pasar por encima.
+//
+// Antes sólo lo hacía la barra superior, así que en modo atravesable los clics
+// sobre las filas se iban al juego y no se desplegaba nada. Con el ratón fuera
+// del overlay se vuelve a atravesar, que es lo que se quiere mientras juegas.
+const root = document.querySelector('.ov');
+root?.addEventListener('mouseenter', () => window.eql.overlayHover(true));
+root?.addEventListener('mouseleave', () => window.eql.overlayHover(false));
 
 $('oClose')?.addEventListener('click', () => window.eql.closeOverlay());
 $('oPass')?.addEventListener('click', () => window.eql.toggleClickThrough());

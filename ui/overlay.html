@@ -8,8 +8,12 @@
 <style>
   body { background: transparent; overflow: hidden; }
   .ov { height: 100vh; display: flex; flex-direction: column;
-        background: rgba(18,22,30,.76); border: 1px solid rgba(51,61,78,.85);
-        backdrop-filter: blur(3px); opacity: .38; transition: opacity .45s ease; }
+        background: rgba(18,22,30,.88); border: 1px solid rgba(51,61,78,.85);
+        opacity: .38; transition: opacity .45s ease; }
+  /* Sin backdrop-filter a propósito: en una ventana transparente y siempre
+     encima obliga al compositor a leer y desenfocar el juego entero en cada
+     fotograma, y eso se nota muchísimo mientras juegas. El fondo sólido con
+     algo de transparencia da un resultado parecido y no cuesta nada. */
   .ov.active, .ov:hover { opacity: 1; }
   .ov.flash { opacity: 1; border-color: var(--t-cold); }
   @media (prefers-reduced-motion: reduce) { .ov { transition: none; } }

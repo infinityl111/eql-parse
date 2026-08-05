@@ -5,9 +5,10 @@
 [![Download](https://img.shields.io/github/v/release/infinityl111/eql-parse-spain?label=Download&style=for-the-badge&color=1f7c8c)](https://github.com/infinityl111/eql-parse-spain/releases/latest)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/eqcampeon)
 
-Real-time combat parser for EverQuest Legends: damage meter, in-game overlay,
-stance advice, voice alerts, and a post-fight breakdown of what could have gone
-better.
+Real-time combat parser for EverQuest Legends. It measures your damage, tells
+you which stance suits what is hitting you, reads chat aloud, keeps every fight
+you've had, and builds a dossier on each enemy from what you've measured
+yourself and what the wiki says.
 
 Interface in Spanish, English, French, German and Portuguese.
 
@@ -17,18 +18,18 @@ Interface in Spanish, English, French, German and Portuguese.
 
 ## If you just want to use it
 
-1. Download `EQL-Parse-SPAIN-1.0.0-setup.exe` and run it.
+1. Download the installer and run it.
 2. Windows will say it doesn't recognise the app. That's normal for unsigned
    programs: **More info → Run anyway**.
 3. In game, type `/log on`.
 4. Options → Filters: set **everything damage-related to full detail**, yours
    and other people's. Without this the parser never sees your group's damage
    and the numbers come out wrong. It's the number one mistake.
-5. Open the app. It finds your `eqlog_*.txt` on every drive by itself.
-6. In the advice panel, pick your three classes. They're also read by typing
-   `/who` in game.
+5. Open the app. It finds your `eqlog_*.txt` on every drive and reads the whole
+   log the first time.
+6. Pick your three classes, or type `/who` and they're read for you.
 7. If you use a pet, type `/pet who leader` once: in EQL it gets a new name
-   every summon, and this way it identifies itself.
+   every summon, and this way it stays identified for good.
 
 ### Shortcuts
 
@@ -38,8 +39,9 @@ Interface in Spanish, English, French, German and Portuguese.
 | `Ctrl+Alt+O` | Toggle between clicks to the game and clicks to the overlay |
 | `Ctrl+Alt+X` | Close the overlay |
 
-The overlay needs EQL in **windowed or borderless**. Windows won't draw over
-exclusive fullscreen.
+The overlay needs EQL in **windowed or borderless**. And if the game stutters
+while you use it, check **Options → Display → Max Background FPS**: on «Min CPU»
+the game drops to a few frames whenever it loses focus.
 
 ---
 
@@ -62,6 +64,35 @@ Two thresholds fall out of the wiki's arithmetic that you can't eyeball:
 So Channeler isn't a timid middle ground: it's the correct pick across the whole
 central band.
 
+### Enemy dossier
+
+![Enemy dossier](docs/enemigo.png)
+
+Pick an enemy and see everything known about it:
+
+- **Estimated health**, derived from the damage it took to drop it. The log
+  gives no health values, so it's a measured bound and it says so.
+- **Which of your spells it resists**, split by invocation. The same spell can
+  land 20% of the time under Inversion and 80% under Over Channel; the mean of
+  the two describes neither. You'll know from your own numbers whether the
+  −150 resist adjust is worth it against each mob.
+- **How it hits you**: its abilities by damage, and its biggest hit.
+- **What the wiki says**, pulled from eqlwiki.com. On Lord Nagafen: "Fire and
+  Magic Resists mean everything with this fellow".
+- **What it drops**, with a link to each item.
+
+### Range summary
+
+![Range summary](docs/resumen.png)
+
+Every fight from the last 2 h, 12 h, 24 h, 3 days, week or month in one
+breakdown. Each combatant expands with abilities summed, by damage type, by
+target, and who hit them. Dps is measured over seconds in combat, not over
+elapsed time.
+
+Fights are saved to disk, so they're there the moment you open the app without
+re-reading the log.
+
 ### Post-fight analysis
 
 ![Analysis](docs/analisis.png)
@@ -75,19 +106,29 @@ versus sustain.
 
 ### Overlay
 
-Dims out of combat, lights up when the fight starts. When a fight ends it
-highlights the result for a few seconds. It warns you when your stance isn't the
-best one, and only when the switch is worth it.
+![Overlay](docs/overlay.png)
 
-### Voice
+Two columns, your side and the enemies. Damage accumulates across the whole
+session and only resets when you want it to. Rows expand on click, dead enemies
+sink to the bottom, and when one drops a card shows for a few seconds who dealt
+how much to it.
 
-Reads incoming chat with a checkbox per channel — tells, group, guild, raid —
-and narrates combat: recommended stance change, your death, your pet's, adds
-joining, a summary when the fight ends.
+### Loot with item tooltips
 
-It also calls out enemy casts that change the fight, filtered by category:
-heals, charm, mez, fear, root. Enemies only, never your group, and the same
-category from the same mob won't repeat within 8 seconds.
+![Item tooltip](docs/objeto.png)
+
+Every fight records what dropped, telling apart what you picked up, what
+auto-sold and what became an upgrade. Hovering shows the stat block in the
+game's own style, pulled from the wiki; clicking opens its page.
+
+### Voice and alerts
+
+Reads incoming chat with a checkbox per channel and narrates combat:
+recommended stance change, your death, your pet's, adds joining, a summary when
+the fight ends. It also calls out enemy casts that change the fight — heals,
+charm, mez, fear, root — enemies only and without repeating itself.
+
+Plus a regex trigger editor, GINA style, with timers and live testing.
 
 ---
 
@@ -106,12 +147,15 @@ src/tailer.js      incremental log reading
 src/patterns.js    pattern dictionary, calibrated against real logs
 src/parser.js      line -> normalised event
 src/encounter.js   fight segmentation and aggregation
+src/store.js       fight store: append-only, never rewritten
+src/aggregate.js   summing many fights, and the enemy dossier
 src/stances.js     stance and invocation data for all 16 classes
 src/advisor.js     which stance suits, on damage reversed to raw
 src/analysis.js    post-fight analysis of long fights
+src/wiki.js        item tooltips and tactical notes from eqlwiki.com
 src/spells.js      spell classification by category
 src/narrator.js    voice: chat and combat
-src/triggers.js    regex triggers, GINA style
+src/triggers.js    regex triggers
 src/i18n.js        translations
 src/engine.js      the facade that ties it together
 electron/          windows, IPC, configuration
@@ -132,9 +176,11 @@ where the program's limits come from, and none of them are papered over:
 - Each stance's cost tells you the price, **not whether you can pay it**.
 - The analysis will never say a heal came late: there's no health data.
 - Only **your** stance is known; nobody else's appears in the log.
+- An enemy's health is an estimate from the damage it took to kill it, not an
+  official figure.
 - Timestamps have one-second resolution, so on short fights DPS carries a large
   structural error. It uses the GamParse/ACT convention,
-  `total / (last − first + 1)`, which is what other people quote.
+  `total / (last − first + 1)`.
 - Shield damage without a possessive (`shards of ice`) can't be attributed, so
   it's kept separate rather than pinned on someone.
 

@@ -10,7 +10,7 @@ const TRIGGERS = () => path.join(app.getPath('userData'), 'triggers.json');
 const DEFAULTS = {
   logPath: null, self: null, idleSec: 20, fromStart: false,
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
-  skipVersion: null, mergePets: false, myPets: [], notPets: [],
+  skipVersion: null, mergePets: false, myPets: [], notPets: [], fpsWarned: false,
   tts: { enabled: true, voice: null, rate: 1, volume: 1 },
   sound: { enabled: true, volume: 0.5 },
 };
@@ -108,7 +108,12 @@ function createOverlay() {
   overlayWin = new BrowserWindow({
     ...b,
     frame: false, transparent: true, resizable: true, skipTaskbar: true, icon: ICON,
-    alwaysOnTop: true, hasShadow: false, focusable: !cfg.clickThrough,
+    alwaysOnTop: true, hasShadow: false,
+    // Nunca recibe el foco. Antes lo tomaba al desactivar el modo atravesable,
+    // y al pincharlo el juego dejaba de ser la ventana activa: EverQuest limita
+    // los fotogramas en segundo plano, de ahí los tirones. Aquí no hay nada que
+    // escribir, así que el foco no hace falta para nada.
+    focusable: false,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
   });
   // 'screen-saver' mantiene la ventana por encima de juegos en modo ventana/borderless.
@@ -124,6 +129,7 @@ function createOverlay() {
 
 function applyClickThrough() {
   if (!overlayWin) return;
+  overlayWin.setFocusable(false);          // por si algo lo hubiera revertido
   overlayWin.setIgnoreMouseEvents(cfg.clickThrough, { forward: true });
   send('overlay:state', { clickThrough: cfg.clickThrough });
 }
@@ -137,11 +143,17 @@ function send(channel, payload) {
 function startPush() {
   clearInterval(pushTimer);
   let lastErr = null;
+  let n = 0;
   pushTimer = setInterval(() => {
     if (!engine) return;
     try {
       engine.tick();
-      send('snapshot', engine.snapshot());
+      const snap = engine.snapshot();
+      mainWin?.webContents.send('snapshot', snap);
+      // El overlay va a la mitad de ritmo: está encima del juego y cada
+      // repintado suyo compite con los fotogramas de EQ. Medio segundo es de
+      // sobra para unas cifras que se leen de reojo.
+      if (++n % 2 === 0) overlayWin?.webContents.send('snapshot', snap);
       lastErr = null;
     } catch (err) {
       // Un fallo aquí solía matar el temporizador entero: la ventana y el
@@ -356,6 +368,8 @@ ipcMain.handle('encounter:export', async (_e, enc) => {
 // Sólo se abre la wiki de EQL: no se acepta cualquier URL que llegue por IPC.
 // Ficha del objeto. Devuelve null si la wiki no lo tiene o no hay red.
 ipcMain.handle('pet:dismiss', (_e, n) => engine.dismissPet(n));
+
+ipcMain.handle('cfg:flag', (_e, { key, value }) => { cfg[key] = value; saveConfig(cfg); return true; });
 
 ipcMain.handle('pets:names', (_e, { name, on }) => {
   // Lista explícita del usuario: manda sobre lo que detecte el registro.

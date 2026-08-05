@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('eql', {
   markPet: (name, on) => ipcRenderer.invoke('pet:mark', { name, on }),
   dismissPet: (n) => ipcRenderer.invoke('pet:dismiss', n),
   setPetName: (name, on) => ipcRenderer.invoke('pets:names', { name, on }),
+  setFlag: (key, value) => ipcRenderer.invoke('cfg:flag', { key, value }),
   onTheme: (fn) => ipcRenderer.on('theme', (_e, t) => fn(t)),
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
   getTriggers: () => ipcRenderer.invoke('triggers:get'),

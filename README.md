@@ -5,9 +5,10 @@
 [![Descargar](https://img.shields.io/github/v/release/infinityl111/eql-parse-spain?label=Descargar&style=for-the-badge&color=1f7c8c)](https://github.com/infinityl111/eql-parse-spain/releases/latest)
 [![Invitar a un café](https://img.shields.io/badge/Invitar%20a%20un%20caf%C3%A9-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/eqcampeon)
 
-Parser de combate en tiempo real para EverQuest Legends: medidor de daño,
-overlay sobre el juego, consejo de postura, avisos por voz y análisis
-posterior de las peleas grandes.
+Parser de combate en tiempo real para EverQuest Legends. Mide tu daño, te dice
+qué postura conviene según lo que te está entrando, lee el chat en voz alta,
+guarda todas tus peleas y arma un expediente de cada enemigo con lo que has
+medido tú y lo que cuenta la wiki.
 
 Interfaz en español, inglés, francés, alemán y portugués.
 
@@ -17,18 +18,18 @@ Interfaz en español, inglés, francés, alemán y portugués.
 
 ## Para quien sólo quiere usarlo
 
-1. Descarga `EQL-Parse-SPAIN-1.0.0-setup.exe` y ejecútalo.
+1. Descarga el instalador y ejecútalo.
 2. Windows dirá que no reconoce la aplicación. Es normal en programas sin
    certificado de firma: **Más información → Ejecutar de todos modos**.
 3. Dentro del juego, escribe `/log on`.
 4. Options → Filters: pon **todo lo relacionado con daño al máximo detalle**,
    tanto lo tuyo como lo de los demás. Sin esto el parser no ve el daño del
    grupo y las cifras salen mal. Es el fallo número uno.
-5. Abre la aplicación. Busca sola tu `eqlog_*.txt` en todas las unidades.
-6. En el panel de consejo, elige tus tres clases. También se leen escribiendo
-   `/who` en el juego.
+5. Abre la aplicación. Busca sola tu `eqlog_*.txt` en todas las unidades y lee
+   el registro entero la primera vez.
+6. Elige tus tres clases, o escribe `/who` y se leen solas.
 7. Si usas mascota, escribe `/pet who leader` una vez: en EQL cambia de nombre
-   en cada invocación y así se identifica sola.
+   en cada invocación y así queda identificada para siempre.
 
 ### Atajos
 
@@ -38,8 +39,9 @@ Interfaz en español, inglés, francés, alemán y portugués.
 | `Ctrl+Alt+O` | Alterna entre clics al juego y clics al overlay |
 | `Ctrl+Alt+X` | Cierra el overlay |
 
-El overlay necesita EQL en **ventana o borderless**. En pantalla completa
-exclusiva Windows no deja dibujar nada por encima.
+El overlay necesita EQL en **ventana o borderless**. Y si el juego se
+entrecorta al usarlo, mira **Options → Display → Max Background FPS**: con
+«Min CPU» el juego baja a unos pocos fotogramas al perder el foco.
 
 ---
 
@@ -62,7 +64,36 @@ De la aritmética del wiki salen dos umbrales que a ojo no se ven:
 Es decir, Channeler no es un término medio conformista: es la elección correcta
 en toda la franja central.
 
-### Análisis posterior de las peleas grandes
+### Expediente del enemigo
+
+![Expediente del enemigo](docs/enemigo.png)
+
+Eliges un enemigo y ves todo lo que se sabe de él:
+
+- **Vida estimada**, deducida del daño que costó tumbarlo. El log no da la vida
+  de nadie, así que es una cota medida y se dice claramente.
+- **Qué hechizos tuyos resiste**, separado por invocación. El mismo hechizo
+  puede entrar el 20% con Inversion y el 80% con Over Channel; el promedio de
+  las dos no describe ninguna. Así sabes con tus números si el −150 de
+  resistencia compensa contra cada bicho.
+- **Cómo te pega**: sus habilidades ordenadas por daño y el golpe más fuerte.
+- **Lo que dice la wiki**, sacado de eqlwiki.com. De Lord Nagafen: «Fire and
+  Magic Resists mean everything with this fellow».
+- **Qué suelta**, con enlace a cada objeto.
+
+### Resumen del tramo
+
+![Resumen del tramo](docs/resumen.png)
+
+Todas las peleas de las últimas 2 h, 12 h, 24 h, 3 días, semana o mes en un
+único desglose. Cada combatiente se despliega con sus habilidades sumadas, por
+tipo de daño, por objetivo y quién le pegó. El dps se mide sobre los segundos
+de combate, no sobre el tiempo transcurrido.
+
+Las peleas se guardan en disco, así que al abrir la aplicación están ahí al
+instante sin releer el registro.
+
+### Análisis posterior
 
 ![Análisis](docs/analisis.png)
 
@@ -75,19 +106,30 @@ curación desperdiciada, foco, bajas y ráfaga contra sostenido.
 
 ### Overlay
 
-Se atenúa fuera de combate y se ilumina al empezar. Al cerrarse la pelea
-destaca el resultado unos segundos. Avisa si tu postura no es la mejor, y sólo
-si el cambio merece la pena.
+![Overlay](docs/overlay.png)
 
-### Voz
+Dos columnas, los tuyos y los enemigos. El daño se acumula durante toda la
+sesión y sólo se pone a cero cuando tú quieres. Las filas se despliegan al
+pulsarlas, los enemigos caídos van bajando, y al morir uno aparece unos
+segundos el reparto de quién le hizo cuánto.
 
-Lee el chat entrante con una casilla por canal —susurros, grupo, hermandad,
-raid— y comenta el combate: cambio de postura recomendado, tu muerte, la de tu
-mascota, enemigos que se suman, resumen al acabar.
+### Botín con ficha de objeto
 
-También avisa de los casteos enemigos que cambian la pelea, filtrados por
-categoría: curaciones, encantar, mez, miedo, raíz. Sólo de enemigos, nunca de
-tus compañeros, y sin repetir la misma categoría del mismo bicho en 8 segundos.
+![Ficha de objeto](docs/objeto.png)
+
+Cada pelea guarda lo que soltó, distinguiendo lo recogido, lo autovendido y las
+mejoras. Al pasar el ratón sale la ficha con el aspecto del juego, sacada de la
+wiki; al pulsar se abre su página.
+
+### Voz y avisos
+
+Lee el chat entrante con una casilla por canal y comenta el combate: cambio de
+postura recomendado, tu muerte, la de tu mascota, enemigos que se suman,
+resumen al acabar. También avisa de los casteos enemigos que cambian la pelea
+—curaciones, encantar, mez, miedo, raíz— sólo de enemigos y sin repetirse.
+
+Y un editor de disparadores por expresión regular, estilo GINA, con
+temporizadores y prueba en vivo.
 
 ---
 
@@ -106,12 +148,15 @@ src/tailer.js      lectura incremental del log
 src/patterns.js    diccionario de patrones, calibrado contra logs reales
 src/parser.js      línea -> evento normalizado
 src/encounter.js   segmentación de peleas y agregación
+src/store.js       almacén de peleas: se añade al final, nunca se reescribe
+src/aggregate.js   suma de varias peleas y expediente del enemigo
 src/stances.js     datos de posturas e invocaciones de las 16 clases
 src/advisor.js     qué postura conviene, con el daño revertido a bruto
 src/analysis.js    análisis posterior de peleas largas
+src/wiki.js        fichas de objeto y notas tácticas desde eqlwiki.com
 src/spells.js      clasificación de hechizos por categoría
 src/narrator.js    voz: chat y combate
-src/triggers.js    disparadores por expresión regular, estilo GINA
+src/triggers.js    disparadores por expresión regular
 src/i18n.js        traducciones
 src/engine.js      fachada que une todo
 electron/          ventanas, IPC, configuración
@@ -132,10 +177,11 @@ ahí salen los límites del programa, y ninguno se disimula:
 - Los costes de cada postura dicen el precio, **no si puedes pagarlo**.
 - El análisis nunca dirá si una cura llegó tarde: no hay dato de vida.
 - Sólo se conoce **tu** postura; la de los demás no aparece.
+- La vida de un enemigo es una estimación del daño que costó matarlo, no un
+  dato oficial.
 - La marca de tiempo tiene resolución de un segundo, así que en peleas de
   pocos segundos el DPS tiene un error estructural grande. Se usa la
-  convención de GamParse y ACT, `total / (último − primero + 1)`, que es la
-  comparable con lo que postea la gente.
+  convención de GamParse y ACT, `total / (último − primero + 1)`.
 - El daño de escudo sin posesivo (`shards of ice`) no se puede atribuir y se
   deja aparte en vez de adjudicarlo a alguien.
 

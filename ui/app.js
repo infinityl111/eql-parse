@@ -105,6 +105,10 @@ async function renderWizard() {
         <div class="th eyebrow">Ctrl+Alt+X</div><div class="td">${esc(t('ov.close'))}</div>
       </div>
       <div class="wz-warn"><p>${esc(t('wz.6.fullscreen'))}</p></div>
+      <div class="wz-warn">
+        <div class="wz-warn-h">${esc(t('ov.fpsTitle'))}</div>
+        <p>${esc(t('ov.fpsBody'))}</p>
+      </div>
       <button id="wzOverlay">${esc(t('wz.6.open'))}</button>
       <p class="hint" style="margin-top:14px">${esc(t('wz.6.ready'))}</p>`,
   }[w.step]();
@@ -1622,7 +1626,20 @@ $('btnTheme')?.addEventListener('click', async () => {
   await window.eql.setTheme(t);
 });
 
-$('btnOverlay').addEventListener('click', () => window.eql.openOverlay());
+$('btnOverlay').addEventListener('click', async () => {
+  window.eql.openOverlay();
+  // Una sola vez: el tirón del juego al usar el overlay casi siempre es este
+  // ajuste, y nadie lo relaciona por su cuenta.
+  if (state.cfg.fpsWarned) return;
+  state.cfg.fpsWarned = true;
+  await window.eql.setFlag?.('fpsWarned', true);
+  const bar = $('updBar');
+  if (!bar) return;
+  bar.innerHTML = `<span><b>${esc(t('ov.fpsTitle'))}.</b> ${esc(t('ov.fpsBody'))}</span>
+    <button id="fpsOk">${esc(t('ov.fpsOk'))}</button>`;
+  bar.style.display = 'flex';
+  $('fpsOk').addEventListener('click', () => { bar.style.display = 'none'; });
+});
 $('btnSetup').addEventListener('click', () => {
   state.setup = true;
   $('bodyGrid').innerHTML = '';   // fuerza el repintado del formulario

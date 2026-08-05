@@ -41,6 +41,7 @@ export const LANGS = [
 ];
 
 const ES = {
+  'ov.fpsTitle': 'Si el juego se entrecorta al usar el overlay', 'ov.fpsBody': 'En EQ, Options → Display → Max Background FPS. Si está en «Min CPU», el juego baja a unos pocos fotogramas cuando deja de ser la ventana activa. Ponlo en 30 o 60 y desaparece el tirón.', 'ov.fpsOk': 'Entendido',
   'foe.withInv': 'con {inv}', 'foe.noInv': 'sin invocación',
   'foe.hpFrom_1': 'de una muerte',
   'foe.hp': 'Vida estimada', 'foe.hpFrom': 'de {n} muertes', 'foe.howHits': 'Cómo te pega', 'foe.drops': 'Botín que suelta', 'foe.zones': 'Zonas',
@@ -351,6 +352,7 @@ const ES = {
 };
 
 const EN = {
+  'ov.fpsTitle': 'If the game stutters while using the overlay', 'ov.fpsBody': 'In EQ, Options → Display → Max Background FPS. On «Min CPU» the game drops to a few frames whenever it stops being the active window. Set it to 30 or 60 and the stutter goes away.', 'ov.fpsOk': 'Got it',
   'foe.withInv': 'with {inv}', 'foe.noInv': 'no invocation',
   'foe.hpFrom_1': 'from one kill',
   'foe.hp': 'Estimated health', 'foe.hpFrom': 'from {n} kills', 'foe.howHits': 'How it hits you', 'foe.drops': 'What it drops', 'foe.zones': 'Zones',
@@ -651,6 +653,7 @@ const EN = {
 
 
 const FR = {
+  'ov.fpsTitle': 'Si le jeu saccade en utilisant l\u2019overlay', 'ov.fpsBody': 'Dans EQ, Options → Display → Max Background FPS. Sur « Min CPU », le jeu tombe à quelques images dès qu\u2019il n\u2019est plus la fenêtre active. Mets 30 ou 60 et la saccade disparaît.', 'ov.fpsOk': 'Compris',
   'foe.withInv': 'avec {inv}', 'foe.noInv': 'sans invocation',
   'foe.hpFrom_1': 'sur une mort',
   'foe.hp': 'Vie estimée', 'foe.hpFrom': 'sur {n} morts', 'foe.howHits': 'Comment il frappe', 'foe.drops': 'Ce qu\u2019il lâche', 'foe.zones': 'Zones',
@@ -1039,6 +1042,7 @@ const FR = {
 };
 
 const DE = {
+  'ov.fpsTitle': 'Wenn das Spiel beim Overlay stockt', 'ov.fpsBody': 'In EQ: Options → Display → Max Background FPS. Bei «Min CPU» fällt das Spiel auf wenige Bilder, sobald es nicht mehr das aktive Fenster ist. Stell 30 oder 60 ein und das Stocken verschwindet.', 'ov.fpsOk': 'Verstanden',
   'foe.withInv': 'mit {inv}', 'foe.noInv': 'ohne Invokation',
   'foe.hpFrom_1': 'aus einem Kill',
   'foe.hp': 'Geschätzte Lebenspunkte', 'foe.hpFrom': 'aus {n} Kills', 'foe.howHits': 'Wie er dich trifft', 'foe.drops': 'Was er fallen lässt', 'foe.zones': 'Zonen',
@@ -1427,6 +1431,7 @@ const DE = {
 };
 
 const PT = {
+  'ov.fpsTitle': 'Se o jogo engasga ao usar o overlay', 'ov.fpsBody': 'No EQ, Options → Display → Max Background FPS. Em «Min CPU» o jogo desce a poucos fotogramas quando deixa de ser a janela ativa. Põe 30 ou 60 e o engasgo desaparece.', 'ov.fpsOk': 'Entendido',
   'foe.withInv': 'com {inv}', 'foe.noInv': 'sem invocação',
   'foe.hpFrom_1': 'de uma morte',
   'foe.hp': 'Vida estimada', 'foe.hpFrom': 'de {n} mortes', 'foe.howHits': 'Como te bate', 'foe.drops': 'O que larga', 'foe.zones': 'Zonas',
