@@ -7,8 +7,8 @@
 
 Parser de combate en tiempo real para EverQuest Legends. Mide tu daño, te dice
 qué postura conviene según lo que te está entrando, lee el chat en voz alta,
-guarda todas tus peleas y arma un expediente de cada enemigo con lo que has
-medido tú y lo que cuenta la wiki.
+guarda todas tus peleas y arma una enciclopedia de zonas, enemigos y botín
+con lo que has medido tú y lo que cuenta la wiki.
 
 Interfaz en español, inglés, francés, alemán y portugués.
 
@@ -75,11 +75,74 @@ Eliges un enemigo y ves todo lo que se sabe de él:
 - **Qué hechizos tuyos resiste**, separado por invocación. El mismo hechizo
   puede entrar el 20% con Inversion y el 80% con Over Channel; el promedio de
   las dos no describe ninguna. Así sabes con tus números si el −150 de
-  resistencia compensa contra cada bicho.
+  resistencia compensa contra cada enemigo.
 - **Cómo te pega**: sus habilidades ordenadas por daño y el golpe más fuerte.
 - **Lo que dice la wiki**, sacado de eqlwiki.com. De Lord Nagafen: «Fire and
   Magic Resists mean everything with this fellow».
 - **Qué suelta**, con enlace a cada objeto.
+
+### Enciclopedia
+
+![Enciclopedia](docs/enciclopedia.png)
+
+Todo lo que has ido aprendiendo peleando, ordenado para consultarlo después. Y
+una regla que gobierna la sección entera: **no se calcula nada al abrirla**. La
+ficha de cada enemigo se pone al día al cerrar cada pelea, que es cuando el dato
+ya está en la mano; consultarla es leer, no calcular. Con dos mil peleas
+guardadas, abrir cualquiera de sus pantallas cuesta dos centésimas de segundo.
+
+#### Zonas, y por qué está partido por dificultad
+
+![Zonas por dificultad](docs/zonas.png)
+
+Una fila por zona y una columna por dificultad, de la D0 a la D4. Esta pantalla
+es la que explica de un vistazo por qué todo lo demás está separado: la misma
+zona en D2, D3 y D4 no es la misma zona. En EQL cada instancia sortea una
+dificultad y los enemigos cambian de verdad — medido en un registro real, Magus
+Rokyl tiene un **59% más de vida en D3 que en D2**, pega 3,6 veces más fuerte y
+lanza dos hechizos que en D2 no tiene. Promediarlas describiría un enemigo que
+no existe.
+
+La celda vacía va a trazos y no dice que ahí no haya nada: dice que **no has
+entrado**. Son dos cosas distintas y conviene que se distingan. La D0 es el
+mundo abierto: el registro no la escribe —una zona sin instanciar no dice «-
+Solo 0», no dice nada—, pero la pregunta «¿en qué dificultad?» tiene respuesta.
+
+#### El expediente de un enemigo, y todo lo que has peleado contra él
+
+![Expediente en la enciclopedia](docs/expediente.png)
+
+Al entrar en un enemigo sale su ficha completa —vida estimada, una tarjeta por
+dificultad, qué resiste, con qué te pega, lo que dice la wiki y qué suelta— y
+debajo **todos los combates que has tenido contra él** en esa zona y esa
+dificultad. Pulsando uno se abre en la pestaña de Combate.
+
+La vida estimada nunca se promedia entre dificultades: se enseña la de la más
+alta en la que llegó a caer, con su etiqueta al lado. Si en la más alta nunca
+cayó, se enseña la de abajo — decir la de arriba sería inventarla.
+
+#### Botín
+
+![Botín](docs/botin.png)
+
+Cada objeto, de quién ha caído y cuántas veces: **«2 en 9 caídas»**. Son dos
+cifras medidas puestas una al lado de la otra —las veces que lo has tumbado y
+las veces que soltó eso—, no una probabilidad de caída: mezcla todas las
+dificultades, porque el registro atribuye el objeto a un nombre y no a una
+instancia. Y lo que el registro no atribuye a nadie sale igual, diciendo que no
+tiene fuente: una lista a la que le faltan objetos sin avisar es peor que una
+con huecos declarados.
+
+#### La ficha se aprende, no se calcula
+
+Se guarda junto a tu histórico y lleva tres marcas que detectan tres cosas
+distintas: su propia generación, la del almacén con el que se construyó y la
+última pelea incorporada. Si sólo le faltan las peleas de mientras la aplicación
+estaba cerrada, las incorpora al arrancar; si reconstruiste el histórico, lo
+detecta y se rehace entera. Hay un botón al pie de la sección y el comando
+`npm run enc:rebuild`, que además compara la rehecha con la que había y avisa si
+alguna cifra se ha movido. Rehacerla no relee tu registro: recorre el histórico
+que ya tienes guardado.
 
 ### Resumen del tramo
 

@@ -7,8 +7,8 @@
 
 Real-time combat parser for EverQuest Legends. It measures your damage, tells
 you which stance suits what is hitting you, reads chat aloud, keeps every fight
-you've had, and builds a dossier on each enemy from what you've measured
-yourself and what the wiki says.
+you've had, and builds an encyclopedia of zones, enemies and loot from what
+you've measured yourself and what the wiki says.
 
 Interface in Spanish, English, French, German and Portuguese.
 
@@ -80,6 +80,69 @@ Pick an enemy and see everything known about it:
 - **What the wiki says**, pulled from eqlwiki.com. On Lord Nagafen: "Fire and
   Magic Resists mean everything with this fellow".
 - **What it drops**, with a link to each item.
+
+### Encyclopedia
+
+![Encyclopedia](docs/enciclopedia.png)
+
+Everything you've learned by fighting, arranged so you can look it up later. One
+rule governs the whole section: **nothing is computed when you open it**. Each
+enemy's entry is brought up to date when a fight closes, which is when the data
+is already in hand; looking it up is reading, not computing. With two thousand
+stored fights, opening any of its screens costs two hundredths of a second.
+
+#### Zones, and why everything is split by difficulty
+
+![Zones by difficulty](docs/zonas.png)
+
+One row per zone, one column per difficulty, D0 to D4. This screen is the one
+that explains at a glance why everything else is kept apart: the same zone at
+D2, D3 and D4 is not the same zone. In EQL every instance rolls a difficulty and
+the enemies genuinely change — measured on a real log, Magus Rokyl has **59%
+more health at D3 than at D2**, hits 3.6 times harder, and casts two spells it
+doesn't have at D2. Averaging them would describe an enemy that doesn't exist.
+
+An empty cell is dashed and doesn't say there's nothing there: it says **you
+haven't been in**. Those are two different things and they should look
+different. D0 is the open world: the log never writes it — an un-instanced zone
+doesn't say "- Solo 0", it says nothing — but "at what difficulty?" does have an
+answer.
+
+#### An enemy's file, and every fight you've had against it
+
+![Enemy file in the encyclopedia](docs/expediente.png)
+
+Opening an enemy gives you its full file — estimated health, one card per
+difficulty, what it resists, what it hits you with, what the wiki says and what
+it drops — and below it **every fight you've had against it** in that zone at
+that difficulty. Click one and it opens in the Combat tab.
+
+Estimated health is never averaged across difficulties: you get the one from the
+highest difficulty where it actually fell, labelled as such. If it never fell at
+the highest, the lower one is shown — claiming the higher one would be inventing
+it.
+
+#### Loot
+
+![Loot](docs/botin.png)
+
+Every item, who dropped it and how many times: **"2 in 9 kills"**. That's two
+measured figures side by side — the times you brought it down and the times it
+dropped that — not a drop rate: it mixes every difficulty, because the log
+attributes the item to a name and not to an instance. And whatever the log
+attributes to nobody shows up anyway, saying it has no source: a list quietly
+missing items is worse than one with declared gaps.
+
+#### The entries are learned, not computed
+
+They live next to your history and carry three marks that detect three different
+things: their own generation, the generation of the store they were built from,
+and the last fight folded in. If they're only missing the fights from while the
+app was closed, those get folded in at startup; if you rebuilt the history, it
+notices and they're rebuilt whole. There's a button at the foot of the section
+and the `npm run enc:rebuild` command, which also compares the rebuilt entries
+against the previous ones and warns you if any figure moved. Rebuilding never
+re-reads your log: it walks the history you already have.
 
 ### Range summary
 
