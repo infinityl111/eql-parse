@@ -133,6 +133,22 @@ instancia. Y lo que el registro no atribuye a nadie sale igual, diciendo que no
 tiene fuente: una lista a la que le faltan objetos sin avisar es peor que una
 con huecos declarados.
 
+#### Mis hechizos, mis muertes y mi progresión
+
+Tu catálogo de hechizos —qué hace cada uno, contra quién entra y cuánto tarda en
+volver—, dónde caes y contra qué, y tus marcas. Cada hechizo con su icono, y lo
+que no es un hechizo no lleva ninguno: `hits` no tiene icono porque no es un
+hechizo, no porque falte algo.
+
+En muertes, el enemigo que sale al lado es **el que más daño te hizo en esa
+pelea**, no quien te dio el golpe final: el registro no dice cuál fue.
+
+Y en progresión **no hay curva de dps en el tiempo**, a propósito: sube al subir
+de nivel y baja al pelear con algo más duro, así que mide las dos cosas a la vez
+y ninguna. Lo comparable es el mismo enemigo, en la misma dificultad y al mismo
+nivel, y sólo se dibuja una línea cuando esa terna llega a cinco peleas. Con tres
+puntos no hay tendencia: hay tres puntos.
+
 #### La ficha se aprende, no se calcula
 
 Se guarda junto a tu histórico y lleva tres marcas que detectan tres cosas

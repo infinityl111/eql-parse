@@ -778,8 +778,15 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .difcard-ab b { color: var(--bone-dim); font-family: var(--mono); }
 
 /* ── Catálogo de hechizos ───────────────────────────── */
-.cat-head, .cat-row { display: grid; align-items: center; gap: 8px; padding: 4px 0;
-  grid-template-columns: minmax(150px,2fr) 84px 54px 64px 92px 84px 58px 72px; }
+/* Ocho columnas, y NUEVE cuando hay resistencias que enseñar: la de «daño
+   efectivo» sólo aparece si alguna vez algo no entra al 100%, porque si no
+   repite a la de al lado. La rejilla estaba clavada en ocho, así que en cuanto
+   aparecía la novena se caía a una segunda línea y arrastraba «reutilización»
+   con ella. Con `auto-fit` no hay que contar: las que haya, caben. */
+.cat-head, .cat-row {
+  display: grid; align-items: center; gap: 8px; padding: 4px 0;
+  grid-template-columns: minmax(150px, 2fr) 84px repeat(auto-fit, minmax(56px, 1fr));
+}
 .cat-head { border-bottom: 1px solid var(--slate-700); margin-top: 14px;
             font-family: var(--display); font-size: 9.5px; letter-spacing: .1em;
             text-transform: uppercase; color: var(--bone-faint); }
@@ -1031,3 +1038,36 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 /* La zona a la que has saltado desde una sugerencia, señalada al llegar. */
 .ztable tr.zmark td { background: rgba(111,199,216,.09); }
 .ztable tr.zmark .zname { color: var(--t-cold); }
+
+/* ── Iconos de hechizo ───────────────────────────────── */
+/* Que un nombre no lleve icono NO es un hueco: `hits` no es un hechizo. Por eso
+   no hay recuadro reservado ni marcador de ausencia — sencillamente no está. */
+.sicon { width: 18px; height: 18px; vertical-align: -4px; margin-right: 7px;
+         border-radius: 2px; image-rendering: auto; }
+.cat-name .sicon { margin-right: 6px; }
+
+/* ── Habilidades del enemigo ─────────────────────────── */
+.abils { display: grid; gap: 7px; }
+.abil { background: var(--slate-800); border-left: 2px solid var(--slate-600);
+        border-radius: 2px; padding: 7px 10px; }
+.abil-h { display: flex; align-items: center; gap: 8px; }
+.abil-h .sicon { width: 22px; height: 22px; vertical-align: 0; margin: 0; }
+.abil-n { flex: 1; font-size: 13px; color: var(--bone); }
+.abil-h .seg { width: 9px; height: 9px; display: inline-block; flex: none; }
+.abil-kv { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px;
+           font-size: 11px; color: var(--bone-dim); }
+.abil-kv b { color: var(--bone); }
+/* Lo consultado, separado de lo medido y dicho. */
+.abil-wiki { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px;
+             padding-top: 6px; border-top: 1px solid var(--slate-700);
+             font-size: 11px; color: var(--bone-faint); }
+.tagw { font-family: var(--display); font-size: 9px; letter-spacing: .1em;
+        text-transform: uppercase; color: var(--t-cold); border: 1px solid var(--t-cold);
+        border-radius: 8px; padding: 0 6px; }
+
+/* ── Progresión y muertes ────────────────────────────── */
+.encrow.static { cursor: default; }
+.encrow.static:hover { background: var(--slate-850); border-color: transparent;
+                       border-left-color: var(--t-ds); }
+.encrow.serie-row { grid-template-columns: 1fr 240px auto; align-items: center; }
+.serie { width: 240px; height: 34px; display: block; }

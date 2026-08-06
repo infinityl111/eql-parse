@@ -221,6 +221,13 @@ export class Engine extends EventEmitter {
     this.path = logPath;
     this.self = opts.self || character;
     this.server = server;
+    // Quién eres se sabe aquí y no al abrir el almacén, y hay un campo del
+    // resumen —tu daño en cada pelea— que sin eso no se puede rellenar. Se
+    // recalcula leyendo el histórico que ya está guardado; el log no se toca.
+    if (this.store) {
+      this.store.self = this.self;
+      this.storeBackfill = this.store.backfill(this.self);
+    }
     this.seq = 0;
     this.error = null;
     // La tabla manual se reproduce desde el principio: al releer el log los
@@ -1225,8 +1232,19 @@ export class Engine extends EventEmitter {
   encFoe(name) { return this.enc?.foe(name) ?? null; }
   encFoes() { return this.enc?.foes() ?? []; }
   encLoot() { return this.enc?.lootList() ?? []; }
+  encDeaths() { return this.enc?.deaths(this.self) ?? null; }
+  encProgress() { return this.enc?.progress() ?? null; }
   encCounts() { return this.enc?.counts() ?? null; }
-  encStatus() { return { ...(this.enc?.audit() ?? {}), load: this.encLoad ?? null }; }
+  encStatus() {
+    return {
+      ...(this.enc?.audit() ?? {}),
+      load: this.encLoad ?? null,
+      // Resúmenes del índice completados al arrancar. Se dice en el pie por lo
+      // mismo que la ficha: si algo tarda un momento la primera vez, mejor que
+      // se sepa por qué.
+      backfilled: this.storeBackfill ?? 0,
+    };
+  }
   encRebuild() { return this.enc?.rebuild() ?? { ok: false }; }
 
   /** Los combates contra un enemigo, opcionalmente los de una zona y dificultad. */

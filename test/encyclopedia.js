@@ -270,6 +270,81 @@ console.log('\nel botín, incluido el que el registro no atribuye a nadie');
     'el recuento de la portada cuenta los dos objetos', enc.counts().botin.objetos);
 }
 
+console.log('\nla progresión sólo compara lo comparable');
+{
+  const store = new FightStore(nuevaCarpeta(), 'Campeon');
+  store.load();
+  const mia = (i, foes, mio, dur, lvl, diff) => {
+    const f = pelea(i, { ...FEAR4, foe: foes[0], vida: mio, diff });
+    f.duration = dur; f.level = lvl;
+    f.rows[0].damage = mio;
+    f.rows[0].targets = foes.map((x) => ({ name: x, sum: Math.round(mio / foes.length) }));
+    // Varios enemigos en la misma pelea: se añaden como filas enemigas.
+    for (const extra of foes.slice(1)) {
+      f.rows.push({ ...f.rows[1], name: extra, abilities: [] });
+    }
+    return f;
+  };
+  // Seis contra Dread al nivel 50 en D4, una corta, y una contra dos a la vez.
+  for (let i = 0; i < 6; i++) store.append(mia(i, ['Dread'], 30000 + i * 2000, 60, 50, 4), 1_700_000_000_000 + i * 60_000);
+  store.append(mia(90, ['Dread'], 9000, 12, 50, 4), 1_700_000_900_000);
+  store.append(mia(91, ['Dread', 'Terror'], 50000, 90, 50, 4), 1_700_000_960_000);
+  const enc = new Encyclopedia(store); enc.load();
+  const p = enc.progress();
+
+  ok(p.fights === 7, 'la pelea de 12 segundos no cuenta: no mide tu ritmo, mide un pico', p.fights);
+  const dread = p.marcas.find((m) => m.name === 'Dread');
+  ok(dread.n === 6,
+    'la pelea contra dos enemigos queda fuera del reparto por enemigo', dread.n);
+  ok(!p.marcas.some((m) => m.name === 'Terror'),
+    'y no se le atribuye a ninguno de los dos');
+  ok(dread.serie && dread.serie.length === 6,
+    'con seis peleas de la misma terna sí se dibuja la línea', dread.serie?.length);
+  ok(dread.serie[0].at < dread.serie.at(-1).at, 'y va en orden de cuándo pasaron');
+
+  // Con pocas, no se dibuja: tres puntos no son una tendencia.
+  const s2 = new FightStore(nuevaCarpeta(), 'Campeon'); s2.load();
+  for (let i = 0; i < 3; i++) s2.append(mia(i, ['Terror'], 30000, 60, 50, 4), 1_700_000_000_000 + i * 60_000);
+  const p2 = new Encyclopedia(s2); p2.load();
+  ok(p2.progress().marcas[0].serie === null,
+    'con tres peleas no se dibuja línea ninguna', String(p2.progress().marcas[0].serie));
+
+  // Sin saber quién eres, tu daño no consta y se dice en vez de suponer un cero.
+  const s3 = new FightStore(nuevaCarpeta());   // sin `self`
+  s3.load();
+  s3.append(mia(1, ['Dread'], 30000, 60, 50, 4), 1_700_000_000_000);
+  const p3 = new Encyclopedia(s3); p3.load();
+  ok(p3.progress().fights === 0 && p3.progress().sinDato === 1,
+    'una pelea sin tu daño anotado no entra, y se cuenta aparte');
+}
+
+console.log('\nlas muertes dicen quién te pegó más, no quién te mató');
+{
+  const store = new FightStore(nuevaCarpeta(), 'Campeon');
+  store.load();
+  const conMuerte = (i, veces) => {
+    const f = pelea(i, { ...FEAR4, foe: 'Dread', vida: 40000 });
+    f.losses = Array(veces).fill('Campeon');
+    f.rows[0].taken = 12000;
+    f.rows[0].takenBySource = [{ name: 'Dread', sum: 9000 }, { name: 'a fear guardian', sum: 3000 }];
+    return f;
+  };
+  store.append(conMuerte(1, 1), 1_700_000_000_000);
+  store.append(conMuerte(2, 2), 1_700_000_060_000);
+  store.append(pelea(3, { ...FEAR4, foe: 'Dread', vida: 40000 }), 1_700_000_120_000);
+  const enc = new Encyclopedia(store); enc.load();
+  const d = enc.deaths('Campeon');
+
+  ok(d.total === 3, 'morir dos veces en una pelea son dos', d.total);
+  ok(d.muertes.length === 2, 'pero son dos peleas', d.muertes.length);
+  ok(d.muertes[0].masDaño.name === 'Dread' && Math.round(d.muertes[0].masDaño.share * 100) === 75,
+    'y se dice quién te hizo más daño, con cuánto del total',
+    `${d.muertes[0].masDaño.name} ${Math.round(d.muertes[0].masDaño.share * 100)}%`);
+  ok(d.porZona[0].k === 'Plane of Fear · D4', 'agrupadas por zona y dificultad', d.porZona[0].k);
+  ok(enc.deaths(null).muertes.length === 0,
+    'sin saber quién eres no se inventa ninguna muerte');
+}
+
 console.log('\nlos combates contra un enemigo se separan por dificultad');
 {
   const store = almacenLleno();

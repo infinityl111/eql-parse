@@ -77,8 +77,10 @@ export function generacion(meta) {
 }
 
 export class FightStore {
-  constructor(dir) {
+  constructor(dir, self = null) {
     this.dir = dir;
+    /** Tu nombre. Hace falta para anotar tu daño en cada resumen. */
+    this.self = self;
     this.dataPath = path.join(dir, 'fights.ndjson');
     this.idxPath = path.join(dir, 'fights.idx');
     this.index = [];        // resúmenes, del más reciente al más antiguo
@@ -121,8 +123,14 @@ export class FightStore {
     };
   }
 
-  /** Resumen: lo justo para la lista y los filtros. */
-  static summary(f, at, off, len) {
+  /**
+   * Resumen: lo justo para la lista y los filtros.
+   *
+   * @param {string|null} self  tu nombre, para anotar tu daño en la pelea. Si no
+   *   se sabe, el campo NO se escribe: un cero afirmaría que no pegaste nada.
+   */
+  static summary(f, at, off, len, self = null) {
+    const mio = self ? (f.rows ?? []).find((r) => r.name === self) : null;
     return {
       // `uid` identifica; `id` sólo se conserva para mostrarlo y exportarlo.
       uid: off, id: f.id, at, off, len,
@@ -143,6 +151,11 @@ export class FightStore {
       // Los nombres del botín van en el índice: así el aviso al pasar el ratón
       // por una pelea no obliga a leerla entera del disco.
       loot: (f.loot ?? []).map((l) => l.item),
+      // TU daño en esa pelea. `raidDps` es el del grupo entero, y con él no se
+      // puede hablar de tu progresión: sube porque entró un compañero que pega
+      // más. Va aquí y no se deduce al consultar porque si no habría que abrir
+      // dos mil registros del disco para dibujar una lista.
+      ...(mio ? { mine: mio.damage ?? 0 } : {}),
     };
   }
 
@@ -171,24 +184,31 @@ export class FightStore {
       }
     } catch { /* aún no hay nada guardado */ }
     this.index.sort((a, b) => b.at - a.at);
-    this.#rellenarAliados();
+    // Con lo que se sepa ahora. Si aún no se sabe quién eres, `mine` se
+    // rellenará cuando el motor lo sepa y vuelva a llamar.
+    this.lastBackfill = this.backfill(this.self);
     return this.index.length;
   }
 
   /**
-   * Índices anteriores a que existiera `allies`: se rellena leyendo el .ndjson.
+   * Rellena los campos del resumen que un índice viejo no traía.
    *
    * El índice es dato DERIVADO —el .ndjson es la fuente y no se toca nunca—,
    * así que esto no es una migración de datos: es recalcular un resumen. Por
-   * eso no hace falta releer el log ni avisar a nadie. Medido sobre un almacén
-   * real de 160 peleas y 2,5 MB: 34 ms, y el índice pasa de 76 a 81 KB.
+   * eso no hace falta releer el log. Medido sobre un almacén real de 160 peleas
+   * y 2,5 MB: 34 ms, y el índice pasa de 76 a 81 KB.
    *
    * Se escribe en un fichero aparte y se renombra encima. Si el proceso muere a
    * medias, el índice de antes sigue entero: lo peor que pasa es que se vuelva
    * a intentar en el siguiente arranque.
+   *
+   * @param {string|null} self  hace falta para `mine`, que es TU daño. Sin él
+   *   ese campo no se rellena: se reintentará cuando se sepa quién eres.
+   * @returns {number} cuántos resúmenes se han completado
    */
-  #rellenarAliados() {
-    const faltan = this.index.filter((s) => s.allies === undefined);
+  backfill(self = null) {
+    const faltan = this.index.filter((s) => s.allies === undefined
+      || (self && s.mine === undefined));
     if (!faltan.length) return 0;
     let fd = null;
     try { fd = fs.openSync(this.dataPath, 'r'); } catch { return 0; }
@@ -198,12 +218,21 @@ export class FightStore {
         const buf = Buffer.allocUnsafe(s.len);
         fs.readSync(fd, buf, 0, s.len, s.off);
         const f = JSON.parse(buf.toString('utf8'));
-        s.allies = (f.rows ?? []).filter((r) => r.side !== 'enemy').map((r) => r.name);
+        if (s.allies === undefined) {
+          s.allies = (f.rows ?? []).filter((r) => r.side !== 'enemy').map((r) => r.name);
+        }
+        if (self && s.mine === undefined) {
+          const mio = (f.rows ?? []).find((r) => r.name === self);
+          // Si no sales en la pelea, tu daño en ella es cero de verdad: estuvo
+          // guardada porque pasó algo, no porque tú estuvieras.
+          if (mio) s.mine = mio.damage ?? 0;
+          else s.mine = 0;
+        }
         hechos++;
       } catch {
-        // Registro ilegible: se deja sin `allies` en vez de ponerle una lista
-        // vacía, que afirmaría que no había nadie. El filtro por compañero lo
-        // descarta, que es lo honesto: no se sabe quién estuvo.
+        // Registro ilegible: se deja sin rellenar en vez de poner una lista
+        // vacía o un cero, que afirmarían que no había nadie o que no pegaste.
+        // El filtro por compañero descarta lo que no consta, que es lo honesto.
       }
     }
     fs.closeSync(fd);
@@ -236,7 +265,7 @@ export class FightStore {
       let off = 0;
       try { off = fs.statSync(this.dataPath).size; } catch { off = 0; }
       fs.appendFileSync(this.dataPath, body);
-      const s = FightStore.summary(fight, at, off, Buffer.byteLength(body));
+      const s = FightStore.summary(fight, at, off, Buffer.byteLength(body), this.self);
       fs.appendFileSync(this.idxPath, JSON.stringify(s) + '\n');
       this.index.unshift(s);
       this.byUid.set(s.uid, s);

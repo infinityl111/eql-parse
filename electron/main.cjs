@@ -409,6 +409,8 @@ ipcMain.handle('enc:zoneFoes', (_e, { base, diff }) => engine.encZoneFoes(base, 
 ipcMain.handle('enc:foe', (_e, name) => engine.encFoe(name));
 ipcMain.handle('enc:foes', () => engine.encFoes());
 ipcMain.handle('enc:loot', () => engine.encLoot());
+ipcMain.handle('enc:deaths', () => engine.encDeaths());
+ipcMain.handle('enc:progress', () => engine.encProgress());
 ipcMain.handle('enc:fights', (_e, q) => engine.encFights(q ?? {}));
 ipcMain.handle('enc:counts', () => engine.encCounts());
 ipcMain.handle('enc:status', () => engine.encStatus());
@@ -540,6 +542,13 @@ ipcMain.handle('store:rebuild', async () => {
 ipcMain.handle('update:get', () => (cfg.skipVersion === latest?.version ? null : latest));
 ipcMain.handle('update:open', () => { if (latest) shell.openExternal(latest.url); return true; });
 ipcMain.handle('update:skip', (_e, v) => { cfg.skipVersion = v; saveConfig(cfg); return true; });
+
+ipcMain.handle('wiki:spellIcons', async (_e, names) => {
+  if (!wiki || !Array.isArray(names)) return [];
+  // Se devuelve como pares y no como Map: el puente los serializa igual, pero
+  // una lista se lee sin sorpresas al otro lado.
+  try { return [...(await wiki.spellIcons(names))]; } catch { return []; }
+});
 
 ipcMain.handle('wiki:item', async (_e, name) => {
   if (!wiki) return null;

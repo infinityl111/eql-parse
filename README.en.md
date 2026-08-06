@@ -133,6 +133,23 @@ attributes the item to a name and not to an instance. And whatever the log
 attributes to nobody shows up anyway, saying it has no source: a list quietly
 missing items is worse than one with declared gaps.
 
+#### My spells, my deaths and my progress
+
+Your spell catalogue — what each one does, what it lands on and how long it
+takes to come back —, where you fall and to what, and your marks. Every spell
+with its icon, and what isn't a spell carries none: `hits` has no icon because
+it isn't a spell, not because something is missing.
+
+Under deaths, the enemy shown beside each one is **the one that dealt you the
+most damage in that fight**, not the one that landed the killing blow: the log
+never says which it was.
+
+And under progress there is **no dps-over-time curve**, on purpose: it rises
+when you level and falls when you fight something tougher, so it measures both
+at once and neither. What compares is the same enemy, at the same difficulty, at
+the same level, and a line is only drawn once that triple reaches five fights.
+Three points are not a trend: they are three points.
+
 #### The entries are learned, not computed
 
 They live next to your history and carry three marks that detect three different

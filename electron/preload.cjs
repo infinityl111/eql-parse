@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('eql', {
   openWiki: (item) => ipcRenderer.invoke('shell:wiki', item),
   wikiItem: (item) => ipcRenderer.invoke('wiki:item', item),
   wikiMob: (name) => ipcRenderer.invoke('wiki:mob', name),
+  spellIcons: (names) => ipcRenderer.invoke('wiki:spellIcons', names),
   onSnapshot: (fn) => ipcRenderer.on('snapshot', (_e, s) => fn(s)),
   onOverlayState: (fn) => ipcRenderer.on('overlay:state', (_e, s) => fn(s)),
 
@@ -79,6 +80,8 @@ contextBridge.exposeInMainWorld('eql', {
   encFoe: (name) => ipcRenderer.invoke('enc:foe', name),
   encFoes: () => ipcRenderer.invoke('enc:foes'),
   encLoot: () => ipcRenderer.invoke('enc:loot'),
+  encDeaths: () => ipcRenderer.invoke('enc:deaths'),
+  encProgress: () => ipcRenderer.invoke('enc:progress'),
   encFights: (q) => ipcRenderer.invoke('enc:fights', q),
   encCounts: () => ipcRenderer.invoke('enc:counts'),
   encStatus: () => ipcRenderer.invoke('enc:status'),

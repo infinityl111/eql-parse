@@ -161,6 +161,108 @@ export class WikiClient {
     };
   }
 
+  /**
+   * El icono de cada hechizo, en lotes.
+   *
+   * La wiki tiene una imagen por hechizo —medido sobre las 1.970 páginas de
+   * `Category:Spells`, el 99,7% de las que son un hechizo de verdad la lleva—,
+   * y son sólo 150 distintas: el arte clásico de las gemas se repite entre
+   * hechizos de la misma escuela. Así que se piden de cincuenta en cincuenta y
+   * se guardan una vez.
+   *
+   * Lo que NO tiene icono es lo que no es un hechizo: `hits`, `kicks`, `bashes`.
+   * Eso no es un fallo y la interfaz no debe pintarlo como tal.
+   *
+   * OJO con el título del fichero: MediaWiki normaliza el guion bajo a espacio,
+   * así que la imagen sale como «File:Spellicon 105.png» y no «Spellicon_105».
+   * Buscando el guion bajo la cobertura da 0% y parece que no hay iconos.
+   *
+   * @param {string[]} names  nombres tal cual salen del registro
+   * @returns {Promise<Map<string,string>>} nombre -> `data:` del icono
+   */
+  async spellIcons(names) {
+    const pedir = [...new Set(names.filter(Boolean))]
+      .filter((n) => this.#icono(n) === undefined);
+    for (let i = 0; i < pedir.length; i += 50) {
+      try { await this.#loteIconos(pedir.slice(i, i + 50)); }
+      catch { /* sin red: se reintenta en otra visita */ }
+    }
+    const out = new Map();
+    for (const n of new Set(names.filter(Boolean))) {
+      const fichero = this.#icono(n);
+      const datos = fichero ? this.cache[`icondata:${fichero}`]?.data : null;
+      if (datos) out.set(n, datos);
+    }
+    return out;
+  }
+
+  /** Lo que se sabe del icono de un hechizo: el fichero, `null` o `undefined`. */
+  #icono(name) {
+    const e = this.cache[`icon:${String(name).toLowerCase()}`];
+    if (!e) return undefined;
+    // Los negativos también caducan: una página puede crearse después.
+    if (!e.file && Date.now() - e.at > NEG_TTL) return undefined;
+    return e.file;
+  }
+
+  async #loteIconos(nombres) {
+    const u = `${API}?action=query&titles=${encodeURIComponent(nombres.join('|'))}`
+      + '&prop=images&imlimit=max&redirects=1&format=json&formatversion=2';
+    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+    if (!r.ok) return;
+    const j = await r.json();
+
+    // La respuesta viene por título normalizado y con las redirecciones ya
+    // resueltas: hay que deshacer las dos para volver al nombre que preguntamos.
+    const alias = new Map();
+    for (const n of j.query?.normalized ?? []) alias.set(n.to, n.from);
+    for (const n of j.query?.redirects ?? []) alias.set(n.to, alias.get(n.from) ?? n.from);
+    const original = (t) => alias.get(t) ?? t;
+
+    const ficheros = new Set();
+    for (const p of j.query?.pages ?? []) {
+      const ic = (p.images ?? []).map((x) => x.title)
+        .find((x) => /^File:Spellicon[ _]/i.test(x));
+      const file = ic ? ic.replace(/^File:/, '') : null;
+      this.cache[`icon:${original(p.title).toLowerCase()}`] = { file, at: Date.now() };
+      if (file) ficheros.add(file);
+    }
+    await this.#bajarIconos([...ficheros]);
+    this.#save();
+  }
+
+  /**
+   * Baja los PNG que falten y los guarda en base64.
+   *
+   * Se guardan aquí y no se enlazan a la wiki para que la enciclopedia funcione
+   * sin red una vez vistos, y para no pedir la misma imagen cuarenta veces. Son
+   * 40×40 y unos 2,6 KB: el juego completo cabe en medio mega.
+   */
+  async #bajarIconos(ficheros) {
+    const faltan = ficheros.filter((f) => !this.cache[`icondata:${f}`]);
+    if (!faltan.length) return;
+    const u = `${API}?action=query&titles=${
+      encodeURIComponent(faltan.map((f) => `File:${f}`).join('|'))}`
+      + '&prop=imageinfo&iiprop=url&format=json&formatversion=2';
+    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+    if (!r.ok) return;
+    const j = await r.json();
+    for (const p of j.query?.pages ?? []) {
+      const url = p.imageinfo?.[0]?.url;
+      if (!url) continue;
+      try {
+        const img = await fetch(url, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+        if (!img.ok) continue;
+        const buf = Buffer.from(await img.arrayBuffer());
+        // Un icono de 40×40 no llega a 6 KB. Algo mucho mayor no es un icono.
+        if (buf.length > 64 * 1024) continue;
+        this.cache[`icondata:${p.title.replace(/^File:/, '')}`] = {
+          data: `data:image/png;base64,${buf.toString('base64')}`, at: Date.now(),
+        };
+      } catch { /* esa se queda sin bajar y se reintenta otro día */ }
+    }
+  }
+
   async #parsePage(title) {
     const u = `${API}?action=parse&page=${encodeURIComponent(title)}`
       + '&prop=text&format=json&formatversion=2&redirects=1';

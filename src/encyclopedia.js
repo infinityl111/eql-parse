@@ -361,6 +361,123 @@ export class Encyclopedia {
     };
   }
 
+  /**
+   * Tus muertes.
+   *
+   * Sale del índice —quién cayó, dónde y en qué dificultad— más una lectura por
+   * muerte para saber quién te hizo más daño en esa pelea. No va en la ficha
+   * aprendida porque no es una propiedad de ningún enemigo: es tuya.
+   *
+   * Lo que NO se puede decir, y por eso no se dice: quién dio el golpe final. El
+   * registro no lo enlaza. «El que más daño te hizo» es otra cosa, y puede
+   * perfectamente no ser el que te remató.
+   */
+  deaths(self, limite = 400) {
+    if (!self) return { self: null, muertes: [], porZona: [], porEnemigo: [] };
+    const caidas = this.store.index
+      .filter((s) => (s.losses ?? []).includes(self))
+      .slice(0, limite);
+
+    const muertes = [];
+    for (const s of caidas) {
+      const veces = (s.losses ?? []).filter((x) => x === self).length;
+      const f = this.store.get(s.uid);
+      const mio = (f?.rows ?? []).find((r) => r.name === self);
+      const top = (mio?.takenBySource ?? [])[0] ?? null;
+      muertes.push({
+        uid: s.uid, at: s.at, zoneBase: s.zoneBase ?? null, diff: s.diff ?? null,
+        level: s.level ?? null, label: s.label, veces,
+        // Rotulado como lo que es: el que más te pegó, no el que te mató.
+        masDaño: top ? { name: top.name, sum: top.sum,
+          share: mio?.taken ? top.sum / mio.taken : null } : null,
+        taken: mio?.taken ?? null,
+      });
+    }
+
+    const agrupar = (clave) => {
+      const m = new Map();
+      for (const d of muertes) {
+        const k = clave(d);
+        if (k === null) continue;
+        m.set(k, (m.get(k) ?? 0) + d.veces);
+      }
+      return [...m].map(([k, n]) => ({ k, n })).sort((a, b) => b.n - a.n || a.k.localeCompare(b.k));
+    };
+
+    return {
+      self,
+      total: muertes.reduce((a, d) => a + d.veces, 0),
+      fights: this.store.index.length,
+      muertes,
+      porZona: agrupar((d) => (d.zoneBase ? `${d.zoneBase} · D${nivel(d.diff)}` : null)),
+      porEnemigo: agrupar((d) => d.masDaño?.name ?? null),
+    };
+  }
+
+  /**
+   * Tu progresión.
+   *
+   * Sale del índice entero, que ya está en memoria: no abre ni un registro.
+   *
+   * Y NO hay curva de dps en el tiempo, a propósito. Sube al subir de nivel y
+   * baja al pelear con algo más duro, así que mide las dos cosas a la vez y
+   * ninguna de las dos. Lo comparable es la terna (enemigo, dificultad, nivel):
+   * ahí sí, la misma pelea contra el mismo enemigo en las mismas condiciones.
+   *
+   * Las peleas con varios enemigos quedan fuera del reparto por enemigo. Tu dps
+   * en una pelea contra tres no es tu dps contra ninguno de los tres, y
+   * atribuírselo a los tres sería contarlo tres veces.
+   */
+  progress({ minDuracion = 30, minSerie = 5 } = {}) {
+    const utiles = this.store.index.filter((s) => typeof s.mine === 'number'
+      && (s.duration ?? 0) >= minDuracion);
+    const sinDato = this.store.index.filter((s) => typeof s.mine !== 'number').length;
+    const dps = (s) => s.mine / s.duration;
+
+    const resumir = (lista) => {
+      const v = lista.map(dps).sort((a, b) => a - b);
+      return { n: v.length, best: v.at(-1) ?? 0, median: v[Math.floor(v.length / 2)] ?? 0 };
+    };
+
+    // ── Por nivel ────────────────────────────────────────────────────────
+    const porNivel = new Map();
+    for (const s of utiles) {
+      const k = s.level ?? 'sin nivel';
+      if (!porNivel.has(k)) porNivel.set(k, []);
+      porNivel.get(k).push(s);
+    }
+
+    // ── Por enemigo, dificultad y nivel ──────────────────────────────────
+    const porEnemigo = new Map();
+    for (const s of utiles) {
+      if ((s.foes ?? []).length !== 1) continue;     // ver el comentario de arriba
+      const k = `${s.foes[0]} ${nivel(s.diff)} ${s.level ?? ''}`;
+      if (!porEnemigo.has(k)) porEnemigo.set(k, []);
+      porEnemigo.get(k).push(s);
+    }
+
+    const marcas = [...porEnemigo].map(([k, lista]) => {
+      const [name, d, lvl] = k.split(' ');
+      return {
+        name, diff: +d, level: lvl === '' ? null : +lvl,
+        ...resumir(lista),
+        // La serie sólo se dibuja con muestra suficiente. Con tres puntos no hay
+        // tendencia, hay tres puntos.
+        serie: lista.length >= minSerie
+          ? [...lista].sort((a, b) => a.at - b.at).map((s) => ({ at: s.at, dps: dps(s) }))
+          : null,
+      };
+    }).sort((a, b) => b.n - a.n || b.best - a.best || a.name.localeCompare(b.name));
+
+    return {
+      fights: utiles.length, sinDato, minSerie,
+      niveles: [...porNivel].map(([level, lista]) => ({
+        level: level === 'sin nivel' ? null : level, ...resumir(lista),
+      })).sort((a, b) => (b.level ?? -1) - (a.level ?? -1)),
+      marcas,
+    };
+  }
+
   /** Salud de la ficha, para el comando de comprobación. */
   audit() {
     const pendientes = this.store.index.filter((s) => s.uid > this.lastUid).length;

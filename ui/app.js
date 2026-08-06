@@ -474,8 +474,7 @@ function renderFightList(snap) {
     </datalist>
     ${matesFilter()}
   </div>
-  <button class="sumbtn" id="btnSummary">${esc(t('sum.open'))}</button>
-  <button class="sumbtn" id="btnCatalog">${esc(t('cat.open'))}</button>`);
+  <button class="sumbtn" id="btnSummary">${esc(t('sum.open'))}</button>`);
 
   // Selección a mano: manda sobre el tramo y el enemigo mientras esté puesta,
   // así que tiene que verse y tiene que poder deshacerse de un clic.
@@ -560,14 +559,6 @@ function renderFightList(snap) {
     if (state.filter.foe === e.target.value) return;
     state.filter.foe = e.target.value;
     refreshFights();
-  });
-  $('btnCatalog')?.addEventListener('click', async () => {
-    const r = RANGES.find((x) => x.key === state.filter.range);
-    state.catalog = await window.eql.spellCatalog?.({ sinceMs: r?.ms ?? null,
-      mates: state.filter.mates ?? [] }) ?? null;
-    state.view = 'catalog';
-    $('bodyGrid').innerHTML = '';
-    renderApp();
   });
   $('btnSummary')?.addEventListener('click', async () => {
     const r = RANGES.find((x) => x.key === state.filter.range);
@@ -1971,7 +1962,12 @@ function diffBlocks(f) {
  * escrito en el filtro y la enciclopedia de lo aprendido, y son la misma cosa
  * con la misma forma. Buscándola aquí dentro sólo podía servir a uno de los dos.
  */
-function foeDossier(f) {
+/**
+ * @param {string} habilidades  el bloque detallado de sus habilidades, cuando
+ *   quien llama tiene con qué construirlo. En el resumen del tramo no lo hay y
+ *   se cae a la lista corta de siempre.
+ */
+function foeDossier(f, habilidades = '') {
   if (!f) return '';
   if (!mobCache.has(f.name)) loadMob(f.name);
   const mob = mobCache.get(f.name);
@@ -2018,11 +2014,12 @@ function foeDossier(f) {
     ${mob ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.wiki'))}</div>
       ${mob.lines.map((l) => `<div class="fw-line">${esc(l)}</div>`).join('')}</div>` : ''}
 
-    ${f.abilities?.length ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.howHits'))}</div>
+    ${habilidades || (f.abilities?.length
+      ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.howHits'))}</div>
       ${f.abilities.map((x) => `<div class="foe-det-l">
         <i class="seg ${typeClass(x.type)}"></i><span>${esc(x.name)}</span>
         <b>${n0(x.sum)}</b><span class="dim">${Math.round(x.sum / abTot * 100)}% · ×${x.n}</span>
-      </div>`).join('')}</div>` : ''}
+      </div>`).join('')}</div>` : '')}
 
     ${f.lootList?.length ? `<div class="dos-block"><div class="eyebrow">${esc(t('foe.drops'))}</div>
       <div class="loot">${f.lootList.map((l) => `<div class="loot-row">
@@ -2107,13 +2104,21 @@ const est = (valor, desde) =>
 const hueco = (need, have) =>
   `<span class="gap" title="${esc(t('est.needMore', { need, have }))}">—</span>`;
 
-function renderCatalog() {
+/**
+ * Mis hechizos, dentro de la enciclopedia.
+ *
+ * Era una pantalla propia detrás de un botón de la barra de combate, que es un
+ * sitio raro para algo que no se mira durante una pelea sino después. La tabla,
+ * las marcas de fiabilidad y los cooldowns son los mismos que llevaban dos
+ * versiones funcionando: lo único que cambia es por dónde se llega y que ahora
+ * abre con un resumen.
+ */
+function encHechizos() {
   const c = state.catalog;
-  const host = $('bodyGrid');
-  if (!c) { host.innerHTML = `<div class="empty"><h2>${esc(t('cat.title'))}</h2>
-    <button id="catBack">${esc(t('sum.back'))}</button></div>`;
-    $('catBack').addEventListener('click', () => { state.view = 'combat'; host.innerHTML = ''; renderApp(); });
-    return; }
+  if (!c || !c.spells?.length) {
+    return `${encCrumb()}<div class="empty"><h2>${esc(t('enc.emptySpells'))}</h2>
+      <p class="hint">${esc(t('enc.emptySpellsNote'))}</p></div>`;
+  }
 
   // Sólo se enseña «efectivo» si aporta algo: mientras todo entre al 100% es
   // una columna que repite a la de al lado.
@@ -2124,7 +2129,7 @@ function renderCatalog() {
     const desde = t('est.from', { fights: s.fights, secs: s.uses });
     const medio = pocos ? est(n0(s.avg), desde) : `<b>${n0(s.avg)}</b>`;
     return `<div class="cat-row">
-      <span class="cat-name">${esc(s.name)}${s.unresistable
+      <span class="cat-name">${spellIcon(s.name)}${esc(s.name)}${s.unresistable
         ? ` <span class="tagx" title="${esc(t('cat.unresistable'))}">∅</span>` : ''}</span>
       <span><i class="seg ${typeClass(s.types[0])}"></i>${esc(s.types[0] ?? '—')}</span>
       <span class="num">${n0(s.uses)}</span>
@@ -2139,12 +2144,26 @@ function renderCatalog() {
     </div>`;
   };
 
+  // ── El resumen con el que abre ────────────────────────────────────────
+  const usos = c.spells.reduce((n, s) => n + s.uses, 0);
+  const daño = c.spells.reduce((n, s) => n + s.total, 0);
+  const entran = c.spells.reduce((n, s) => n + s.landed, 0);
+  const intentos = c.spells.reduce((n, s) => n + s.landed + s.resisted, 0);
+  const mejor = c.spells.filter((s) => s.uses >= MIN_USOS).sort((a, b) => b.avg - a.avg)[0] ?? null;
+  const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
   const cds = (c.cooldowns ?? []).filter((x) => x.seconds > 0);
-  host.innerHTML = `<div class="summary" id="catRoot">
-    <div class="sum-head">
-      <h2>${esc(t('cat.title'))}</h2>
-      <button id="catBack">${esc(t('sum.back'))}</button>
+
+  return `${encCrumb()}
+    <div class="enc-h"><h2>${esc(t('enc.hechizos'))}</h2></div>
+    <div class="metrics">
+      ${card(c.spells.length, t('enc.spellsN', { n: c.spells.length }))}
+      ${card(n0(usos), t('cat.uses'))}
+      ${card(n0(daño), t('metric.total'))}
+      ${intentos >= 4 ? card(`${Math.round(entran / intentos * 100)}%`, t('cat.lands')) : ''}
+      ${card(n0(c.fights ?? 0), t('sum.fights', { n: c.fights ?? 0 }))}
     </div>
+    ${mejor ? `<div class="hint">${esc(t('enc.spellsTop', {
+      name: mejor.name, avg: n0(mejor.avg), n: mejor.uses }))}</div>` : ''}
     <div class="hint">${esc(t('cat.note'))}</div>
 
     <div class="cat-head">
@@ -2179,15 +2198,13 @@ function renderCatalog() {
     ${cds.length ? `<div class="sec-title eyebrow" style="margin-top:22px">${esc(t('cat.cdTitle'))}</div>
       <div class="hint">${esc(t('cat.cdNote'))}</div>
       ${cds.map((x) => `<div class="foe-det-l">
-        <span>${esc(x.name)}</span>
+        <span>${spellIcon(x.name)}${esc(x.name)}</span>
         <b>${secs(x.seconds)}</b>
         <span class="dim">${x.attempts} ${esc(t('cat.cdAttempts'))}${
           x.source === 'una sola muestra' ? ` · ${esc(t('cat.oneSample'))}` : ''}</span>
         <span class="${x.countable ? 'dim' : 'gap'}" ${x.countable ? '' : `title="${esc(t('cat.notCountable'))}"`}>${
           x.countable ? `${n0(x.uses)} ${esc(t('cat.cdUses'))}` : esc(t('cat.notCountable'))}</span>
-      </div>`).join('')}` : ''}
-  </div>`;
-  $('catBack').addEventListener('click', () => { state.view = 'combat'; host.innerHTML = ''; renderApp(); });
+      </div>`).join('')}` : ''}`;
 }
 
 // ═══════════ Enciclopedia ═══════════
@@ -2199,18 +2216,60 @@ function renderCatalog() {
  * verde desde siempre, el enemigo es rojo porque lo es su expediente, y las
  * zonas se llevan el azul, que es el color con el que la interfaz señala.
  */
+/**
+ * Seis, no siete.
+ *
+ * «Habilidades de los enemigos» era una sección propia y ahora vive dentro de
+ * cada enemigo, que es donde se busca: llegar dos veces al mismo sitio por dos
+ * caminos distintos no es más información, es más camino.
+ *
+ * Con cuatro columnas, seis salen 4+2 y no dejan ninguna huérfana en su fila
+ * —el problema era el 6+1—, así que el hueco no hay que rellenarlo. Inventar
+ * una sección para tapar un hueco es la peor razón para construirla.
+ */
 const ENC_SECTIONS = [
   { key: 'zonas', accent: 'var(--t-cold)' },
   { key: 'enemigos', accent: 'var(--t-ds)' },
   { key: 'botin', accent: 'var(--t-poison)' },
   { key: 'hechizos', accent: 'var(--t-magic)' },
   { key: 'progreso', accent: 'var(--t-fire)' },
-  { key: 'habilidades', accent: 'var(--t-dot)' },
   { key: 'muertes', accent: 'var(--t-disease)' },
 ];
 
 /** Las secciones que ya se pueden abrir. Las demás se pintan y no responden. */
-const ENC_ABIERTAS = ['zonas', 'enemigos', 'botin'];
+const ENC_ABIERTAS = ['zonas', 'enemigos', 'botin', 'hechizos', 'progreso', 'muertes'];
+
+/**
+ * Los iconos de hechizo de la wiki, por nombre.
+ *
+ * Se piden en lote para lo que se va a pintar y se guardan del otro lado, así
+ * que a partir de la segunda vez no hay viaje. Mientras no han llegado, las
+ * filas se pintan sin icono y no pasa nada: el icono identifica, no informa.
+ */
+const iconCache = new Map();
+
+async function pedirIconos(nombres, repintar) {
+  const faltan = [...new Set(nombres.filter(Boolean))].filter((n) => !iconCache.has(n));
+  if (!faltan.length) return;
+  for (const n of faltan) iconCache.set(n, null);   // no se pide dos veces
+  try {
+    const pares = (await window.eql.spellIcons?.(faltan)) ?? [];
+    for (const [n, d] of pares) iconCache.set(n, d);
+    if (pares.length) repintar?.();
+  } catch { /* sin red: se queda sin icono, que no es un error */ }
+}
+
+/**
+ * El icono de un hechizo, o nada.
+ *
+ * Que no haya icono NO es un hueco que rellenar: `hits` no lo tiene porque no
+ * es un hechizo, y ahí no debe verse ni un recuadro vacío ni un interrogante.
+ * Lo que no es un hechizo simplemente no lleva imagen.
+ */
+const spellIcon = (name) => {
+  const d = iconCache.get(name);
+  return d ? `<img class="sicon" src="${d}" alt="" aria-hidden="true">` : '';
+};
 
 /**
  * Con separador de millares, pero sin romper el singular.
@@ -2244,7 +2303,7 @@ async function encGo(page, args = {}) {
   if (page !== e.page) e.q = '';
   // Entrar por una sección de primer nivel fija de dónde vienes; si no, volver
   // al índice y entrar por otra dejaba la miga contando el camino anterior.
-  if (['zonas', 'enemigos', 'botin'].includes(page)) e.from = page;
+  if (['zonas', 'enemigos', 'botin', 'hechizos', 'progreso', 'muertes'].includes(page)) e.from = page;
   // La zona señalada sólo dura el salto que la señala.
   e.marcada = args.marcada ?? null;
   e.page = page;
@@ -2263,6 +2322,16 @@ async function encGo(page, args = {}) {
     }
     if (page === 'botin' && !e.todos?.length) e.todos = (await window.eql.encFoes?.()) ?? [];
     if (page === 'botin') e.loot = (await window.eql.encLoot?.()) ?? [];
+    if (page === 'hechizos') {
+      // El catálogo se pide sobre TODO el histórico y no sobre el tramo que
+      // tengas puesto en el filtro: aquí no miras una sesión, miras tus
+      // hechizos.
+      e.catalog = (await window.eql.spellCatalog?.({ sinceMs: null })) ?? null;
+      state.catalog = e.catalog;
+      pedirIconos((e.catalog?.spells ?? []).map((s) => s.name), renderEncyclopedia);
+    }
+    if (page === 'muertes') e.deaths = (await window.eql.encDeaths?.()) ?? null;
+    if (page === 'progreso') e.progress = (await window.eql.encProgress?.()) ?? null;
     if (page === 'foe') {
       e.foe = (await window.eql.encFoe?.(e.name)) ?? null;
       // Desde la lista de enemigos no hay zona ni dificultad de por medio, así
@@ -2271,6 +2340,10 @@ async function encGo(page, args = {}) {
       const q = { name: e.name };
       if (e.from === 'zonas') { q.base = e.base; q.diff = e.diff; }
       e.fights = (await window.eql.encFights?.(q)) ?? [];
+      // Los iconos de sus habilidades, y lo que la wiki cuenta de cada una.
+      const abil = (e.foe?.abilities ?? []).map((a) => a.name);
+      pedirIconos(abil, renderEncyclopedia);
+      for (const a of abil.slice(0, 8)) loadAbility(a);
     }
   } catch (err) {
     console.error('enciclopedia:', err);
@@ -2351,6 +2424,7 @@ function encEstado() {
   return `<div class="enc-foot">
     <span class="eyebrow">${esc(t('enc.stateLine', { foes: s.foes, fights: s.fights - s.pending }))}</span>
     ${l?.rebuilt ? `<span class="hint" title="${esc(l.reason)}">${esc(t('enc.rebuilt'))}</span>` : ''}
+    ${s.backfilled ? `<span class="hint">${esc(t('enc.backfilled', { n: s.backfilled }))}</span>` : ''}
     <button class="lnk" id="encRebuild" title="${esc(t('enc.rebuildNote'))}">${esc(t('enc.rebuild'))}</button>
   </div>`;
 }
@@ -2565,6 +2639,170 @@ function encBotin() {
     : `<div class="hint">${esc(t('enc.noMatch'))}</div>`}`;
 }
 
+/**
+ * Sus habilidades: lo visto en el chat, y lo que la wiki dice de cada una.
+ *
+ * Esto era una sección propia de la enciclopedia y vive aquí porque es aquí
+ * donde se busca. Lo medido manda y va primero: qué lanzó, en cuántos de
+ * cuántos encuentros, cuánto sumó y su golpe más fuerte. Lo consultado va
+ * detrás, marcado, y sólo si dice algo.
+ */
+function encHabilidades(f) {
+  const abil = f.abilities ?? [];
+  if (!abil.length) return '';
+  const tot = abil.reduce((n, x) => n + x.sum, 0) || 1;
+  // En cuántos encuentros salió cada una, por dificultad. Es el dato que impide
+  // leer la lista como «sus habilidades»: son las que le has visto lanzar.
+  const encuentros = (nombre) => (f.dificultades ?? [])
+    .map((d) => {
+      const a = (d.abilities ?? []).find((x) => x.name === nombre);
+      return a ? `${encDiffLabel(d.diff)} ${a.inFights}/${d.fights}` : null;
+    }).filter(Boolean);
+
+  return `<div class="dos-block">
+    <div class="eyebrow">${esc(t('enc.abilities'))} · ${esc(t('foe.measured'))}</div>
+    <div class="hint">${esc(t('enc.abilitiesNote'))}</div>
+    <div class="abils">
+      ${abil.map((x) => {
+        const wiki = mobCache.get(`hab:${x.name}`);
+        return `<div class="abil">
+          <div class="abil-h">
+            ${spellIcon(x.name)}
+            <span class="abil-n">${esc(x.name)}</span>
+            <i class="seg ${typeClass(x.type)}" title="${esc(x.type ?? '')}"></i>
+            <span class="num strong">${n0(x.sum)}</span>
+            <span class="num dim">${Math.round(x.sum / tot * 100)}%</span>
+          </div>
+          <div class="abil-kv">
+            <span>${esc(t('enc.abTimes'))} <b class="num">${n0(x.n)}</b></span>
+            <span>${esc(t('foe.maxHit'))} <b class="num">${n0(x.max)}</b></span>
+            ${encuentros(x.name).map((e) => `<span class="dim num">${esc(e)}</span>`).join('')}
+          </div>
+          ${wiki?.lines?.length ? `<div class="abil-wiki">
+            <span class="tagw">${esc(t('foe.wiki'))}</span>
+            ${wiki.lines.slice(0, 2).map((l) => `<span>${esc(l)}</span>`).join('')}
+          </div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+/**
+ * Mis muertes.
+ *
+ * El enemigo que sale al lado de cada caída es **el que más daño te hizo en esa
+ * pelea**, y así está rotulado. No es quien te dio el golpe final: el registro
+ * no lo enlaza, y perfectamente puede haberte rematado el que menos te pegó.
+ */
+function encMuertes() {
+  const d = state.enc.deaths;
+  if (!d) return `${encCrumb()}<div class="hint">${esc(t('flt.none'))}</div>`;
+  if (!d.total) {
+    return `${encCrumb()}<div class="empty"><h2>${esc(t('enc.noDeaths'))}</h2>
+      <p class="hint">${esc(t('enc.noDeathsNote'))}</p></div>`;
+  }
+  const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
+  const cuando = (at) => new Date(at).toLocaleString('es-ES',
+    { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const lista = (titulo, filas) => (filas.length ? `<div class="dos-block">
+      <div class="eyebrow">${esc(titulo)}</div>
+      ${filas.slice(0, 10).map((x) => `<div class="foe-det-l">
+        <span>${esc(x.k)}</span><b>${x.n}</b>
+        <span class="dim">${Math.round(x.n / d.total * 100)}%</span>
+      </div>`).join('')}
+    </div>` : '');
+
+  return `${encCrumb()}
+    <div class="enc-h"><h2>${esc(t('enc.muertes'))}</h2></div>
+    <div class="metrics">
+      ${card(d.total, t('metric.losses', { n: d.total }), 'foe')}
+      ${card(`${(d.total / Math.max(1, d.fights) * 100).toFixed(1)}%`, t('enc.deathsRate'))}
+      ${card(n0(d.fights), t('sum.fights', { n: d.fights }))}
+    </div>
+    <div class="hint">${esc(t('enc.deathsNote'))}</div>
+    ${lista(t('enc.deathsByZone'), d.porZona)}
+    ${lista(t('enc.deathsByFoe'), d.porEnemigo)}
+    <div class="sec-title eyebrow" style="margin-top:18px">${esc(t('enc.deathsEach'))}</div>
+    <div class="encrows">${d.muertes.map((m) => `
+      <button class="encrow fight" data-uid="${m.uid}">
+        <span class="nm">${esc(cuando(m.at))}${m.veces > 1 ? ` <span class="dim">×${m.veces}</span>` : ''}</span>
+        <span class="num dim">${esc(m.zoneBase ?? '—')} ${esc(encDiffLabel(m.diff))}</span>
+        <span class="num">${m.masDaño ? esc(m.masDaño.name) : '—'}</span>
+        <span class="num dim">${m.masDaño?.share !== null && m.masDaño
+          ? `${Math.round(m.masDaño.share * 100)}%` : ''}</span>
+      </button>`).join('')}</div>`;
+}
+
+/**
+ * Mi progresión.
+ *
+ * NO hay curva de dps en el tiempo y es a propósito: sube al subir de nivel y
+ * baja al pelear con algo más duro, así que mide las dos cosas a la vez y
+ * ninguna. Lo comparable es la terna (enemigo, dificultad, nivel), y la línea
+ * sólo se dibuja dentro de una terna y con muestra suficiente.
+ */
+function encProgreso() {
+  const p = state.enc.progress;
+  if (!p) return `${encCrumb()}<div class="hint">${esc(t('flt.none'))}</div>`;
+  if (!p.fights) {
+    return `${encCrumb()}<div class="empty"><h2>${esc(t('enc.noProgress'))}</h2>
+      <p class="hint">${esc(t('enc.noProgressNote'))}</p></div>`;
+  }
+  const conSerie = p.marcas.filter((m) => m.serie);
+
+  /** La línea de una terna. Sin ejes ni promesas: los puntos que hay. */
+  const serie = (m) => {
+    const v = m.serie.map((x) => x.dps);
+    const max = Math.max(...v) || 1;
+    const min = Math.min(...v);
+    const W = 240; const H = 34;
+    const px = (i) => (m.serie.length === 1 ? W / 2 : (i / (m.serie.length - 1)) * W);
+    const py = (y) => H - ((y - min) / Math.max(1, max - min)) * (H - 6) - 3;
+    const d = m.serie.map((x, i) => `${i ? 'L' : 'M'}${px(i).toFixed(1)} ${py(x.dps).toFixed(1)}`).join('');
+    return `<svg class="serie" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${d}" fill="none" stroke="var(--t-fire)" stroke-opacity=".85" stroke-width="1.6"/>
+      ${m.serie.map((x, i) => `<circle cx="${px(i).toFixed(1)}" cy="${py(x.dps).toFixed(1)}" r="2"
+        fill="var(--t-fire)" fill-opacity=".9"/>`).join('')}
+    </svg>`;
+  };
+
+  return `${encCrumb()}
+    <div class="enc-h"><h2>${esc(t('enc.progreso'))}</h2></div>
+    <div class="hint">${esc(t('enc.progressNote'))}</div>
+    ${p.sinDato ? `<div class="hint">${esc(t('enc.progressMissing', { n: p.sinDato }))}</div>` : ''}
+
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('marks.title'))}</div>
+    <div class="encrows">${p.niveles.map((l) => `<div class="encrow static">
+      <span class="nm">${l.level === null ? esc(t('lvl.unknown')) : esc(t('lvl.level', { n: l.level }))}</span>
+      <span class="num">${esc(t('marks.best'))} <b>${n0(l.best)}</b></span>
+      <span class="num dim">${esc(t('marks.median'))} ${n0(l.median)}</span>
+      <span class="num dim">${l.n} ${esc(t('sum.fights', { n: l.n }))}</span>
+    </div>`).join('')}</div>
+
+    <div class="sec-title eyebrow" style="margin-top:18px">${esc(t('enc.progressByFoe'))}</div>
+    <div class="hint">${esc(t('enc.progressByFoeNote'))}</div>
+    <div class="encrows">${p.marcas.slice(0, 40).map((m) => `<div class="encrow static">
+      <span class="nm">${esc(m.name)}
+        <span class="dpills"><span class="dpill">${esc(encDiffLabel(m.diff))}</span>${
+          m.level === null ? '' : `<span class="dpill">${esc(t('lvl.level', { n: m.level }))}</span>`}</span></span>
+      <span class="num">${esc(t('marks.best'))} <b>${n0(m.best)}</b></span>
+      <span class="num dim">${m.n >= 3 ? `${esc(t('marks.median'))} ${n0(m.median)}` : ''}</span>
+      <span class="num dim">${m.n} ${esc(t('sum.fights', { n: m.n }))}</span>
+    </div>`).join('')}</div>
+
+    ${conSerie.length ? `
+      <div class="sec-title eyebrow" style="margin-top:18px">${esc(t('enc.progressSeries'))}</div>
+      <div class="hint">${esc(t('enc.progressSeriesNote', { n: p.minSerie }))}</div>
+      <div class="encrows">${conSerie.map((m) => `<div class="encrow static serie-row">
+        <span class="nm">${esc(m.name)} <span class="dim">${esc(encDiffLabel(m.diff))}${
+          m.level === null ? '' : ` · ${esc(t('lvl.level', { n: m.level }))}`}</span></span>
+        ${serie(m)}
+        <span class="num dim">${m.n} ${esc(t('sum.fights', { n: m.n }))}</span>
+      </div>`).join('')}</div>`
+    : `<div class="hint" style="margin-top:16px">${esc(t('enc.progressNoSeries', { n: p.minSerie }))}</div>`}`;
+}
+
 /** El expediente, con todos los combates que has tenido contra él debajo. */
 function encFoe() {
   const f = state.enc.foe;
@@ -2573,7 +2811,7 @@ function encFoe() {
   const cuando = (at) => new Date(at).toLocaleString('es-ES',
     { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   return `${encCrumb()}
-    ${foeDossier(f)}
+    ${foeDossier(f, encHabilidades(f))}
     <div class="sec-title eyebrow" style="margin-top:18px">${
       esc(t('enc.fightsHere', { n: fs2.length }))}</div>
     ${fs2.length ? `<div class="encrows">${fs2.map((s) => `
@@ -2596,8 +2834,11 @@ function renderEncyclopedia() {
     : e.page === 'zona' ? encZona()
       : e.page === 'enemigos' ? encEnemigos()
         : e.page === 'botin' ? encBotin()
-          : e.page === 'foe' ? encFoe()
-            : encIndex();
+          : e.page === 'hechizos' ? encHechizos()
+            : e.page === 'progreso' ? encProgreso()
+              : e.page === 'muertes' ? encMuertes()
+                : e.page === 'foe' ? encFoe()
+                  : encIndex();
   host.innerHTML = `<div class="tabpane"><div class="enc" id="encRoot">${cuerpo}</div></div>`;
 
   host.querySelectorAll('.enccard').forEach((el) => el.addEventListener('click', () => {
@@ -2700,6 +2941,25 @@ function renderEncyclopedia() {
 /** Quién le hizo qué a ese enemigo, sacado del reparto por objetivo. */
 const mobCache = new Map();
 
+/**
+ * Lo que la wiki cuenta de una HABILIDAD concreta.
+ *
+ * Hasta ahora sólo se consultaba la página del enemigo. Las habilidades tienen
+ * la suya, y ahí es donde pone si algo no se puede resistir o si es un golpe de
+ * muerte. Se guarda en el mismo mapa con otro prefijo para no mezclar «lo que
+ * dice la wiki de Lord Nagafen» con «lo que dice de Ice Comet».
+ */
+async function loadAbility(name) {
+  const k = `hab:${name}`;
+  if (mobCache.has(k)) return;
+  mobCache.set(k, null);
+  try {
+    const d = await window.eql.wikiMob?.(name);
+    mobCache.set(k, d ?? null);
+    if (d && state.view === 'encyclopedia' && state.enc.page === 'foe') renderEncyclopedia();
+  } catch { /* sin red */ }
+}
+
 /** Pide a la wiki las notas del enemigo y repinta cuando llegan. */
 async function loadMob(name) {
   if (mobCache.has(name)) return;
@@ -2742,12 +3002,6 @@ function foeDetail(a, f) {
 }
 
 function renderApp() {
-  if (state.view === 'catalog') {
-    // Misma guarda que el resumen: es una vista con su propio scroll y el
-    // snapshot de 250 ms la reconstruiría entera.
-    if (!$('catRoot')) renderCatalog();
-    return;
-  }
   if (state.view === 'summary') {
     // Sólo se monta una vez. Sin esta guarda el snapshot de 250 ms reconstruye
     // la vista entera y el scroll vuelve arriba en cuanto lo mueves.
