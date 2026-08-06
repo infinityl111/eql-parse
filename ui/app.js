@@ -779,9 +779,28 @@ function renderRows(snap) {
   const grupos = new Set(f.rows.map(grupo));
   let lastSide = null;
 
+  /**
+   * Coloca un nodo en su sitio, y SÓLO si no estaba ya en él.
+   *
+   * `appendChild` sobre un nodo que ya está puesto no es gratis: lo saca del
+   * documento y lo vuelve a meter, y al sacarlo se pierde el foco de lo que
+   * hubiera dentro. La lista se repinta cuatro veces por segundo, así que el
+   * desplegable de asignar mascota perdía el foco un cuarto de segundo después
+   * de abrirlo; entonces el desglose dejaba de estar «en uso», se reconstruía,
+   * y el desplegable desaparecía debajo del cursor antes de poder elegir nada.
+   *
+   * La guarda de la 1.3.1 —no tocar el desglose mientras tengas el foco dentro—
+   * estaba bien; lo que fallaba es que el foco se lo quitaba esto de aquí.
+   */
+  let pos = 0;
+  const colocar = (nodo) => {
+    if (host.children[pos] !== nodo) host.insertBefore(nodo, host.children[pos] ?? null);
+    pos++;
+  };
+
   let rankAlly = 0, rankFoe = 0;
   const ORDEN = { ally: 0, unknown: 1, enemy: 2 };
-  [...f.rows].sort((a, b) => ORDEN[grupo(a)] - ORDEN[grupo(b)]).forEach((r, i) => {
+  [...f.rows].sort((a, b) => ORDEN[grupo(a)] - ORDEN[grupo(b)]).forEach((r) => {
     seen.add(r.name);
     let node = state.rowNodes.get(r.name);
     if (!node) { node = buildRow(r.name); state.rowNodes.set(r.name, node); }
@@ -795,12 +814,20 @@ function renderRows(snap) {
         h.className = 'side-head eyebrow';
         state.sideHeads.set(g, h);
       }
-      h.textContent = t(ROTULO[g]);
-      h.title = g === 'unknown' ? t('side.unknownNote') : '';
-      host.appendChild(h);
+      // El texto sólo se toca si cambió: escribirlo igual también cuenta como
+      // tocar el DOM, y en una lista que se repinta cuatro veces por segundo
+      // conviene no tocar nada que no haga falta.
+      const rotulo = t(ROTULO[g]);
+      if (h.textContent !== rotulo) h.textContent = rotulo;
+      const titulo = g === 'unknown' ? t('side.unknownNote') : '';
+      if (h.title !== titulo) h.title = titulo;
+      colocar(h);
     }
-    host.appendChild(node.el);
+    colocar(node.el);
   });
+
+  // Lo que quede por detrás sobra: cabeceras de un grupo que ya no está.
+  while (host.children.length > pos) host.lastChild.remove();
 
   for (const [name, node] of state.rowNodes) {
     if (!seen.has(name)) { node.el.remove(); state.rowNodes.delete(name); }
@@ -1880,7 +1907,14 @@ function renderSummary() {
   // fila entera responde al clic plegándose. Se atienden en fase de captura
   // para cortar el suceso antes de que llegue a ella: si no, pulsar un botón
   // cerraría el desglose bajo el cursor.
-  host.addEventListener('click', async (e) => {
+  //
+  // Y se cuelgan de `#sumRoot`, que se construye entero en cada repintado, y NO
+  // de `#bodyGrid`, que sobrevive a todos: reemplazar el contenido de un nodo no
+  // le quita sus escuchadores, así que colgarlos ahí apilaba uno por repintado y
+  // al elegir un dueño se llamaba al puente tantas veces como veces se hubiera
+  // pintado el resumen.
+  const raiz = $('sumRoot');
+  raiz.addEventListener('click', async (e) => {
     if (e.target.closest?.('.petof')) { e.stopPropagation(); return; }
     const btn = e.target.closest?.('.excl-btn');
     if (!btn) return;
@@ -1894,7 +1928,7 @@ function renderSummary() {
     if (btn.dataset.mate) refreshFights();
     await recargarResumen();
   }, true);
-  host.addEventListener('change', async (e) => {
+  raiz.addEventListener('change', async (e) => {
     const sel = e.target.closest?.('.petof-sel');
     if (!sel) return;
     e.stopPropagation();
