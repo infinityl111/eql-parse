@@ -10,6 +10,7 @@ import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
 import { setLang } from './i18n.js';
 import { FightStore } from './store.js';
+import { Encyclopedia } from './encyclopedia.js';
 import { aggregate, mergePets, mergeOwnerPets, ownerPets, ensureSides } from './aggregate.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
 import { parseZone } from './zones.js';
@@ -246,6 +247,10 @@ export class Engine extends EventEmitter {
         // los filtros por tramo dejan de significar nada.
         const at = Math.round((f.start ?? Date.now() / 1000) * 1000);
         const sum = this.store?.append(f, at) ?? f;
+        // La enciclopedia se aprende aquí, con la pelea en la mano, y no cuando
+        // alguien la abre. Se le pasa el resumen porque `uid` es lo que impide
+        // contar dos veces la misma pelea al releer el log.
+        this.enc?.fold(f, sum);
         this.history.unshift(sum);
         if (this.history.length > 60) this.history.length = 60;
         this.storeSeq++;
@@ -375,6 +380,11 @@ export class Engine extends EventEmitter {
     this.tailer?.stop();
     this.tailer = null;
     this.status = 'idle';
+    // Lo aprendido y aún no escrito. El temporizador de guardado no llega si se
+    // cierra la aplicación justo después de una pelea, y esa pelea se volvería
+    // a plegar al arrancar — que es correcto, pero cuesta una lectura de disco
+    // por nada.
+    this.enc?.flush();
   }
 
   describe() {
@@ -1068,6 +1078,10 @@ export class Engine extends EventEmitter {
     } catch { /* aún no hay lista */ }
     const n = this.store.load();
     this.history = this.store.filter({ limit: 60 });
+    // La enciclopedia va detrás del almacén y nunca antes: necesita el índice
+    // cargado para saber qué le falta y para detectar que se reconstruyó.
+    this.enc = new Encyclopedia(this.store);
+    this.encLoad = this.enc.load();
     this.storeSeq++;
     return n;
   }
@@ -1203,11 +1217,32 @@ export class Engine extends EventEmitter {
   foeList(sinceMs) { return this.store?.foeList(sinceMs) ?? []; }
   storeStats() { return this.store?.stats() ?? null; }
 
+  // ── Enciclopedia ───────────────────────────────────────────────────────
+  // Todo esto se contesta desde la ficha, que ya está en memoria. Lo único que
+  // toca el disco es la lista de combates contra un enemigo, y sólo el índice.
+  encZones() { return this.enc?.zones() ?? []; }
+  encZoneFoes(base, diff) { return this.enc?.zoneFoes(base, diff ?? null) ?? []; }
+  encFoe(name) { return this.enc?.foe(name) ?? null; }
+  encFoes() { return this.enc?.foes() ?? []; }
+  encLoot() { return this.enc?.lootList() ?? []; }
+  encCounts() { return this.enc?.counts() ?? null; }
+  encStatus() { return { ...(this.enc?.audit() ?? {}), load: this.encLoad ?? null }; }
+  encRebuild() { return this.enc?.rebuild() ?? { ok: false }; }
+
+  /** Los combates contra un enemigo, opcionalmente los de una zona y dificultad. */
+  encFights(q = {}) {
+    if (!this.store) return [];
+    const f = { foeExact: q.name, zoneBase: q.base, limit: q.limit ?? 200 };
+    // Sólo se pasa si de verdad se pide: `null` es «sin marca» y no «da igual».
+    if (Object.hasOwn(q, 'diff')) f.diff = q.diff;
+    return this.store.filter(f);
+  }
+
   /**
    * Al caer un enemigo, quién le hizo cuánto.
    *
    * Se calcula sobre ESE objetivo, no sobre la pelea: en una pelea con varios
-   * bichos el reparto general no dice nada de quién mató a cuál. El dps va
+   * enemigos el reparto general no dice nada de quién mató a cuál. El dps va
    * sobre el tiempo que ese enemigo estuvo recibiendo golpes.
    */
   #makeKillCard(ev) {

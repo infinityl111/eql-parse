@@ -93,7 +93,7 @@ export function baseSpell(name) {
   return m && m[1] ? s.slice(0, m.index) : s;
 }
 
-/** Nombres de bicho más cortos al hablarlos: "a fire giant warrior" -> "fire giant warrior". */
+/** Nombres de enemigo más cortos al hablarlos: "a fire giant warrior" -> "fire giant warrior". */
 export function shortName(name) {
   return String(name ?? '').replace(/^(an?|the) /i, '');
 }

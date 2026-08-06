@@ -97,7 +97,7 @@ export class Parser {
    * Medido en un log real: `Jobarn` fue tuya a las 20:07 y a las 23:51
    * invocaste `Kabarer`. A las 00:01 apareció otro `Jobarn`, el de `Krumka`, y
    * se guardó una pelea entera en la que tú no estabas — su dueño, su mascota y
-   * el bicho— como si fuera tuya.
+   * el enemigo— como si fuera tuya.
    *
    * Sólo se tiene una a la vez, así que confirmar una nueva retira la anterior.
    * Las tres señales que llegan aquí son inequívocas en el instante en que
@@ -127,7 +127,7 @@ export class Parser {
       return this.self ?? 'You';
     }
     // EQ capitaliza al principio de frase: "A fire giant warrior" y
-    // "a fire giant warrior" son el mismo bicho. Sólo tocamos el artículo,
+    // "a fire giant warrior" son el mismo enemigo. Sólo tocamos el artículo,
     // para no estropear nombres propios como "King Tranix".
     return name.replace(/^(An?|The) /, (m) => m.toLowerCase());
   }

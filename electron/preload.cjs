@@ -72,4 +72,15 @@ contextBridge.exposeInMainWorld('eql', {
   setTrios: (lista) => ipcRenderer.invoke('trios:set', lista),
   trioConflicts: () => ipcRenderer.invoke('trios:conflicts'),
   rebuildStore: () => ipcRenderer.invoke('store:rebuild'),
+
+  // Enciclopedia. Todo sale de la ficha aprendida, que ya está en memoria.
+  encZones: () => ipcRenderer.invoke('enc:zones'),
+  encZoneFoes: (base, diff) => ipcRenderer.invoke('enc:zoneFoes', { base, diff }),
+  encFoe: (name) => ipcRenderer.invoke('enc:foe', name),
+  encFoes: () => ipcRenderer.invoke('enc:foes'),
+  encLoot: () => ipcRenderer.invoke('enc:loot'),
+  encFights: (q) => ipcRenderer.invoke('enc:fights', q),
+  encCounts: () => ipcRenderer.invoke('enc:counts'),
+  encStatus: () => ipcRenderer.invoke('enc:status'),
+  encRebuild: () => ipcRenderer.invoke('enc:rebuild'),
 });

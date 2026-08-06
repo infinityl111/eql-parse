@@ -404,6 +404,16 @@ ipcMain.handle('history:stats', () => engine.storeStats());
 // Catalogo de hechizos construido desde el historico, con los cooldowns medidos.
 ipcMain.handle('catalog:spells', (_e, q) => engine.spellCatalog(q ?? {}));
 
+ipcMain.handle('enc:zones', () => engine.encZones());
+ipcMain.handle('enc:zoneFoes', (_e, { base, diff }) => engine.encZoneFoes(base, diff));
+ipcMain.handle('enc:foe', (_e, name) => engine.encFoe(name));
+ipcMain.handle('enc:foes', () => engine.encFoes());
+ipcMain.handle('enc:loot', () => engine.encLoot());
+ipcMain.handle('enc:fights', (_e, q) => engine.encFights(q ?? {}));
+ipcMain.handle('enc:counts', () => engine.encCounts());
+ipcMain.handle('enc:status', () => engine.encStatus());
+ipcMain.handle('enc:rebuild', () => engine.encRebuild());
+
 ipcMain.handle('session:reset', () => {
   const r = engine.resetSession();
   // El reset puede venir del overlay o de la ventana principal: se avisa a las

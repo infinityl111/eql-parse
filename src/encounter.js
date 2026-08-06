@@ -160,7 +160,7 @@ export class Encounter {
     this.targetTotals = new Map();  // para nombrar la pelea
     this.deadAt = new Map();       // nombre -> segundo en que cayó
     // Lo que costó tumbar a cada enemigo, una muestra por muerte. Se anota al
-    // caer y no al acabar la pelea: si el mismo bicho cae tres veces, sumar el
+    // caer y no al acabar la pelea: si el mismo enemigo cae tres veces, sumar el
     // daño de las tres y llamarlo «su vida» la triplica.
     this.hpSamples = new Map();    // nombre -> [daño hasta cada muerte]
     this.deathBase = new Map();    // nombre -> daño acumulado en su muerte anterior
@@ -289,7 +289,7 @@ export class EncounterTracker extends EventEmitter {
         if (this.#mine().has(ev.caster)) {
           this.current.resistsSuffered++;
           // Contra QUIÉN y con QUÉ hechizo: es lo que permite saber después a
-          // qué es resistente cada bicho, medido en tus propias peleas.
+          // qué es resistente cada enemigo, medido en tus propias peleas.
           this.#tally(this.current, ev.target, ev.ability, 'resisted', ev.invocation);
         }
       } else if (ev.kind === 'resist_by_you') this.current.resistsCaused++;
@@ -316,7 +316,7 @@ export class EncounterTracker extends EventEmitter {
     // ── Filtro de relevancia ──────────────────────────────────────────────
     //
     // El log ve TODO lo que pasa a tu alrededor, incluido un desconocido
-    // matando bichos a diez metros. Sin este filtro su pelea entra en la tuya
+    // matando enemigos a diez metros. Sin este filtro su pelea entra en la tuya
     // y falsea el reparto entero.
     //
     // Cuenta un suceso si toca a los tuyos (tú o tus mascotas) o a alguien a
@@ -409,7 +409,7 @@ export class EncounterTracker extends EventEmitter {
         enc.actor(ev.victim).deaths++;
         // Lo que costó ESTA muerte: el daño acumulado contra él menos el que ya
         // llevaba cuando cayó la vez anterior. Sin restar, matar tres veces al
-        // mismo bicho daba una «vida» del triple.
+        // mismo enemigo daba una «vida» del triple.
         const acumulado = enc.targetTotals.get(ev.victim) ?? 0;
         const coste = acumulado - (enc.deathBase.get(ev.victim) ?? 0);
         if (coste > 0) {

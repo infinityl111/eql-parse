@@ -37,7 +37,7 @@ export function catalog(fights, self, cooldowns = new Map()) {
       if ((a.min ?? 0) > 0) e.min = Math.min(e.min, a.min);
       // EQL etiqueta el tipo de daño, y entre ellos hay uno que no estábamos
       // usando: `unresistable`. Que un hechizo no se pueda resistir es
-      // exactamente lo que quieres saber contra un bicho que resiste todo.
+      // exactamente lo que quieres saber contra un enemigo que resiste todo.
       if (a.type) e.tipos.set(a.type, (e.tipos.get(a.type) ?? 0) + (a.sum ?? 0));
       e.peleas.add(f.uid ?? f.id);
     }

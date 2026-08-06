@@ -283,6 +283,22 @@ export class FightStore {
     const mates = (q.mates ?? []).filter(Boolean);
     let out = this.index;
     if (cut !== null) out = out.filter((s) => s.at >= cut);
+
+    // Los tres exactos son para la enciclopedia, y son otra pregunta que los de
+    // arriba. `foe` busca lo que escribes y por eso hace «contiene»: tecleas
+    // «naga» y salen los Nagafen. La enciclopedia no busca, señala una ficha
+    // concreta, y con «contiene» «a fear guardian» arrastraría a cualquier otro
+    // guardián. Lo mismo con la zona: «Plane of Fear» contiene a las cinco
+    // dificultades a la vez, que es justo lo que hay que separar.
+    if (q.foeExact) out = out.filter((s) => (s.foes ?? []).includes(q.foeExact));
+    if (q.zoneBase) {
+      out = out.filter((s) => (s.zoneBase ?? null) === q.zoneBase);
+    }
+    // `diff: null` es una dificultad —«sin marca», el mundo abierto— y no «no
+    // filtres». Se distingue por que la clave venga o no, no por su valor.
+    if (Object.hasOwn(q, 'diff') && q.diff !== undefined) {
+      out = out.filter((s) => (s.diff ?? null) === q.diff);
+    }
     if (mates.length) {
       // TODOS los marcados, no cualquiera de ellos. Comparar lo que ha hecho
       // cada uno sólo significa algo si en todas las peleas estaba la misma

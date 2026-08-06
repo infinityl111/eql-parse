@@ -51,7 +51,7 @@ function findBlock(text) {
 }
 
 /**
- * Frases tácticas de la ficha de un bicho.
+ * Frases tácticas de la ficha de un enemigo.
  *
  * Las páginas de NPC no usan plantilla: la información útil está en prosa
  * («High resists, not normally slowable, does not DT»). Se buscan las frases
@@ -118,7 +118,7 @@ export class WikiClient {
     return job;
   }
 
-  /** Ficha táctica de un bicho: lo que la wiki cuenta sobre cómo se pelea. */
+  /** Ficha táctica de un enemigo: lo que la wiki cuenta sobre cómo se pelea. */
   async mob(name) {
     const key = 'mob:' + String(name ?? '').toLowerCase();
     if (!key) return null;

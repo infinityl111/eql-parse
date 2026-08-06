@@ -271,7 +271,7 @@ export class Narrator extends EventEmitter {
     const cat = classifySpell(ev.ability, { nukeNames: this.config.nukeNames });
     if (!cat || !cfg[cat]) return false;
 
-    // Un mismo bicho recastando lo mismo cada pocos segundos no se repite.
+    // Un mismo enemigo recastando lo mismo cada pocos segundos no se repite.
     const key = `${ev.source}|${cat}`;
     if (ev.t - (this.lastCast.get(key) ?? -99) < 8) return false;
     this.lastCast.set(key, ev.t);

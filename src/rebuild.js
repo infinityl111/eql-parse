@@ -18,7 +18,20 @@ import { FightStore, STORE_VERSION } from './store.js';
  *    delante meses de histórico.
  */
 
-const FICHEROS = ['fights.ndjson', 'fights.idx'];
+/**
+ * Lo que se aparta, y por qué la enciclopedia va en la lista.
+ *
+ * La ficha de la enciclopedia se construye a partir de estas mismas peleas y
+ * apunta a la última por su posición en el fichero. Dejándola fuera, una
+ * reconstrucción que falla a medias restauraba el histórico de antes y se
+ * quedaba con la ficha a medio hacer del intento: dos cosas que ya no se
+ * describen la una a la otra, y con posiciones que pueden coincidir por
+ * casualidad —los dos ficheros empiezan en cero y crecen igual—, así que la
+ * comprobación de divergencia podía darla por buena.
+ *
+ * Van juntas o no van: se apartan a la vez y se restauran a la vez.
+ */
+const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json'];
 
 export async function rebuildStore({ dir, logPath, self = null, idleSec = 20, trios = [] } = {}) {
   if (!dir) return { ok: false, reason: 'sin-carpeta' };

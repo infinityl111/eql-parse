@@ -397,7 +397,46 @@ button.ghost:hover { color: var(--bone); border-color: var(--slate-600); }
                text-transform: uppercase; color: var(--t-fire); }
 .brand-tag { font-family: var(--body); font-size: 10px; font-style: italic;
              color: var(--bone-faint); letter-spacing: .02em; }
-@media (max-width: 1150px) { .brand-tag { display: none; } }
+/* La cabecera no puede comerse sus propios botones.
+   Con la pestaña de Enciclopedia dentro, a 1180 px —el tamaño con el que abre
+   la ventana— la fila medía 1.495 px: «Cambiar log» y el conmutador de tema se
+   salían por la derecha y no había forma de llegar a ellos. Ya se salían antes
+   de la pestaña, con un nombre de zona largo como «Plane of Fear - Group 4
+   (Refined)»; la pestaña sólo lo hizo evidente.
+   Lo que cede es el TEXTO, nunca los botones: personaje, zona y postura se
+   recortan con puntos suspensivos y enseñan el valor entero al pasar el ratón.
+   Un dato a medias se lee; un botón que no está no se pulsa. */
+header { gap: 12px; flex-wrap: wrap; }
+header > * { flex: none; }
+.meta { flex: 1 1 auto; min-width: 0; gap: 10px; justify-content: flex-end; }
+.meta .eyebrow {
+  min-width: 0; max-width: 15ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.meta button { flex: none; padding: 6px 9px; }
+/* Se va quitando lo prescindible antes que lo útil, y en ese orden: primero el
+   lema, el nombre del idioma —la bandera ya lo dice— y la palabra del estado
+   —el punto de color ya lo dice—; después se recortan los valores. El nombre de
+   la hermandad se queda: es de quién es esto. */
+@media (max-width: 1560px) {
+  .brand-tag { display: none; }
+  .status .eyebrow { display: none; }
+  .lang-name { display: none; }
+}
+/* Cuando el sitio aprieta de verdad, lo que se va es la ETIQUETA y no el valor.
+   Recortando el conjunto salía «ZONA P…», que es la palabra que ya sabías y
+   ninguna de la que preguntabas. Sin etiqueta se lee «Plane of Fear -…», y el
+   nombre entero sigue estando al pasar el ratón.
+   El personaje se retira antes que los otros dos: es el único de los tres que
+   no cambia durante la sesión, y su nombre está en el pie, dentro de la ruta
+   del log. */
+@media (max-width: 1280px) {
+  .meta .eyebrow > span { display: none; }
+  .meta-char { display: none; }
+}
+/* Y si aun así no cabe —a 900 px, el mínimo de la ventana, no cabe—, el bloque
+   de la derecha baja entero a una segunda línea en lugar de salirse. La
+   cabecera se ve más alta; se ven todos los botones. */
 
 /* ── Selector de idioma ──────────────────────────────── */
 .langpick { position: relative; margin-right: 14px; }
@@ -522,9 +561,131 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .voice-row input[type=range] { width: 110px; }
 
 /* ── Filtros del histórico ───────────────────────────── */
-.flt { display: flex; gap: 6px; padding: 0 0 10px; }
-.flt select { flex: 1; min-width: 0; font-family: var(--body); font-size: 11.5px; padding: 4px 5px; }
+/* Una línea, tres controles. `position: relative` es lo que ancla el
+   desplegable de compañeros justo debajo de la barra. */
+.flt { display: flex; gap: 6px; padding: 0 0 10px; position: relative; align-items: stretch; }
+/* El tramo se lleva algo más de sitio que el enemigo: «Últimas 24 h» tiene que
+   caber entero, y el enemigo es un hueco donde escribes tú. */
+.flt select { flex: 1.5 1 0; min-width: 0; font-family: var(--body); font-size: 11.5px; padding: 4px 2px 4px 5px; }
 .flt-foot { padding: 10px 2px 4px; color: var(--bone-faint); text-align: center; }
+
+/* ── Enciclopedia ────────────────────────────────────── */
+/**
+ * Una sola columna, centrada.
+ *
+ * El panel ocupa la ventana entera y la enciclopedia todavía tiene poco dentro:
+ * pegada a la izquierda dejaba medio monitor vacío a la derecha en cuanto la
+ * pantalla era ancha. El tope va en el bloque y no en cada vista, para que
+ * pasar de la rejilla a una zona o a un enemigo no mueva el sitio de las cosas.
+ *
+ * 1.200 px salen de la rejilla: cuatro tarjetas de 285 con sus huecos. Es el
+ * ancho que hace que el índice no se estire y que el resto de las vistas no se
+ * queden con líneas de texto de punta a punta de la pantalla.
+ */
+.enc { max-width: 1200px; margin-inline: auto; }
+.enc-note { margin: 0 0 16px; max-width: 62ch; }
+/**
+ * Cuatro columnas, fijas, y la cuenta es a propósito.
+ *
+ * Son SIETE secciones: con cuatro salen 4+3, que es una composición cerrada.
+ * Con `auto-fill` la rejilla decidía sola y a 1920 ponía seis, o sea 6+1, y a
+ * 900 tres, o sea 3+3+1: en los dos casos una tarjeta huérfana en su propia
+ * fila, que se lee como un fallo de maquetación y no como una decisión.
+ *
+ * Fijándolas, lo que cambia con la ventana es el tamaño de la tarjeta y no la
+ * composición, que es lo que hace que una rejilla parezca deliberada.
+ *
+ * OJO: esta cuenta depende del número de secciones. Con ocho saldría 4+4 y
+ * estaría aún mejor; con nueve vuelve la huérfana y hay que rehacerla.
+ *
+ * El máximo es para que a pantalla ancha no se inflen: esto es un índice y su
+ * trabajo es que las siete se vean de un golpe, no lucir el dibujo. 344 px es
+ * donde deja de crecer.
+ */
+.encgrid {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px;
+  max-width: 1436px;
+}
+.enccard {
+  display: block; width: 100%; padding: 0; text-align: left; cursor: pointer;
+  background: var(--slate-850); border: 1px solid var(--slate-700);
+  border-bottom: 2px solid var(--enc-accent, var(--slate-600));
+  border-radius: 3px; overflow: hidden;
+  font-family: var(--body); font-size: 13px; letter-spacing: 0;
+  text-transform: none; color: var(--bone);
+}
+.enccard:hover { background: var(--slate-800); border-color: var(--slate-600);
+                 border-bottom-color: var(--enc-accent, var(--slate-600)); }
+.enccard:hover .plate { color: var(--bone); }
+.plate { display: block; width: 100%; height: auto; color: var(--bone-dim);
+         transition: color .15s ease; }
+@media (prefers-reduced-motion: reduce) { .plate { transition: none; } }
+.enccard-t { display: block; padding: 9px 13px 2px; font-family: var(--display);
+             font-size: 16px; letter-spacing: .08em; text-transform: uppercase; }
+.enccard-s { display: block; padding: 0 13px 10px; font-size: 11.5px;
+             color: var(--bone-faint); line-height: 1.45; }
+/* Sección con la lámina aún por dibujar: el filete a trazos lo dice sin
+   apagar la tarjeta, que sí existe. */
+.enccard.pend { border-bottom-style: dashed; cursor: default; }
+.enccard.pend:hover { background: var(--slate-850); border-color: var(--slate-700); }
+.enccard.pend:hover .plate { color: var(--bone-dim); }
+
+/* ── Enciclopedia: el camino recorrido ───────────────── */
+.enc-crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 7px;
+  font-family: var(--display); font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--bone-faint); margin-bottom: 14px; }
+.enc-crumb b { color: var(--bone); font-weight: 600; }
+.enc-crumb i { font-style: normal; opacity: .5; }
+.enc-crumb .lnk { font-family: var(--display); font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; background: none; border: none; padding: 0;
+  color: var(--bone-faint); cursor: pointer; }
+.enc-crumb .lnk:hover { color: var(--t-cold); background: none; }
+
+.enc-h { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.enc-h h2 { font-family: var(--display); font-size: 19px; letter-spacing: .05em;
+            text-transform: uppercase; margin: 0; }
+.difpill { font-family: var(--mono); font-size: 11px; padding: 2px 9px; border-radius: 10px;
+           border: 1px solid var(--t-cold); color: var(--t-cold);
+           background: rgba(111,199,216,.12); }
+
+/* ── La rejilla de zonas ─────────────────────────────── */
+.zscroll { overflow-x: auto; }
+.ztable { width: 100%; border-collapse: collapse; }
+.ztable th { font-family: var(--display); font-size: 10px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--bone-faint); font-weight: 600;
+  text-align: left; padding: 0 8px 8px; border-bottom: 1px solid var(--slate-700);
+  white-space: nowrap; }
+.ztable td { padding: 6px 8px; border-bottom: 1px solid var(--slate-800); vertical-align: middle; }
+.zname { font-size: 13px; min-width: 180px; }
+.zname.dim { font-size: 10px; font-family: var(--display); letter-spacing: .1em;
+             text-transform: uppercase; color: var(--bone-faint); }
+.enccell {
+  display: inline-flex; align-items: baseline; gap: 7px; padding: 4px 10px;
+  background: var(--slate-800); border: 1px solid var(--slate-600); border-radius: 2px;
+  font-family: var(--body); font-size: 11px; letter-spacing: 0; text-transform: none;
+  color: var(--bone-dim); cursor: pointer; white-space: nowrap;
+}
+.enccell b { font-family: var(--mono); font-size: 13px; color: var(--bone); }
+.enccell:hover { border-color: var(--t-cold); background: rgba(111,199,216,.10); color: var(--bone); }
+/* Donde no has entrado. A trazos y sin fondo: es un hueco, no un cero. */
+.enccell.void { display: inline-block; border-style: dashed; border-color: var(--slate-700);
+  color: var(--bone-faint); background: none; cursor: default; padding: 4px 14px; }
+.ztable .hint { display: inline; margin-left: 10px; }
+
+/* ── Listas de la enciclopedia ───────────────────────── */
+.encrows { display: grid; gap: 5px; margin-bottom: 12px; }
+.encrow {
+  display: grid; grid-template-columns: 1fr auto auto auto; gap: 14px;
+  align-items: baseline; width: 100%; text-align: left;
+  padding: 8px 11px; background: var(--slate-850);
+  border: 1px solid transparent; border-left: 2px solid var(--t-ds); border-radius: 2px;
+  font-family: var(--body); font-size: 12.5px; letter-spacing: 0; text-transform: none;
+  color: var(--bone-dim); cursor: pointer;
+}
+.encrow:hover { background: var(--slate-800); border-color: var(--slate-600);
+                border-left-color: var(--t-cold); }
+.encrow .nm { color: var(--bone); font-size: 13px; }
+.encrow.fight { border-left-color: var(--t-cold); }
 
 /* ── Botín ───────────────────────────────────────────── */
 .loot { margin: 4px 0 18px; padding: 11px 14px; background: var(--slate-850);
@@ -641,7 +802,12 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .marks-h .num { margin-left: auto; font-family: var(--mono); font-size: 11.5px; }
 .chk.mini { display: inline-flex; align-items: center; gap: 5px; margin-left: 12px;
             font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
-            color: var(--bone-faint); cursor: pointer; }
+            color: var(--bone-faint); cursor: pointer;
+/* `.mini` a secas es la barra de 5 px del desglose, y su `height: 5px` llevaba
+   tiempo aplicándose también a estas casillas por compartir el nombre de clase:
+   la de «juntar mascotas» era una tira gris de 5 px con el texto desbordado por
+   arriba. La casilla manda sobre la barra donde coinciden las dos. */
+            height: auto; background: none; }
 .chk.mini input { width: 11px; height: 11px; }
 .chk.mini:hover { color: var(--bone-dim); }
 
@@ -743,17 +909,47 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .excl-btn.mate:hover { border-color: var(--t-poison); color: var(--t-poison); }
 .excl-item.mate { border-color: var(--t-poison); }
 
-/* Filtro por compañero, bajo el tramo y el enemigo. */
-.mates { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 6px; }
-.mates .eyebrow { font-size: 9px; }
-.mates .hint { flex-basis: 100%; font-size: 10px; margin: 0; }
-.mate-chip {
-  font-size: 10.5px; padding: 3px 8px; cursor: pointer;
-  border: 1px solid var(--line); border-radius: 10px;
-  background: transparent; color: var(--dim);
+/* Filtro por compañero: el tercer control de la barra, del ancho de su texto.
+   Las fichas que había antes crecían con cada compañero declarado y echaban de
+   la línea al tramo y al enemigo; esto ocupa lo mismo con dos que con veinte. */
+.mates-btn {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--display); font-size: 10px; letter-spacing: .08em;
+  text-transform: uppercase; padding: 4px 6px;
+  background: var(--slate-800); border: 1px solid var(--slate-600);
+  color: var(--bone-dim); border-radius: 2px; cursor: pointer; white-space: nowrap;
 }
-.mate-chip:hover { color: var(--bone); }
-.mate-chip.on { border-color: var(--t-poison); color: var(--t-poison); background: rgba(168,199,79,.12); }
+.mates-btn:hover { color: var(--bone); background: var(--slate-700); }
+.mates-btn b { font-size: 11px; color: inherit; }
+.mates-btn .caret { font-size: 9px; opacity: .85; margin-left: 1px; }
+.mates-btn.on { border-color: var(--t-poison); color: var(--t-poison); background: rgba(168,199,79,.12); }
+.mates-pop {
+  position: absolute; z-index: 6; top: 100%; right: 0; min-width: 150px; max-width: 100%;
+  max-height: 240px; overflow-y: auto;
+  padding: 8px 10px; background: var(--slate-800);
+  border: 1px solid var(--slate-600); border-radius: 3px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.45);
+}
+:root[data-theme="light"] .mates-pop { box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.mates-pop .eyebrow { display: block; margin-bottom: 6px; }
+/* En vertical y pegadas a la izquierda: `.chk.mini` es en línea y con sangría
+   porque nació al lado de un título, y aquí es una lista. */
+.mates-pop .chk.mini {
+  display: flex; justify-content: flex-start; text-align: left;
+  width: 100%; margin: 0 0 4px; padding: 2px 0;
+  font-size: 11px; letter-spacing: .04em; text-transform: none;
+  color: var(--bone-dim);
+}
+.mates-pop .chk.mini input { flex: 0 0 auto; }
+.mates-pop .hint { margin: 6px 0 0; font-size: 10px; }
+.mates-pop .pick-clear { width: 100%; margin-top: 7px; }
+/* Y en el resumen se dice con qué filtro salen esas cifras: si no, un total
+   filtrado por dos compañeros tiene el mismo aspecto que el total de todo. */
+.mates-tag {
+  font-size: 10.5px; padding: 2px 8px; border-radius: 10px;
+  border: 1px solid var(--t-poison); color: var(--t-poison);
+  background: rgba(168,199,79,.12);
+}
 .trio-conf {
   margin-top: 10px; padding: 8px 10px;
   border: 1px solid var(--t-ds); border-radius: 4px;
@@ -768,3 +964,70 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .petof { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; color: var(--dim); }
 .petof-sel { font-size: 10px; padding: 3px 6px; background: var(--slate-800);
   color: var(--bone); border: 1px solid var(--line); border-radius: 4px; }
+
+/* El estado de la ficha, al pie del índice de la enciclopedia. */
+.enc-foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px;
+            margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--slate-800); }
+.enc-foot .hint { margin: 0; color: var(--t-fire); }
+.enc-foot .lnk { margin-left: auto; font-size: 10px; }
+
+/* El expediente ya no necesita tope propio: lo enmarca la columna centrada de
+   la enciclopedia, que es la que decide el ancho de todas sus vistas. */
+
+/* ── Enciclopedia: buscador y listas largas ──────────── */
+.enc-find {
+  flex: 0 1 260px; min-width: 0; margin-left: auto;
+  font-family: var(--body); font-size: 12px; padding: 5px 9px;
+  background: var(--slate-900); color: var(--bone); border: 1px solid var(--slate-600);
+}
+.enc-find:focus { outline: none; border-color: var(--t-cold); }
+.enc-h .hint { margin: 0; flex: none; }
+.dpills { display: inline-flex; gap: 4px; margin-left: 9px; vertical-align: 1px; }
+.dpill {
+  font-family: var(--mono); font-size: 9.5px; padding: 1px 5px; border-radius: 8px;
+  border: 1px solid var(--slate-600); color: var(--bone-faint);
+}
+.encrow:hover .dpill { border-color: var(--t-cold); color: var(--t-cold); }
+
+/* ── Botín ───────────────────────────────────────────── */
+.lootgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+            gap: 12px; margin-bottom: 12px; }
+.lootcard { background: var(--slate-850); border: 1px solid var(--slate-700);
+            border-left: 2px solid var(--t-poison); border-radius: 2px; padding: 9px 11px; }
+.lootcard-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.lootcard .hint { margin: 5px 0 0; font-size: 10.5px; }
+.lootfrom {
+  display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 3px 0; background: none; border: none; cursor: pointer;
+  font-family: var(--body); font-size: 11.5px; letter-spacing: 0; text-transform: none;
+  color: var(--bone-dim); text-align: left;
+}
+.lootfrom:hover { background: none; color: var(--t-cold); }
+.lootfrom .num { font-size: 11px; color: var(--bone-faint); }
+.lootfrom:hover .num { color: var(--t-cold); }
+
+/* ── Sugerencias del buscador ────────────────────────── */
+/* Van en la fila del título, a la izquierda del campo, y NO flotando sobre la
+   lista: mientras escribes quieres ver las dos cosas a la vez. */
+.suggs { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+/* Las sugerencias van pegadas al campo, no flotando a medio camino. */
+.suggs + .enc-find { margin-left: 0; }
+.sugg {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px 3px 7px; border-radius: 11px; cursor: pointer;
+  background: var(--slate-800); border: 1px solid var(--slate-600);
+  font-family: var(--body); font-size: 11.5px; letter-spacing: 0;
+  text-transform: none; color: var(--bone-dim); white-space: nowrap;
+}
+.sugg svg { width: 11px; height: 11px; flex: none; fill: currentColor; }
+/* Forma Y color, no sólo color: la estrella es la de la rosa de los vientos de
+   la lámina de Zonas y el hexágono el del medallón de la de Enemigos, así que
+   la marca ya se ha visto antes en la misma pantalla. */
+.sugg.zone { color: var(--t-cold); border-color: color-mix(in srgb, var(--t-cold) 45%, var(--slate-600)); }
+.sugg.foe { color: var(--t-ds); border-color: color-mix(in srgb, var(--t-ds) 45%, var(--slate-600)); }
+.sugg.zone:hover, .sugg.zone:focus-visible { background: rgba(111,199,216,.14); }
+.sugg.foe:hover, .sugg.foe:focus-visible { background: rgba(176,85,95,.14); }
+
+/* La zona a la que has saltado desde una sugerencia, señalada al llegar. */
+.ztable tr.zmark td { background: rgba(111,199,216,.09); }
+.ztable tr.zmark .zname { color: var(--t-cold); }

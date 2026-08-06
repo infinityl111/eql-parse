@@ -4,6 +4,7 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
 import { initTriggers, renderTriggers } from './triggers.js';
+import { plate, DIBUJADAS } from './plates.js';
 import { mountBanner, speak, playSound, listVoices } from './alerts.js';
 
 const TYPES = ['magic', 'cold', 'fire', 'poison', 'disease', 'melee', 'ds', 'dot', 'spell'];
@@ -37,6 +38,16 @@ const state = {
   summary: null,
   openFoes: new Set(),
   openSumRows: new Set(),
+  // El desplegable de compañeros del filtro. Vive en el estado y no en el DOM
+  // porque la lista se repinta sola cada 250 ms con el snapshot: guardarlo en
+  // una clase del nodo lo cerraría al cuarto de segundo de abrirlo.
+  matesOpen: false,
+  // Recuentos de la enciclopedia, por sección. Vacío mientras no existan las
+  // fichas: la tarjeta enseña entonces su descripción, que es lo que hay.
+  encCounts: null,
+  // Dónde estás dentro de la enciclopedia. Es una ruta y no un `view` más
+  // porque tiene cuatro niveles y hay que poder volver por donde viniste.
+  enc: { page: 'index', base: null, name: null, zonas: [], foes: [], fights: [] },
 };
 
 // ═══════════ Introducción de primera vez ═══════════
@@ -423,6 +434,33 @@ function fightCard(f, live) {
   </div>`;
 }
 
+/**
+ * Los tres filtros, en una sola línea.
+ *
+ * El de compañeros era una fila de fichas, una por cada uno declarado. Con dos
+ * ya empujaba al tramo y al enemigo fuera de la barra —272 px de columna no dan
+ * para tres controles y una fila que crece—, y en una raid de veinte nombres no
+ * habría cabido nada. Un desplegable ocupa lo mismo con dos que con veinte: la
+ * lista se va por dentro y la barra no se entera.
+ */
+function matesFilter() {
+  const todos = state.cfg.companions ?? [];
+  // Sin nadie declarado no hay nada que filtrar: el control no se pinta y la
+  // barra se queda con los dos de siempre.
+  if (!todos.length) return '';
+  const on = state.filter.mates ?? [];
+  return `<button class="mates-btn ${on.length ? 'on' : ''}" id="fltMates"
+      title="${esc(t('mate.title'))}" aria-haspopup="true" aria-expanded="${state.matesOpen}"
+      >${esc(t('mate.filter'))}${on.length ? ` <b class="num">${on.length}</b>` : ''}<span class="caret">▾</span></button>
+    ${state.matesOpen ? `<div class="mates-pop" id="matesPop">
+      <div class="eyebrow">${esc(t('mate.title'))}</div>
+      ${todos.map((n) => `<label class="chk mini"><input type="checkbox" data-mate="${esc(n)}"${
+        on.includes(n) ? ' checked' : ''}> ${esc(n)}</label>`).join('')}
+      ${on.length > 1 ? `<div class="hint">${esc(t('mate.filterAll'))}</div>` : ''}
+      ${on.length ? `<button class="pick-clear" id="matesClear">${esc(t('pick.clear'))}</button>` : ''}
+    </div>` : ''}`;
+}
+
 function renderFightList(snap) {
   const parts = [];
 
@@ -434,14 +472,7 @@ function renderFightList(snap) {
     <datalist id="foeList">
       ${state.foes.map((f) => `<option value="${esc(f.name)}">${f.n}</option>`).join('')}
     </datalist>
-    ${(state.cfg.companions ?? []).length ? `<div class="mates">
-      <span class="eyebrow">${esc(t('mate.filter'))}</span>
-      ${(state.cfg.companions ?? []).map((n) => `<button class="mate-chip ${
-        (state.filter.mates ?? []).includes(n) ? 'on' : ''}" data-mate="${esc(n)}"
-        >${esc(n)}</button>`).join('')}
-      ${(state.filter.mates ?? []).length > 1
-        ? `<span class="hint">${esc(t('mate.filterAll'))}</span>` : ''}
-    </div>` : ''}
+    ${matesFilter()}
   </div>
   <button class="sumbtn" id="btnSummary">${esc(t('sum.open'))}</button>
   <button class="sumbtn" id="btnCatalog">${esc(t('cat.open'))}</button>`);
@@ -486,16 +517,32 @@ function renderFightList(snap) {
   list.innerHTML = html;
 
   $('fltRange')?.addEventListener('change', (e) => { state.filter.range = e.target.value; refreshFights(); });
+  $('fltMates')?.addEventListener('click', (e) => {
+    // Sin esto el clic sube hasta el documento, que es quien cierra el
+    // desplegable: se abriría y se cerraría con el mismo clic.
+    e.stopPropagation();
+    state.matesOpen = !state.matesOpen;
+    list.dataset.sig = '';
+    renderApp();
+  });
+  // El desplegable se queda abierto mientras marcas: marcar a uno solo casi
+  // nunca es lo que quieres, y volver a abrirlo por cada nombre sobra.
+  $('matesPop')?.addEventListener('click', (e) => e.stopPropagation());
   // Marcar varios es «estuvieron todos», no «alguno»: ver el porqué en
   // FightStore.filter. Aquí sólo se recogen los marcados.
-  list.querySelectorAll('.mate-chip').forEach((el) => el.addEventListener('click', () => {
-    const n = el.dataset.mate;
+  list.querySelectorAll('#matesPop input[data-mate]').forEach((el) => el.addEventListener('change', () => {
     const m = new Set(state.filter.mates ?? []);
-    m.has(n) ? m.delete(n) : m.add(n);
+    el.checked ? m.add(el.dataset.mate) : m.delete(el.dataset.mate);
     state.filter.mates = [...m];
     state.summary = null;
     refreshFights();
   }));
+  $('matesClear')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.filter.mates = [];
+    state.summary = null;
+    refreshFights();
+  });
   // Se espera a que dejes de escribir: filtrar en cada tecla releería el índice
   // entero con cada letra.
   let foeTimer = null;
@@ -1742,6 +1789,9 @@ function renderSummary() {
   host.innerHTML = `<div class="summary" id="sumRoot">
     <div class="sum-head">
       <h2>${esc(state.summaryFrom === 'pick' ? t('pick.title') : t('sum.title'))}</h2>
+      ${state.summaryFrom !== 'pick' && (state.filter.mates ?? []).length
+        ? `<span class="mates-tag" title="${esc(t('mate.filterAll'))}">${esc(t('mate.filter'))} ${
+            esc(state.filter.mates.join(', '))}</span>` : ''}
       <label class="chk mini" id="sumMergeL" title="${esc(t('pets.mergeHint'))}">
         <input type="checkbox" id="sumMerge"${state.cfg.mergePets ? ' checked' : ''}> ${esc(t('pets.mergePets'))}
         <span class="dim">(${petNames().length})</span></label>
@@ -1771,7 +1821,10 @@ function renderSummary() {
       </div>`;
     })()}
 
-    ${state.filter.foe ? foeDossier(a) : ''}
+    ${state.filter.foe
+      ? foeDossier(a.foes.find((x) => x.name.toLowerCase().includes(state.filter.foe.toLowerCase()))
+        ?? a.foes[0])
+      : ''}
 
     <div class="sec-title eyebrow" style="margin-top:20px">${esc(t('side.allies'))}</div>
     ${a.rows.filter((r) => r.side !== 'enemy' && !r.unidentified).map((r) => sumRow(r, maxDmg)).join('')}
@@ -1809,11 +1862,11 @@ function renderSummary() {
   $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
   // El botón de la ficha del enemigo. Su listener estaba registrado en la rama
   // del resumen VACÍO, donde ese botón no existe: con `?.` no daba error y el
-  // botón se pintaba inerte.
-  $('dosWiki')?.addEventListener('click', () => {
-    const f = state.summary?.foes?.find((x) => x.name.toLowerCase()
-      .includes((state.filter.foe ?? '').toLowerCase()));
-    window.eql.openWiki(f?.name ?? state.filter.foe);
+  // botón se pintaba inerte. Ahora el nombre va en el propio botón, así que el
+  // expediente funciona igual aquí que en la enciclopedia.
+  host.querySelector('.dos-wiki')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.eql.openWiki(e.currentTarget.dataset.wiki);
   });
   $('sumMerge')?.addEventListener('change', async (e) => {
     state.cfg.mergePets = e.target.checked;
@@ -1877,7 +1930,7 @@ function renderSummary() {
 /**
  * Fichas por dificultad.
  *
- * Sólo aparecen si de verdad has peleado con ese bicho en más de una: si no,
+ * Sólo aparecen si de verdad has peleado con ese enemigo en más de una: si no,
  * repetirían la cabecera. Y llevan lo que cambia —vida, golpe máximo,
  * habilidades— y no las resistencias, que se han medido y apenas se distinguen.
  */
@@ -1911,9 +1964,14 @@ function diffBlocks(f) {
   </div>`;
 }
 
-function foeDossier(a) {
-  const f = a.foes.find((x) => x.name.toLowerCase().includes(state.filter.foe.toLowerCase()))
-    ?? a.foes[0];
+/**
+ * @param {object} f  la ficha del enemigo, tal cual la devuelve el contador
+ *
+ * Recibe la ficha en vez de buscarla: el resumen la saca de lo que tengas
+ * escrito en el filtro y la enciclopedia de lo aprendido, y son la misma cosa
+ * con la misma forma. Buscándola aquí dentro sólo podía servir a uno de los dos.
+ */
+function foeDossier(f) {
   if (!f) return '';
   if (!mobCache.has(f.name)) loadMob(f.name);
   const mob = mobCache.get(f.name);
@@ -1924,7 +1982,7 @@ function foeDossier(a) {
   return `<div class="dossier">
     <div class="dos-head">
       <h3>${esc(f.name)}</h3>
-      ${mob ? `<button class="lnk" id="dosWiki">${esc(t('foe.seeWiki'))}</button>` : ''}
+      ${mob ? `<button class="lnk dos-wiki" data-wiki="${esc(f.name)}">${esc(t('foe.seeWiki'))}</button>` : ''}
     </div>
     <div class="metrics">
       ${f.hp ? card(n0(f.hp.avg), t('foe.hp')) : ''}
@@ -2132,17 +2190,526 @@ function renderCatalog() {
   $('catBack').addEventListener('click', () => { state.view = 'combat'; host.innerHTML = ''; renderApp(); });
 }
 
+// ═══════════ Enciclopedia ═══════════
+/**
+ * La rejilla de entrada.
+ *
+ * El acento de cada tarjeta no se elige por gusto: es el color que esa cosa ya
+ * tiene en la aplicación. El botín es verde porque su bloque lleva el filete
+ * verde desde siempre, el enemigo es rojo porque lo es su expediente, y las
+ * zonas se llevan el azul, que es el color con el que la interfaz señala.
+ */
+const ENC_SECTIONS = [
+  { key: 'zonas', accent: 'var(--t-cold)' },
+  { key: 'enemigos', accent: 'var(--t-ds)' },
+  { key: 'botin', accent: 'var(--t-poison)' },
+  { key: 'hechizos', accent: 'var(--t-magic)' },
+  { key: 'progreso', accent: 'var(--t-fire)' },
+  { key: 'habilidades', accent: 'var(--t-dot)' },
+  { key: 'muertes', accent: 'var(--t-disease)' },
+];
+
+/** Las secciones que ya se pueden abrir. Las demás se pintan y no responden. */
+const ENC_ABIERTAS = ['zonas', 'enemigos', 'botin'];
+
+/**
+ * Con separador de millares, pero sin romper el singular.
+ *
+ * `t()` elige la forma de «1 combate» comparando `n === 1`, y un `'1'` con
+ * comillas no es 1: pasando siempre el número formateado, el singular dejaba de
+ * existir y salía «1 combates».
+ */
+const nPlural = (v) => (v === 1 ? 1 : n0(v));
+
+/** El recuento de una sección, ya redactado, o `null` si aún no hay nada. */
+function encCount(key) {
+  const c = state.encCounts?.[key];
+  if (!c) return null;
+  if (key === 'zonas') return c.zonas
+    ? `${t('enc.nZones', { n: nPlural(c.zonas) })} · ${t('enc.nSheets', { n: nPlural(c.fichas) })}` : null;
+  if (key === 'enemigos') return c.fichas
+    ? `${t('enc.nSheets', { n: nPlural(c.fichas) })} · ${t('enc.nFights', { n: nPlural(c.peleas) })}` : null;
+  if (key === 'botin') return c.objetos
+    ? `${t('enc.nItems', { n: nPlural(c.objetos) })} · ${t('enc.fromN', { n: nPlural(c.de) })}` : null;
+  if (key === 'habilidades') return c.habilidades
+    ? `${t('enc.nAbilities', { n: nPlural(c.habilidades) })}` : null;
+  return null;
+}
+
+/** Ida y vuelta por la enciclopedia. Cada nivel pide sus datos y repinta. */
+async function encGo(page, args = {}) {
+  const e = state.enc;
+  // Lo escrito en el buscador es de la lista que estabas mirando: llevarlo a la
+  // siguiente enseñaría una lista filtrada por algo que no has escrito ahí.
+  if (page !== e.page) e.q = '';
+  // Entrar por una sección de primer nivel fija de dónde vienes; si no, volver
+  // al índice y entrar por otra dejaba la miga contando el camino anterior.
+  if (['zonas', 'enemigos', 'botin'].includes(page)) e.from = page;
+  // La zona señalada sólo dura el salto que la señala.
+  e.marcada = args.marcada ?? null;
+  e.page = page;
+  if (page === 'index') { e.base = null; e.foe = null; delete e.diff; }
+  if ('base' in args) e.base = args.base;
+  if ('diff' in args) e.diff = args.diff;
+  if ('name' in args) e.name = args.name;
+  try {
+    if (page === 'zonas') e.zonas = (await window.eql.encZones?.()) ?? [];
+    if (page === 'zona') e.foes = (await window.eql.encZoneFoes?.(e.base, e.diff)) ?? [];
+    if (page === 'enemigos') {
+      e.todos = (await window.eql.encFoes?.()) ?? [];
+      // Las zonas hacen falta aquí para poder sugerirlas: el buscador encuentra
+      // enemigos por su zona, así que la zona tiene que ser un destino.
+      if (!e.zonas?.length) e.zonas = (await window.eql.encZones?.()) ?? [];
+    }
+    if (page === 'botin' && !e.todos?.length) e.todos = (await window.eql.encFoes?.()) ?? [];
+    if (page === 'botin') e.loot = (await window.eql.encLoot?.()) ?? [];
+    if (page === 'foe') {
+      e.foe = (await window.eql.encFoe?.(e.name)) ?? null;
+      // Desde la lista de enemigos no hay zona ni dificultad de por medio, así
+      // que salen TODOS sus combates. Desde una zona salen los de esa zona y
+      // esa dificultad, que es de donde vienes mirando.
+      const q = { name: e.name };
+      if (e.from === 'zonas') { q.base = e.base; q.diff = e.diff; }
+      e.fights = (await window.eql.encFights?.(q)) ?? [];
+    }
+  } catch (err) {
+    console.error('enciclopedia:', err);
+  }
+  renderEncyclopedia();
+}
+
+/**
+ * El camino recorrido, y cada tramo se puede pulsar para volver a él.
+ *
+ * Al mismo enemigo se llega por dos sitios, así que el camino sale de por dónde
+ * viniste y no de una jerarquía inventada: llegar por Enemigos y que la miga
+ * dijera «Zonas › Plane of Fear» sería contarte un camino que no hiciste.
+ */
+function encCrumb() {
+  const e = state.enc;
+  const desde = e.from ?? 'zonas';
+  const partes = [{ label: t('tab.encyclopedia'), page: 'index' }];
+  if (e.page !== 'index') partes.push({ label: t(`enc.${desde}`), page: desde });
+  if (e.page === 'zona' || (e.page === 'foe' && desde === 'zonas')) {
+    partes.push({ label: e.base, page: 'zona' });
+    partes.push({ label: encDiffLabel(e.diff), page: 'zona' });
+  }
+  if (e.page === 'foe') partes.push({ label: e.name, page: 'foe' });
+  return `<div class="enc-crumb">${partes.map((p, i) => (i === partes.length - 1
+    ? `<b>${esc(p.label)}</b>`
+    : `<button class="lnk" data-crumb="${p.page}">${esc(p.label)}</button><i>›</i>`)).join('')}</div>`;
+}
+
+/**
+ * Cómo se rotula una dificultad.
+ *
+ * Son cinco, de la 0 a la 4. La 0 —el mundo abierto— es la única sin nombre
+ * oficial, y la línea de entrada del registro no la escribe: una zona sin
+ * instanciar no dice «- Solo 0», no dice nada. Por eso lo que llega como
+ * `null` se rotula D0 y no «sin dificultad»: la pregunta tiene respuesta.
+ */
+const encDiffLabel = (d) => `D${d ?? 0}${DIF_TAGS[d ?? 0] ? ` ${DIF_TAGS[d ?? 0]}` : ''}`;
+
+/** Los nombres oficiales de los niveles (wiki de EQL). La 0 no tiene. */
+const DIF_TAGS = { 0: null, 1: 'Awakened', 2: 'Adaptive', 3: 'Fused', 4: 'Refined' };
+
+function encIndex() {
+  return `<div class="hint enc-note">${esc(t('enc.note'))}</div>
+    <div class="encgrid">
+      ${ENC_SECTIONS.map((s) => {
+        const abierta = ENC_ABIERTAS.includes(s.key);
+        // Lo visible es el recuento en cuanto hay fichas; la descripción no se
+        // pierde, se va al rótulo emergente. El recuento sirve al que ya sabe
+        // qué hay dentro —o sea a partir de la segunda visita— y la descripción
+        // sirve la primera. No hay que elegir: una a la vista, otra a un ratón.
+        const desc = t(`enc.${s.key}Sub`);
+        const cuenta = encCount(s.key);
+        return `<button class="enccard${abierta ? '' : ' pend'}" data-enc="${s.key}"
+          style="--enc-accent:${s.accent}" title="${esc(desc)}"
+          ${abierta ? '' : `aria-disabled="true"`}>
+          ${plate(s.key)}
+          <span class="enccard-t">${esc(t(`enc.${s.key}`))}</span>
+          <span class="enccard-s">${esc(cuenta ?? desc)}</span>
+        </button>`;
+      }).join('')}
+    </div>
+    ${encEstado()}`;
+}
+
+/**
+ * El estado de la ficha, al pie del índice.
+ *
+ * Dice cuánto lleva incorporado y, si al abrir hubo que rehacerla, por qué. Una
+ * ficha que se aprende sola puede desfasarse sin que se note —los números
+ * siguen ahí, con el mismo aspecto—, así que lo mínimo es que diga desde cuándo
+ * y que se pueda rehacer sin abrir una consola.
+ */
+function encEstado() {
+  const s = state.encStatus;
+  if (!s || !s.fights) return '';
+  const l = s.load;
+  return `<div class="enc-foot">
+    <span class="eyebrow">${esc(t('enc.stateLine', { foes: s.foes, fights: s.fights - s.pending }))}</span>
+    ${l?.rebuilt ? `<span class="hint" title="${esc(l.reason)}">${esc(t('enc.rebuilt'))}</span>` : ''}
+    <button class="lnk" id="encRebuild" title="${esc(t('enc.rebuildNote'))}">${esc(t('enc.rebuild'))}</button>
+  </div>`;
+}
+
+/**
+ * Las zonas: una fila por zona, una columna por dificultad.
+ *
+ * La celda vacía dice que ahí no has entrado, y eso no es lo mismo que decir
+ * que no hay nada. Las de mundo abierto no declaran dificultad y van en una
+ * fila a lo ancho: inventarles una quinta columna sería afirmar algo que no hay.
+ */
+function encZonas() {
+  const z = state.enc.zonas ?? [];
+  if (!z.length) return `<div class="empty"><h2>${esc(t('enc.emptyZones'))}</h2>
+    <p class="hint">${esc(t('enc.emptyNote'))}</p></div>`;
+  const celda = (base, c, diff) => (c
+    ? `<button class="enccell" data-base="${esc(base)}" data-diff="${diff}">
+        <b class="num">${c.foes}</b> <span>${esc(t('enc.foesWord', { n: c.foes }))}</span>
+        <span class="dim num" title="${esc(t('enc.cellNote'))}">${
+          c.fights}${c.kills ? ` · ${c.kills}†` : ''}</span>
+      </button>`
+    : `<span class="enccell void" title="${esc(t('enc.notBeen'))}">—</span>`);
+
+  const fila = (row) => `<tr${row.base === state.enc.marcada ? ' class="zmark"' : ''}>
+      <td class="zname">${esc(row.base)}</td>
+      ${row.celdas.map((c, i) => `<td>${celda(row.base, c, i)}</td>`).join('')}
+    </tr>`;
+
+  return `${encCrumb()}
+    <div class="zscroll"><table class="ztable">
+      <thead><tr><th>${esc(t('enc.zoneCol'))}</th>
+        ${[0, 1, 2, 3, 4].map((d) => `<th${d === 0 ? ` title="${esc(t('enc.openWorld'))}"` : ''}>D${d}${
+          DIF_TAGS[d] ? ` · ${DIF_TAGS[d]}` : ''}</th>`).join('')}
+      </tr></thead>
+      <tbody>${z.map(fila).join('')}</tbody>
+    </table></div>
+    <div class="hint">${esc(t('enc.zonesNote'))}</div>`;
+}
+
+/** Los enemigos de una zona y dificultad, de los que tienes datos por pelear. */
+function encZona() {
+  const l = state.enc.foes ?? [];
+  return `${encCrumb()}
+    <div class="enc-h">
+      <h2>${esc(state.enc.base)}</h2>
+      <span class="difpill">${esc(encDiffLabel(state.enc.diff))}</span>
+      <span class="hint">${esc(t('enc.foes', { n: l.length }))}</span>
+    </div>
+    ${l.length ? `<div class="encrows">${l.map((f) => `
+      <button class="encrow" data-foe="${esc(f.name)}">
+        <span class="nm">${esc(f.name)}</span>
+        <span class="num">${f.hp ? `${esc(t('foe.hp'))} ${n0(f.hp.avg)}` : ''}</span>
+        <span class="num dim">${esc(t('sum.times', { n: f.fights }))}</span>
+        <span class="num dim">${f.kills ? esc(t('sum.killed', { n: f.kills })) : esc(t('enc.neverFell'))}</span>
+      </button>`).join('')}</div>
+      <div class="hint">${esc(t('enc.zoneNote'))}</div>` : `<div class="hint">${esc(t('flt.none'))}</div>`}`;
+}
+
+/**
+ * Lo que coincide con lo escrito, como accesos directos.
+ *
+ * El buscador hace dos cosas a la vez —encuentra enemigos y encuentra zonas— y
+ * eso no se ve filtrando una lista de enemigos: escribiendo «Nag» salen los
+ * enemigos cuya zona encaja, pero no se entiende por qué. Las sugerencias lo
+ * enseñan: «Lord Nagafen» con una marca y «Nagafen's Lair» con otra.
+ *
+ * Van en la fila del título, a la izquierda del campo, y no flotando encima de
+ * la lista: mientras escribes quieres ver las dos cosas.
+ */
+function encSuggest() {
+  const e = state.enc;
+  const q = (e.q ?? '').trim().toLowerCase();
+  if (q.length < 2) return [];
+  const out = [];
+  for (const f of e.todos ?? []) {
+    if (f.name.toLowerCase().includes(q)) out.push({ kind: 'foe', label: f.name });
+  }
+  // Las zonas sólo son un destino desde la lista de enemigos: en el botín no
+  // hay nada indexado por zona a lo que saltar.
+  if (e.page === 'enemigos') {
+    for (const z of e.zonas ?? []) {
+      if (z.base.toLowerCase().includes(q)) out.push({ kind: 'zone', label: z.base, zona: z });
+    }
+  }
+  // Lo que empieza por lo que has escrito va primero: es lo que estabas
+  // escribiendo, y lo que contiene el trozo por el medio casi nunca lo es.
+  const empieza = (s) => (s.label.toLowerCase().startsWith(q) ? 0 : 1);
+  return out
+    .sort((a, b) => empieza(a) - empieza(b) || a.label.localeCompare(b.label))
+    .slice(0, 5);
+}
+
+/** El marco de las dos láminas, en pequeño: la marca dice de qué es cada uno. */
+const SUG_GLIFO = {
+  zone: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0.6 7.2 4.8 11.4 6 7.2 7.2 6 11.4 4.8 7.2 0.6 6 4.8 4.8Z"/></svg>',
+  foe: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0.8 11 3.4v5.2L6 11.2 1 8.6V3.4Z" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="6" cy="6" r="1.6"/></svg>',
+};
+
+function encSuggestHTML() {
+  const sug = encSuggest();
+  if (!sug.length) return '';
+  return `<div class="suggs">${sug.map((s, i) => `
+    <button class="sugg ${s.kind}" data-sug="${i}" data-kind="${s.kind}"
+      data-label="${esc(s.label)}"
+      aria-label="${esc(`${t(s.kind === 'zone' ? 'enc.sugZone' : 'enc.sugFoe')}: ${s.label}`)}"
+      title="${esc(t(s.kind === 'zone' ? 'enc.sugZone' : 'enc.sugFoe'))}"
+      >${SUG_GLIFO[s.kind]}<span>${esc(s.label)}</span></button>`).join('')}</div>`;
+}
+
+/**
+ * Ir a lo que se ha sugerido.
+ *
+ * Una zona no es un destino por sí sola: hace falta decir en qué dificultad. Si
+ * sólo hay una con datos se entra directo, y si hay varias se abre la rejilla
+ * con esa fila señalada, que es donde se elige. Entrar en una cualquiera sería
+ * elegir por ti.
+ */
+async function encIrA(kind, label) {
+  if (kind === 'foe') {
+    state.enc.from = state.enc.page === 'botin' ? 'botin' : 'enemigos';
+    await encGo('foe', { name: label });
+    return;
+  }
+  const z = (state.enc.zonas ?? []).find((x) => x.base === label);
+  const conDatos = (z?.celdas ?? []).filter(Boolean);
+  if (z && conDatos.length === 1 && !z.sinMarca) {
+    await encGo('zona', { base: z.base, diff: conDatos[0].diff });
+    return;
+  }
+  if (z && !conDatos.length && z.sinMarca) {
+    await encGo('zona', { base: z.base, diff: null });
+    return;
+  }
+  await encGo('zonas', { marcada: label });
+}
+
+/**
+ * Todos los enemigos con ficha, con buscador.
+ *
+ * El buscador filtra sobre lo que ya está en memoria y no vuelve a preguntar:
+ * son ochenta y seis fichas, no ochenta y seis mil, y hacerlo por el puente en
+ * cada tecla sería el mismo error que filtrar el histórico letra a letra.
+ */
+function encEnemigos() {
+  const q = (state.enc.q ?? '').toLowerCase();
+  const todos = state.enc.todos ?? [];
+  const l = q ? todos.filter((f) => f.name.toLowerCase().includes(q)
+    || f.zonas.some((z) => z.toLowerCase().includes(q))) : todos;
+  const pill = (d) => `<span class="dpill" title="${esc(t('enc.pillNote', {
+    d: encDiffLabel(d.diff), n: d.fights, k: d.kills,
+    hp: d.hp === null ? '—' : n0(d.hp) }))}">${d.diff === null ? '—' : `D${d.diff}`}</span>`;
+
+  return `${encCrumb()}
+    <div class="enc-h">
+      <h2>${esc(t('enc.enemigos'))}</h2>
+      ${encSuggestHTML()}
+      <input id="encQ" class="enc-find" type="search" autocomplete="off"
+        placeholder="${esc(t('enc.find'))}" value="${esc(state.enc.q ?? '')}">
+      <span class="hint">${esc(t('enc.foes', { n: l.length }))}${
+        q && l.length !== todos.length ? ` ${esc(t('enc.ofN', { n: todos.length }))}` : ''}</span>
+    </div>
+    ${l.length ? `<div class="encrows">${l.map((f) => `
+      <button class="encrow foe" data-foe="${esc(f.name)}">
+        <span class="nm">${esc(f.name)}
+          <span class="dpills">${f.difs.map(pill).join('')}</span></span>
+        <span class="num">${f.hp
+          ? `${esc(t('foe.hp'))} ${n0(f.hp.avg)} <span class="dim">${
+            f.hp.diff === null ? '' : `D${f.hp.diff}`}</span>` : ''}</span>
+        <span class="num dim">${esc(t('sum.times', { n: f.fights }))}</span>
+        <span class="num dim">${f.kills ? esc(t('sum.killed', { n: f.kills }))
+          : esc(t('enc.neverFell'))}</span>
+      </button>`).join('')}</div>
+      <div class="hint">${esc(t('enc.foesNote'))}</div>`
+    : `<div class="hint">${esc(t('enc.noMatch'))}</div>`}`;
+}
+
+/**
+ * El botín: cada objeto y de quién ha caído.
+ *
+ * «2 de 11» son dos cifras medidas puestas una al lado de la otra, no una
+ * probabilidad de caída: mezcla todas las dificultades, porque el log atribuye
+ * el objeto a un nombre y no a una instancia. Lo dice el pie, y por eso el
+ * número va con la palabra «de» y no con un porcentaje, que sí prometería otra
+ * cosa.
+ */
+function encBotin() {
+  const q = (state.enc.q ?? '').toLowerCase();
+  const todos = state.enc.loot ?? [];
+  const l = q ? todos.filter((o) => o.item.toLowerCase().includes(q)
+    || o.from.some((f) => f.name.toLowerCase().includes(q))) : todos;
+
+  return `${encCrumb()}
+    <div class="enc-h">
+      <h2>${esc(t('enc.botin'))}</h2>
+      ${encSuggestHTML()}
+      <input id="encQ" class="enc-find" type="search" autocomplete="off"
+        placeholder="${esc(t('enc.findItem'))}" value="${esc(state.enc.q ?? '')}">
+      <span class="hint">${esc(t('enc.nItems', { n: nPlural(l.length) }))}</span>
+    </div>
+    ${l.length ? `<div class="lootgrid">${l.map((o) => `<div class="lootcard">
+      <div class="lootcard-h">
+        <button class="loot-item" data-item="${esc(o.item)}">${esc(o.item)}</button>
+        ${o.n > 1 ? `<span class="num dim">×${o.n}</span>` : ''}
+      </div>
+      ${o.from.map((f) => `<button class="lootfrom" data-foe="${esc(f.name)}">
+        <span>${esc(f.name)}</span>
+        <span class="num">${esc(t('enc.outOf', { n: f.n, k: f.kills }))}</span>
+      </button>`).join('')}
+      ${o.sinFuente ? `<div class="hint">${esc(t('enc.noSource', { n: o.sinFuente }))}</div>` : ''}
+    </div>`).join('')}</div>
+    <div class="hint">${esc(t('enc.lootNote'))}</div>`
+    : `<div class="hint">${esc(t('enc.noMatch'))}</div>`}`;
+}
+
+/** El expediente, con todos los combates que has tenido contra él debajo. */
+function encFoe() {
+  const f = state.enc.foe;
+  if (!f) return `${encCrumb()}<div class="hint">${esc(t('foe.noData'))}</div>`;
+  const fs2 = state.enc.fights ?? [];
+  const cuando = (at) => new Date(at).toLocaleString('es-ES',
+    { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return `${encCrumb()}
+    ${foeDossier(f)}
+    <div class="sec-title eyebrow" style="margin-top:18px">${
+      esc(t('enc.fightsHere', { n: fs2.length }))}</div>
+    ${fs2.length ? `<div class="encrows">${fs2.map((s) => `
+      <button class="encrow fight" data-uid="${s.uid}">
+        <span class="nm">${esc(cuando(s.at))}</span>
+        <span class="num dim">${secs(s.duration)}</span>
+        <span class="num">${n0(s.raidDps)} dps</span>
+        <span class="num dim">${(s.kills ?? []).includes(f.name)
+          ? esc(t('enc.fell')) : esc(t('enc.survived'))}</span>
+      </button>`).join('')}</div>` : `<div class="hint">${esc(t('flt.none'))}</div>`}`;
+}
+
+function renderEncyclopedia() {
+  const host = $('bodyGrid');
+  const e = state.enc;
+  // El título de la vista lo pone la pestaña, que está justo encima y marcada.
+  // Repetirlo aquí costaba una línea de las que hacen falta para que las siete
+  // secciones quepan de un vistazo, que es el trabajo de esa pantalla.
+  const cuerpo = e.page === 'zonas' ? encZonas()
+    : e.page === 'zona' ? encZona()
+      : e.page === 'enemigos' ? encEnemigos()
+        : e.page === 'botin' ? encBotin()
+          : e.page === 'foe' ? encFoe()
+            : encIndex();
+  host.innerHTML = `<div class="tabpane"><div class="enc" id="encRoot">${cuerpo}</div></div>`;
+
+  host.querySelectorAll('.enccard').forEach((el) => el.addEventListener('click', () => {
+    if (el.getAttribute('aria-disabled') === 'true') return;
+    encGo(el.dataset.enc);
+  }));
+  $('encRebuild')?.addEventListener('click', async (ev) => {
+    const b = ev.currentTarget;
+    b.disabled = true;
+    b.textContent = t('enc.rebuilding');
+    await window.eql.encRebuild?.().catch(() => null);
+    await encRefresh();
+    renderEncyclopedia();
+  });
+  host.querySelectorAll('[data-crumb]').forEach((el) => el.addEventListener('click', () => {
+    encGo(el.dataset.crumb);
+  }));
+  // Sólo las celdas con datos. La vacía es un hueco, no un enlace a una lista
+  // vacía: sin este filtro se abría una zona «undefined» en dificultad NaN.
+  host.querySelectorAll('.enccell[data-base]').forEach((el) => el.addEventListener('click', () => {
+    encGo('zona', { base: el.dataset.base, diff: +el.dataset.diff });
+  }));
+  // De dónde vienes se apunta al saltar, que es cuando se sabe.
+  host.querySelectorAll('.encrow[data-foe]').forEach((el) => el.addEventListener('click', () => {
+    state.enc.from = el.classList.contains('foe') ? 'enemigos' : 'zonas';
+    encGo('foe', { name: el.dataset.foe });
+  }));
+  host.querySelectorAll('.lootfrom').forEach((el) => el.addEventListener('click', () => {
+    state.enc.from = 'botin';
+    encGo('foe', { name: el.dataset.foe });
+  }));
+  // El buscador filtra lo que ya está cargado: no vuelve a preguntar por el
+  // puente, así que puede repintar en cada tecla sin coste.
+  const busca = $('encQ');
+  if (busca) {
+    busca.addEventListener('input', (ev) => {
+      state.enc.q = ev.target.value;
+      renderEncyclopedia();
+      const n = $('encQ');
+      // Repintar mata el foco y el cursor; sin esto sólo se puede escribir una
+      // letra por clic.
+      if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
+    });
+    /**
+     * Con el teclado, sin tocar el ratón.
+     *
+     * Intro va a la primera sugerencia, que es la que estabas escribiendo.
+     * Abajo entra en la fila para elegir otra, y a partir de ahí las flechas se
+     * mueven entre ellas. Escape vuelve al campo.
+     *
+     * Las flechas izquierda y derecha NO se tocan dentro del campo: ahí mueven
+     * el cursor, y robárselas para navegar haría imposible corregir una letra.
+     */
+    busca.addEventListener('keydown', (ev) => {
+      const chips = [...host.querySelectorAll('.sugg')];
+      if (ev.key === 'Enter' && chips.length) { ev.preventDefault(); chips[0].click(); }
+      else if (ev.key === 'ArrowDown' && chips.length) { ev.preventDefault(); chips[0].focus(); }
+      else if (ev.key === 'ArrowUp' && chips.length) { ev.preventDefault(); chips.at(-1).focus(); }
+      else if (ev.key === 'Escape' && state.enc.q) {
+        ev.preventDefault();
+        state.enc.q = '';
+        renderEncyclopedia();
+        $('encQ')?.focus();
+      }
+    });
+  }
+  host.querySelectorAll('.sugg').forEach((el) => {
+    el.addEventListener('click', () => encIrA(el.dataset.kind, el.dataset.label));
+    el.addEventListener('keydown', (ev) => {
+      const chips = [...host.querySelectorAll('.sugg')];
+      const i = chips.indexOf(el);
+      if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
+        ev.preventDefault(); chips[(i + 1) % chips.length].focus();
+      } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
+        ev.preventDefault(); chips[(i - 1 + chips.length) % chips.length].focus();
+      } else if (ev.key === 'Escape') {
+        ev.preventDefault(); $('encQ')?.focus();
+      }
+    });
+  });
+  // Un combate concreto se abre donde se ven los combates, que es la otra
+  // pestaña: aquí no se repite el desglose de una pelea.
+  host.querySelectorAll('.encrow.fight').forEach((el) => el.addEventListener('click', async () => {
+    state.selectedFight = +el.dataset.uid;
+    state.rowNodes.clear();
+    await loadFight(state.selectedFight);
+    setView('combat');
+  }));
+  host.querySelector('.dos-wiki')?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    window.eql.openWiki(ev.currentTarget.dataset.wiki);
+  });
+  host.querySelectorAll('.loot-item').forEach((el) => {
+    el.addEventListener('click', (ev) => { ev.stopPropagation(); window.eql.openWiki(el.dataset.item); });
+    el.addEventListener('mouseenter', () => showItemTip(el.dataset.item));
+    el.addEventListener('mouseleave', hideItemTip);
+  });
+}
+
 /** Quién le hizo qué a ese enemigo, sacado del reparto por objetivo. */
 const mobCache = new Map();
 
-/** Pide a la wiki las notas del bicho y repinta cuando llegan. */
+/** Pide a la wiki las notas del enemigo y repinta cuando llegan. */
 async function loadMob(name) {
   if (mobCache.has(name)) return;
   mobCache.set(name, null);
   try {
     const d = await window.eql.wikiMob?.(name);
     mobCache.set(name, d ?? null);
+    // El expediente vive en dos sitios y la wiki llega tarde a los dos.
     if (d && state.view === 'summary') renderSummary();
+    if (d && state.view === 'encyclopedia' && state.enc.page === 'foe') renderEncyclopedia();
   } catch { /* sin red */ }
 }
 
@@ -2185,6 +2752,11 @@ function renderApp() {
     // Sólo se monta una vez. Sin esta guarda el snapshot de 250 ms reconstruye
     // la vista entera y el scroll vuelve arriba en cuanto lo mueves.
     if (!$('sumRoot')) renderSummary();
+    return;
+  }
+  if (state.view === 'encyclopedia') {
+    // La misma guarda: es una vista con su propio scroll.
+    if (!$('encRoot')) renderEncyclopedia();
     return;
   }
   if (state.wizard) {
@@ -2244,6 +2816,11 @@ function renderChrome(snap) {
   $('mZone').textContent = snap.zone ?? '—';
   const post = [snap.stance, snap.invocation].filter(Boolean).join(' · ');
   const el = $('mStance'); if (el) el.textContent = post || '—';
+  // El texto de la cabecera se recorta cuando no cabe, así que el valor entero
+  // tiene que estar en algún sitio: el nombre de zona es justo el que se recorta
+  // y justo el que necesitas leer entero.
+  $('mZone').parentElement.title = snap.zone ?? '';
+  if (el) el.parentElement.title = post;
   $('fParsed').textContent = n0(snap.parsed);
   $('fUnknown').textContent = n0(snap.unknown);
   const fp = $('fPets');
@@ -2330,6 +2907,7 @@ function applyLangToChrome() {
   const set = (id, v) => { const n = $(id); if (n) n.textContent = v; };
   set('tabCombat', t('tab.combat'));
   set('tabTriggers', t('tab.alerts'));
+  set('tabEnc', t('tab.encyclopedia'));
   set('lblChar', t('hdr.character'));
   set('lblZone', t('hdr.zone'));
   set('lblStance', t('hdr.stance'));
@@ -2378,6 +2956,17 @@ $('btnSetup').addEventListener('click', () => {
 });
 $('fPath').addEventListener('click', () => window.eql.reveal(state.snap?.path));
 
+// Un clic fuera cierra el desplegable de compañeros. Se registra UNA vez y aquí
+// fuera: dentro de renderFightList se apilaría un manejador por repintado, y la
+// lista se repinta con cada snapshot.
+document.addEventListener('click', () => {
+  if (!state.matesOpen) return;
+  state.matesOpen = false;
+  const l = $('fightList');
+  if (l) l.dataset.sig = '';
+  renderApp();
+});
+
 /** Reabre la introducción conservando lo ya configurado. */
 function openWizard() {
   state.wizard = {
@@ -2408,12 +2997,28 @@ function setView(v) {
   state.view = v;
   $('tabCombat').classList.toggle('active', v === 'combat');
   $('tabTriggers').classList.toggle('active', v === 'triggers');
+  $('tabEnc').classList.toggle('active', v === 'encyclopedia');
   $('bodyGrid').innerHTML = '';
   state.rowNodes.clear();
   renderApp();
 }
 $('tabCombat').addEventListener('click', () => setView('combat'));
 $('tabTriggers').addEventListener('click', async () => { await initTriggers(); setView('triggers'); });
+/**
+ * Los recuentos y el estado se piden al entrar y no en cada repintado: salen de
+ * la ficha, que ya está en memoria del otro lado, pero el viaje por el puente
+ * no es gratis y esta pantalla se repinta con cada snapshot.
+ */
+async function encRefresh() {
+  state.encCounts = (await window.eql.encCounts?.().catch(() => null)) ?? null;
+  state.encStatus = (await window.eql.encStatus?.().catch(() => null)) ?? null;
+}
+
+$('tabEnc').addEventListener('click', async () => {
+  await encRefresh();
+  state.enc.page = 'index';
+  setView('encyclopedia');
+});
 
 window.eql.onLang((c) => { setLang(c); applyLangToChrome(); renderLangPicker(); });
 
