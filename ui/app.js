@@ -277,6 +277,64 @@ const excluidos = () => new Set(state.cfg.excluded ?? []);
  */
 const companeros = () => new Set(state.cfg.companions ?? []);
 
+/**
+ * Decir quién es alguien: excluirlo, declararlo compañero o asignar su
+ * mascota a su dueño.
+ *
+ * Va en el desglose de la fila y hace falta en LOS DOS SITIOS donde miras
+ * filas: la pelea suelta y el resumen. La primera versión sólo lo puso en la
+ * pelea, y el resumen es justo donde se ve el reparto y donde decides que ese
+ * 20% es de alguien — allí no había nada que pulsar.
+ *
+ * @param {object} r     la fila
+ * @param {object[]} filas  las de al lado, de donde salen los dueños posibles
+ */
+/**
+ * «Es la mascota de X.»
+ *
+ * Si ese X eres tú, no es una mascota ajena: es tuya, y va donde van las tuyas.
+ * Son dos sitios distintos a propósito —las tuyas cuentan en el filtro de
+ * relevancia y las de otro no— así que elegirte a ti en el desplegable tiene
+ * que acabar en `markPet` y no en la lista de ajenas.
+ */
+async function asignarMascota(pet, dueno) {
+  if (dueno && dueno === state.snap?.self) {
+    await window.eql.setPetOwner(pet, null);
+    await window.eql.markPet(pet, true);
+    return;
+  }
+  await window.eql.setPetOwner(pet, dueno);
+}
+
+function controlesDeFila(r, filas = []) {
+  const esMio = r.name === state.snap?.self || isMyPet(r.name);
+  if (esMio) return '';
+  const yaEs = companeros().has(r.name);
+  // Los dueños posibles son los jugadores que están AHÍ, en lo que estás
+  // mirando. Se quitan las mascotas —ni las tuyas ni las ajenas tienen
+  // mascota— y el propio combatiente.
+  const duenos = filas
+    .filter((x) => x.side !== 'enemy' && x.name !== r.name && !x.petOf
+      && !isMyPet(x.name) && !x.merged)
+    .map((x) => x.name);
+  const asignar = !duenos.length ? '' : `<label class="petof">
+    ${esc(t('pet.ownerOf'))}
+    <select class="petof-sel" data-pet="${esc(r.name)}">
+      <option value="">${esc(t('pet.ownerNone'))}</option>
+      ${duenos.map((n) => `<option value="${esc(n)}"${
+    r.petOf === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}
+    </select></label>`;
+  return `<div class="sec">
+    <button class="excl-btn" data-excl="${esc(r.name)}">${esc(t('excl.remove'))}</button>
+    ${r.petOf ? '' : `<button class="excl-btn mate" data-mate="${esc(r.name)}" data-on="${yaEs ? '0' : '1'}">${
+    esc(yaEs ? t('mate.remove') : t('mate.add'))}</button>`}
+    ${asignar}
+    ${r.petOf ? `<span class="hint">${esc(t('pet.ownedBy', { who: r.petOf }))}</span>`
+    : yaEs ? `<span class="hint">${esc(t('mate.declared'))}</span>`
+      : r.unidentified ? `<span class="hint">${esc(t('side.unknownNote'))}</span>` : ''}
+  </div>`;
+}
+
 /** Aplica la declaración a unas filas, vengan de la pelea o del resumen. */
 function marcarCompaneros(rows) {
   const amigos = companeros();
@@ -583,7 +641,7 @@ function buildRow(name) {
     const sel = e.target.closest?.('.petof-sel');
     if (!sel) return;
     e.stopPropagation();
-    await window.eql.setPetOwner(sel.dataset.pet, sel.value || null);
+    await asignarMascota(sel.dataset.pet, sel.value || null);
     state.rowNodes.clear();
     if ($('rows')) $('rows').innerHTML = '';
     state.summary = null;
@@ -650,7 +708,13 @@ function updateRow(node, r, snap, live, rank) {
   // se pinta una vez para poder seleccionar texto con tranquilidad.
   if (open) {
     const stamp = live ? sig : 'static';
-    if (state.detailStamp.get(r.name) !== stamp) {
+    // Y no se toca mientras estés usando algo de dentro. En una pelea viva el
+    // desglose se reconstruye cuatro veces por segundo, y reconstruirlo
+    // destruye el <select> de asignar mascota: el desplegable se abría y se
+    // cerraba solo antes de poder elegir nada. Con el foco dentro se deja
+    // quieto; las cifras se ponen al día en cuanto sueltes.
+    const usandolo = refs.detail.contains(document.activeElement);
+    if (!usandolo && state.detailStamp.get(r.name) !== stamp) {
       state.detailStamp.set(r.name, stamp);
       refs.detail.innerHTML = detailHTML(r);
     }
@@ -825,30 +889,7 @@ function detailHTML(r) {
   // señal de grupo, así que decirlo tú es la única forma de que deje de salir
   // como «sin identificar». No se ofrece para tus mascotas ni para las de otro
   // jugador, que ya se saben lo que son.
-  const esMio = r.name === state.snap?.self || isMyPet(r.name);
-  const yaEs = companeros().has(r.name);
-  // Los jugadores que hay en esta pelea, para poder decir de quién es una
-  // mascota sin teclear nada. Se excluyen las mascotas —ni las tuyas ni las
-  // ajenas tienen mascota— y el propio combatiente.
-  const duenos = (state.snap?.current?.rows ?? fightFor(state.snap)?.rows ?? [])
-    .filter((x) => x.side !== 'enemy' && x.name !== r.name && !x.petOf && !isMyPet(x.name))
-    .map((x) => x.name);
-  const asignar = (esMio || !duenos.length) ? '' : `<label class="petof">
-    ${esc(t('pet.ownerOf'))}
-    <select class="petof-sel" data-pet="${esc(r.name)}">
-      <option value="">${esc(t('pet.ownerNone'))}</option>
-      ${duenos.map((n) => `<option value="${esc(n)}"${
-        r.petOf === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}
-    </select></label>`;
-  const excluir = esMio ? '' : `<div class="sec">
-    <button class="excl-btn" data-excl="${esc(r.name)}">${esc(t('excl.remove'))}</button>
-    ${r.petOf ? '' : `<button class="excl-btn mate" data-mate="${esc(r.name)}" data-on="${yaEs ? '0' : '1'}">${
-      esc(yaEs ? t('mate.remove') : t('mate.add'))}</button>`}
-    ${asignar}
-    ${r.petOf ? `<span class="hint">${esc(t('pet.ownedBy', { who: r.petOf }))}</span>`
-      : yaEs ? `<span class="hint">${esc(t('mate.declared'))}</span>`
-        : r.unidentified ? `<span class="hint">${esc(t('side.unknownNote'))}</span>` : ''}
-  </div>`;
+  const excluir = controlesDeFila(r, withPets(fightFor(state.snap))?.rows ?? []);
 
   return `<div class="detail">${composition}${abilities}${targets}${stanceSec}${offence}${defence}${healing}${activity}${excluir}</div>`;
 }
@@ -1663,6 +1704,26 @@ function renderTimers(snap) {
 }
 
 /** Todas las peleas del tramo en un único desglose, desplegable por enemigo. */
+/**
+ * Vuelve a pedir el resumen con los mismos criterios con que se abrió.
+ *
+ * Hace falta porque decir quién es alguien cambia el reparto: asignar una
+ * mascota a su dueño mueve su daño de sitio, y volver a pintar lo que ya
+ * teníamos en memoria enseñaría las cifras de antes.
+ */
+async function recargarResumen() {
+  const base = { mergePets: state.cfg.mergePets, petLabel: t('pets.merged'),
+    myPets: state.cfg.myPets ?? [], notPets: state.cfg.notPets ?? [] };
+  if (state.summaryFrom === 'pick') {
+    state.summary = await window.eql.aggregate({ ...base, uids: [...state.picked] });
+  } else {
+    const r = RANGES.find((x) => x.key === state.filter.range);
+    state.summary = await window.eql.aggregate({ ...base, sinceMs: r?.ms ?? null,
+      foe: state.filter.foe || null, mates: state.filter.mates ?? [] });
+  }
+  renderSummary();
+}
+
 function renderSummary() {
   // La declaración se aplica también aquí, y por la misma razón que en la
   // pelea: se guarda lo que se midió, y quién es cada uno lo dices tú después.
@@ -1771,6 +1832,32 @@ function renderSummary() {
     state.openSumRows.has(nm) ? state.openSumRows.delete(nm) : state.openSumRows.add(nm);
     renderSummary();
   }));
+  // Los controles de «quién es quién» viven dentro de la fila desplegada, y la
+  // fila entera responde al clic plegándose. Se atienden en fase de captura
+  // para cortar el suceso antes de que llegue a ella: si no, pulsar un botón
+  // cerraría el desglose bajo el cursor.
+  host.addEventListener('click', async (e) => {
+    if (e.target.closest?.('.petof')) { e.stopPropagation(); return; }
+    const btn = e.target.closest?.('.excl-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    const r = btn.dataset.mate
+      ? await window.eql.setCompanion(btn.dataset.mate, btn.dataset.on === '1')
+      : await window.eql.setExcluded(btn.dataset.excl, true);
+    state.cfg.excluded = r.excluded ?? state.cfg.excluded;
+    state.cfg.companions = r.companions ?? state.cfg.companions;
+    state.rowNodes.clear();
+    if (btn.dataset.mate) refreshFights();
+    await recargarResumen();
+  }, true);
+  host.addEventListener('change', async (e) => {
+    const sel = e.target.closest?.('.petof-sel');
+    if (!sel) return;
+    e.stopPropagation();
+    await asignarMascota(sel.dataset.pet, sel.value || null);
+    state.rowNodes.clear();
+    await recargarResumen();
+  }, true);
   host.querySelectorAll('.foe-row').forEach((el) => el.addEventListener('click', () => {
     const nm = el.dataset.foe;
     state.openFoes.has(nm) ? state.openFoes.delete(nm) : state.openFoes.add(nm);
@@ -1942,6 +2029,7 @@ function sumRowDetail(r) {
     ${tbl(t('det.byType'), r.types.map(([ty, v]) => [ty, v, '', ty]), dmg)}
     ${tbl(t('det.byTarget'), (r.targets ?? []).map((x) => [x.name, x.sum, '']), dmg)}
     ${tbl(t('det.takenBy'), (r.takenBySource ?? []).map((x) => [x.name, x.sum, '']), r.taken || 1)}
+    ${controlesDeFila(r, state.summary?.rows ?? [])}
   </div>`;
 }
 
