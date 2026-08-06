@@ -1,6 +1,6 @@
 {
   "name": "eql-parse",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "type": "module",
   "description": "Parser DPS en tiempo real para EverQuest Legends — <SPAIN> Guild",
   "main": "electron/main.cjs",
@@ -10,8 +10,9 @@
     "store:check": "node bin/store-check.js",
     "store:rebuild": "node bin/store-rebuild.js",
     "live": "node bin/live.js",
-    "test": "node test/smoke.js && node test/stances.js && node test/bridge.js && node test/store.js && node test/combat.js && node test/survival.js && node test/zones.js && node test/classes.js && node test/trios.js",
-    "dist": "electron-builder --win --x64"
+    "test": "node test/smoke.js && node test/stances.js && node test/bridge.js && node test/store.js && node test/combat.js && node test/survival.js && node test/zones.js && node test/foes.js && node test/encyclopedia.js && node test/rebuild.js && node test/classes.js && node test/trios.js",
+    "dist": "electron-builder --win --x64",
+    "enc:rebuild": "node bin/enc-rebuild.js"
   },
   "build": {
     "appId": "dev.miguelangelfernandez.eqlparse",
