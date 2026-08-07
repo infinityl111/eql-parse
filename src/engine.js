@@ -14,7 +14,7 @@ import { Encyclopedia } from './encyclopedia.js';
 import { aggregate, mergePets, mergeOwnerPets, ownerPets, ensureSides } from './aggregate.js';
 import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
 import { parseZone } from './zones.js';
-import { catalog } from './catalog.js';
+import { catalog, spellDetail, spellbook } from './catalog.js';
 import { proofOf } from './classes.js';
 import { normalizeTrios } from './trios.js';
 import { t } from './i18n.js';
@@ -539,6 +539,30 @@ export class Engine extends EventEmitter {
     // nivel baja al cambiar una clase por otra más baja: es la otra mitad de
     // la línea de tiempo, junto al /who.
     if (ev.kind === 'levelup' && ev.level) this.#markLevel(ev.level, null);
+    // Un punto de habilidad, con su hora. No pertenece a ninguna pelea —cae
+    // entre unas y otras— así que va a su propio sitio, como el botín huérfano.
+    // Que un hechizo esté en tu libro no se deduce de haberlo lanzado: se dice
+    // en tres líneas distintas y las tres cuentan. Sin esto, «Mis hechizos»
+    // sólo conoce lo que has usado y no puede enseñarte lo que tienes parado.
+    // Y haberlo lanzado también se anota aquí, no sólo dentro de la pelea.
+    //
+    // `casts` vive en cada pelea guardada, así que un hechizo lanzado fuera de
+    // combate —un buff antes de entrar, una cura de camino— o en una pelea que
+    // no llegó a guardarse no contaba como usado. Medido: 40 hechizos sin usar
+    // leyendo el registro entero contra 59 leyendo sólo las peleas. Diecinueve
+    // que la aplicación habría señalado como «lo tienes parado» cuando sí lo
+    // usas, que es peor que no decir nada.
+    if (ev.kind === 'cast' && ev.ability && ev.source === (this.self ?? 'You')) {
+      this.store?.appendSpell({ name: ev.ability, via: 'lanzado', t: ev.t, at: Math.round(ev.t * 1000) });
+    }
+    if (['scribe', 'memorize', 'spell_buy'].includes(ev.kind) && ev.ability) {
+      const via = ev.kind === 'spell_buy' ? 'comprado'
+        : (ev.kind === 'scribe' ? 'escrito' : 'memorizado');
+      this.store?.appendSpell({ name: ev.ability, via, t: ev.t, at: Math.round(ev.t * 1000) });
+    }
+    if (ev.kind === 'aa') {
+      this.store?.appendAA({ t: ev.t, at: Math.round(ev.t * 1000), balance: ev.balance ?? null });
+    }
     if (ev.kind === 'cast' && ev.source === (this.self ?? 'You') && ev.ability) this.classProof(ev);
     if (ev.kind === 'stance' && ev.stance) this.#checkConflict('stance', ev.stance);
     if (ev.kind === 'invocation' && ev.invocation) this.#checkConflict('invocation', ev.invocation);
@@ -1259,8 +1283,25 @@ export class Engine extends EventEmitter {
       spells: catalog(full, this.self, this.cooldowns),
       cooldowns: [...this.cooldowns.values()].sort((a, b) => b.attempts - a.attempts),
       marks: this.#marks(full),
+      book: spellbook(this.store, full, this.self),
       fights: full.length,
     };
+  }
+
+  /**
+   * La ficha de un hechizo. Se pide al abrirlo, no con la lista.
+   *
+   * Son 205 puntos de uno solo: mandarlos con el catálogo entero serían
+   * veinticuatro series por el puente cada vez que se pinta una tabla.
+   */
+  spellDetail(nombre, q = {}) {
+    if (!this.store || !nombre) return null;
+    const list = this.store.filter({ ...q, limit: q.limit ?? 2000 });
+    const full = list.map((sm) => {
+      const f = this.store.get(sm.uid);
+      return f ? { ...f, uid: sm.uid, at: sm.at } : null;
+    }).filter(Boolean);
+    return spellDetail(full, this.self, nombre, this.cooldowns);
   }
 
   /**

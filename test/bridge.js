@@ -71,9 +71,9 @@ console.log('\nnada expuesto se queda sin usar');
 const PENDIENTES = new Set([
   'detach',      // desconectar del log sin cerrar; hoy sólo se reconecta
   'clearTimers', // borrar todos los temporizadores de golpe
-  'setPetName',  // marcar a un aliado como mascota tuya para siempre; el
-                 // resumen ya lista los sin identificar y pide el comando,
-                 // así que el botón se cae de maduro
+  // `setPetName` estuvo aquí y ya no: era la segunda puerta para marcar una
+  // mascota, la que guardaba pero no llamaba nadie. Se borró al dejar una sola
+  // en la 1.6.1, que es lo que esta lista existe para provocar.
 ]);
 const sobra = [...expuestas.keys()].filter((n) => !usadas.has(n) && !PENDIENTES.has(n)).sort();
 ok(sobra.length === 0, 'el preload no expone funciones sin usar ni declaradas pendientes',

@@ -2503,6 +2503,96 @@ const hueco = (need, have) =>
  * versiones funcionando: lo único que cambia es por dónde se llega y que ahora
  * abre con un resumen.
  */
+/**
+ * La ficha de un hechizo: las dos mitades de lo que hace, y su historia.
+ *
+ * La sección leía sólo el daño. Un drenaje que hace 1.093.644 de daño y 796.751
+ * de curación estaba contado a medias, y diez hechizos que sólo curan no
+ * existían en ninguna parte. Aquí salen los dos lados.
+ *
+ * Y la historia va PARTIDA por nivel y dificultad, con las dos condiciones de
+ * siempre: lo que no llega a `minSerie` peleas no se dibuja —con tres puntos no
+ * hay tendencia, hay tres puntos— y lo que se queda fuera se dice.
+ */
+function encHechizo() {
+  const d = state.enc.spell;
+  if (!d) return `${encCrumb()}<div class="hint">${esc(t('enc.noMatch'))}</div>`;
+  const soloCura = d.kind === 'heal' || d.kind === 'unknownHeal';
+  const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
+
+  // Una barra por punto, con su altura relativa. No es una gráfica de tiempo
+  // real: los puntos van en orden pero no a escala, porque entre dos peleas
+  // pueden pasar diez segundos o dos días y estirar el eje por eso no dice nada.
+  const barras = (g) => {
+    const campo = soloCura ? 'heal' : 'sum';
+    const tope = Math.max(1, ...g.puntos.map((p) => p[campo]));
+    return `<div class="sparks">${g.puntos.map((p) => `<i style="height:${
+      Math.max(4, Math.round(p[campo] / tope * 100))}%" title="${esc([
+      p.label ?? '', cuando(p.at),
+      soloCura ? `${t('cat.healed')} ${n0(p.heal)} · ${p.healN} ${t('cat.uses')}`
+        : `${n0(p.sum)} · ${p.n} ${t('cat.uses')}${p.crits ? ` · ${p.crits} crit` : ''}`,
+    ].filter(Boolean).join('\n'))}"></i>`).join('')}</div>`;
+  };
+
+  return `${encCrumb()}
+    <div class="enc-h">
+      <h2>${spellIcon(d.name)}${esc(d.name)}</h2>
+      ${d.kind === 'ds' ? `<span class="difpill">${esc(t('cat.ds'))}</span>` : ''}
+      ${d.kind === 'unknownHeal' ? `<span class="difpill">${esc(t('cat.unknownHeal'))}</span>` : ''}
+      ${d.unresistable ? `<span class="difpill">${esc(t('cat.unresistable'))}</span>` : ''}
+    </div>
+    ${d.kind === 'ds' ? `<div class="hint">${esc(t('cat.dsNote'))}</div>` : ''}
+    ${d.kind === 'unknownHeal' ? `<div class="hint">${esc(t('cat.unknownHealNote'))}</div>` : ''}
+
+    <div class="metrics">
+      ${d.uses ? card(n0(d.uses), t('cat.uses')) : ''}
+      ${d.uses ? card(n0(d.total), t('cat.damage')) : ''}
+      ${d.uses ? card(n0(d.avg), t('cat.avg')) : ''}
+      ${d.uses ? card(`${n0(d.min)}–${n0(d.max)}`, t('cat.range')) : ''}
+      ${d.uses ? card(`${Math.round(d.critRate * 100)}%`, t('cat.crits')) : ''}
+      ${d.heal ? card(n0(d.heal), t('cat.healed'), 'heal') : ''}
+      ${d.healN ? card(n0(d.healAvg), t('cat.healAvg'), 'heal') : ''}
+      ${card(n0(d.fights), t('cat.inFights'))}
+    </div>
+    ${d.heal && d.uses ? `<div class="hint">${esc(t('cat.drainNote'))}</div>` : ''}
+
+    ${(d.levels ?? []).length > 1 ? `<div class="hint">${esc(t('cat.levelsNote', {
+    levels: d.levels.join(', ') }))}</div>` : ''}
+
+    ${d.series.length ? `<div class="dos-block">
+      <div class="eyebrow">${esc(t('cat.byTranche'))} · ${esc(t('foe.measured'))}</div>
+      <div class="hint">${esc(t('cat.trancheNote', { n: d.minSerie }))}</div>
+      ${d.series.map((g) => `<div class="serie">
+        <div class="serie-h">
+          <b>${esc(g.level ? t('lvl.level', { n: g.level }) : t('lvl.unknown'))}</b>
+          <span class="dpill">${esc(encDiffLabel(g.diff))}</span>
+          <span class="dim">${esc(t('sum.fights', { n: g.fights }))}</span>
+          ${g.uses ? `<span class="num">${esc(t('cat.avg'))} <b>${n0(g.avg)}</b></span>` : ''}
+          ${g.uses ? `<span class="num dim">${esc(t('cat.max'))} ${n0(g.max)}</span>` : ''}
+          ${g.uses ? `<span class="num dim">${Math.round(g.critRate * 100)}% crit</span>` : ''}
+          ${g.healN ? `<span class="num heal">${esc(t('cat.healAvg'))} <b>${n0(g.healAvg)}</b></span>` : ''}
+        </div>
+        ${barras(g)}
+      </div>`).join('')}
+    </div>` : `<div class="hint">${esc(t('cat.noTranche', { n: d.minSerie }))}</div>`}
+
+    ${d.descartadas.length ? `<div class="hint">${esc(t('cat.dropped', {
+    n: d.descartadas.length,
+    f: d.descartadas.reduce((a, x) => a + x.fights, 0),
+  }))} — ${d.descartadas.map((x) => `${x.level ? `n${x.level}` : t('lvl.unknown')} ${encDiffLabel(x.diff)} (${x.fights})`).join(', ')}</div>` : ''}
+
+    ${(d.byFoe ?? []).length ? `<div class="dos-block">
+      <div class="eyebrow">${esc(t('cat.vsFoes'))}</div>
+      <div class="hint">${esc(t('cat.vsFoesNote'))}</div>
+      ${d.byFoe.map((c) => `<div class="foe-det-l">
+        <span>${esc(c.foe)} <span class="dim">${esc(encDiffLabel(c.diff))}</span></span>
+        <b class="${c.rate >= 0.6 ? 'bad' : c.rate <= 0.2 ? 'good' : ''}">${Math.round((1 - c.rate) * 100)}%</b>
+        <span class="dim">${c.landed}/${c.landed + c.resisted}</span>
+      </div>`).join('')}</div>` : ''}
+
+    ${d.cooldown ? `<div class="hint">${esc(t('cat.cdNote', { s: secs(d.cooldown) }))}</div>` : ''}`;
+}
+
 function encHechizos() {
   const c = state.catalog;
   if (!c || !c.spells?.length) {
@@ -2518,9 +2608,14 @@ function encHechizos() {
     const pocos = s.uses < MIN_USOS;
     const desde = t('est.from', { fights: s.fights, secs: s.uses });
     const medio = pocos ? est(n0(s.avg), desde) : `<b>${n0(s.avg)}</b>`;
-    return `<div class="cat-row">
+    // La fila abre la ficha del hechizo. Los escudos de daño y la curación sin
+    // identificar también: tienen menos que contar, pero tienen historia.
+    return `<div class="cat-row abre" data-spell="${esc(s.name)}">
       <span class="cat-name">${spellIcon(s.name)}${esc(s.name)}${s.unresistable
-        ? ` <span class="tagx" title="${esc(t('cat.unresistable'))}">∅</span>` : ''}</span>
+        ? ` <span class="tagx" title="${esc(t('cat.unresistable'))}">∅</span>` : ''}${
+  s.kind === 'ds' ? ` <span class="tagx" title="${esc(t('cat.dsNote'))}">${esc(t('cat.ds'))}</span>` : ''}${
+  s.kind === 'unknownHeal' ? ` <span class="tagx" title="${esc(t('cat.unknownHealNote'))}">?</span>` : ''}${
+  s.heal ? ` <span class="tagheal" title="${esc(t('cat.alsoHeals', { n: n0(s.heal) }))}">+${n0(s.heal)}</span>` : ''}</span>
       <span><i class="seg ${typeClass(s.types[0])}"></i>${esc(s.types[0] ?? '—')}</span>
       <span class="num">${n0(s.uses)}</span>
       <span class="num">${medio}</span>
@@ -2594,7 +2689,53 @@ function encHechizos() {
           x.source === 'una sola muestra' ? ` · ${esc(t('cat.oneSample'))}` : ''}</span>
         <span class="${x.countable ? 'dim' : 'gap'}" ${x.countable ? '' : `title="${esc(t('cat.notCountable'))}"`}>${
           x.countable ? `${n0(x.uses)} ${esc(t('cat.cdUses'))}` : esc(t('cat.notCountable'))}</span>
-      </div>`).join('')}` : ''}`;
+      </div>`).join('')}` : ''}
+
+    ${libroHTML(c.book)}`;
+}
+
+/**
+ * El libro: lo que consta que tienes, y de eso, lo que no usas.
+ *
+ * La tabla de arriba mide lo lanzado. Esto mide lo contrario, que es un dato
+ * distinto y que ninguna tabla de uso puede dar: un hechizo que no aparece en
+ * ningún sitio puede ser que no lo tengas o que lo tengas parado, y son cosas
+ * muy diferentes. El registro sabe distinguirlas porque anota cuándo escribes,
+ * memorizas o compras.
+ *
+ * Cada uno lleva de dónde consta, porque las tres constancias no valen igual:
+ * escrito es tenerlo en el libro, comprado es haberlo pagado, y memorizado es
+ * haberlo llevado puesto. Un hechizo que sólo consta memorizado pudo haberse
+ * quedado atrás hace veinte niveles.
+ *
+ * Y los lanzados sin constancia se enseñan aparte en vez de esconderlos: son
+ * los de antes de que empezara este registro —en esta partida, también los de
+ * clases anteriores— y decir cuántos hay es más honesto que dar 84 como si
+ * fuera el libro entero.
+ */
+function libroHTML(b) {
+  if (!b || !b.known) return '';
+  const sinUsar = b.spells.filter((x) => !x.used);
+  const via = (v) => `<span class="tagx" title="${esc(t(`book.via.${v}.note`))}">${esc(t(`book.via.${v}`))}</span>`;
+  // La fecha en el idioma elegido, no en el mío: aquí la constancia es del
+  // usuario y la lee él.
+  const cuando = (at) => new Date(at).toLocaleDateString(langInfo().code,
+    { day: 'numeric', month: 'short', year: 'numeric' });
+  return `
+    <div class="sec-title eyebrow" style="margin-top:22px">${esc(t('book.title'))}</div>
+    <div class="hint">${esc(t('book.note'))}</div>
+    <div class="metrics">
+      <div class="metric"><b>${b.known}</b><span>${esc(t('book.known'))}</span></div>
+      <div class="metric"><b>${b.unused}</b><span>${esc(t('book.unused'))}</span></div>
+    </div>
+    ${sinUsar.length ? sinUsar.map((x) => `<div class="foe-det-l">
+      <span>${spellIcon(x.name)}${esc(x.name)}</span>
+      <span>${x.vias.map(via).join(' ')}</span>
+      <span class="dim">${x.at ? esc(cuando(x.at)) : ''}</span>
+    </div>`).join('') : `<div class="hint">${esc(t('book.allUsed'))}</div>`}
+    ${b.sinConstancia.length ? `<div class="hint" style="margin-top:12px">${
+      esc(t('book.noRecord', { n: b.sinConstancia.length }))}<br>${
+      esc(b.sinConstancia.join(' · '))}</div>` : ''}`;
 }
 
 // ═══════════ Enciclopedia ═══════════
@@ -2720,6 +2861,10 @@ async function encGo(page, args = {}) {
       e.catalog = (await window.eql.spellCatalog?.({ sinceMs: null })) ?? null;
       state.catalog = e.catalog;
       pedirIconos((e.catalog?.spells ?? []).map((s) => s.name), renderEncyclopedia);
+    }
+    if (page === 'hechizo') {
+      e.spell = (await window.eql.spellDetail?.(e.name, { sinceMs: null })) ?? null;
+      pedirIconos([e.name], renderEncyclopedia);
     }
     if (page === 'muertes') e.deaths = (await window.eql.encDeaths?.()) ?? null;
     if (page === 'progreso') e.progress = (await window.eql.encProgress?.()) ?? null;
@@ -3223,6 +3368,69 @@ function encMuertes() {
  * ninguna. Lo comparable es la terna (enemigo, dificultad, nivel), y la línea
  * sólo se dibuja dentro de una terna y con muestra suficiente.
  */
+/**
+ * Tu nivel a lo largo del tiempo, y lo que pasó en cada tramo.
+ *
+ * NO es una progresión: en EQL cambiar una clase por otra más baja te BAJA el
+ * nivel, así que la línea va y viene. De diez cambios medidos en un histórico
+ * real, tres son bajadas. Por eso se enseñan periodos y no una cuesta, y una
+ * bajada se rotula como cambio de clase y no como retroceso.
+ *
+ * El instante del cambio no se sabe —el registro no lo dice cuando baja— pero
+ * queda acotado entre la última pelea de un nivel y la primera del siguiente.
+ * Se enseña ese margen en vez de una hora inventada.
+ *
+ * Los hitos van AL LADO, no como explicación. Que en un periodo subieras diez
+ * puntos de habilidad y te quedaras una pieza +4 es un hecho, y que tu récord
+ * subiera es otro. Ponerlos juntos deja que los relaciones tú; afirmarlo aquí
+ * sería inventar una causa que no se ha medido.
+ */
+function periodosHTML(p) {
+  const per = p.periodos ?? [];
+  if (!per.length) return '';
+  const tope = Math.max(1, ...per.map((x) => x.best));
+  const cambio = (i) => (p.cambios ?? [])[i - 1];
+
+  const fila = (x) => {
+    const c = cambio(x.i);
+    const salto = !c ? '' : `<div class="salto ${c.sube ? 'sube' : 'baja'}">
+      <span>${c.sube ? '↑' : '↓'} ${esc(t(c.sube ? 'per.up' : 'per.down', { de: c.de, a: c.a }))}</span>
+      <span class="dim">${esc(t('per.between', { m: Math.max(1, Math.round(c.margen / 60000)) }))}</span>
+    </div>`;
+    const hitos = [
+      x.aa ? `<span class="hito aa">${esc(t('per.aa', { n: x.aa }))}</span>` : '',
+      x.piezasN ? `<span class="hito eq" title="${esc(x.piezas.map((q) => q.item).join('\n'))}">${
+        esc(t('per.gear', { n: x.piezasN }))}${x.mejorTier ? ` <b>+${x.mejorTier}</b>` : ''}</span>` : '',
+    ].filter(Boolean).join('');
+    return `${salto}
+      <button class="periodo${x.bastante ? '' : ' flojo'}" data-uid="${x.bestUid}"
+        ${x.bestUid === null ? 'disabled' : ''}>
+        <span class="per-lvl">${esc(t('lvl.level', { n: x.level }))}</span>
+        <span class="per-barra"><i style="width:${Math.round(x.best / tope * 100)}%"></i></span>
+        <span class="num">${esc(t('marks.best'))} <b>${n0(x.best)}</b></span>
+        <span class="num dim">${esc(t('marks.median'))} ${n0(x.median)}</span>
+        <span class="num dim">${x.fights} ${esc(t('sum.fights', { n: x.fights }))}</span>
+        <span class="per-hitos">${hitos}</span>
+        <span class="num dim">${esc(cuando(x.desde))}</span>
+      </button>`;
+  };
+
+  // La única comparación que dice algo: mismo nivel, momentos distintos.
+  const comp = (p.comparables ?? []).map((c) => {
+    const l = c.periodos.map((i) => per.find((x) => x.i === i)).filter(Boolean);
+    const meds = l.map((x) => n0(x.median)).join(' → ');
+    const bests = l.map((x) => n0(x.best)).join(' → ');
+    return `<div class="hint">${esc(t('per.same', { n: c.level, k: l.length }))}
+      <b>${esc(t('marks.median'))} ${meds}</b> · <b>${esc(t('marks.best'))} ${bests}</b></div>`;
+  }).join('');
+
+  return `<div class="sec-title eyebrow" style="margin-top:16px">${esc(t('per.title'))}</div>
+    <div class="hint">${esc(t('per.note'))}</div>
+    <div class="periodos">${per.map(fila).join('')}</div>
+    ${comp ? `<div class="sec-title eyebrow" style="margin-top:14px">${esc(t('per.compTitle'))}</div>
+      <div class="hint">${esc(t('per.compNote'))}</div>${comp}` : ''}`;
+}
+
 function encProgreso() {
   const p = state.enc.progress;
   if (!p) return `${encCrumb()}<div class="hint">${esc(t('flt.none'))}</div>`;
@@ -3253,24 +3461,34 @@ function encProgreso() {
     <div class="hint">${esc(t('enc.progressNote'))}</div>
     ${p.sinDato ? `<div class="hint">${esc(t('enc.progressMissing', { n: p.sinDato }))}</div>` : ''}
 
+    ${periodosHTML(p)}
+
     <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('marks.title'))}</div>
-    <div class="encrows">${p.niveles.map((l) => `<div class="encrow static">
+    <div class="hint">${esc(t('marks.openNote'))}</div>
+    <div class="encrows">${p.niveles.map((l) => `<button class="encrow fight" data-uid="${l.bestUid}"
+      ${l.bestUid === null ? 'disabled' : ''}>
       <span class="nm">${l.level === null ? esc(t('lvl.unknown')) : esc(t('lvl.level', { n: l.level }))}</span>
       <span class="num">${esc(t('marks.best'))} <b>${n0(l.best)}</b></span>
       <span class="num dim">${esc(t('marks.median'))} ${n0(l.median)}</span>
       <span class="num dim">${l.n} ${esc(t('sum.fights', { n: l.n }))}</span>
-    </div>`).join('')}</div>
+      <span class="num dim">${l.bestAt ? esc(cuando(l.bestAt)) : ''}</span>
+    </button>`).join('')}</div>
 
     <div class="sec-title eyebrow" style="margin-top:18px">${esc(t('enc.progressByFoe'))}</div>
     <div class="hint">${esc(t('enc.progressByFoeNote'))}</div>
-    <div class="encrows">${p.marcas.slice(0, 40).map((m) => `<div class="encrow static">
+    <div class="encrows">${p.marcas.slice(0, 40).map((m) => `<button class="encrow fight" data-uid="${m.bestUid}"
+      ${m.bestUid === null ? 'disabled' : ''}>
       <span class="nm">${esc(m.name)}
         <span class="dpills"><span class="dpill">${esc(encDiffLabel(m.diff))}</span>${
-          m.level === null ? '' : `<span class="dpill">${esc(t('lvl.level', { n: m.level }))}</span>`}</span></span>
+  m.level === null ? '' : `<span class="dpill">${esc(t('lvl.level', { n: m.level }))}</span>`}</span></span>
       <span class="num">${esc(t('marks.best'))} <b>${n0(m.best)}</b></span>
       <span class="num dim">${m.n >= 3 ? `${esc(t('marks.median'))} ${n0(m.median)}` : ''}</span>
-      <span class="num dim">${m.n} ${esc(t('sum.fights', { n: m.n }))}</span>
-    </div>`).join('')}</div>
+      <!-- Con una sola pelea el «récord» ES esa pelea. Decirlo evita que se lea
+           como una marca sacada de varias. -->
+      <span class="num dim">${m.n === 1 ? esc(t('marks.onlyOne'))
+    : `${m.n} ${esc(t('sum.fights', { n: m.n }))}`}</span>
+      <span class="num dim">${m.bestAt ? esc(cuando(m.bestAt)) : ''}</span>
+    </button>`).join('')}</div>
 
     ${conSerie.length ? `
       <div class="sec-title eyebrow" style="margin-top:18px">${esc(t('enc.progressSeries'))}</div>
@@ -3320,7 +3538,8 @@ function renderEncyclopedia() {
               : e.page === 'muertes' ? encMuertes()
                 : e.page === 'foe' ? encFoe()
                   : e.page === 'foeDif' ? encFoeDif()
-                    : encIndex();
+                    : e.page === 'hechizo' ? encHechizo()
+                      : encIndex();
   host.innerHTML = `<div class="tabpane"><div class="enc" id="encRoot">${cuerpo}</div></div>`;
 
   host.querySelectorAll('.enccard').forEach((el) => el.addEventListener('click', () => {
@@ -3371,6 +3590,10 @@ function renderEncyclopedia() {
     state.enc.lootDifSet = v !== 'all';
     state.enc.lootDiff = v === 'all' ? undefined : (v === 'null' ? null : +v);
     renderEncyclopedia();
+  }));
+  host.querySelectorAll('.cat-row.abre').forEach((el) => el.addEventListener('click', () => {
+    state.enc.from = 'hechizos';
+    encGo('hechizo', { name: el.dataset.spell });
   }));
   host.querySelectorAll('.lootfrom').forEach((el) => el.addEventListener('click', () => {
     state.enc.from = 'botin';
@@ -3427,8 +3650,13 @@ function renderEncyclopedia() {
   });
   // Un combate concreto se abre donde se ven los combates, que es la otra
   // pestaña: aquí no se repite el desglose de una pelea.
-  host.querySelectorAll('.encrow.fight').forEach((el) => el.addEventListener('click', async () => {
-    state.selectedFight = +el.dataset.uid;
+  host.querySelectorAll('.encrow.fight, .periodo[data-uid]').forEach((el) => el.addEventListener('click', async () => {
+    // `uid` es el byte donde empieza el registro, así que 0 es un uid válido —
+    // pero «null» convertido a número también da 0, y ésa abriría la primera
+    // pelea del histórico en vez de la que se pulsó. Se filtra por texto.
+    const crudo = el.dataset.uid;
+    if (crudo === undefined || crudo === '' || crudo === 'null') return;
+    state.selectedFight = +crudo;
     state.rowNodes.clear();
     await loadFight(state.selectedFight);
     setView('combat');

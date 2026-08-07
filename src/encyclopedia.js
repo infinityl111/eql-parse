@@ -564,9 +564,31 @@ export class Encyclopedia {
     const sinDato = this.store.index.filter((s) => typeof s.mine !== 'number').length;
     const dps = (s) => s.mine / s.duration;
 
+  /**
+   * El resumen de un grupo de peleas, CON la identidad de la mejor.
+   *
+   * Antes esto mapeaba a números y ordenaba: la cifra sobrevivía y la pelea se
+   * perdía. Y una marca sin su pelea deja la pregunta obvia sin respuesta —«mi
+   * récord contra Overseer of Air fueron 210 dps, ¿y qué hice?»—. Se ordenan
+   * las peleas enteras y se guarda el `uid` de la primera, que es lo que
+   * permite abrirla.
+   *
+   * La mediana no lleva pelea a propósito: es una posición en una lista, no un
+   * combate concreto, y darle un enlace haría creer que aquella pelea tiene
+   * algo de particular cuando lo único que tiene es estar en medio.
+   */
     const resumir = (lista) => {
-      const v = lista.map(dps).sort((a, b) => a - b);
-      return { n: v.length, best: v.at(-1) ?? 0, median: v[Math.floor(v.length / 2)] ?? 0 };
+      const orden = [...lista].sort((a, b) => dps(a) - dps(b));
+      const mejor = orden.at(-1);
+      return {
+        n: orden.length,
+        best: mejor ? dps(mejor) : 0,
+        median: orden.length ? dps(orden[Math.floor(orden.length / 2)]) : 0,
+        bestUid: mejor?.uid ?? null,
+        bestAt: mejor?.at ?? null,
+        bestDuration: mejor?.duration ?? null,
+        bestZone: mejor?.zoneBase ?? mejor?.zone ?? null,
+      };
     };
 
     // ── Por nivel ────────────────────────────────────────────────────────
@@ -581,13 +603,13 @@ export class Encyclopedia {
     const porEnemigo = new Map();
     for (const s of utiles) {
       if ((s.foes ?? []).length !== 1) continue;     // ver el comentario de arriba
-      const k = `${s.foes[0]} ${diffKey(s.diff)} ${s.level ?? ''}`;
+      const k = `${s.foes[0]}\u0000${diffKey(s.diff)}\u0000${s.level ?? ''}`;
       if (!porEnemigo.has(k)) porEnemigo.set(k, []);
       porEnemigo.get(k).push(s);
     }
 
     const marcas = [...porEnemigo].map(([k, lista]) => {
-      const [name, d, lvl] = k.split(' ');
+      const [name, d, lvl] = k.split('\u0000');
       return {
         // `d` viene como «D2» o como «sin marca». Lo segundo NO es cero: es una
         // pelea de la que no consta la dificultad, y comparar tus marcas de una
@@ -609,7 +631,99 @@ export class Encyclopedia {
         level: level === 'sin nivel' ? null : level, ...resumir(lista),
       })).sort((a, b) => (b.level ?? -1) - (a.level ?? -1)),
       marcas,
+      ...this.#periodos(minDuracion, minSerie),
     };
+  }
+
+  /**
+   * Tu nivel a lo largo del tiempo, y lo que pasó en cada tramo.
+   *
+   * NO ES UNA PROGRESIÓN, SON PERIODOS. En EQL cambiar una clase por otra más
+   * baja te BAJA el nivel, así que la línea no sube: va y viene. Medido en un
+   * histórico real, de diez cambios de nivel tres son bajadas, y el patrón es
+   * subir a 50, bajar a los veintitantos a subir secundarias y volver. Once
+   * tramos, no una cuesta.
+   *
+   * Y NADA DE ESTO SE GUARDA APARTE: cada pelea ya lleva su nivel y su hora, así
+   * que un cambio es simplemente donde el nivel es distinto entre dos peleas
+   * consecutivas. El momento exacto no se sabe —el registro no lo dice cuando
+   * baja— pero queda acotado entre la última pelea de un nivel y la primera del
+   * siguiente: mediana de diez minutos en ese histórico.
+   *
+   * LA ÚNICA COMPARACIÓN QUE DICE ALGO es entre periodos del MISMO nivel. En el
+   * histórico de referencia hay tres a nivel 50: medianas 129, 122 y 130 —o sea
+   * la misma— y récords 210, 190 y 300. La mediana no se mueve y el techo sube,
+   * que es una lectura de verdad y no se ve de ninguna otra forma.
+   *
+   * LOS HITOS son hechos fechados que se ponen al lado, no explicaciones. Los
+   * puntos de habilidad ganados y el equipo que te quedaste en ese tramo. NO se
+   * afirma que una cosa cause la otra: se ponen juntas y quien mira decide.
+   */
+  #periodos(minDuracion, minSerie) {
+    const orden = [...this.store.index].filter((s) => s.level).sort((a, b) => a.at - b.at);
+    const tramos = [];
+    for (const s of orden) {
+      const u = tramos.at(-1);
+      if (u && u.level === s.level) u.peleas.push(s);
+      else tramos.push({ level: s.level, peleas: [s] });
+    }
+
+    const dps = (s) => s.mine / s.duration;
+    const aas = this.store.aa ?? [];
+    // Lo que te QUEDASTE, que no es lo mismo que lo que recogiste: lo vendido al
+    // instante es basura de vendedor y lo consumido eran materiales. Medido, de
+    // 794 unidades recogidas sólo 216 se quedaron.
+    const guardado = [];
+    for (const s of this.store.index) {
+      const f = this.store.get(s.uid);
+      for (const l of f?.loot ?? []) {
+        if (l.sold || l.upgraded || l.stored || !l.item) continue;
+        guardado.push({ item: l.item, at: s.at + (l.t ?? 0) * 1000, tier: nivelMejora(l.item) });
+      }
+    }
+
+    const periodos = tramos.map((g, i) => {
+      const utiles = g.peleas.filter((s) => typeof s.mine === 'number' && (s.duration ?? 0) >= minDuracion);
+      const desde = g.peleas[0].at;
+      const hasta = g.peleas.at(-1).at;
+      const piezas = guardado.filter((q) => q.at >= desde && q.at <= hasta && q.tier !== null)
+        .sort((a, b) => b.tier - a.tier);
+      return {
+        i: i + 1, level: g.level, desde, hasta,
+        fights: g.peleas.length,
+        ...resumirCon(utiles, dps),
+        // Suficiente para comparar, o no. Con dos peleas hay dos peleas.
+        bastante: utiles.length >= minSerie,
+        aa: aas.filter((a) => a.at >= desde && a.at <= hasta).length,
+        piezas: piezas.slice(0, 6),
+        piezasN: piezas.length,
+        mejorTier: piezas[0]?.tier ?? null,
+      };
+    });
+
+    // El cambio entre dos periodos, con lo que NO se sabe: el instante exacto.
+    const cambios = [];
+    for (let i = 1; i < periodos.length; i++) {
+      const a = periodos[i - 1], b = periodos[i];
+      cambios.push({
+        de: a.level, a: b.level, sube: b.level > a.level,
+        desde: a.hasta, hasta: b.desde, margen: b.desde - a.hasta,
+      });
+    }
+
+    // Mismo nivel en momentos distintos: la comparación que sí vale.
+    const porMismoNivel = new Map();
+    for (const p of periodos) {
+      if (!p.bastante) continue;
+      if (!porMismoNivel.has(p.level)) porMismoNivel.set(p.level, []);
+      porMismoNivel.get(p.level).push(p);
+    }
+    const comparables = [...porMismoNivel]
+      .filter(([, l]) => l.length >= 2)
+      .map(([level, l]) => ({ level, periodos: l.map((p) => p.i) }))
+      .sort((a, b) => b.level - a.level);
+
+    return { periodos, cambios, comparables };
   }
 
   /** Salud de la ficha, para el comando de comprobación. */
@@ -640,6 +754,50 @@ export const zoneBaseOf = (f) => f.zoneBase ?? (f.zone ? parseZone(f.zone).base 
  * al agrupar y al consultar, que es donde la pregunta es «¿en qué dificultad?»
  * y la respuesta correcta es cero y no «se desconoce».
  */
+/**
+ * El nivel de mejora que EQL escribe en el propio nombre: «Carmine Trinket +4».
+ * Es un dato MEDIDO, no una deducción: está en la línea del registro. Lo que sí
+ * se deduce es que una pieza con nombre de ranura sea equipo, y por eso lo que
+ * no lleva `+N` ni nombre de pieza no cuenta como hito.
+ */
+/**
+ * CALIBRADO CONTRA UN INVENTARIO REAL, y no se construyó nada con él.
+ *
+ * El juego exporta el inventario con «/output inventory»: una tabla con la
+ * ranura, el nombre y el identificador de cada objeto. Sirve para responder
+ * a la única pregunta que esta función no puede: ¿de verdad es equipo lo que
+ * yo llamo equipo?
+ *
+ * Medido sobre el inventario de la partida de referencia, 25 piezas
+ * equipadas: la regla de aquí acierta las 25. Ninguna se escapa y ninguna
+ * sobra. Con lo cual la deducción está calibrada y el fichero no hace falta.
+ *
+ * NO SE IMPORTA, Y ES A PROPÓSITO. El fichero es una foto sin fecha: dice lo
+ * que llevas puesto hoy, no cuándo lo conseguiste, y aquí todo lo que se
+ * enseña va fechado. Pedirlo además rompería la regla de la casa —quien no
+ * exporte nada tiene la aplicación entera—. Queda como calibración: si algún
+ * día la regla falla, se vuelve a medir contra otro inventario.
+ */
+const RANURA = /(sword|blade|dagger|axe|hammer|mace|staff|bow|shield|helm|coif|cap|mask|tunic|robe|breastplate|vest|bracer|gauntlet|glove|greaves|leggings|boots|sandals|cloak|ring|earring|necklace|amulet|belt|girdle|sash|turban|cape|trinket)/i;
+function nivelMejora(nombre) {
+  const m = /\+(\d+)\s*$/.exec(String(nombre ?? ''));
+  if (m) return +m[1];
+  return RANURA.test(String(nombre ?? '')) ? 0 : null;
+}
+
+/** El resumen de una lista con la identidad de la mejor, como `resumir`. */
+function resumirCon(lista, dps) {
+  const orden = [...lista].sort((a, b) => dps(a) - dps(b));
+  const mejor = orden.at(-1);
+  return {
+    n: orden.length,
+    best: mejor ? dps(mejor) : 0,
+    median: orden.length ? dps(orden[Math.floor(orden.length / 2)]) : 0,
+    bestUid: mejor?.uid ?? null,
+    bestAt: mejor?.at ?? null,
+  };
+}
+
 // Aquí vivía `const nivel = (d) => d ?? 0`, que convertía «no consta» en D0 y
 // era la razón de que East Freeport saliera en la columna de una dificultad.
 // No se sustituye por nada: `null` viaja como `null` y quien lo enseña lo

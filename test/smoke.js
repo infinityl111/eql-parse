@@ -50,6 +50,46 @@ for (const r of rows) {
 console.log('kills:', enc.kills.map(k=>k.victim).join(','));
 console.log('desconocidas:', parser.unrecognized);
 
+// ── La carpeta de datos no se mueve ────────────────────────────────────────
+//
+// Electron decide dónde vive `%APPDATA%` con `app.getName()`, que devuelve el
+// `productName` de la RAÍZ del package.json si existe y, si no, el `name`.
+// Comprobado ejecutándolo:
+//
+//   name: eql-parse, productName sólo dentro de "build"  →  Roaming/eql-parse
+//   productName en la RAÍZ                               →  Roaming/EQL Parse
+//
+// O sea que añadir un `productName` a la raíz, o tocar `name`, deja huérfanos
+// el histórico, la enciclopedia y la configuración de todo el que tenga la
+// aplicación instalada. Sin aviso y sin vuelta atrás.
+//
+// El nombre visible se cambia en `build.productName`, que sólo lee
+// electron-builder. Si algún día hubiera que mover la carpeta de verdad, hace
+// falta migración —detectar la vieja, mover el contenido y decirlo—, no un
+// cambio de campo.
+{
+  const fs = await import('node:fs');
+  const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  console.log('\ncarpeta de datos');
+  let mal = 0;
+  const comprueba = (cond, msg, extra) => {
+    console.log(`  ${cond ? 'ok ' : 'MAL'}  ${msg}${extra !== undefined ? ` — ${extra}` : ''}`);
+    if (!cond) mal++;
+  };
+  comprueba(pkg.name === 'eql-parse',
+    '`name` sigue siendo eql-parse, que es lo que fija %APPDATA%', pkg.name);
+  comprueba(pkg.productName === undefined,
+    'no hay `productName` en la RAÍZ: si lo hubiera, Electron movería la carpeta',
+    pkg.productName);
+  comprueba(typeof pkg.build?.productName === 'string',
+    'el nombre visible vive en build.productName, que no toca la carpeta',
+    pkg.build?.productName);
+  comprueba(pkg.build?.appId === 'dev.miguelangelfernandez.eqlparse',
+    'y el appId no cambia: Windows lo usa para saber que es la misma aplicación',
+    pkg.build?.appId);
+  if (mal) process.exit(1);
+}
+
 // ── Ninguna clave de traducción sin traducir ──────────────────────────────
 //
 // `t()` devuelve la propia clave cuando falta, y eso se ve en pantalla tal

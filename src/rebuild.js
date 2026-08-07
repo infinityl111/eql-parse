@@ -37,7 +37,7 @@ import { FightStore, STORE_VERSION } from './store.js';
 // deduplica por (hora, objeto, de quién), así que no se duplicaría — pero
 // entonces conservaría entradas de un log que ya no existe, y eso es peor:
 // nadie sabría de dónde salieron. Van juntas o no van.
-const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjson'];
+const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjson', 'aa.ndjson', 'spells.ndjson'];
 
 export async function rebuildStore({ dir, logPath, self = null, idleSec = 20, trios = [] } = {}) {
   if (!dir) return { ok: false, reason: 'sin-carpeta' };

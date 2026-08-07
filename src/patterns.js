@@ -244,6 +244,14 @@ const rules = [
   // formas. Quien declara las clases es el /who.
   { kind: 'scribe', hint: 'finished scribing', re: /^You have finished scribing (.+?)\.$/, map: (m) => ({ ability: m[1] }) },
 
+  // Comprar un hechizo también deja constancia de que lo tienes, y no se
+  // reconocía: 23 en un registro real, invisibles. El «Spell:» del principio es
+  // lo que lo distingue de comprar una llave o una racion.
+  { kind: 'spell_buy', hint: 'You purchased',
+    re: /^You purchased \d+ Spell: (.+?) from (.+?) for\s+(.*)$/,
+    map: (m) => ({ ability: m[1], from: m[2], price: m[3].replace(/\.$/, '').trim() }) },
+  { kind: 'noise', hint: 'You purchased', re: /^You purchased \d+ (.+?) from (.+?) for/, map: (m) => ({ item: m[1] }) },
+
   // El nivel, dicho en absoluto y gratis. En EQL el nivel efectivo es el de la
   // clase más baja del trío, así que cambiar una clase por otra más baja te
   // baja el nivel entero: es una variable de la pelea, no del personaje.
@@ -390,6 +398,14 @@ const rules = [
   { kind: 'noise', hint: 'Spell set', re: /^Spell set (.+?) loaded\.$/, map: (m) => ({ set: m[1] }) },
   { kind: 'noise', hint: 'greater hold', re: /^Pet greater hold has been set to (on|off)\.$/, map: (m) => ({ on: m[1] === 'on' }) },
   { kind: 'noise', hint: 'You activate', re: /^You activate (.+?)\.$/, map: (m) => ({ what: m[1] }) },
+  // Un punto de habilidad. Estaba como ruido y no lo es: es una señal fechada
+  // de que el personaje mejora, y explica por qué el techo de daño sube sin que
+  // se mueva la mediana. El registro NO tiene línea de gasto, así que el número
+  // del mensaje es el saldo SIN gastar, no el total ganado: cuando baja entre
+  // dos avisos es que gastaste, y eso se deduce de la caída.
+  { kind: 'aa', hint: 'ability point',
+    re: /^You have gained an ability point!\s+You now have (\d+) ability point/,
+    map: (m) => ({ balance: +m[1] }) },
   { kind: 'noise', hint: 'ability point', re: /^You have gained an ability point!/, map: () => ({}) },
   { kind: 'noise', hint: "can't reach", re: /^You can't reach that, get closer\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'stunned too recently', re: /^Your target has been stunned too recently/, map: () => ({}) },

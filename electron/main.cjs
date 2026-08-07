@@ -449,6 +449,7 @@ ipcMain.handle('history:foes', (_e, sinceMs) => engine.foeList(sinceMs));
 ipcMain.handle('history:stats', () => engine.storeStats());
 // Catalogo de hechizos construido desde el historico, con los cooldowns medidos.
 ipcMain.handle('catalog:spells', (_e, q) => engine.spellCatalog(q ?? {}));
+ipcMain.handle('catalog:spell', (_e, { name, q }) => engine.spellDetail(name, q ?? {}));
 
 ipcMain.handle('enc:zones', () => engine.encZones());
 ipcMain.handle('enc:zoneFoes', (_e, { base, diff }) => engine.encZoneFoes(base, diff));

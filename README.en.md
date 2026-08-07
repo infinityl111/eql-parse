@@ -144,11 +144,39 @@ Under deaths, the enemy shown beside each one is **the one that dealt you the
 most damage in that fight**, not the one that landed the killing blow: the log
 never says which it was.
 
+Every spell opens its own dossier: which brackets it hits in, how often it
+crits, the two numbers it lives between, and what you have landed it on. Marks
+are grouped by level and they open: the best fight of each one is a click, not a
+loose number.
+
 And under progress there is **no dps-over-time curve**, on purpose: it rises
 when you level and falls when you fight something tougher, so it measures both
 at once and neither. What compares is the same enemy, at the same difficulty, at
 the same level, and a line is only drawn once that triple reaches five fights.
 Three points are not a trend: they are three points.
+
+**Nor is it a progression — they are periods.** In EQL swapping a class for a
+lower one LOWERS your level: over a real history, three of ten changes are drops.
+So the line goes up and down, and the only thing compared is periods at the same
+level. Beside them sit the dated milestones — ability points and gear with its
+`+N` — placed NEXT TO the figures and never as a cause: that you gained ten
+points and that your record went up are two facts; saying one explains the other
+is something else.
+
+#### Your spellbook
+
+The table above measures what you cast; this measures the opposite. A spell that
+shows up nowhere might be one you do not own or one you own and never bring out,
+and those are very different things. The log can tell them apart because
+scribing, memorizing and buying each leave a line, and every spell is shown with
+where it is known from: *scribed* means it is in your book, *bought* means you
+paid for it, *memorized* only means you had it slotted once, and that could have
+been twenty levels ago.
+
+It comes from the log and **there is no file to export**. Over a real history
+that is 84 spells and 40 that never come out. The ones cast with no record of
+where they came from are shown separately rather than hidden: they predate the
+log, or belong to an earlier class.
 
 #### The entries are learned, not computed
 

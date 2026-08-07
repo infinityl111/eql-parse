@@ -143,11 +143,36 @@ hechizo, no porque falte algo.
 En muertes, el enemigo que sale al lado es **el que más daño te hizo en esa
 pelea**, no quien te dio el golpe final: el registro no dice cuál fue.
 
+Cada hechizo abre su ficha: en qué tramos pega, cuánto crítica, entre qué dos
+cifras se mueve y sobre qué enemigos lo has soltado. Las marcas van por nivel y
+se abren: la mejor pelea de cada uno es un clic, no un número suelto.
+
 Y en progresión **no hay curva de dps en el tiempo**, a propósito: sube al subir
 de nivel y baja al pelear con algo más duro, así que mide las dos cosas a la vez
 y ninguna. Lo comparable es el mismo enemigo, en la misma dificultad y al mismo
 nivel, y sólo se dibuja una línea cuando esa terna llega a cinco peleas. Con tres
 puntos no hay tendencia: hay tres puntos.
+
+**Tampoco es una progresión, son periodos.** En EQL cambiar una clase por otra
+más baja te BAJA el nivel: sobre un histórico real, de diez cambios tres son
+bajadas. Así que la línea va y viene, y lo único que se compara son periodos del
+mismo nivel. Al lado van los hitos fechados —puntos de habilidad y equipo con su
+`+N`—, puestos JUNTO a las cifras y nunca como causa: que subieras diez puntos y
+que tu récord subiera son dos hechos, decir que uno explica el otro es otra cosa.
+
+#### Tu libro de hechizos
+
+La tabla de arriba mide lo que lanzas; esto mide lo contrario. Un hechizo que no
+aparece en ningún sitio puede ser que no lo tengas o que lo tengas parado, y son
+cosas muy distintas. El registro sabe separarlas porque escribir, memorizar y
+comprar dejan línea, y cada uno se enseña con de dónde consta: *escrito* es
+tenerlo en el libro, *comprado* es haberlo pagado, *memorizado* es sólo haberlo
+llevado puesto, y eso pudo ser hace veinte niveles.
+
+Sale del registro y **no hay que exportar ningún fichero**. Sobre un histórico
+real son 84 hechizos y 40 que nunca salen. Los que se lanzan sin que conste de
+dónde salieron se enseñan aparte en vez de esconderlos: son de antes de que el
+registro empezara, o de una clase anterior.
 
 #### La ficha se aprende, no se calcula
 

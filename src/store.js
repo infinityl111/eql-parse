@@ -105,6 +105,18 @@ export class FightStore {
     this.lootPath = path.join(dir, 'loot.ndjson');
     this.orphanLoot = [];
     this.lootSeen = new Set();
+    // Puntos de habilidad, con su hora. Fichero aparte por lo mismo que el
+    // botín sin pelea: no pertenecen a ningún combate, pasan entre unos y
+    // otros. Si el fichero no está, no hay hitos y ya está — no es un error.
+    this.aaPath = path.join(dir, 'aa.ndjson');
+    this.aa = [];
+    this.aaSeen = new Set();
+    // El libro de hechizos: los que CONSTA que tienes, y de qué línea consta.
+    // Fichero aparte por lo mismo que los puntos: escribir o comprar un hechizo
+    // pasa fuera de cualquier pelea.
+    this.spellsPath = path.join(dir, 'spells.ndjson');
+    this.spellbook = [];
+    this.spellSeen = new Set();
     this.index = [];        // resúmenes, del más reciente al más antiguo
     this.cache = new Map(); // uid -> pelea completa, para no releer el disco
     this.byUid = new Map();
@@ -187,6 +199,8 @@ export class FightStore {
     this.seen.clear();
     this.dropped = 0;
     this.#loadLoot();
+    this.#loadAA();
+    this.#loadSpells();
     try {
       const raw = fs.readFileSync(this.idxPath, 'utf8');
       for (const line of raw.split('\n')) {
@@ -301,6 +315,90 @@ export class FightStore {
       this.orphanLoot.push(fila);
       return fila;
     } catch { return null; }
+  }
+
+  /**
+   * Un punto de habilidad ganado, con su hora.
+   *
+   * Se deduplica por hora porque releer el registro vuelve a generarlos, igual
+   * que las peleas. El saldo se guarda tal cual lo dijo el juego: es el que le
+   * quedaba SIN gastar, no el total, y de sus caídas se deduce lo gastado.
+   */
+  appendAA(e) {
+    const t = Math.round(e?.t ?? 0);
+    if (!t || this.aaSeen.has(t)) return null;
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      const fila = { t, at: e.at ?? t * 1000, balance: e.balance ?? null };
+      fs.appendFileSync(this.aaPath, `${JSON.stringify(fila)}\n`);
+      this.aaSeen.add(t);
+      this.aa.push(fila);
+      return fila;
+    } catch { return null; }
+  }
+
+  /**
+   * «Este hechizo lo tienes», con la línea que lo dice.
+   *
+   * Tres procedencias y las tres cuentan, pero no dicen lo mismo:
+   *
+   *   escrito      «You have finished scribing X» — lo pusiste en el libro.
+   *   comprado     «You purchased 1 Spell: X from Y» — lo pagaste.
+   *   memorizado   «Beginning to memorize X» — lo llevabas puesto. Es la más
+   *                floja de las tres como prueba de posesión, y a la vez la más
+   *                abundante: 2.328 líneas en un registro real contra 22 de
+   *                escritura. Se guarda cuál fue.
+   *
+   * Se deduplica por (hechizo, procedencia): memorizar el mismo cien veces es
+   * un hecho una vez.
+   */
+  appendSpell(e) {
+    if (!e?.name || !e?.via) return null;
+    const clave = `${e.name}\u0000${e.via}`;
+    if (this.spellSeen.has(clave)) return null;
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      const fila = { name: e.name, via: e.via, t: Math.round(e.t ?? 0), at: e.at ?? null };
+      fs.appendFileSync(this.spellsPath, `${JSON.stringify(fila)}\n`);
+      this.spellSeen.add(clave);
+      this.spellbook.push(fila);
+      return fila;
+    } catch { return null; }
+  }
+
+  #loadSpells() {
+    this.spellbook = [];
+    this.spellSeen = new Set();
+    try {
+      for (const line of fs.readFileSync(this.spellsPath, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const e = JSON.parse(line);
+          if (!e?.name || !e?.via) continue;
+          const k = `${e.name}\u0000${e.via}`;
+          if (this.spellSeen.has(k)) continue;
+          this.spellSeen.add(k);
+          this.spellbook.push(e);
+        } catch { /* línea rota: se salta */ }
+      }
+    } catch { /* sin fichero: el libro sale de lo que se haya lanzado */ }
+  }
+
+  #loadAA() {
+    this.aa = [];
+    this.aaSeen = new Set();
+    try {
+      for (const line of fs.readFileSync(this.aaPath, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const e = JSON.parse(line);
+          if (!e?.t || this.aaSeen.has(e.t)) continue;
+          this.aaSeen.add(e.t);
+          this.aa.push(e);
+        } catch { /* línea rota: se salta */ }
+      }
+      this.aa.sort((a, b) => a.t - b.t);
+    } catch { /* sin fichero: no hay puntos anotados */ }
   }
 
   #loadLoot() {
