@@ -12,6 +12,7 @@ const DEFAULTS = {
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
   skipVersion: null, trios: [], mergePets: false, myPets: [], notPets: [], fpsWarned: false, excluded: [],
   notCompanions: [], companionSrc: {},
+  raidMobs: {},
   companions: [],
   tts: { enabled: true, voice: null, rate: 1, volume: 1 },
   sound: { enabled: true, volume: 0.5 },
@@ -631,6 +632,39 @@ ipcMain.handle('wiki:item', async (_e, name) => {
 ipcMain.handle('wiki:mob', async (_e, name) => {
   if (!wiki) return null;
   try { return await wiki.mob(name); } catch { return null; }
+});
+
+/**
+ * Quien es jefe y de donde se sabe.
+ *
+ * Se piden en lote: una ficha de zona tiene veinte enemigos y veinte viajes por
+ * el puente para una etiqueta serian veinte repintados. La wiki los cachea, asi
+ * que a partir de la segunda vez esto no toca la red.
+ */
+ipcMain.handle('raid:flags', async (_e, nombres) => {
+  const out = {};
+  const lista = [...new Set(nombres ?? [])].filter(Boolean);
+  await Promise.all(lista.map(async (n) => {
+    let w = null;
+    try { w = wiki ? await wiki.classify(n) : null; } catch { w = null; }
+    out[n] = {
+      wiki: w?.found ? { raid: !!w.raid, named: !!w.named } : null,
+      manual: (cfg.raidMobs ?? {})[n] ?? null,
+    };
+  }));
+  return out;
+});
+
+// «Esto es un jefe» / «no lo es», dicho a mano. Manda sobre la wiki, que es lo
+// acordado: la wiki declara, la heuristica deduce y tu corriges. `null` borra
+// tu marca y devuelve la palabra a la wiki.
+ipcMain.handle('raid:set', (_e, { name, value }) => {
+  const m = { ...(cfg.raidMobs ?? {}) };
+  if (value === null || value === undefined) delete m[name];
+  else m[name] = !!value;
+  cfg.raidMobs = m;
+  saveConfig(cfg);
+  return cfg.raidMobs;
 });
 
 ipcMain.handle('shell:wiki', (_e, item) => {

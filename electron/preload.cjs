@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld('eql', {
   openWiki: (item) => ipcRenderer.invoke('shell:wiki', item),
   wikiItem: (item) => ipcRenderer.invoke('wiki:item', item),
   wikiMob: (name) => ipcRenderer.invoke('wiki:mob', name),
+  raidFlags: (nombres) => ipcRenderer.invoke('raid:flags', nombres),
+  setRaid: (name, value) => ipcRenderer.invoke('raid:set', { name, value }),
   spellIcons: (names) => ipcRenderer.invoke('wiki:spellIcons', names),
   onSnapshot: (fn) => ipcRenderer.on('snapshot', (_e, s) => fn(s)),
   onOverlayState: (fn) => ipcRenderer.on('overlay:state', (_e, s) => fn(s)),

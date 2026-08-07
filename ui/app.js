@@ -3,6 +3,9 @@ import { analyse } from '../src/analysis.js';
 import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
+import { fightToChat } from '../src/share.js';
+import { clasificaJefe, jefesDe } from '../src/raid.js';
+import { copiarAlPortapapeles } from './clip.js';
 import { initTriggers, renderTriggers } from './triggers.js';
 import { plate, DIBUJADAS } from './plates.js';
 import { mountBanner, speak, playSound, listVoices } from './alerts.js';
@@ -287,6 +290,50 @@ const excluidos = () => new Set(state.cfg.excluded ?? []);
  * así que la marca se re-deriva aquí en vez de creerse la que quedó guardada.
  */
 const companeros = () => new Set(state.cfg.companions ?? []);
+
+/**
+ * Quién es jefe: lo que ha contestado la wiki y lo que has dicho tú.
+ *
+ * Se pregunta en lote y se cachea aquí además de en el cliente de la wiki: una
+ * ficha de zona son veinte enemigos y repintar no puede disparar veinte viajes
+ * por el puente cada vez.
+ */
+const raidWiki = new Map();     // nombre -> {raid, named} | null
+const raidPedidos = new Set();
+function pedirRaid(nombres, luego) {
+  const faltan = [...new Set(nombres)].filter((n) => n && !raidPedidos.has(n));
+  if (!faltan.length) return;
+  faltan.forEach((n) => raidPedidos.add(n));
+  window.eql.raidFlags?.(faltan).then((res) => {
+    let algo = false;
+    for (const [n, v] of Object.entries(res ?? {})) {
+      if (v?.wiki) { raidWiki.set(n, { found: true, ...v.wiki }); algo = true; }
+    }
+    if (algo && luego) luego();
+  }).catch(() => { /* sin red: se queda la deducción */ });
+}
+/** Lo que dijiste tú, en la forma que espera `clasificaJefe`. */
+const raidManual = () => new Map(Object.entries(state.cfg.raidMobs ?? {}));
+const jefeDe = (nombre, vida) => clasificaJefe(nombre, {
+  manual: raidManual(), wiki: raidWiki, vida,
+});
+
+/**
+ * El interruptor de «esto es un jefe», en la ficha.
+ *
+ * `auto` no es «no»: borra tu marca y devuelve la palabra a la wiki. Sin esa
+ * tercera opción, corregirte a ti mismo sería imposible — te quedarías con un
+ * «no» tuyo tapando para siempre lo que diga la wiki.
+ */
+function cablearRaid(host) {
+  host?.querySelectorAll('[data-raid]').forEach((el) => el.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const v = el.dataset.to;
+    const r = await window.eql.setRaid?.(el.dataset.raid, v === 'auto' ? null : v === '1');
+    state.cfg.raidMobs = r ?? state.cfg.raidMobs;
+    renderApp();
+  }));
+}
 
 /**
  * De dónde salió que alguien es compañero: lo dijiste tú o se dedujo del canal.
@@ -1234,6 +1281,25 @@ async function renderNarrate(host) {
       anteriores se quedaban en la configuración sin ningún botón que las
       quitase, porque el único camino para borrarlas nunca se llamó desde aquí.
     -->
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('share.prefixTitle'))}</div>
+    <div class="hint">${esc(t('share.prefixNote'))}</div>
+    <input id="sharePrefix" type="text" maxlength="12" style="width:120px"
+      placeholder="${esc(t('share.prefixPh'))}" value="${esc(state.cfg.sharePrefix ?? '')}">
+
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('share.petsTitle'))}</div>
+    <div class="hint">${esc(t('share.petsNote'))}</div>
+    <select id="sharePets">
+      <option value="merge"${(state.cfg.sharePets ?? 'merge') === 'merge' ? ' selected' : ''}>${esc(t('share.petsMerge'))}</option>
+      <option value="group"${state.cfg.sharePets === 'group' ? ' selected' : ''}>${esc(t('share.petsGroup'))}</option>
+    </select>
+
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('share.pctTitle'))}</div>
+    <div class="hint">${esc(t('share.pctNote'))}</div>
+    <select id="sharePct">
+      <option value="%"${(state.cfg.sharePct ?? '%') === '%' ? ' selected' : ''}>30%</option>
+      <option value="pct"${state.cfg.sharePct === 'pct' ? ' selected' : ''}>30pct</option>
+    </select>
+
     <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('pet.mineTitle'))}</div>
     <div class="hint">${esc(t('pet.mineNote'))}</div>
     <div class="excl-list" id="petList">${(state.cfg.myPets ?? []).length
@@ -1335,6 +1401,23 @@ async function renderNarrate(host) {
     refreshFights();
     renderApp();
   };
+  // El prefijo se guarda al salir del campo, no en cada tecla: escribir «[EQL]»
+  // son seis escrituras en disco y seis avisos al overlay para nada.
+  const pref = host.querySelector('#sharePrefix');
+  pref?.addEventListener('change', async () => {
+    state.cfg.sharePrefix = pref.value;
+    await window.eql.setFlag('sharePrefix', pref.value);
+  });
+  const pets = host.querySelector('#sharePets');
+  pets?.addEventListener('change', async () => {
+    state.cfg.sharePets = pets.value;
+    await window.eql.setFlag('sharePets', pets.value);
+  });
+  const pct = host.querySelector('#sharePct');
+  pct?.addEventListener('change', async () => {
+    state.cfg.sharePct = pct.value;
+    await window.eql.setFlag('sharePct', pct.value);
+  });
   host.querySelectorAll('[data-unpet]').forEach((el) => el.addEventListener('click',
     () => declararMascota(el.dataset.unpet, false)));
   host.querySelectorAll('[data-repet]').forEach((el) => el.addEventListener('click',
@@ -1772,6 +1855,7 @@ function renderHead(snap) {
       <div class="head-actions">
         ${!live ? `<button class="primary" id="btnAnalyse">${t('an.button')}</button>
         <button id="btnExport">${t('fight.save')}</button>` : ''}
+        <button id="btnChat" title="${esc(t('share.tip'))}">${t('share.copy')}</button>
       </div>
     </div>
     <div class="metrics">
@@ -1791,6 +1875,26 @@ function renderHead(snap) {
     el.addEventListener('mouseleave', hideItemTip);
   });
   $('btnExport')?.addEventListener('click', (e) => { e.stopPropagation(); window.eql.exportEncounter(f); });
+  // Copiar para el chat. Mismo texto que el botón del overlay —sale del mismo
+  // sitio, `src/share.js`— para que no acaben divergiendo dos formatos que
+  // deberían ser uno. El aviso va en el propio botón, sin nodos nuevos.
+  $('btnChat')?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const b = e.currentTarget;
+    // Los jefes salen de la wiki y de lo que hayas dicho tú; sin respuesta aún,
+    // `jefesDe` deduce. Se piden por si acaso, para la próxima vez.
+    pedirRaid((f.rows ?? []).filter((r) => r.side === 'enemy').map((r) => r.name), null);
+    const { texto } = fightToChat(f, {
+      prefijo: state.cfg.sharePrefix ?? '', pct: state.cfg.sharePct ?? undefined,
+      self: state.snap?.self ?? null, pets: state.cfg.sharePets ?? undefined,
+      named: jefesDe(f.rows ?? [], { manual: raidManual(), wiki: raidWiki }),
+    });
+    const bien = await copiarAlPortapapeles(texto);
+    b.textContent = t(bien ? 'share.done' : 'share.fail');
+    b.classList.add(bien ? 'ok' : 'bad');
+    clearTimeout(b._t);
+    b._t = setTimeout(() => { b.textContent = t('share.copy'); b.classList.remove('ok', 'bad'); }, 1600);
+  });
   $('btnAnalyse')?.addEventListener('click', (e) => { e.stopPropagation(); state.view = 'analysis'; $('bodyGrid').innerHTML = ''; renderApp(); });
 }
 
@@ -2005,6 +2109,7 @@ function renderSummary() {
     e.stopPropagation();
     window.eql.openWiki(e.currentTarget.dataset.wiki);
   });
+  cablearRaid(host);
   $('sumMerge')?.addEventListener('change', async (e) => {
     state.cfg.mergePets = e.target.checked;
     await window.eql.setMergePets(e.target.checked);
@@ -2240,7 +2345,9 @@ function encFoeDif() {
 function foeDossier(f, habilidades = '') {
   if (!f) return '';
   if (!mobCache.has(f.name)) loadMob(f.name);
+  pedirRaid([f.name], renderApp);
   const mob = mobCache.get(f.name);
+  const jefe = jefeDe(f.name, f.hp?.avg ?? 0);
   const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
   const spells = (f.spells ?? []).filter((x) => x.landed + x.resisted >= 2);
   const abTot = (f.abilities ?? []).reduce((n, x) => n + x.sum, 0) || 1;
@@ -2248,6 +2355,19 @@ function foeDossier(f, habilidades = '') {
   return `<div class="dossier">
     <div class="dos-head">
       <h3>${esc(f.name)}</h3>
+      <!--
+        La insignia dice DOS cosas, y las dos hacen falta: si es jefe y de dónde
+        se sabe. Igual que con las clases y con los compañeros — una etiqueta
+        sin procedencia acaba leyéndose como un hecho, y mientras la wiki no
+        conteste esto es una suposición sobre la vida y el artículo del nombre.
+      -->
+      <span class="raidmark ${jefe.raid ? 'si' : 'no'} ${jefe.src}"
+        title="${esc(t(`raid.src.${jefe.src}`))}">${
+  esc(jefe.raid ? t('raid.isRaid') : t('raid.notRaid'))} <i>${esc(t(`raid.short.${jefe.src}`))}</i></span>
+      <button class="lnk" data-raid="${esc(f.name)}" data-to="${jefe.raid ? '0' : '1'}"
+        title="${esc(t('raid.setNote'))}">${esc(jefe.raid ? t('raid.unset') : t('raid.set'))}</button>
+      ${state.cfg.raidMobs?.[f.name] !== undefined && state.cfg.raidMobs?.[f.name] !== null
+    ? `<button class="lnk" data-raid="${esc(f.name)}" data-to="auto">${esc(t('raid.clear'))}</button>` : ''}
       ${mob ? `<button class="lnk dos-wiki" data-wiki="${esc(f.name)}">${esc(t('foe.seeWiki'))}</button>` : ''}
     </div>
     <div class="metrics">
@@ -3317,6 +3437,7 @@ function renderEncyclopedia() {
     ev.stopPropagation();
     window.eql.openWiki(ev.currentTarget.dataset.wiki);
   });
+  cablearRaid(host);
   host.querySelectorAll('.loot-item').forEach((el) => {
     el.addEventListener('click', (ev) => { ev.stopPropagation(); window.eql.openWiki(el.dataset.item); });
     el.addEventListener('mouseenter', () => showItemTip(el.dataset.item));

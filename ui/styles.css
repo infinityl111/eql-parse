@@ -332,6 +332,12 @@ code { font-family: var(--mono); font-size: 11px; background: var(--slate-800); 
 .head-top { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 12px; }
 .head-title { font-family: var(--display); font-size: 19px; letter-spacing: .02em; margin-bottom: 3px; }
 .head-actions { margin-left: auto; }
+
+/* El botón de copiar al chat, junto a las otras acciones de la pelea. Cambia
+   su propio texto al copiar en vez de añadir un aviso aparte: un nodo nuevo se
+   pierde en el siguiente repintado y nadie llega a leerlo. */
+#btnChat.ok { border-color: var(--t-poison); color: var(--t-poison); }
+#btnChat.bad { border-color: var(--t-fire); color: var(--t-fire); }
 .metrics { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .metric { background: var(--slate-850); border-radius: 4px; padding: 9px 14px; min-width: 96px; }
 .metric.lead { border-left: 2px solid var(--t-cold); }
@@ -848,6 +854,18 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
        text-transform: uppercase; padding: 1px 5px; border: 1px solid; margin-left: 2px; }
 .src.manual { color: var(--t-cold); border-color: var(--t-cold); opacity: .8; }
 .src.auto { color: var(--bone-faint); border-color: var(--slate-700); }
+
+/* Si es jefe, y de dónde se sabe. Las dos cosas juntas y con distinto color,
+   por lo mismo que con las clases: lo declarado y lo supuesto no pueden
+   verse igual, o la suposición acaba leyéndose como un hecho. */
+.raidmark { font-family: var(--display); font-size: 9.5px; letter-spacing: .09em;
+  text-transform: uppercase; padding: 2px 7px; border: 1px solid; margin-left: 6px; }
+.raidmark i { font-style: normal; opacity: .65; margin-left: 5px; font-size: 8.5px; }
+.raidmark.si { color: var(--t-fire); border-color: var(--t-fire); }
+.raidmark.no { color: var(--bone-faint); border-color: var(--slate-700); }
+/* Lo deducido, en trazo discontinuo: se ve de lejos que aún no está confirmado. */
+.raidmark.deducido { border-style: dashed; }
+.raidmark.manual { border-style: solid; box-shadow: inset 0 0 0 1px rgba(111,199,216,.25); }
 
 /* ── Catálogo de hechizos ───────────────────────────── */
 /* Ocho columnas, y NUEVE cuando hay resistencias que enseñar: la de «daño

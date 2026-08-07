@@ -58,6 +58,19 @@
   .ovf.nueva .ovf-h { animation: ovf-in .9s ease-out; }
   @keyframes ovf-in { from { background: rgba(111,199,216,.4); } }
   @media (prefers-reduced-motion: reduce) { .ovf.nueva .ovf-h { animation: none; } }
+  /* Copiar al chat. Va en la cabecera y no dentro de una fila: las filas se
+     recolocan cuatro veces por segundo y un botón ahí se pierde entre
+     repintados. Aparece al pasar por encima para no robar sitio, pero mientras
+     dice «copiado» se queda visible — si no, el aviso se iría con el ratón. */
+  .ovf-copy { flex: none; background: none; border: 1px solid var(--slate-700);
+    color: var(--bone-faint); font-family: var(--display); font-size: 9px;
+    letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px;
+    cursor: pointer; opacity: 0; transition: opacity .12s; }
+  .ovf-h:hover .ovf-copy, .ovf-copy:focus-visible,
+  .ovf-copy.ok, .ovf-copy.bad { opacity: 1; }
+  .ovf-copy:hover { border-color: var(--t-cold); color: var(--t-cold); }
+  .ovf-copy.ok { border-color: var(--t-poison); color: var(--t-poison); }
+  .ovf-copy.bad { border-color: var(--t-fire); color: var(--t-fire); }
   .ovf-caret { font-size: 8px; color: var(--bone-faint); width: 9px; flex: none; }
   .ovf-label { flex: 1; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ovf-tot { font-family: var(--mono); font-size: 11.5px; }

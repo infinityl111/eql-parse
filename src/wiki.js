@@ -263,6 +263,64 @@ export class WikiClient {
     }
   }
 
+  /**
+   * ¿Es este enemigo un jefe de raid? Lo dice la wiki por sus categorías.
+   *
+   * SÓLO CUENTA «Raid_Encounters», Y NO ES UNA ELECCIÓN DE ESTILO.
+   *
+   * La intuición era usar «Named_Mobs», que suena a lo que se busca. Medido
+   * sobre los 119 enemigos de un registro real: 96 la llevan —el 81%—,
+   * incluidos `a desert tarantula` con 175 de vida y `a vampire bat` con 1.723.
+   * En esta wiki esa categoría significa «tiene página», no «es importante», y
+   * partir por ella dejaría casi todo en el lado de los jefes.
+   *
+   * «Raid_Encounters» sí discrimina, y con holgura: 14 enemigos, vida mediana
+   * 32.005 frente a 7.769 de los otros, y la lista es la que uno esperaría —
+   * Nagafen, Vox, Master Yael, the Spiroc Lord, Eye of Veeshan…
+   *
+   * SIN BÚSQUEDA DIFUSA. `mob()` cae a buscar cuando el título exacto no
+   * existe, y para leer tácticas está bien. Aquí NO: preguntando por «a fire
+   * giant warrior» —que no tiene página— la búsqueda devolvería la primera
+   * página que se le parezca, que bien puede ser la de un jefe, y marcaríamos
+   * como raid a un bicho corriente. Que no haya página es una respuesta:
+   * significa que no es nadie.
+   *
+   * @returns {{found:boolean, raid:boolean, named:boolean, title:string|null}}
+   */
+  async classify(name) {
+    const limpio = baseName(name);
+    if (!limpio) return null;
+    const key = `cls:${limpio.toLowerCase()}`;
+    const e = this.cache[key];
+    if (e && Date.now() - e.at < (e.found ? TTL : NEG_TTL)) return e;
+    if (this.pending.has(key)) return this.pending.get(key);
+
+    const job = (async () => {
+      const u = `${API}?action=parse&page=${encodeURIComponent(limpio)}`
+        + '&prop=categories&format=json&formatversion=2&redirects=1';
+      const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+      if (!r.ok) return null;
+      const j = await r.json();
+      // `missingtitle` no es un fallo: es la wiki diciendo que ese enemigo no
+      // tiene página, y eso ya responde a la pregunta.
+      if (j.error) return { found: true, raid: false, named: false, title: null, at: Date.now() };
+      const cats = (j.parse?.categories ?? []).map((c) => c.category);
+      return {
+        found: true,
+        raid: cats.includes('Raid_Encounters'),
+        named: cats.includes('Named_Mobs'),
+        title: j.parse?.title ?? null,
+        at: Date.now(),
+      };
+    })().then((res) => {
+      this.cache[key] = res ?? { found: false, at: Date.now() };
+      this.#save(); this.pending.delete(key);
+      return this.cache[key];
+    }).catch(() => { this.pending.delete(key); return null; });
+    this.pending.set(key, job);
+    return job;
+  }
+
   async #parsePage(title) {
     const u = `${API}?action=parse&page=${encodeURIComponent(title)}`
       + '&prop=text&format=json&formatversion=2&redirects=1';

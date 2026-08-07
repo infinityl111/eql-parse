@@ -1,4 +1,7 @@
 import { t, setLang } from '../src/i18n.js';
+import { fightToChat } from '../src/share.js';
+import { copiarAlPortapapeles } from './clip.js';
+import { jefesDe } from '../src/raid.js';
 
 /**
  * El overlay va combate a combate.
@@ -43,6 +46,15 @@ const MAX_ENEMIES = 20;      // dentro de un bloque: los caídos más antiguos s
 const VISIBLES = 8;          // combates cerrados que se conservan a la vista
 
 let closed = [];             // peleas cerradas, la más reciente primero
+// La pelea del bloque de arriba. Se guarda porque el botón de copiar necesita
+// los datos, y arriba puede haber una viva que no está en `closed`.
+let arriba = null;
+// Lo que va delante de cada línea copiada. Vacío por defecto: en un chat de
+// grupo ya se entiende de qué es, y son caracteres que en el borde cuentan.
+let sharePrefix = '';
+let sharePct;                // sufijo del reparto; sin valor, el de share.js
+let sharePets;               // 'merge' o 'group'; sin valor, el de share.js
+let yo = null;               // tu nombre: sin él no se sabe de quién es tu mascota
 // Filas desplegadas. La clave lleva la pelea delante: el mismo enemigo aparece
 // en varios combates y, con el nombre a secas, desplegarlo en uno lo desplegaba
 // en todos.
@@ -163,6 +175,8 @@ function fightHTML(f, self, { live = false, open = false } = {}) {
         <span class="ovf-label">${esc(f.label ?? t('fight.skirmish'))}</span>
         <span class="ovf-tot num">${n0(f.total)}</span>
         <span class="ovf-dur num">${secs(f.duration)}</span>
+        <button class="ovf-copy" data-copy="${esc(f.key)}"
+          title="${esc(t('share.tip'))}">${esc(t('share.copy'))}</button>
       </div>${cuerpo}</div>`;
 }
 
@@ -178,6 +192,49 @@ function wire(host, repintar, cabeza = false) {
     s.has(k) ? s.delete(k) : s.add(k);
     repintar();
   }));
+  // Copiar al portapapeles. Dos cautelas, las dos por cómo va este overlay:
+  //
+  //  1. `stopPropagation`, porque el botón vive DENTRO de la cabecera y ésta
+  //     pliega el bloque al pincharla. Sin esto, copiar cerraba la pelea.
+  //  2. El aviso de «copiado» cambia el texto del propio botón y no añade
+  //     ningún nodo. La lista se repinta cuatro veces por segundo y cualquier
+  //     elemento nuevo desaparecería antes de que te diera tiempo a leerlo; el
+  //     botón, en cambio, sobrevive porque la firma del bloque no ha cambiado.
+  host.querySelectorAll('.ovf-copy').forEach((el) => el.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const f = buscarPelea(el.dataset.copy);
+    if (!f) return;
+    // Se relee al pulsar en vez de quedarse con el del arranque: cambiarlo en
+    // Ajustes tenía que verse aquí sin reiniciar, y una llamada por clic no le
+    // cuesta nada a una ventana que sólo se toca al terminar una pelea.
+    try {
+      const c = await window.eql.getConfig();
+      sharePrefix = c?.sharePrefix ?? sharePrefix;
+      sharePct = c?.sharePct ?? sharePct;
+      sharePets = c?.sharePets ?? sharePets;
+    } catch { /* valen los de antes */ }
+    // Los jefes: lo que la wiki ya haya contestado y lo que hayas marcado tú.
+    // El overlay no espera a la red — si no hay respuesta, `jefesDe` deduce.
+    let flags = {};
+    try { flags = (await window.eql.raidFlags?.((f.rows ?? []).filter((r) => r.side === 'enemy').map((r) => r.name))) ?? {}; } catch { /* se deduce */ }
+    const wiki = new Map(); const manual = new Map();
+    for (const [n, v] of Object.entries(flags)) {
+      if (v?.wiki) wiki.set(n, { found: true, ...v.wiki });
+      if (v?.manual !== null && v?.manual !== undefined) manual.set(n, v.manual);
+    }
+    const { texto } = fightToChat(f, {
+      prefijo: sharePrefix, pct: sharePct, self: yo, pets: sharePets,
+      named: jefesDe(f.rows ?? [], { wiki, manual }),
+    });
+    const bien = await copiarAlPortapapeles(texto);
+    el.textContent = t(bien ? 'share.done' : 'share.fail');
+    el.classList.add(bien ? 'ok' : 'bad');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => {
+      el.textContent = t('share.copy');
+      el.classList.remove('ok', 'bad');
+    }, 1600);
+  }));
   host.querySelectorAll('.ov-row').forEach((el) => el.addEventListener('click', (e) => {
     e.stopPropagation();
     const k = rowKey(el.closest('.ovf').dataset.key, el.dataset.name);
@@ -185,6 +242,9 @@ function wire(host, repintar, cabeza = false) {
     repintar();
   }));
 }
+
+/** La pelea de una clave, esté arriba o en la pila. */
+const buscarPelea = (key) => (arriba?.key === key ? arriba : closed.find((f) => f.key === key) ?? null);
 
 /** El bloque de arriba: la pelea viva, o la última cerrada si no hay ninguna. */
 function renderHead(f, self, live) {
@@ -296,6 +356,8 @@ window.eql.onSnapshot((snap) => {
   // quita de la pila de abajo: durante medio segundo el motor puede tener la
   // pelea ya cerrada y el snapshot todavía con la viva, y saldría dos veces.
   const head = live ?? closed[0] ?? null;
+  arriba = head;
+  yo = snap.self ?? yo;
   renderHead(head, snap.self, !!live);
   renderClosed(head?.key ?? null, snap.self);
 
@@ -388,6 +450,9 @@ window.eql.onLang((c) => { setLang(c); repintarTodo(); });
 window.eql.getConfig().then((c) => {
   document.documentElement.dataset.theme = c.theme ?? 'dark';
   setLang(c.lang ?? 'es');
+  sharePrefix = c.sharePrefix ?? '';
+  sharePct = c.sharePct ?? undefined;
+  sharePets = c.sharePets ?? undefined;
   repintarTodo();
 });
 window.eql.onOverlayState(({ clickThrough }) => {

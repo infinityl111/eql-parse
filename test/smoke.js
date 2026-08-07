@@ -49,3 +49,45 @@ for (const r of rows) {
 }
 console.log('kills:', enc.kills.map(k=>k.victim).join(','));
 console.log('desconocidas:', parser.unrecognized);
+
+// ── Ninguna clave de traducción sin traducir ──────────────────────────────
+//
+// `t()` devuelve la propia clave cuando falta, y eso se ve en pantalla tal
+// cual: el pie de la Enciclopedia llevaba tiempo enseñando «enc.rebuild» y
+// «enc.stateLine» a quien lo mirase, porque las cinco claves de ese bloque no
+// existían en ningún idioma. Se descubrió porque un usuario preguntó qué
+// significaba lo que ponía ahí.
+//
+// Un hueco así no rompe nada y por eso no se cae solo: hay que buscarlo.
+{
+  const fs = await import('node:fs');
+  const { t } = await import('../src/i18n.js');
+  const usadas = new Set();
+  for (const f of ['ui/app.js', 'ui/overlay.js', 'ui/plates.js', 'ui/alerts.js', 'ui/triggers.js']) {
+    const s = fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+    for (const m of s.matchAll(/\bt\(\s*'([^']+)'/g)) usadas.add(m[1]);
+  }
+  const vars = { n: 1, foes: 1, fights: 1, k: 1, d: '', who: '', levels: '', total: 1, inv: '' };
+  const rotas = [...usadas].filter((k) => t(k, vars) === k).sort();
+  console.log(`\ntraducciones: ${usadas.size} claves usadas por la interfaz`);
+  if (rotas.length) {
+    console.log(`  MAL  ${rotas.length} sin traducir, se verían en crudo: ${rotas.join(', ')}`);
+    process.exit(1);
+  }
+  console.log('  ok   todas existen');
+
+  // Y en los CINCO idiomas, no sólo en uno.
+  //
+  // Mirar sólo `t()` no basta: cae a inglés y luego a español, así que una
+  // clave que falte en francés devuelve el texto inglés y la comprobación de
+  // arriba la da por buena. El usuario francés vería inglés suelto en medio de
+  // su interfaz, que es un fallo más discreto y por eso dura más.
+  const src = fs.readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
+  const veces = (clave) => (src.match(new RegExp(`'${clave.replace(/\./g, '\\.')}':`, 'g')) ?? []).length;
+  const cojas = [...usadas].filter((k) => veces(k) < 5).sort();
+  if (cojas.length) {
+    console.log(`  MAL  ${cojas.length} no están en los cinco idiomas: ${cojas.join(', ')}`);
+    process.exit(1);
+  }
+  console.log('  ok   y en los cinco idiomas');
+}
