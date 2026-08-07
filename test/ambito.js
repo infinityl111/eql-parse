@@ -127,5 +127,48 @@ for (const rel of FICHEROS) {
     rotos.length ? `\n      ${rotos.join('\n      ')}` : undefined);
 }
 
+// ── Y nada local que tape un nombre importado ──────────────────────────────
+//
+// LA COMPROBACIÓN DE ARRIBA NO CAZA ESTO, y se supo con un fallo de verdad:
+// `updateTip` hacía `const t = ensureTip()`, tapando la `t` de traducir que
+// entra por el import. Las siete llamadas siguientes intentaban traducir
+// contra un <div>, y el rótulo emergente reventaba con «t is not a function»
+// cada vez que pasabas el ratón por una fila.
+//
+// La de arriba lo saltaba a propósito: excluye los nombres que existen en la
+// columna cero o entran por import, justamente para no ahogarse en ruido. Así
+// que el caso peor —tapar uno de ésos— caía en su punto ciego.
+//
+// Es el mismo patrón que el `.serie` con dos dueños del CSS, pero en
+// JavaScript: un nombre, dos significados, y gana el de dentro.
+//
+// SÓLO LAS DECLARACIONES, no los parámetros. `TYPES.map((t) => …)` también
+// tapa, pero ahí el nombre se lee de un vistazo y no hay llamadas de por
+// medio; medido sobre este código, tres parámetros así y ninguno rompe,
+// contra cuatro declaraciones de las que una rompía.
+console.log('\nnada local que tape un nombre importado');
+
+for (const rel of FICHEROS) {
+  const url = new URL(`../${rel}`, import.meta.url);
+  if (!fs.existsSync(url)) continue;
+  const bruto = fs.readFileSync(url, 'utf8');
+
+  const importados = new Set();
+  for (const m of bruto.matchAll(/import\s+([^;]+?)\s+from\s+/g)) {
+    for (const n of m[1].matchAll(/([\w$]+)/g)) importados.add(n[1]);
+  }
+  importados.delete('from');
+
+  const tapan = [];
+  bruto.split(/\r?\n/).forEach((l, i) => {
+    if (/^\s*(?:\/\/|\*)/.test(l)) return;
+    const d = /^\s+(?:const|let|var)\s+([\w$]+)\s*=/.exec(l);
+    if (d && importados.has(d[1])) tapan.push(`${rel}:${i + 1}  const ${d[1]} = … tapa el import`);
+  });
+
+  ok(tapan.length === 0, `${rel}: ${importados.size} importados, ninguno tapado por un local`,
+    tapan.length ? `\n      ${tapan.join('\n      ')}` : undefined);
+}
+
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');
 process.exit(failed ? 1 : 0);

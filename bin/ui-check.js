@@ -35,6 +35,16 @@ fs.mkdirSync(SALIDA, { recursive: true });
 
 const espera = (ms) => new Promise((r) => { setTimeout(r, ms); });
 
+// Si el puerto ya está cogido, esto se engancharía a la ventana ANTERIOR y
+// mediría el código viejo dando un verde que no vale nada. Pasó: una prueba
+// de revertir salió limpia porque estaba mirando la instancia de antes.
+try {
+  await fetch(`http://127.0.0.1:${PUERTO}/json/version`, { signal: AbortSignal.timeout(1500) });
+  console.error(`\nEl puerto ${PUERTO} ya está ocupado: hay otra ventana abierta con`);
+  console.error('depuración. Ciérrala antes, o esto mediría esa y no la de ahora.\n');
+  process.exit(2);
+} catch { /* libre, que es lo que hace falta */ }
+
 async function conecta() {
   for (let i = 0; i < 40; i++) {
     try {
@@ -69,8 +79,36 @@ function cdp(url) {
   return { ws, manda, listo };
 }
 
-// Cada vista: cómo llegar, y qué cajas no deben pisarse.
+// Cada vista: cómo llegar, qué cajas no deben pisarse y por dónde pasar el
+// ratón. `raton` es un selector: se le lanzan los eventos a cada elemento que
+// case, uno a uno, y después se mira si saltó la caja de fallo.
 const VISTAS = [
+  {
+    nombre: 'combate',
+    // Hay que cargar una pelea del histórico: recién abierta, la lista de
+    // combatientes está vacía y no hay nada por donde pasar el ratón.
+    llega: [
+      "[...document.querySelectorAll('.tab')].find((x) => /COMBATE/i.test(x.textContent))?.click()",
+      "document.querySelector('.fight[data-live=\"0\"]')?.click()",
+    ],
+    cajas: '.row',
+    raton: '.row',
+  },
+  {
+    // La LISTA, que es donde viven las filas pulsables. La vista de abajo se
+    // mete en la ficha y allí ya no hay ninguna: sin este paso, la
+    // comprobación del cursor no encontraba nada que mirar y daba verde.
+    nombre: 'hechizos',
+    // Se entra por la PESTAÑA, no por el migajero: viniendo de Combate no hay
+    // migajero que pulsar, y la vista se quedaba en cero filas dando un rojo
+    // por el motivo equivocado.
+    llega: [
+      "[...document.querySelectorAll('.tab')].find((x) => /ENCICLOPEDIA/i.test(x.textContent))?.click()",
+      "[...document.querySelectorAll('.enccard')].find((x) => /hechizos/i.test(x.textContent))?.click()",
+    ],
+    cajas: '.cat-row',
+    raton: '.cat-row.abre',
+  },
   {
     nombre: 'hechizo',
     llega: [
@@ -114,6 +152,20 @@ const bin = createRequire(import.meta.url)('electron');
 const app = spawn(bin, ['.', `--remote-debugging-port=${PUERTO}`],
   { stdio: 'ignore', detached: false });
 
+// Lo pulsable enseña la mano. No es adorno: el cursor es lo único que dice
+// si algo se puede pulsar ANTES de pulsarlo. Se descubrió que la fila de la
+// tabla de hechizos se quedaba con la flecha, y encima con el cursor de
+// texto, que promete justo lo contrario de lo que hace.
+//
+// Estos selectores salen de los `addEventListener('click')` del propio
+// `ui/app.js`: si mañana se ata otro, se añade aquí.
+const PULSABLES = ['.cat-row.abre', '.enccard', '.enccell[data-base]', '.encrow.fight',
+  '.periodo[data-uid]', '.encrow[data-foe]', '.fcell[data-foe]', '.fight', '.lang-item',
+  '.loot-item', '.lootTab', '.lootfrom', '[data-crumb]'];
+// Y lo que NO se puede pulsar no la enseña: las filas de marca sin pelea van
+// deshabilitadas a propósito.
+const NO_PULSABLES = ['.encrow.static'];
+
 let mal = 0;
 try {
   const pagina = await conecta();
@@ -137,6 +189,29 @@ try {
 
   for (const v of VISTAS) {
     for (const paso of v.llega) { await evalua(paso); await espera(1600); }
+    let raton = 0;
+
+    // EL RATÓN, que es lo que un recorrido de vistas no toca. El fallo de
+    // «t is not a function» sólo saltaba al pasar por encima de una fila:
+    // ninguna vista se ve mal, ninguna cifra sale torcida, y hasta que no
+    // pasas el ratón no existe. Se lanzan los eventos de verdad —`mouseover`
+    // y `mousemove` con coordenadas— porque los manejadores los leen.
+    if (v.raton) {
+      const n = await evalua(`(() => {
+        const els = [...document.querySelectorAll(${JSON.stringify(v.raton)})].slice(0, 12);
+        for (const el of els) {
+          const r = el.getBoundingClientRect();
+          const o = { bubbles: true, clientX: Math.round(r.left + r.width / 2), clientY: Math.round(r.top + r.height / 2) };
+          el.dispatchEvent(new MouseEvent('mouseover', o));
+          el.dispatchEvent(new MouseEvent('mousemove', o));
+          el.dispatchEvent(new MouseEvent('mouseenter', o));
+          el.dispatchEvent(new MouseEvent('mouseleave', o));
+        }
+        return els.length;
+      })()`);
+      await espera(500);
+      raton = n;
+    }
 
     const m = await evalua(`(() => {
       const n = [...document.querySelectorAll(${JSON.stringify(v.cajas)})];
@@ -173,8 +248,28 @@ try {
     if (!bien) mal++;
     console.log(`  ${bien ? 'ok ' : 'MAL'}  ${v.nombre.padEnd(10)} ${
       m.n} cajas «${v.cajas}» · ${m.solapes} solapes · ${m.sinAlto} sin alto · ${
-      m.desbordan} desbordan${
+      m.desbordan} desbordan${raton ? ` · ratón por ${raton}` : ''}${
       m.crash ? `\n         REVENTÓ: ${m.crash}` : ''}${m.vacia ? '\n         la vista salió vacía' : ''}`);
+
+    // El cursor de lo que haya en esta vista.
+    const cursores = await evalua(`(() => {
+      const malos = [];
+      for (const s of ${JSON.stringify(PULSABLES)}) {
+        for (const el of [...document.querySelectorAll(s)].slice(0, 3)) {
+          if (getComputedStyle(el).cursor !== 'pointer') { malos.push(s + ' → flecha'); break; }
+        }
+      }
+      for (const s of ${JSON.stringify(NO_PULSABLES)}) {
+        for (const el of [...document.querySelectorAll(s)].slice(0, 3)) {
+          if (getComputedStyle(el).cursor === 'pointer') { malos.push(s + ' → mano sin serlo'); break; }
+        }
+      }
+      return malos;
+    })()`);
+    if (cursores.length) {
+      mal++;
+      console.log(`         CURSOR: ${cursores.join(' · ')}`);
+    }
 
     const alto = await evalua('document.body.scrollHeight');
     await manda('Emulation.setDeviceMetricsOverride', {

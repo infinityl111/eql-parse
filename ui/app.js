@@ -1099,13 +1099,13 @@ function ensureTip() {
   return tipEl;
 }
 function placeTip() {
-  const t = ensureTip();
-  const r = t.getBoundingClientRect();
+  const caja = ensureTip();
+  const r = caja.getBoundingClientRect();
   let x = mouse.x + 16, y = mouse.y + 14;
   if (x + r.width > window.innerWidth - 8) x = mouse.x - r.width - 14;
   if (y + r.height > window.innerHeight - 8) y = window.innerHeight - r.height - 8;
-  t.style.left = `${Math.max(8, x)}px`;
-  t.style.top = `${Math.max(8, y)}px`;
+  caja.style.left = `${Math.max(8, x)}px`;
+  caja.style.top = `${Math.max(8, y)}px`;
 }
 function hideTip() { if (tipEl) tipEl.style.display = 'none'; }
 function showTip() { updateTip(); if (tipEl) { tipEl.style.display = 'block'; placeTip(); } }
@@ -1167,9 +1167,14 @@ function updateTip() {
   const r = f?.rows.find((x) => x.name === state.hover);
   if (!r) { hideTip(); return; }
   if (state.expanded.has(r.name)) { hideTip(); return; }
-  const t = ensureTip();
+  // `caja`, no `t`. `t` es la función de traducir, importada arriba, y aquí
+  // la tapaba una variable local: las siete llamadas de abajo intentaban
+  // traducir contra un <div> y el rótulo emergente reventaba con «t is not a
+  // function» cada vez que pasabas el ratón por una fila. Los datos no tenían
+  // nada que ver, y no lo veía ninguna prueba: sólo salta al pasar el ratón.
+  const caja = ensureTip();
   const dmgTotal = r.damage || 1;
-  t.innerHTML = `<div class="tip-head">${esc(r.name)}</div>
+  caja.innerHTML = `<div class="tip-head">${esc(r.name)}</div>
     <div class="tip-grid">
       <span class="eyebrow">DPS</span><b class="num">${n1(r.dps)}</b>
       <span class="eyebrow">${esc(t('det.dmg'))}</span><b class="num">${n0(r.damage)} · ${pct(r.share)}</b>
@@ -1990,11 +1995,11 @@ function renderAnalysis(snap) {
 function renderTimers(snap) {
   const host = $('timers');
   if (!host) return;
-  const t = snap.timers ?? [];
-  const sig = t.map((x) => `${x.id}:${x.left.toFixed(1)}`).join('|');
+  const ts = snap.timers ?? [];
+  const sig = ts.map((x) => `${x.id}:${x.left.toFixed(1)}`).join('|');
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
-  host.innerHTML = t.map((x) => `<div class="timer">
+  host.innerHTML = ts.map((x) => `<div class="timer">
       <div class="timer-fill" style="width:${(x.left / x.total * 100).toFixed(1)}%;background:${x.color ?? 'var(--t-cold)'}"></div>
       <span class="timer-label">${esc(x.label)}</span>
       <span class="timer-left num">${x.left < 10 ? x.left.toFixed(1) : Math.ceil(x.left)}s</span>
@@ -3952,9 +3957,9 @@ function applyTheme(t2) {
 }
 
 $('btnTheme')?.addEventListener('click', async () => {
-  const t = state.theme === 'light' ? 'dark' : 'light';
-  applyTheme(t);
-  await window.eql.setTheme(t);
+  const otro = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme(otro);
+  await window.eql.setTheme(otro);
 });
 
 $('btnOverlay').addEventListener('click', async () => {

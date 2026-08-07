@@ -961,6 +961,18 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .cat-head .r, .cat-row .num { text-align: right; }
 .cat-row { border-bottom: 1px solid rgba(36,44,58,.45); font-size: 12px; }
 .cat-row:hover { background: rgba(255,255,255,.03); }
+/* La fila que abre la ficha del hechizo: mano, y sin arrastrar la selección.
+ *
+ * Era la única pulsable de la enciclopedia que se quedaba con la flecha —
+ * medido con la aplicación abierta, `getComputedStyle` sobre las veintinueve
+ * cosas que tienen click atado: veintiocho en `pointer` y ésta en `auto`—. Y
+ * el cursor de texto encima de algo que se pulsa promete lo contrario de lo
+ * que hace. Las celdas «—» de la rejilla de enemigos salen mano y está bien:
+ * lo pulsable ahí es la fila entera. */
+
+.cat-row.abre { cursor: pointer; }
+.cat-row.abre, .encrow, .enccard, .enccell, .fight, .fcell.has, .loot-item,
+.lootfrom, .lootTab, [data-crumb] { user-select: none; }
 .cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Marca de que algo se ha usado poco: no es un dato firme, y se ve que no lo es. */
 .est { font-style: italic; color: var(--bone-faint); cursor: help; }
