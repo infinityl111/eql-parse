@@ -590,7 +590,15 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
  * ancho que hace que el índice no se estire y que el resto de las vistas no se
  * queden con líneas de texto de punta a punta de la pantalla.
  */
-.enc { max-width: 1200px; margin-inline: auto; }
+/* La enciclopedia usa el ancho que hay.
+ *
+ * Estaba clavada en 1200px, y en una pantalla ancha eso deja cuatrocientos
+ * píxeles muertos a cada lado mientras las cinco columnas de dificultad de un
+ * enemigo se aprietan unas contra otras. El texto corrido NO se estira con
+ * ella: una línea de noventa caracteres deja de leerse, así que las notas
+ * siguen con su tope propio. */
+.enc { max-width: min(1720px, 100%); margin-inline: auto; }
+.enc > .hint, .enc > .dos-block > .hint { max-width: 100ch; }
 .enc-note { margin: 0 0 16px; max-width: 62ch; }
 /**
  * Cuatro columnas, fijas, y la cuenta es a propósito.
@@ -771,7 +779,7 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .migbar button[disabled] { opacity: .55; cursor: default; }
 
 /* ── Fichas por dificultad del expediente ────────────── */
-.difgrid { display: grid; gap: 10px; margin-top: 8px;
+.difgrid { display: grid; gap: 18px; margin-top: 8px;
            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
 .difcard { background: var(--slate-850); border-left: 2px solid var(--t-fire); padding: 8px 11px; }
 .difcard-h { font-family: var(--display); font-size: 11px; letter-spacing: .08em;
@@ -787,7 +795,7 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 
 /* Las cinco columnas, siempre las cinco. Una tarjeta apagada dice «ahí no has
    peleado», que es un dato: sin el hueco, faltar y valer cero se ven igual. */
-.difgrid.five { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.difgrid.five { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
 .difcard.has { display: block; width: 100%; text-align: left; cursor: pointer;
                border: 0; border-left: 2px solid var(--t-fire); font: inherit; }
 .difcard.has:hover { background: var(--slate-800); border-left-color: var(--t-cold); }
@@ -821,11 +829,25 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 .dtab.on { border-color: var(--t-fire); color: var(--t-fire); }
 .dtab .dim { font-family: var(--mono); }
 
-/* Rejilla de enemigos: una columna por dificultad, como en Zonas. */
+/* Rejilla de enemigos: una columna por dificultad, como en Zonas.
+ *
+ * TODAS LAS PISTAS FIJAS MENOS EL NOMBRE. Cada fila es su propia rejilla, así
+ * que una pista en `auto` la mide cada fila por su cuenta: la última columna
+ * lleva «Vida estimada 13.069 D3 Fused» en una y «Vida estimada 7218 D0» en la
+ * siguiente, y con eso las cinco dificultades caían en un sitio distinto en
+ * cada fila y en otro más en la cabecera. Con una sola pista elástica —el
+ * nombre— y el resto fijas, todas las rejillas del bloque coinciden.
+ *
+ * Y la cabecera lleva el sangrado de la fila —11px de relleno más los 2 del
+ * filete de la izquierda—, que si no va tres píxeles corrida. */
 .fgrid-head, .encrow.fgrid { display: grid; align-items: center; gap: 0 6px;
-  grid-template-columns: minmax(150px, 1fr) repeat(5, 38px) 10px 60px minmax(90px, auto); }
-.fgrid-head { padding: 0 10px 4px; font-family: var(--display); font-size: 9.5px;
+  grid-template-columns: minmax(150px, 1fr) repeat(5, 40px) 12px 68px 216px; }
+.fgrid-head { padding: 0 11px 4px 13px; font-family: var(--display); font-size: 9.5px;
   letter-spacing: .1em; color: var(--bone-faint); text-transform: uppercase; }
+/* La vida estimada es la última pista y ya no puede estirarse: si el texto no
+   cabe, se recorta por el final, que es donde está lo reconstruible. */
+.encrow.fgrid > :last-child { overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; text-align: right; }
 .fgrid-head .num, .fgrid-head .zunknown { text-align: center; }
 .fcell { text-align: center; font-family: var(--mono); font-size: 12px;
          color: var(--bone-faint); padding: 3px 0; border: 1px solid transparent; }

@@ -2505,6 +2505,22 @@ const hueco = (need, have) =>
  * abre con un resumen.
  */
 /**
+ * La fecha y la hora de un instante, en el idioma elegido.
+ *
+ * VIVE AQUÍ Y NO DENTRO DE CADA PÁGINA. Estaba declarada como `const` local en
+ * tres funciones y usada en SEIS, así que la ficha de un hechizo, el bloque de
+ * periodos y la página de progreso lanzaban ReferenceError al pintarse. Y un
+ * fallo al construir la cadena revienta antes de asignar el `innerHTML`: la
+ * página no se queda a medias, es que no cambia — pulsas y no pasa nada, que
+ * es lo más difícil de reconocer como avería.
+ *
+ * Las dos que había además fijaban 'es-ES' a mano, en una aplicación con cinco
+ * idiomas.
+ */
+const cuando = (at) => new Date(at).toLocaleString(langInfo().code,
+  { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/**
  * La ficha de un hechizo: las dos mitades de lo que hace, y su historia.
  *
  * La sección leía sólo el daño. Un drenaje que hace 1.093.644 de daño y 796.751
@@ -2718,9 +2734,9 @@ function libroHTML(b) {
   if (!b || !b.known) return '';
   const sinUsar = b.spells.filter((x) => !x.used);
   const via = (v) => `<span class="tagx" title="${esc(t(`book.via.${v}.note`))}">${esc(t(`book.via.${v}`))}</span>`;
-  // La fecha en el idioma elegido, no en el mío: aquí la constancia es del
-  // usuario y la lee él.
-  const cuando = (at) => new Date(at).toLocaleDateString(langInfo().code,
+  // El libro enseña el día, sin la hora: aquí la constancia es de una fecha,
+  // no de un instante.
+  const soloFecha = (at) => new Date(at).toLocaleDateString(langInfo().code,
     { day: 'numeric', month: 'short', year: 'numeric' });
   return `
     <div class="sec-title eyebrow" style="margin-top:22px">${esc(t('book.title'))}</div>
@@ -2732,7 +2748,7 @@ function libroHTML(b) {
     ${sinUsar.length ? sinUsar.map((x) => `<div class="foe-det-l">
       <span>${spellIcon(x.name)}${esc(x.name)}</span>
       <span>${x.vias.map(via).join(' ')}</span>
-      <span class="dim">${x.at ? esc(cuando(x.at)) : ''}</span>
+      <span class="dim">${x.at ? esc(soloFecha(x.at)) : ''}</span>
     </div>`).join('') : `<div class="hint">${esc(t('book.allUsed'))}</div>`}
     ${b.sinConstancia.length ? `<div class="hint" style="margin-top:12px">${
       esc(t('book.noRecord', { n: b.sinConstancia.length }))}<br>${
@@ -3330,8 +3346,6 @@ function encMuertes() {
       <p class="hint">${esc(t('enc.noDeathsNote'))}</p></div>`;
   }
   const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
-  const cuando = (at) => new Date(at).toLocaleString('es-ES',
-    { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const lista = (titulo, filas) => (filas.length ? `<div class="dos-block">
       <div class="eyebrow">${esc(titulo)}</div>
       ${filas.slice(0, 10).map((x) => `<div class="foe-det-l">
@@ -3508,8 +3522,6 @@ function encFoe() {
   const f = state.enc.foe;
   if (!f) return `${encCrumb()}<div class="hint">${esc(t('foe.noData'))}</div>`;
   const fs2 = state.enc.fights ?? [];
-  const cuando = (at) => new Date(at).toLocaleString('es-ES',
-    { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   return `${encCrumb()}
     ${foeDossier(f, encHabilidades(f))}
     <div class="sec-title eyebrow" style="margin-top:18px">${
