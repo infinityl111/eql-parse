@@ -1,6 +1,6 @@
 {
   "name": "eql-parse",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "type": "module",
   "description": "Parser DPS en tiempo real para EverQuest Legends",
   "main": "electron/main.cjs",
@@ -10,7 +10,7 @@
     "store:check": "node bin/store-check.js",
     "store:rebuild": "node bin/store-rebuild.js",
     "live": "node bin/live.js",
-    "test": "node test/smoke.js && node test/stances.js && node test/bridge.js && node test/store.js && node test/combat.js && node test/survival.js && node test/zones.js && node test/foes.js && node test/encyclopedia.js && node test/rebuild.js && node test/classes.js && node test/trios.js && node test/loot.js && node test/curacion.js && node test/dificultades.js && node test/mascotas.js && node test/share.js && node test/raid.js && node test/hechizos.js && node test/periodos.js && node test/libro.js && node test/ambito.js",
+    "test": "node test/smoke.js && node test/stances.js && node test/bridge.js && node test/store.js && node test/combat.js && node test/survival.js && node test/zones.js && node test/foes.js && node test/encyclopedia.js && node test/rebuild.js && node test/classes.js && node test/trios.js && node test/loot.js && node test/curacion.js && node test/dificultades.js && node test/mascotas.js && node test/share.js && node test/raid.js && node test/hechizos.js && node test/periodos.js && node test/libro.js && node test/ambito.js && node test/fallo.js",
     "dist": "electron-builder --win --x64",
     "enc:rebuild": "node bin/enc-rebuild.js"
   },

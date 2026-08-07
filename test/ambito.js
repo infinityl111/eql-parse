@@ -48,7 +48,7 @@ const ok = (cond, msg, extra) => {
 };
 
 const FICHEROS = ['ui/app.js', 'ui/overlay.js', 'ui/clip.js', 'ui/plates.js',
-  'ui/alerts.js', 'ui/triggers.js'];
+  'ui/alerts.js', 'ui/triggers.js', 'ui/fallo.js'];
 
 console.log('\námbito de los ayudantes de la interfaz');
 
@@ -79,6 +79,9 @@ for (const rel of FICHEROS) {
   lineas.forEach((l) => {
     const m = /^(?:export\s+)?(?:async\s+)?(?:function\s+([\w$]+)|(?:const|let|var)\s+([\w$]+))/.exec(l);
     if (m) global.add(m[1] ?? m[2]);
+    // `const { pintar, vigilar } = crearFallo(…)` también declara arriba.
+    const des = /^(?:export\s+)?(?:const|let|var)\s+\{([^}]*)\}\s*=/.exec(l);
+    if (des) for (const n of des[1].matchAll(/([\w$]+)/g)) global.add(n[1]);
   });
 
   // Los nombres que en algún sitio son parámetro quedan fuera de la

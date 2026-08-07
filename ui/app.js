@@ -9,6 +9,7 @@ import { copiarAlPortapapeles } from './clip.js';
 import { initTriggers, renderTriggers } from './triggers.js';
 import { plate, DIBUJADAS } from './plates.js';
 import { mountBanner, speak, playSound, listVoices } from './alerts.js';
+import { crearFallo } from './fallo.js';
 
 const TYPES = ['magic', 'cold', 'fire', 'poison', 'disease', 'melee', 'ds', 'dot', 'spell'];
 const typeClass = (t) => (TYPES.includes(t) ? t : 'other');
@@ -18,6 +19,14 @@ const n1 = (v) => (v || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 })
 const pct = (v) => `${((v || 0) * 100).toFixed(1)}%`;
 const secs = (s) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
 const $ = (id) => document.getElementById(id);
+
+// La red de seguridad, montada antes que nada: si algo revienta al arrancar,
+// tiene que verse igual que si revienta luego.
+let version = '';
+const { pintar: pintarSeguro, vigilar } = crearFallo({
+  doc: document, t, copiar: copiarAlPortapapeles, version: () => version,
+});
+vigilar(window);
 
 const state = {
   snap: null,
@@ -3517,32 +3526,13 @@ function encProgreso() {
     : `<div class="hint" style="margin-top:16px">${esc(t('enc.progressNoSeries', { n: p.minSerie }))}</div>`}`;
 }
 
-/** El expediente, con todos los combates que has tenido contra él debajo. */
-function encFoe() {
-  const f = state.enc.foe;
-  if (!f) return `${encCrumb()}<div class="hint">${esc(t('foe.noData'))}</div>`;
-  const fs2 = state.enc.fights ?? [];
-  return `${encCrumb()}
-    ${foeDossier(f, encHabilidades(f))}
-    <div class="sec-title eyebrow" style="margin-top:18px">${
-      esc(t('enc.fightsHere', { n: fs2.length }))}</div>
-    ${fs2.length ? `<div class="encrows">${fs2.map((s) => `
-      <button class="encrow fight" data-uid="${s.uid}">
-        <span class="nm">${esc(cuando(s.at))}</span>
-        <span class="num dim">${secs(s.duration)}</span>
-        <span class="num">${n0(s.raidDps)} dps</span>
-        <span class="num dim">${(s.kills ?? []).includes(f.name)
-          ? esc(t('enc.fell')) : esc(t('enc.survived'))}</span>
-      </button>`).join('')}</div>` : `<div class="hint">${esc(t('flt.none'))}</div>`}`;
-}
-
 function renderEncyclopedia() {
   const host = $('bodyGrid');
   const e = state.enc;
   // El título de la vista lo pone la pestaña, que está justo encima y marcada.
   // Repetirlo aquí costaba una línea de las que hacen falta para que las siete
   // secciones quepan de un vistazo, que es el trabajo de esa pantalla.
-  const cuerpo = e.page === 'zonas' ? encZonas()
+  const cuerpo = pintarSeguro(() => (e.page === 'zonas' ? encZonas()
     : e.page === 'zona' ? encZona()
       : e.page === 'enemigos' ? encEnemigos()
         : e.page === 'botin' ? encBotin()
@@ -3552,7 +3542,7 @@ function renderEncyclopedia() {
                 : e.page === 'foe' ? encFoe()
                   : e.page === 'foeDif' ? encFoeDif()
                     : e.page === 'hechizo' ? encHechizo()
-                      : encIndex();
+                      : encIndex()), `Enciclopedia · ${e.page}`);
   host.innerHTML = `<div class="tabpane"><div class="enc" id="encRoot">${cuerpo}</div></div>`;
 
   host.querySelectorAll('.enccard').forEach((el) => el.addEventListener('click', () => {
@@ -3988,6 +3978,8 @@ function openWizard() {
 window.eql.appVersion?.().then((v) => {
   const el = $('fVer');
   if (el && v) el.textContent = v;
+  // Y la lleva el informe de fallo: sin versión, un pantallazo no sirve.
+  version = v ?? '';
 }).catch(() => { /* si no la da, el pie se queda con el nombre y el crédito */ });
 
 $('btnHelp')?.addEventListener('click', openWizard);

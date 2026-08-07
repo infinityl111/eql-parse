@@ -1227,3 +1227,19 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
                        border-left-color: var(--t-ds); }
 .encrow.serie-row { grid-template-columns: 1fr 240px auto; align-items: center; }
 .serie { width: 240px; height: 34px; display: block; }
+
+/* Que reventar se note. Feo a propósito: no se camufla con el resto de la
+   interfaz porque no es parte de ella, es una avería. */
+.crash { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 9999;
+  display: none; max-height: 40vh; overflow: auto;
+  background: #2a0f10; border: 1px solid #a33; border-left: 4px solid #e55;
+  color: #ffd9d9; padding: 10px 12px; border-radius: 3px;
+  font-family: var(--mono); font-size: 12px; }
+.crash-h { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.crash-h b { color: #ff9c9c; letter-spacing: .04em; }
+.crash-h .dim { color: #d9a5a5; margin-right: auto; }
+.crash pre { margin: 0; white-space: pre-wrap; word-break: break-word; color: #ffe6e6; }
+.crash .hint { color: #d9a5a5; margin-top: 6px; }
+.crash-inline { background: #2a0f10; border-left: 4px solid #e55; color: #ffd9d9;
+  padding: 12px 14px; margin: 10px 0; font-family: var(--mono); font-size: 12px; }
+.crash-inline pre { margin: 6px 0 0; white-space: pre-wrap; color: #ffe6e6; }
