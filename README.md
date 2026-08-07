@@ -1,4 +1,6 @@
-# EQL Parse &lt;SPAIN&gt; Guild
+# EQL Parse
+
+Parser DPS para **EverQuest Legends**.
 
 **Español** · [English](README.en.md)
 
@@ -366,3 +368,9 @@ ahí salen los límites del programa, y ninguno se disimula:
 
 Proyecto personal y gratuito. Si te resulta útil y te apetece invitar a un café,
 [aquí está el enlace](https://paypal.me/eqcampeon). No hace falta.
+
+---
+
+Hecha por **Campeon Delmundo** de &lt;SPAIN&gt; Guild, jugando. Cada cosa que mide
+salió de una partida real, y casi todas las decisiones raras que verás en el
+código están ahí porque algo no cuadraba en el registro de esa partida.

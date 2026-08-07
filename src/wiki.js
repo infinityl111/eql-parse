@@ -208,7 +208,7 @@ export class WikiClient {
   async #loteIconos(nombres) {
     const u = `${API}?action=query&titles=${encodeURIComponent(nombres.join('|'))}`
       + '&prop=images&imlimit=max&redirects=1&format=json&formatversion=2';
-    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse' } });
     if (!r.ok) return;
     const j = await r.json();
 
@@ -244,14 +244,14 @@ export class WikiClient {
     const u = `${API}?action=query&titles=${
       encodeURIComponent(faltan.map((f) => `File:${f}`).join('|'))}`
       + '&prop=imageinfo&iiprop=url&format=json&formatversion=2';
-    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse' } });
     if (!r.ok) return;
     const j = await r.json();
     for (const p of j.query?.pages ?? []) {
       const url = p.imageinfo?.[0]?.url;
       if (!url) continue;
       try {
-        const img = await fetch(url, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+        const img = await fetch(url, { headers: { 'User-Agent': 'EQL-Parse' } });
         if (!img.ok) continue;
         const buf = Buffer.from(await img.arrayBuffer());
         // Un icono de 40×40 no llega a 6 KB. Algo mucho mayor no es un icono.
@@ -298,7 +298,7 @@ export class WikiClient {
     const job = (async () => {
       const u = `${API}?action=parse&page=${encodeURIComponent(limpio)}`
         + '&prop=categories&format=json&formatversion=2&redirects=1';
-      const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+      const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse' } });
       if (!r.ok) return null;
       const j = await r.json();
       // `missingtitle` no es un fallo: es la wiki diciendo que ese enemigo no
@@ -324,7 +324,7 @@ export class WikiClient {
   async #parsePage(title) {
     const u = `${API}?action=parse&page=${encodeURIComponent(title)}`
       + '&prop=text&format=json&formatversion=2&redirects=1';
-    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse' } });
     if (!r.ok) return null;
     const j = await r.json();
     if (j.error || !j.parse?.text) return null;
@@ -335,7 +335,7 @@ export class WikiClient {
   async #searchThenParse(title) {
     const u = `${API}?action=query&list=search&srsearch=${encodeURIComponent(title)}`
       + '&srlimit=1&format=json&formatversion=2';
-    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse-SPAIN' } });
+    const r = await fetch(u, { headers: { 'User-Agent': 'EQL-Parse' } });
     if (!r.ok) return null;
     const j = await r.json();
     const first = j.query?.search?.[0]?.title;

@@ -87,6 +87,24 @@ console.log('desconocidas:', parser.unrecognized);
   comprueba(pkg.build?.appId === 'dev.miguelangelfernandez.eqlparse',
     'y el appId no cambia: Windows lo usa para saber que es la misma aplicación',
     pkg.build?.appId);
+
+  // Y el crédito, que es lo único que el renombrado de la 1.7.0 SÍ tenía que
+  // añadir. Va aquí y no en la interfaz porque es metadato del instalador:
+  // es lo que Windows enseña como editor en «Aplicaciones instaladas», y si
+  // desaparece no se nota mirando la aplicación.
+  const CREDITO = 'Campeon Delmundo de <SPAIN> Guild';
+  comprueba(pkg.build?.win?.publisherName === CREDITO,
+    'el crédito viaja en los metadatos del instalador', pkg.build?.win?.publisherName);
+
+  // El nombre visible perdió el <SPAIN> en la 1.7.0; el crédito lo conserva.
+  // Son dos cosas distintas: cómo se llama la aplicación y quién la hizo.
+  comprueba(!/SPAIN/.test(pkg.build?.productName ?? ''),
+    'el nombre visible no lleva el <SPAIN>', pkg.build?.productName);
+  comprueba(!/SPAIN/.test(pkg.build?.nsis?.shortcutName ?? ''),
+    'ni el acceso directo', pkg.build?.nsis?.shortcutName);
+  comprueba(!/SPAIN/.test(pkg.build?.nsis?.artifactName ?? pkg.build?.artifactName ?? ''),
+    'ni el nombre del instalador', pkg.build?.nsis?.artifactName ?? pkg.build?.artifactName);
+
   if (mal) process.exit(1);
 }
 

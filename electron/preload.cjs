@@ -64,6 +64,7 @@ contextBridge.exposeInMainWorld('eql', {
   onUpdate: (fn) => ipcRenderer.on('update', (_e, u) => fn(u)),
   openUpdate: () => ipcRenderer.invoke('update:open'),
   skipUpdate: (v) => ipcRenderer.invoke('update:skip', v),
+  appVersion: () => ipcRenderer.invoke('app:version'),
 
   // Migración del almacén al formato de la 1.1.0.
   migration: () => ipcRenderer.invoke('store:migration'),

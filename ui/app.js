@@ -128,7 +128,8 @@ async function renderWizard() {
         <p>${esc(t('ov.fpsBody'))}</p>
       </div>
       <button id="wzOverlay">${esc(t('wz.6.open'))}</button>
-      <p class="hint" style="margin-top:14px">${esc(t('wz.6.ready'))}</p>`,
+      <p class="hint" style="margin-top:14px">${esc(t('wz.6.ready'))}</p>
+      <p class="hint" style="margin-top:18px;opacity:.6">${esc(t('app.credit'))}</p>`,
   }[w.step]();
 
   // Se mira el estado, no el DOM: al repintar, $('wzPath') aún es el anterior.
@@ -3969,6 +3970,13 @@ function openWizard() {
   $('bodyGrid').innerHTML = '';
   renderApp();
 }
+
+// La versión en el pie, al lado del crédito. No estaba en ninguna parte de la
+// interfaz: para saber qué versión tenías había que mirar el instalador.
+window.eql.appVersion?.().then((v) => {
+  const el = $('fVer');
+  if (el && v) el.textContent = v;
+}).catch(() => { /* si no la da, el pie se queda con el nombre y el crédito */ });
 
 $('btnHelp')?.addEventListener('click', openWizard);
 $('btnSetup').addEventListener('contextmenu', (e) => { e.preventDefault(); openWizard(); });

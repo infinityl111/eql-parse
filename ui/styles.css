@@ -399,8 +399,10 @@ button.ghost:hover { color: var(--bone); border-color: var(--slate-600); }
 .brand-main { font-family: var(--display); font-size: 15px; letter-spacing: .1em;
               text-transform: uppercase; font-weight: 700; }
 .brand-main .dot-sep { color: var(--t-cold); }
-.brand-guild { font-family: var(--display); font-size: 11px; letter-spacing: .14em;
-               text-transform: uppercase; color: var(--t-fire); }
+/* El crédito va al final del pie y cede el sitio antes que la ruta del log:
+   los datos son estructura, el rótulo es comprimible. */
+.credit { margin-left: auto; opacity: .55; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .brand-tag { font-family: var(--body); font-size: 10px; font-style: italic;
              color: var(--bone-faint); letter-spacing: .02em; }
 /* La cabecera no puede comerse sus propios botones.

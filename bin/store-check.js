@@ -16,12 +16,27 @@ import { aggregate, ensureSides } from '../src/aggregate.js';
 
 // En desarrollo Electron usa el `name` del package.json; empaquetado, el
 // productName. Se miran los dos antes de rendirse.
+// La carpeta del almacén se busca por lo que TIENE, no por cómo se llama.
+//
+// Antes bastaba con que existiera, y eso es una trampa: al probar el cambio de
+// nombre quedó en esta máquina un «Roaming/EQL Parse» con un único fichero de
+// Electron dentro, y una lista que sólo mira si la carpeta existe habría
+// elegido ese en cuanto el bueno faltara — y habría dicho «cero peleas» en vez
+// de «no la encuentro», que es mucho peor.
+//
+// El nombre visible cambió a «EQL Parse» en la 1.7.0 y la carpeta NO se movió:
+// Electron la decide con `app.getName()`, que lee el `productName` de la RAÍZ
+// del package.json y, si no lo hay, el `name`. El nombre visible vive en
+// `build.productName`, que sólo lee el instalador. Hay una guarda en las
+// pruebas para que nadie añada ese `productName` sin darse cuenta.
 const CANDIDATES = [
   path.join(os.homedir(), 'AppData', 'Roaming', 'eql-parse'),
   path.join(os.homedir(), 'AppData', 'Roaming', 'EQL Parse SPAIN Guild'),
+  path.join(os.homedir(), 'AppData', 'Roaming', 'EQL Parse'),
 ];
+const tieneAlmacen = (d) => fs.existsSync(path.join(d, 'fights.ndjson'));
 
-const dir = process.argv[2] ?? CANDIDATES.find((d) => fs.existsSync(path.join(d, 'fights.idx')));
+const dir = process.argv[2] ?? CANDIDATES.find(tieneAlmacen);
 if (!dir) {
   console.error('No encuentro el almacén. Pásame la carpeta:');
   for (const c of CANDIDATES) console.error(`  ${c}`);

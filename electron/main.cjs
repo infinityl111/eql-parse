@@ -74,7 +74,7 @@ function newerThan(a, b) {
 async function checkUpdate() {
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { 'User-Agent': 'EQL-Parse-SPAIN', Accept: 'application/vnd.github+json' },
+      headers: { 'User-Agent': 'EQL-Parse', Accept: 'application/vnd.github+json' },
     });
     if (!r.ok) return;
     const j = await r.json();
@@ -89,7 +89,7 @@ function createMain() {
   mainWin = new BrowserWindow({
     width: 1180, height: 760, minWidth: 900, minHeight: 560,
     backgroundColor: '#12161E',
-    title: 'EQL Parse <SPAIN> Guild (World Champion Again)',
+    title: 'EQL Parse',
     icon: ICON,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
   });
@@ -617,6 +617,7 @@ ipcMain.handle('store:rebuild', async () => {
 ipcMain.handle('update:get', () => (cfg.skipVersion === latest?.version ? null : latest));
 ipcMain.handle('update:open', () => { if (latest) shell.openExternal(latest.url); return true; });
 ipcMain.handle('update:skip', (_e, v) => { cfg.skipVersion = v; saveConfig(cfg); return true; });
+ipcMain.handle('app:version', () => app.getVersion());
 
 ipcMain.handle('wiki:spellIcons', async (_e, names) => {
   if (!wiki || !Array.isArray(names)) return [];
