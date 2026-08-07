@@ -37,6 +37,15 @@ const N = '(\\d+)';
 const A = '(.+?)';
 /** Sufijo opcional: (Critical) (Riposte) (Flurry) (Strikethrough)… */
 const SUF = '(?:\\s*\\(([A-Za-z][A-Za-z \'-]{1,28})\\))?';
+/**
+ * Lo que precede al nombre de un objeto recogido: un artículo o una cantidad.
+ * «a Rusty Dagger», «an Iron Ration», «2 Bone Chips». No hay una tercera forma:
+ * medido sobre 681 líneas de botín de un log real, los prefijos son exactamente
+ * `a ` (513), `an ` (85) y un número (83).
+ *
+ * El grupo captura SÓLO la cantidad, y queda indefinido cuando vino artículo.
+ */
+const QTY = '(?:an?|(\\d+))\\s+';
 
 const rules = [
   // ═══ DAÑO DE HECHIZO / HABILIDAD (atribuido y tipado) ═══
@@ -265,10 +274,41 @@ const rules = [
   { kind: 'zone', hint: 'have entered', re: /^You have entered (.+?)\.$/, map: (m) => ({ zone: m[1] }) },
   { kind: 'xp', hint: 'experience', re: /^You gain (?:party |raid )?experience/, map: () => ({}) },
   { kind: 'skillup', hint: 'become better at', re: /^You have become better at (.+?)! \((\d+)\)$/, map: (m) => ({ skill: m[1], value: +m[2] }) },
-  { kind: 'loot', hint: 'have looted', re: /^--You have looted an? (.+?) from (.+?)'s corpse\.--$/, map: (m) => ({ item: m[1], from: m[2] }) },
-  { kind: 'loot', hint: 'have looted', re: /^--You have looted an? (.+?)\.--$/, map: (m) => ({ item: m[1] }) },
-  { kind: 'loot', hint: 'You looted', re: /^You looted an? (.+?) from (.+?)'s corpse and sold it for (.+?)$/, map: (m) => ({ item: m[1], from: m[2], sold: m[3], autosold: true }) },
-  { kind: 'loot', hint: 'You looted', re: /^You looted an? (.+?) from (.+?)'s corpse to create an? (.+?)$/, map: (m) => ({ item: m[1], from: m[2], upgraded: m[3] }) },
+  // ═══ BOTÍN ═══
+  //
+  // Cuatro finales, y son todos los que hay: medido sobre las 681 líneas de
+  // botín de un log de 278.000, «and sold it for X» (381), «to create a X»
+  // (57), «and stored it in your currency» (15) y la forma entre guiones, que
+  // no lleva final (196).
+  //
+  // Dos cosas que faltaban y costaban 98 líneas, el 14% del botín:
+  //
+  //  1. La cantidad. Exigir artículo tiraba «You looted 2 Phosphorous Powder»
+  //     entera, 83 veces. Y capturarla importa tanto como casar la línea:
+  //     contar «2 Bone Chips» como uno sería peor que no parsearla, porque
+  //     entonces el fallo desaparece del contador de no reconocidas y ya no lo
+  //     ve nadie. Por eso `qty` viaja hasta el almacén y se suma allí.
+  //
+  //  2. «and stored it in your currency», que no existía como regla. Son los
+  //     Motes, que van al monedero en vez de a la bolsa: 15 líneas, 9 de ellas
+  //     `Mote of Major Potential`, ninguna en la sección de Botín. Ojo al
+  //     final, porque es el único que NO lleva punto: con `\.$` seguiría sin
+  //     casar.
+  { kind: 'loot', hint: 'have looted',
+    re: new RegExp(`^--You have looted ${QTY}(.+?) from (.+?)'s corpse\\.--$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3] }) },
+  { kind: 'loot', hint: 'have looted',
+    re: new RegExp(`^--You have looted ${QTY}(.+?)\\.--$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2] }) },
+  { kind: 'loot', hint: 'You looted',
+    re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse and sold it for (.+?)$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], sold: m[4], autosold: true }) },
+  { kind: 'loot', hint: 'You looted',
+    re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse to create an? (.+?)$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], upgraded: m[4] }) },
+  { kind: 'loot', hint: 'You looted',
+    re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse and stored it in your currency\\.?$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], stored: true }) },
   { kind: 'coin', hint: 'from the corpse', re: /^You receive (.+?) from the corpse\.$/, map: (m) => ({ coin: m[1] }) },
   { kind: 'con', hint: ' -- ', re: /^(.+?) (?:scowls at you|glares at you|glowers at you|regards you|looks at you|considers you|judges you|kindly considers you|ponders your|looks upon you)[^-]*-- (.+?)(?: \(Lvl: (\d+)\))?$/, map: (m) => ({ mob: m[1], con: m[2], level: m[3] ? +m[3] : null }) },
   { kind: 'logging', hint: 'Logging to', re: /^Logging to '(.+?)' is now \*(ON|OFF)\*\.$/, map: (m) => ({ file: m[1], on: m[2] === 'ON' }) },

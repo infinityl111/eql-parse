@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FoeLedger, vida } from './foes.js';
 import { STORE_VERSION } from './store.js';
-import { parseZone } from './zones.js';
+import { parseZone, diffKey, labelDiff, DIFFS, SIN_MARCA } from './zones.js';
 
 /**
  * La enciclopedia: lo que se aprende jugando.
@@ -138,8 +138,10 @@ export class Encyclopedia {
       const item = typeof l === 'string' ? l : l.item;
       if (!item) continue;
       const e = this.loot.get(item) ?? { n: 0, sinFuente: 0 };
-      e.n += 1;
-      if (!(typeof l === 'object' && l.from)) e.sinFuente += 1;
+      // Unidades, no recogidas: la misma cuenta que el resumen y la ficha.
+      const q = typeof l === 'object' ? (l.qty ?? 1) : 1;
+      e.n += q;
+      if (!(typeof l === 'object' && l.from)) e.sinFuente += q;
       this.loot.set(item, e);
     }
   }
@@ -206,11 +208,19 @@ export class Encyclopedia {
   // ── Consultas ──────────────────────────────────────────────────────────
 
   /**
-   * La rejilla de zonas: una fila por zona base, una celda por dificultad.
+   * La rejilla de zonas: una fila por zona base, cinco celdas de dificultad y
+   * una sexta, aparte, para lo que no la declara.
    *
    * Una celda vacía dice que ahí no has entrado, que no es lo mismo que decir
-   * que no hay nada. Las zonas sin dificultad —mundo abierto— van aparte y no
-   * en una quinta columna: inventarles una sería afirmar algo que no hay.
+   * que no hay nada.
+   *
+   * LO QUE CAMBIÓ Y POR QUÉ: la columna D0 contenía East Freeport. Había un
+   * `nivel = (d) => d ?? 0` que metía «no consta» en el cajón del cero, así que
+   * una columna rotulada como una dificultad medida contenía la ausencia de
+   * medida. Un dato ausente con aspecto de dato medido es peor que no tener la
+   * columna. Ahora D0 son sólo instancias con D0 de verdad —modo declarado sin
+   * número, medido un peldaño entero por debajo de D1— y el mundo abierto va en
+   * `sinMarca`, que la interfaz enseña rotulado como lo que es.
    */
   zones() {
     const porBase = new Map();
@@ -219,21 +229,25 @@ export class Encyclopedia {
         for (const base of d.zones) {
           let z = porBase.get(base);
           if (!z) { z = { base, porDif: new Map() }; porBase.set(base, z); }
-          const n = nivel(d.diff);
-          let c = z.porDif.get(n);
-          if (!c) { c = { diff: n, tag: d.tag, foes: 0, fights: 0, kills: 0, sinDeclarar: 0 }; z.porDif.set(n, c); }
+          const k = diffKey(d.diff);
+          let c = z.porDif.get(k);
+          if (!c) { c = { diff: d.diff, tag: d.tag, foes: 0, fights: 0, kills: 0, modes: new Map() }; z.porDif.set(k, c); }
           if (d.tag && !c.tag) c.tag = d.tag;
           c.foes += 1;
           c.fights += d.fights;
           c.kills += d.kills;
-          if (d.diff === null) c.sinDeclarar += d.fights;
+          for (const [m, n] of d.modes ?? []) c.modes.set(m, (c.modes.get(m) ?? 0) + n);
         }
       }
     }
+    const salida = (c) => (c ? { ...c, modes: [...c.modes].sort((a, b) => b[1] - a[1]).map(([mode, n]) => ({ mode, n })) } : null);
     return [...porBase.values()]
       .map((z) => ({
         base: z.base,
-        celdas: [0, 1, 2, 3, 4].map((n) => z.porDif.get(n) ?? null),
+        celdas: DIFFS.map((n) => salida(z.porDif.get(diffKey(n)))),
+        // Ni es una sexta dificultad ni se mezcla con la primera: va por su
+        // cuenta y se rotula como ausencia.
+        sinMarca: salida(z.porDif.get(SIN_MARCA)),
         // Para ordenar: la zona donde más has peleado, arriba.
         fights: [...z.porDif.values()].reduce((a, c) => a + c.fights, 0),
       }))
@@ -246,25 +260,28 @@ export class Encyclopedia {
    * @param {number|null} diff
    */
   zoneFoes(base, diff) {
-    // Por nombre y no por ficha de dificultad: en el nivel 0 caben dos fichas
-    // del mismo enemigo —la que el registro marcó como 0 y la que no marcó—, y
-    // son el mismo enemigo en la misma dificultad. Se juntan las muestras y la
-    // vida se calcula una vez, con la misma cuenta que en todas partes.
+    // Antes se agrupaba por nombre porque en la celda 0 caían dos fichas del
+    // mismo enemigo, la marcada como 0 y la que no marcaba nada, y había que
+    // juntarlas. Ya no: son cajones distintos y no se tocan. Se sigue
+    // agrupando por nombre porque un mismo enemigo puede tener varias fichas de
+    // la misma dificultad si aparece en más de una zona base.
+    const buscada = diffKey(diff);
     const porNombre = new Map();
     for (const e of this.ledger.porNombre.values()) {
       for (const d of e.porDif.values()) {
-        if (nivel(d.diff) !== nivel(diff) || !d.zones.has(base)) continue;
+        if (diffKey(d.diff) !== buscada || !d.zones.has(base)) continue;
         let r = porNombre.get(e.name);
         if (!r) {
-          r = { name: e.name, diff: nivel(diff), tag: d.tag, fights: 0, kills: 0,
-            maxHit: 0, taken: 0, damageTo: 0, muestras: [] };
+          r = { name: e.name, diff: d.diff, tag: d.tag, fights: 0, kills: 0, deaths: 0,
+            maxHit: 0, taken: 0, damageTo: 0, muestras: [], items: 0 };
           porNombre.set(e.name, r);
         }
         if (d.tag && !r.tag) r.tag = d.tag;
-        r.fights += d.fights; r.kills += d.kills;
+        r.fights += d.fights; r.kills += d.kills; r.deaths += d.deaths ?? 0;
         r.maxHit = Math.max(r.maxHit, d.maxHit);
         r.taken += d.taken; r.damageTo += d.damageTo;
         r.muestras.push(...d.hpSamples);
+        r.items += (d.loot?.size ?? 0);
       }
     }
     const out = [...porNombre.values()].map(({ muestras, ...r }) => ({ ...r, hp: vida(muestras) }));
@@ -278,6 +295,42 @@ export class Encyclopedia {
   foe(name) { return this.ledger.get(name); }
 
   /**
+   * Un enemigo EN UNA DIFICULTAD, y sólo esa.
+   *
+   * Cinco columnas no caben en una ficha cuando cada una trae resistencias,
+   * vida, golpe máximo, habilidades y botín propios. Así que desde el enemigo
+   * se entra a una dificultad y se ve entera, sin nada promediado con las
+   * demás: esto devuelve exactamente lo que se midió en ese cajón.
+   *
+   * `diff` puede ser `null`, que es «las peleas de las que no consta la
+   * dificultad». Es un cajón como los otros y se enseña rotulado como ausencia,
+   * no como una sexta dificultad.
+   */
+  foeAt(name, key) {
+    const e = this.ledger.porNombre.get(name);
+    if (!e) return null;
+    const ficha = this.ledger.get(name);
+    // Por clave de cajón y no por número: «mundo abierto» y «sin zona
+    // conocida» son los dos `diff: null` y con un número se confundirían.
+    const d = (ficha?.dificultades ?? []).find((x) => x.key === key);
+    if (!d) return null;
+    return {
+      name,
+      // El contexto de la ficha común que sigue valiendo aquí: con qué niveles
+      // peleaste y en qué zonas. No son cifras de combate, así que no mienten
+      // al no estar partidas — pero se dice que son de todas las dificultades.
+      levels: ficha.levels, someWithoutLevel: ficha.someWithoutLevel,
+      ...d,
+      label: labelDiff(d.diff, d.tag),
+      // Para poder saltar de una dificultad a otra sin volver atrás.
+      hermanas: (ficha.dificultades ?? []).map((x) => ({
+        diff: x.diff, tag: x.tag, key: x.key, fights: x.fights,
+        label: labelDiff(x.diff, x.tag),
+      })),
+    };
+  }
+
+  /**
    * Todos los enemigos con ficha, con lo justo para la lista.
    *
    * La vida NO se promedia entre dificultades: se manda una por dificultad y la
@@ -287,22 +340,30 @@ export class Encyclopedia {
    */
   foes() {
     const out = [];
+    const celda = (d) => (d ? {
+      diff: d.diff, tag: d.tag, fights: d.fights, kills: d.kills,
+      deaths: d.deaths ?? 0, maxHit: d.maxHit, items: d.loot?.size ?? 0,
+      hp: vida(d.hpSamples)?.avg ?? null,
+    } : null);
+
     for (const e of this.ledger.porNombre.values()) {
-      const difs = [...e.porDif.values()]
-        .map((d) => ({
-          diff: d.diff, tag: d.tag, fights: d.fights, kills: d.kills,
-          hp: vida(d.hpSamples)?.avg ?? null,
-        }))
-        .sort((a, b) => (a.diff ?? -1) - (b.diff ?? -1));
+      const difs = [...e.porDif.values()].map(celda)
+        .sort((a, b) => (a.diff ?? 99) - (b.diff ?? 99));
+      // Las cinco columnas, en su sitio y con hueco donde no has peleado. Es la
+      // misma rejilla que la de Zonas, y por lo mismo: «no lo he matado en D0»
+      // y «no he entrado en D0» son cosas distintas, y una celda vacía sólo
+      // puede decir la segunda.
+      const rejilla = DIFFS.map((n) => celda(e.porDif.get(diffKey(n))));
+      const sinMarca = celda(e.porDif.get(SIN_MARCA));
       const zonas = new Set();
       for (const d of e.porDif.values()) for (const z of d.zones) zonas.add(z);
       // La de arriba con vida conocida: si en la más alta nunca cayó, decir su
       // vida sería inventarla, y la de abajo sí se midió.
-      const conVida = [...difs].reverse().find((d) => d.hp !== null) ?? null;
+      const conVida = [...difs].reverse().find((d) => d && d.hp !== null) ?? null;
       out.push({
-        name: e.name, fights: e.fights, kills: e.kills,
+        name: e.name, fights: e.fights, kills: e.kills, deaths: e.deaths,
         damageTo: e.damageTo, taken: e.taken, maxHit: e.maxHit,
-        difs, zonas: [...zonas].sort(),
+        difs, rejilla, sinMarca, zonas: [...zonas].sort(),
         hp: conVida ? { avg: conVida.hp, diff: conVida.diff, tag: conVida.tag } : null,
         items: e.loot.size,
       });
@@ -311,12 +372,14 @@ export class Encyclopedia {
   }
 
   /**
-   * El botín: cada objeto y de quién ha caído.
+   * El botín: cada objeto, de quién ha caído y EN QUÉ DIFICULTAD.
    *
    * «3 de 11» sale de dos cifras medidas —las veces que lo has tumbado y las
-   * veces que soltó eso— y no es una probabilidad de caída: mezcla todas las
-   * dificultades, porque el log atribuye el objeto a un nombre y no a una
-   * instancia. Se enseña como lo que es y con esa salvedad escrita al lado.
+   * veces que soltó eso— y no es una probabilidad de caída. Antes, además,
+   * mezclaba las cinco dificultades, y eso es justo lo que no se puede hacer:
+   * lo que suelta un bicho en D0 no tiene por qué ser lo que suelta en D4.
+   * Ahora cada fuente trae su reparto por dificultad, con las veces que lo
+   * mataste EN ESA dificultad al lado, que es el único denominador honesto.
    *
    * Lo que el log no atribuye a nadie se cuenta igual y se dice: una lista de
    * botín a la que le faltan objetos sin avisar es peor que una con huecos.
@@ -324,19 +387,39 @@ export class Encyclopedia {
   lootList() {
     const porObjeto = new Map();
     for (const [item, g] of this.loot) {
-      porObjeto.set(item, { item, n: g.n, sinFuente: g.sinFuente, from: [] });
+      porObjeto.set(item, { item, n: g.n, sinFuente: g.sinFuente, from: [], porDif: new Map() });
     }
     for (const e of this.ledger.porNombre.values()) {
       for (const [item, n] of e.loot) {
         // Un objeto atribuido a un enemigo que no está en el recuento global no
         // debería existir, pero si pasara se enseña igual antes que perderlo.
         let o = porObjeto.get(item);
-        if (!o) { o = { item, n, sinFuente: 0, from: [] }; porObjeto.set(item, o); }
-        o.from.push({ name: e.name, n, kills: e.kills });
+        if (!o) { o = { item, n, sinFuente: 0, from: [], porDif: new Map() }; porObjeto.set(item, o); }
+        // El desglose del enemigo, dificultad a dificultad. `kills` es el de esa
+        // dificultad y no el total: decir «2 de 11» con los 11 de otra celda
+        // sería un porcentaje inventado.
+        const desglose = [];
+        for (const d of e.porDif.values()) {
+          const cuantos = d.loot?.get(item) ?? 0;
+          if (!cuantos) continue;
+          desglose.push({ diff: d.diff, tag: d.tag, n: cuantos, kills: d.kills });
+          const g = o.porDif.get(diffKey(d.diff))
+            ?? { diff: d.diff, tag: d.tag, n: 0, kills: 0 };
+          g.n += cuantos; g.kills += d.kills;
+          o.porDif.set(diffKey(d.diff), g);
+        }
+        o.from.push({
+          name: e.name, n, kills: e.kills,
+          porDif: desglose.sort((a, b) => (a.diff ?? 99) - (b.diff ?? 99)),
+        });
       }
     }
     return [...porObjeto.values()]
-      .map((o) => ({ ...o, from: o.from.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name)) }))
+      .map((o) => ({
+        ...o,
+        from: o.from.sort((a, b) => b.n - a.n || a.name.localeCompare(b.name)),
+        porDif: [...o.porDif.values()].sort((a, b) => (a.diff ?? 99) - (b.diff ?? 99)),
+      }))
       .sort((a, b) => b.n - a.n || a.item.localeCompare(b.item));
   }
 
@@ -409,7 +492,10 @@ export class Encyclopedia {
       total: muertes.reduce((a, d) => a + d.veces, 0),
       fights: this.store.index.length,
       muertes,
-      porZona: agrupar((d) => (d.zoneBase ? `${d.zoneBase} · D${nivel(d.diff)}` : null)),
+      // «Nagafen's Lair · D2» o «Nagafen's Lair · sin marca», nunca «· D0»
+      // cuando lo que pasa es que no consta.
+      porZona: agrupar((d) => (d.zoneBase
+        ? `${d.zoneBase} · ${labelDiff(d.diff, d.diffTag) ?? SIN_MARCA}` : null)),
       porEnemigo: agrupar((d) => d.masDaño?.name ?? null),
     };
   }
@@ -451,7 +537,7 @@ export class Encyclopedia {
     const porEnemigo = new Map();
     for (const s of utiles) {
       if ((s.foes ?? []).length !== 1) continue;     // ver el comentario de arriba
-      const k = `${s.foes[0]} ${nivel(s.diff)} ${s.level ?? ''}`;
+      const k = `${s.foes[0]} ${diffKey(s.diff)} ${s.level ?? ''}`;
       if (!porEnemigo.has(k)) porEnemigo.set(k, []);
       porEnemigo.get(k).push(s);
     }
@@ -459,7 +545,11 @@ export class Encyclopedia {
     const marcas = [...porEnemigo].map(([k, lista]) => {
       const [name, d, lvl] = k.split(' ');
       return {
-        name, diff: +d, level: lvl === '' ? null : +lvl,
+        // `d` viene como «D2» o como «sin marca». Lo segundo NO es cero: es una
+        // pelea de la que no consta la dificultad, y comparar tus marcas de una
+        // zona sin declarar con las de D0 sería juntar dos cosas distintas.
+        name, diff: d === SIN_MARCA ? null : +d.slice(1),
+        level: lvl === '' ? null : +lvl,
         ...resumir(lista),
         // La serie sólo se dibuja con muestra suficiente. Con tres puntos no hay
         // tendencia, hay tres puntos.
@@ -506,4 +596,7 @@ export const zoneBaseOf = (f) => f.zoneBase ?? (f.zone ? parseZone(f.zone).base 
  * al agrupar y al consultar, que es donde la pregunta es «¿en qué dificultad?»
  * y la respuesta correcta es cero y no «se desconoce».
  */
-const nivel = (d) => (d === null || d === undefined ? 0 : d);
+// Aquí vivía `const nivel = (d) => d ?? 0`, que convertía «no consta» en D0 y
+// era la razón de que East Freeport saliera en la columna de una dificultad.
+// No se sustituye por nada: `null` viaja como `null` y quien lo enseña lo
+// rotula como ausencia. Si vuelve a hacer falta una clave, es `diffKey`.

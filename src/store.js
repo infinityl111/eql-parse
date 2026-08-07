@@ -66,8 +66,18 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  *                   instancia. El 23% de las peleas de un log real tenía la
  *                   zona destruida. Además la dificultad pasa a ser un campo
  *                   propio, que es lo que permite separar el expediente.
+ *   4               Botín perdido y botín mal contado. De las 681 líneas de
+ *                   botín de un log real se descartaban 98 —el 14%—: 83 porque
+ *                   traían cantidad en vez de artículo («2 Phosphorous
+ *                   Powder») y 15 porque acababan en «and stored it in your
+ *                   currency», un final que no existía como regla; entre estas
+ *                   últimas, los 9 `Mote of Major Potential` recogidos, de los
+ *                   que no aparecía ninguno. Y la cantidad no se guardaba: lo
+ *                   recogido se contaba por veces y no por unidades, así que
+ *                   «2 Bone Chips» valía uno. Releyendo el log salen 764
+ *                   unidades donde antes se veían 583.
  */
-export const STORE_VERSION = 3;
+export const STORE_VERSION = 4;
 const META = 'store.json';
 
 /** Generación de un almacén ya marcado. Lo que no sea un número es anterior. */

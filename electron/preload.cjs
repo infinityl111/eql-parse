@@ -78,6 +78,7 @@ contextBridge.exposeInMainWorld('eql', {
   encZones: () => ipcRenderer.invoke('enc:zones'),
   encZoneFoes: (base, diff) => ipcRenderer.invoke('enc:zoneFoes', { base, diff }),
   encFoe: (name) => ipcRenderer.invoke('enc:foe', name),
+  encFoeAt: (name, diff) => ipcRenderer.invoke('enc:foeAt', { name, diff }),
   encFoes: () => ipcRenderer.invoke('enc:foes'),
   encLoot: () => ipcRenderer.invoke('enc:loot'),
   encDeaths: () => ipcRenderer.invoke('enc:deaths'),

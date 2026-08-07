@@ -906,6 +906,15 @@ export class Engine extends EventEmitter {
       // de las dos cosas antes que contarlo mal.
       losses: enc.kills.filter((k) => k.victim === me || petSet.has(k.victim)
         || (!foeSet.has(k.victim) && t.rows.some((r) => r.name === k.victim))).map((k) => k.victim),
+      // Y QUIÉN os mató, que es dato del log —«You have been slain by X!»— y se
+      // estaba tirando al quedarse sólo con el nombre de la víctima. Sin esto,
+      // «cuántas veces te mató este enemigo» habría que deducirlo de a quién
+      // apuntaba, que no es lo mismo: en una pelea con tres enemigos, apuntarte
+      // no es haberte rematado. Va en una lista aparte para no cambiarle la
+      // forma a `losses`, que ya la lee media aplicación.
+      lossesBy: enc.kills.filter((k) => k.victim === me || petSet.has(k.victim)
+        || (!foeSet.has(k.victim) && t.rows.some((r) => r.name === k.victim)))
+        .map((k) => ({ victim: k.victim, killer: k.killer ?? null })),
       series: [...(enc.series ?? new Map()).values()].sort((a, b) => a.s - b.s),
       stanceSpans: (enc.stanceSpans ?? []).map((x, i, arr) => ({
         ...x, to: i === arr.length - 1 ? Math.max(x.to, enc.end - enc.start) : x.to,
@@ -1230,6 +1239,7 @@ export class Engine extends EventEmitter {
   encZones() { return this.enc?.zones() ?? []; }
   encZoneFoes(base, diff) { return this.enc?.zoneFoes(base, diff ?? null) ?? []; }
   encFoe(name) { return this.enc?.foe(name) ?? null; }
+  encFoeAt(name, diff) { return this.enc?.foeAt(name, diff ?? null) ?? null; }
   encFoes() { return this.enc?.foes() ?? []; }
   encLoot() { return this.enc?.lootList() ?? []; }
   encDeaths() { return this.enc?.deaths(this.self) ?? null; }

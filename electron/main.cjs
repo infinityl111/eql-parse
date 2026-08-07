@@ -407,6 +407,7 @@ ipcMain.handle('catalog:spells', (_e, q) => engine.spellCatalog(q ?? {}));
 ipcMain.handle('enc:zones', () => engine.encZones());
 ipcMain.handle('enc:zoneFoes', (_e, { base, diff }) => engine.encZoneFoes(base, diff));
 ipcMain.handle('enc:foe', (_e, name) => engine.encFoe(name));
+ipcMain.handle('enc:foeAt', (_e, { name, diff }) => engine.encFoeAt(name, diff));
 ipcMain.handle('enc:foes', () => engine.encFoes());
 ipcMain.handle('enc:loot', () => engine.encLoot());
 ipcMain.handle('enc:deaths', () => engine.encDeaths());

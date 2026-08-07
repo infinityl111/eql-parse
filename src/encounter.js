@@ -162,14 +162,29 @@ export class Encounter {
     // Lo que costó tumbar a cada enemigo, una muestra por muerte. Se anota al
     // caer y no al acabar la pelea: si el mismo enemigo cae tres veces, sumar el
     // daño de las tres y llamarlo «su vida» la triplica.
-    this.hpSamples = new Map();    // nombre -> [daño hasta cada muerte]
+    // Y se le descuenta lo que le curaron: la muestra es daño MENOS curación,
+    // no daño a secas. Un enemigo al que sanan 5.000 por el camino no tiene
+    // 5.000 puntos de vida más, y contarlos así se los inventa. Medido sobre un
+    // log real, le cambia la cifra a 59 de 147 enemigos —un 3,9% menos en
+    // total— y a los que más, los que van con sanador: `the Spiroc Guardian`
+    // un 17% y `a scareling` un 17%.
+    this.hpSamples = new Map();    // nombre -> [(daño - curación) hasta cada muerte]
     this.deathBase = new Map();    // nombre -> daño acumulado en su muerte anterior
+    this.healTotals = new Map();   // nombre -> curación recibida en la pelea
+    this.healBase = new Map();     // nombre -> curación recibida en su muerte anterior
     // Daño real que no se puede atribuir a nadie: escudos sin posesivo
     // («shards of ice»). No entra en el total de nadie ni en el del grupo.
     this.unattributed = 0;
     this.loot = [];                // {item, from, sold, upgraded, t}
     this.spellVsFoe = new Map();   // 'enemigo|hechizo' -> {landed, resisted}
     this.foesSeen = new Set();     // a quién estáis pegando en esta pelea
+    // A quién habéis hecho daño, y sólo eso. `foesSeen` no sirve para esto:
+    // se llena también con los destinos de vuestras curaciones, así que curar
+    // a un compañero lo metería aquí y su curación de vuelta se confundiría
+    // con una sanguijuela. Separados a propósito.
+    this.golpeados = new Set();
+    /** Curaciones tuyas que el log atribuyó al enemigo que las provocó. */
+    this.lifetaps = 0;
     this.targetFirst = new Map();  // nombre -> primer segundo en que le pegaron
     this.resistsSuffered = 0;
     this.casts = [];           // {t, source, ability, cat} — el análisis filtra por bando
@@ -266,6 +281,8 @@ export class EncounterTracker extends EventEmitter {
     this.history = [];
     this.nextId = 1;
     this.zone = null;
+    // Objetos recogidos sin ninguna pelea abierta a la que atribuirlos.
+    this.lootSinPelea = 0;
     // Los pone el motor según van llegando los hitos: /who y subidas de nivel.
     // Cada pelea se queda con los que hubiera al abrirse.
     this.level = null;
@@ -302,12 +319,24 @@ export class EncounterTracker extends EventEmitter {
     }
 
     // El botín llega tras la muerte, dentro de la ventana de la pelea.
+    //
+    // `qty` viaja con el objeto en vez de expandirse en dos entradas iguales:
+    // «2 Bone Chips» es una recogida de dos unidades, no dos recogidas, y la
+    // diferencia importa al contar de cuántos cadáveres ha salido algo.
     if (ev.kind === 'loot' && ev.item && this.current) {
       this.current.loot.push({
-        item: ev.item, from: ev.from ?? null,
+        item: ev.item, qty: ev.qty ?? 1, from: ev.from ?? null,
         sold: ev.sold ?? null, upgraded: ev.upgraded ?? null,
+        stored: ev.stored ?? false,
         t: Math.max(0, Math.round(ev.t - this.current.start)),
       });
+    } else if (ev.kind === 'loot' && ev.item) {
+      // Sin pelea abierta no hay dónde guardarlo. Pasa cuando al enemigo lo
+      // mata entero un compañero declarado: el filtro de relevancia sólo abre
+      // pelea contigo o con tus mascotas, así que ese cadáver nunca tuvo una.
+      // Se cuenta para poder decir cuánto se pierde, porque una lista de botín
+      // con huecos silenciosos es peor que una con huecos anunciados.
+      this.lootSinPelea++;
     }
 
     const isCombat = DAMAGE_KINDS.has(ev.kind) || ev.kind === 'miss' || ev.kind === 'heal' || ev.kind === 'death';
@@ -382,6 +411,7 @@ export class EncounterTracker extends EventEmitter {
         enc.targetTotals.set(ev.target, b + ev.amount);
         if (!enc.targetFirst.has(ev.target)) enc.targetFirst.set(ev.target, ev.t);
       }
+      if (ev.target && mine.has(ev.source)) enc.golpeados.add(ev.target);
       // Un hechizo vuestro que sí entró, para saber la proporción contra ese
       // enemigo. Va AQUÍ y no en el bloque de señales de arriba porque aquél
       // exige que la pelea ya esté abierta, y el primer hechizo de la pelea es
@@ -399,9 +429,29 @@ export class EncounterTracker extends EventEmitter {
       if (ev.source) enc.actor(ev.source).addMissDealt(ev);
       if (ev.target) enc.actor(ev.target).addAvoided(ev);
     } else if (ev.kind === 'heal' && ev.amount > 0) {
+      // ── Sanguijuela: el log pone al ENEMIGO de sanador ──────────────────
+      //
+      // «Lord Nagafen has taken 451 damage from your Harm Touch X.» y, en el
+      // mismo segundo, «Lord Nagafen healed you for 451 hit points by Leech
+      // Touch I.» — el drenaje te devuelve lo que hizo tu golpe, y el cliente
+      // nombra sanador al que lo recibió. Son 321 líneas en un log real, y
+      // engordaban la curación hecha por cada jefe con la tuya propia.
+      //
+      // El discriminador es el daño y no la habilidad: si el que «te cura» es
+      // alguien a quien acabáis de pegar, la curación es tuya. Medido, separa
+      // las dos poblaciones sin solaparse — las 321 sanguijuelas vienen todas
+      // de un enemigo, y las 25 curaciones de verdad, todas de un compañero al
+      // que nadie estaba pegando.
+      const sanguijuela = ev.target === this.self
+        && ev.source && ev.source !== this.self && enc.golpeados.has(ev.source);
+      const quienCura = sanguijuela ? this.self : ev.source;
+      if (sanguijuela) enc.lifetaps++;
       enc.tick(ev.t, 'heal', ev.amount);
-      if (ev.source) enc.actor(ev.source).addHealDone(ev);
-      if (ev.target) enc.actor(ev.target).addHealTaken(ev);
+      if (quienCura) enc.actor(quienCura).addHealDone({ ...ev, source: quienCura });
+      if (ev.target) {
+        enc.actor(ev.target).addHealTaken(ev);
+        enc.healTotals.set(ev.target, (enc.healTotals.get(ev.target) ?? 0) + ev.amount);
+      }
     } else if (ev.kind === 'death') {
       enc.kills.push({ t: ev.t, victim: ev.victim, killer: ev.killer });
       if (ev.victim) {
@@ -410,14 +460,22 @@ export class EncounterTracker extends EventEmitter {
         // Lo que costó ESTA muerte: el daño acumulado contra él menos el que ya
         // llevaba cuando cayó la vez anterior. Sin restar, matar tres veces al
         // mismo enemigo daba una «vida» del triple.
+        //
+        // Y menos lo que le curaron en ese mismo tramo, por la misma razón que
+        // se resta la muerte anterior: no es vida suya, es daño deshecho. La
+        // resta va tramo a tramo y no repartida entre las muertes, que sería
+        // una aproximación pudiendo tenerlo exacto.
         const acumulado = enc.targetTotals.get(ev.victim) ?? 0;
-        const coste = acumulado - (enc.deathBase.get(ev.victim) ?? 0);
+        const curado = enc.healTotals.get(ev.victim) ?? 0;
+        const coste = (acumulado - (enc.deathBase.get(ev.victim) ?? 0))
+          - (curado - (enc.healBase.get(ev.victim) ?? 0));
         if (coste > 0) {
           const muestras = enc.hpSamples.get(ev.victim) ?? [];
           muestras.push(Math.round(coste));
           enc.hpSamples.set(ev.victim, muestras);
         }
         enc.deathBase.set(ev.victim, acumulado);
+        enc.healBase.set(ev.victim, curado);
       }
       if (this.closeOnDeath) this.#close();
       return;

@@ -16,6 +16,9 @@ export function normReason(raw) {
   return r.slice(0, 24) || 'fallo';
 }
 
+/** «himself», «itself»… El log los usa como destino de una curación propia. */
+const REFLEXIVO = /^(?:himself|herself|itself|themselves)$/i;
+
 const MONTHS = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
 
 /**
@@ -208,6 +211,33 @@ export class Parser {
         if (ev.ability) ev.castCat = classifySpell(ev.ability);
         this.recentCasts.push({ t: ev.t, source: ev.source, ability: ev.ability });
         if (this.recentCasts.length > 64) this.recentCasts.shift();
+        break;
+
+      // ═══ CURACIÓN: dos nombres que no son de nadie ═══
+      //
+      // El destino de una curación llega de dos formas que no son combatientes,
+      // y las dos acababan en la tabla «a quién has curado» de la ficha, con
+      // aspecto de dato medido. Contadas en un log real de 278.299 líneas:
+      //
+      //   1.126  «You healed Campeon over time for 153 …» — el sufijo es del
+      //          tic de una curación con duración, no parte del nombre. Partía
+      //          a cada objetivo en dos: «Campeon» y «Campeon over time», éste
+      //          con 147.772 pv repartidos por 105 peleas.
+      //   1.131  «a worry wraith pet healed himself for 613 …» — el pronombre
+      //          es quien cura, no un combatiente nuevo. Al perderse, la
+      //          autocuración de un enemigo no llegaba nunca al enemigo.
+      //
+      // El orden importa: existen las dos juntas —«healed itself over time»,
+      // 43 veces— así que primero se quita el sufijo y luego se resuelve el
+      // pronombre. Al revés, «itself over time» no casaría con el pronombre.
+      case 'heal':
+        if (typeof ev.target === 'string' && / over time$/.test(ev.target)) {
+          // Se marca en vez de perderse: que la curación fuera un tic es un
+          // dato del hechizo, y es lo que distingue un HoT de una cura directa.
+          ev.overTime = true;
+          ev.target = this.#norm(ev.target.replace(/ over time$/, ''));
+        }
+        if (REFLEXIVO.test(ev.target ?? '')) ev.target = ev.source;
         break;
 
       case 'miss':

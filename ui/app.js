@@ -1959,34 +1959,151 @@ function renderSummary() {
  * repetirían la cabecera. Y llevan lo que cambia —vida, golpe máximo,
  * habilidades— y no las resistencias, que se han medido y apenas se distinguen.
  */
+/**
+ * Las cinco dificultades de un enemigo, una al lado de otra.
+ *
+ * Sale SIEMPRE, aunque sólo haya peleado en una. Antes hacía falta `ds.length
+ * >= 2` y con ello «sólo lo he visto en D2» y «D2 es la única que hay» se veían
+ * igual: sin bloque. La rejilla completa dice cuál es cuál, porque la celda
+ * vacía afirma que ahí no has entrado y eso es un dato.
+ *
+ * Cada tarjeta es un enlace: dentro de una ficha no caben cinco juegos de
+ * resistencias, vida, golpe máximo, habilidades y botín, así que desde aquí se
+ * entra a una dificultad y se ve entera y sola.
+ */
 function diffBlocks(f) {
   const ds = (f.dificultades ?? []).filter((d) => d.fights > 0);
-  if (ds.length < 2) return '';
-  const nombre = (d) => (d.diff === null ? t('foe.noDiff') : `D${d.diff}${d.tag ? ' ' + d.tag : ''}`);
+  if (!ds.length) return '';
+  const porClave = new Map(ds.map((d) => [d.key, d]));
+  // Las cinco columnas siempre, y detrás los dos cajones de ausencia, que sólo
+  // se pintan si existen: no haberte cruzado nunca una pelea sin zona no es
+  // información que merezca un hueco.
+  const celdas = [...[0, 1, 2, 3, 4].map((n) => [`D${n}`, n]),
+    ['sin marca', null], ['sin zona', 'z']];
+
+  const tarjeta = ([clave, valor]) => {
+    const d = porClave.get(clave);
+    const rotulo = valor === 'z' ? t('enc.noZone')
+      : (valor === null ? t('enc.noDiffCol') : `D${valor}${DIF_TAGS[valor] ? ' ' + DIF_TAGS[valor] : ''}`);
+    if (!d) {
+      // Sin peleas no se pinta hueco para los dos cajones de ausencia: no
+      // haberte encontrado nunca una pelea «sin zona» no es información.
+      if (valor === null || valor === 'z') return '';
+      return `<div class="difcard void" title="${esc(t('enc.notFought'))}">
+        <div class="difcard-h">${esc(rotulo)}</div>
+        <div class="difcard-none">—</div></div>`;
+    }
+    const res = (d.spells ?? []).slice(0, 3);
+    return `<button class="difcard has" data-foedif="${esc(f.name)}" data-dkey="${esc(clave)}">
+      <div class="difcard-h">${esc(rotulo)}
+        ${(d.modes ?? []).length ? `<span class="dim">${esc(d.modes.map((m) => `${m.mode} ${m.n}`).join(' · '))}</span>` : ''}</div>
+      <div class="difcard-kv">
+        <span><b>${d.fights}</b> ${esc(t('sum.fights', { n: d.fights }))}</span>
+        ${d.kills ? `<span><b>${d.kills}</b> ${esc(t('metric.kills', { n: d.kills }))}</span>` : ''}
+        ${d.deaths ? `<span class="foe"><b>${d.deaths}</b> ${esc(t('enc.killedYouShort'))}</span>` : ''}
+        ${d.hp ? `<span>${esc(t('foe.hp'))} <b>${n0(d.hp.avg)}</b>${
+      d.hp.n > 1 ? ` <span class="dim">${n0(d.hp.min)}–${n0(d.hp.max)}</span>` : ''}</span>`
+      : `<span class="dim">${esc(t('foe.hp'))} —</span>`}
+        <span>${esc(t('foe.maxHit'))} <b>${n0(d.maxHit)}</b></span>
+        <span>${esc(t('foe.dealtYou'))} <b>${n0(d.taken)}</b></span>
+      </div>
+      <div class="difcard-cast">${esc(t('foe.castIn', { n: d.fights }))}</div>
+      <div class="difcard-ab">${(d.abilities ?? []).slice(0, 8).map((x) =>
+      `<span title="${esc(t('foe.inFights', { n: x.inFights, total: d.fights }))}"><i class="seg ${typeClass(x.type)}"></i>${
+        esc(x.name)} <b>${n0(x.sum)}</b>${d.fights > 1
+        ? ` <span class="dim">${x.inFights}/${d.fights}</span>` : ''}</span>`).join('')}</div>
+      ${res.length ? `<div class="difcard-res">${res.map((x) => resistCell(x)).join('')}</div>` : ''}
+      ${(d.lootList ?? []).length ? `<div class="difcard-loot">${
+      d.lootList.slice(0, 4).map((l) => `<span>${esc(l.item)}${l.n > 1 ? ` <b>×${l.n}</b>` : ''}</span>`).join('')}${
+      d.lootList.length > 4 ? `<span class="dim">${esc(t('tip.more', { n: d.lootList.length - 4 }))}</span>` : ''}</div>` : ''}
+      <span class="difcard-go">${esc(t('enc.openDiff'))}</span>
+    </button>`;
+  };
+
   return `<div class="dos-block">
     <div class="eyebrow">${esc(t('foe.byDiff'))} · ${esc(t('foe.measured'))}</div>
     <div class="hint">${esc(t('foe.diffNote'))}</div>
-    <div class="difgrid">
-      ${ds.map((d) => `<div class="difcard">
-        <div class="difcard-h">${esc(nombre(d))}</div>
-        <div class="difcard-kv">
-          <span><b>${d.fights}</b> ${esc(t('sum.fights', { n: d.fights }))}</span>
-          ${d.kills ? `<span><b>${d.kills}</b> ${esc(t('metric.kills', { n: d.kills }))}</span>` : ''}
-          ${d.hp ? `<span>${esc(t('foe.hp'))} <b>${n0(d.hp.avg)}</b>${
-            d.hp.n > 1 ? ` <span class="dim">${n0(d.hp.min)}–${n0(d.hp.max)}</span>` : ''}</span>`
-            : `<span class="dim">${esc(t('foe.hp'))} —</span>`}
-          <span>${esc(t('foe.maxHit'))} <b>${n0(d.maxHit)}</b></span>
-          <span>${esc(t('foe.dealtYou'))} <b>${n0(d.taken)}</b></span>
-        </div>
-        <div class="difcard-cast">${esc(t('foe.castIn', { n: d.fights }))}</div>
-        <div class="difcard-ab">${(d.abilities ?? []).slice(0, 8).map((x) =>
-          `<span title="${esc(t('foe.inFights', { n: x.inFights, total: d.fights }))}"><i class="seg ${typeClass(x.type)}"></i>${
-            esc(x.name)} <b>${n0(x.sum)}</b>${d.fights > 1
-              ? ` <span class="dim">${x.inFights}/${d.fights}</span>` : ''}</span>`).join('')}</div>
-      </div>`).join('')}
-    </div>
+    <div class="difgrid five">${celdas.map(tarjeta).join('')}</div>
     <div class="hint">${esc(t('foe.castNote'))}</div>
   </div>`;
+}
+
+/**
+ * Una resistencia con su tamaño de muestra, siempre.
+ *
+ * El `n` no es un adorno: partido por dificultad, un «86% entra» puede venir de
+ * 14 intentos o de 400 y sobre la pantalla se leen igual. Por debajo de seis
+ * intentos se marca en gris, que es la forma de decir «esto no afirma nada» sin
+ * escondértelo ni escribir un párrafo al lado.
+ */
+function resistCell(x) {
+  const n = x.n ?? (x.landed + x.resisted);
+  const flojo = n < 6;
+  return `<span class="res${flojo ? ' thin' : ''}" title="${esc(t('enc.sampleNote', { n }))}">
+    ${esc(x.spell)} <b class="${flojo ? 'dim' : (x.rate >= 0.6 ? 'bad' : x.rate <= 0.2 ? 'good' : '')}">${
+  Math.round((1 - x.rate) * 100)}%</b> <span class="dim">n=${n}</span></span>`;
+}
+
+/**
+ * Un enemigo en UNA dificultad, entera y sola.
+ *
+ * Nada de lo que sale aquí está promediado con otra dificultad: la vida, el
+ * golpe máximo, las resistencias, las habilidades y el botín son los de esta
+ * celda. Lo único que viene de la ficha común son los niveles y las zonas, y va
+ * dicho.
+ */
+function encFoeDif() {
+  const d = state.enc.foeDif;
+  if (!d) return `${encCrumb()}<div class="hint">${esc(t('enc.noMatch'))}</div>`;
+  const abTot = (d.abilities ?? []).reduce((n, x) => n + x.sum, 0) || 1;
+
+  return `${encCrumb()}
+    <div class="enc-h">
+      <h2>${esc(d.name)}</h2>
+      <span class="difpill">${esc(d.label ?? t('enc.noDiffCol'))}</span>
+      ${(d.modes ?? []).length ? `<span class="hint">${esc(modosDe(d))}</span>` : ''}
+    </div>
+    <div class="dhermanas">${(d.hermanas ?? []).map((h) => `<button class="dtab${
+    h.key === d.key ? ' on' : ''}" data-foedif="${esc(d.name)}" data-dkey="${esc(h.key)}">${esc(h.label ?? t('enc.noDiffCol'))} <span class="dim">${h.fights}</span></button>`).join('')}</div>
+
+    <div class="metrics">
+      ${d.hp ? `<div class="metric"><b>${n0(d.hp.avg)}</b><span>${esc(t('foe.hp'))}</span></div>` : ''}
+      <div class="metric"><b>${d.fights}</b><span>${esc(t('sum.fights', { n: d.fights }))}</span></div>
+      ${d.kills ? `<div class="metric"><b>${d.kills}</b><span>${esc(t('metric.kills', { n: d.kills }))}</span></div>` : ''}
+      ${d.deaths ? `<div class="metric foe"><b>${d.deaths}</b><span>${esc(t('enc.killedYouShort'))}</span></div>` : ''}
+      <div class="metric"><b>${n0(d.damageTo)}</b><span>${esc(t('foe.youDealt'))}</span></div>
+      <div class="metric foe"><b>${n0(d.taken)}</b><span>${esc(t('foe.dealtYou'))}</span></div>
+      ${d.maxHit ? `<div class="metric foe"><b>${n0(d.maxHit)}</b><span>${esc(t('foe.maxHit'))}</span></div>` : ''}
+    </div>
+    ${d.hp && d.hp.n > 1 ? `<div class="hint">${esc(t('foe.hpNote'))} ${
+    esc(t('foe.hpFrom', { n: d.hp.n }))}: ${n0(d.hp.min)} – ${n0(d.hp.max)}</div>` : ''}
+
+    ${(d.spells ?? []).length ? `<div class="dos-block">
+      <div class="eyebrow">${esc(t('foe.weak'))} · ${esc(t('foe.measured'))}</div>
+      <div class="hint">${esc(t('enc.resistDiffNote'))}</div>
+      <div class="reslist">${d.spells.map((x) => resistCell(x)).join('')}</div>
+    </div>` : ''}
+
+    ${(d.abilities ?? []).length ? `<div class="dos-block">
+      <div class="eyebrow">${esc(t('foe.howHits'))}</div>
+      <div class="hint">${esc(t('enc.abilitiesNote'))}</div>
+      ${d.abilities.map((x) => `<div class="foe-det-l">
+        <i class="seg ${typeClass(x.type)}"></i><span>${esc(x.name)}</span>
+        <b>${n0(x.sum)}</b><span class="dim">${Math.round(x.sum / abTot * 100)}% · ×${x.n}${
+      d.fights > 1 ? ` · ${x.inFights}/${d.fights}` : ''}</span>
+      </div>`).join('')}</div>` : ''}
+
+    ${(d.lootList ?? []).length ? `<div class="dos-block">
+      <div class="eyebrow">${esc(t('foe.drops'))}</div>
+      <div class="hint">${esc(t('enc.lootDiffNote', { d: d.label ?? t('enc.noDiffCol'), k: d.kills }))}</div>
+      <div class="loot">${d.lootList.map((l) => `<div class="loot-row">
+        <button class="loot-item" data-item="${esc(l.item)}">${esc(l.item)}</button>
+        ${l.n > 1 ? `<span class="num dim">×${l.n}</span>` : ''}</div>`).join('')}</div></div>` : ''}
+
+    ${(d.zones ?? []).length ? `<div class="hint">${esc(t('foe.zones'))}: ${esc(d.zones.join(', '))}</div>` : ''}
+    ${(d.levels ?? []).length > 1 || d.someWithoutLevel
+    ? `<div class="hint">${esc(t('lvl.mixed', {
+      levels: [...(d.levels ?? []), ...(d.someWithoutLevel ? [t('lvl.unknown')] : [])].join(', ') }))}</div>` : ''}`;
 }
 
 /**
@@ -2344,6 +2461,7 @@ async function encGo(page, args = {}) {
   if (page === 'index') { e.base = null; e.foe = null; delete e.diff; }
   if ('base' in args) e.base = args.base;
   if ('diff' in args) e.diff = args.diff;
+  if ('dkey' in args) e.dkey = args.dkey;
   if ('name' in args) e.name = args.name;
   try {
     if (page === 'zonas') e.zonas = (await window.eql.encZones?.()) ?? [];
@@ -2366,6 +2484,13 @@ async function encGo(page, args = {}) {
     }
     if (page === 'muertes') e.deaths = (await window.eql.encDeaths?.()) ?? null;
     if (page === 'progreso') e.progress = (await window.eql.encProgress?.()) ?? null;
+    if (page === 'foeDif') {
+      // Un enemigo EN una dificultad: la ficha entera de esa celda y nada
+      // promediado con las demás. `diff` puede ser `null` a propósito — es el
+      // cajón de «no consta», y es un destino como cualquier otro.
+      e.foeDif = (await window.eql.encFoeAt?.(e.name, e.dkey)) ?? null;
+      pedirIconos((e.foeDif?.abilities ?? []).map((a) => a.name), renderEncyclopedia);
+    }
     if (page === 'foe') {
       e.foe = (await window.eql.encFoe?.(e.name)) ?? null;
       // Desde la lista de enemigos no hay zona ni dificultad de por medio, así
@@ -2415,7 +2540,11 @@ function encCrumb() {
  * instanciar no dice «- Solo 0», no dice nada. Por eso lo que llega como
  * `null` se rotula D0 y no «sin dificultad»: la pregunta tiene respuesta.
  */
-const encDiffLabel = (d) => `D${d ?? 0}${DIF_TAGS[d ?? 0] ? ` ${DIF_TAGS[d ?? 0]}` : ''}`;
+// `null` NO es D0. Era `D${d ?? 0}` lo que rotulaba «no consta» como si fuera
+// la dificultad base, y con ello una ausencia de dato pasaba por medida.
+const encDiffLabel = (d) => (d === null || d === undefined
+  ? t('enc.noDiff')
+  : `D${d}${DIF_TAGS[d] ? ` ${DIF_TAGS[d]}` : ''}`);
 
 /** Los nombres oficiales de los niveles (wiki de EQL). La 0 no tiene. */
 const DIF_TAGS = { 0: null, 1: 'Awakened', 2: 'Adaptive', 3: 'Fused', 4: 'Refined' };
@@ -2464,18 +2593,26 @@ function encEstado() {
 }
 
 /**
- * Las zonas: una fila por zona, una columna por dificultad.
+ * Las zonas: una fila por zona, cinco columnas de dificultad y una sexta,
+ * separada, para lo que no la declara.
  *
  * La celda vacía dice que ahí no has entrado, y eso no es lo mismo que decir
- * que no hay nada. Las de mundo abierto no declaran dificultad y van en una
- * fila a lo ancho: inventarles una quinta columna sería afirmar algo que no hay.
+ * que no hay nada.
+ *
+ * La sexta columna NO es una dificultad y por eso va detrás de un hueco, con su
+ * propio rótulo y sin número: antes el mundo abierto caía dentro de D0 y la
+ * columna afirmaba una medida que no existía. Un dato ausente que parece un
+ * dato medido es peor que no tener la columna.
  */
 function encZonas() {
   const z = state.enc.zonas ?? [];
   if (!z.length) return `<div class="empty"><h2>${esc(t('enc.emptyZones'))}</h2>
     <p class="hint">${esc(t('enc.emptyNote'))}</p></div>`;
+  // `diff` viaja como texto porque una de las columnas no es un número: se lee
+  // con `difFromCell`, que devuelve `null` para la de «no consta».
   const celda = (base, c, diff) => (c
-    ? `<button class="enccell" data-base="${esc(base)}" data-diff="${diff}">
+    ? `<button class="enccell" data-base="${esc(base)}" data-diff="${diff}"
+        title="${esc(modosDe(c))}">
         <b class="num">${c.foes}</b> <span>${esc(t('enc.foesWord', { n: c.foes }))}</span>
         <span class="dim num" title="${esc(t('enc.cellNote'))}">${
           c.fights}${c.kills ? ` · ${c.kills}†` : ''}</span>
@@ -2484,19 +2621,33 @@ function encZonas() {
 
   const fila = (row) => `<tr${row.base === state.enc.marcada ? ' class="zmark"' : ''}>
       <td class="zname">${esc(row.base)}</td>
-      ${row.celdas.map((c, i) => `<td>${celda(row.base, c, i)}</td>`).join('')}
+      ${row.celdas.map((c, i) => `<td>${celda(row.base, c, String(i))}</td>`).join('')}
+      <td class="zgap"></td>
+      <td>${celda(row.base, row.sinMarca, 'null')}</td>
     </tr>`;
 
   return `${encCrumb()}
     <div class="zscroll"><table class="ztable">
       <thead><tr><th>${esc(t('enc.zoneCol'))}</th>
-        ${[0, 1, 2, 3, 4].map((d) => `<th${d === 0 ? ` title="${esc(t('enc.openWorld'))}"` : ''}>D${d}${
+        ${[0, 1, 2, 3, 4].map((d) => `<th>D${d}${
           DIF_TAGS[d] ? ` · ${DIF_TAGS[d]}` : ''}</th>`).join('')}
+        <th class="zgap"></th>
+        <th class="zunknown" title="${esc(t('enc.openWorld'))}">${esc(t('enc.noDiffCol'))}</th>
       </tr></thead>
       <tbody>${z.map(fila).join('')}</tbody>
     </table></div>
     <div class="hint">${esc(t('enc.zonesNote'))}</div>`;
 }
+
+/** Los modos en que peleaste una celda. Dato de la celda, nunca un eje. */
+function modosDe(c) {
+  const m = c?.modes ?? [];
+  if (!m.length) return '';
+  return `${t('enc.modes')}: ${m.map((x) => `${x.mode} ${x.n}`).join(' · ')}`;
+}
+
+/** Lee el `data-diff` de una celda. «null» es «no consta» y NO es cero. */
+const difFromCell = (v) => (v === 'null' || v === null || v === undefined ? null : +v);
 
 /** Los enemigos de una zona y dificultad, de los que tienes datos por pelear. */
 function encZona() {
@@ -2607,9 +2758,25 @@ function encEnemigos() {
   const todos = state.enc.todos ?? [];
   const l = q ? todos.filter((f) => f.name.toLowerCase().includes(q)
     || f.zonas.some((z) => z.toLowerCase().includes(q))) : todos;
-  const pill = (d) => `<span class="dpill" title="${esc(t('enc.pillNote', {
-    d: encDiffLabel(d.diff), n: d.fights, k: d.kills,
-    hp: d.hp === null ? '—' : n0(d.hp) }))}">${d.diff === null ? '—' : `D${d.diff}`}</span>`;
+
+  // La misma rejilla que en Zonas, y por lo mismo: «no lo he matado en D0» y
+  // «no he peleado con él en D0» son cosas distintas, y sólo una celda vacía
+  // puede decir la segunda. Con las pastillas de antes no se veía el hueco:
+  // sólo salían las dificultades que había, así que faltar y valer cero se
+  // veían igual —que es, exactamente, no verse.
+  //
+  // Cada celda lleva las veces que cayó, que es lo que preguntaste: si lo has
+  // matado en D0, se ve en la columna de D0.
+  const celda = (f, c, diff) => (c
+    ? `<span class="fcell${c.kills ? ' has' : ''}" title="${esc([
+      `${encDiffLabel(c.diff)} · ${t('sum.times', { n: c.fights })}`,
+      c.kills ? t('sum.killed', { n: c.kills }) : t('enc.neverFell'),
+      c.hp === null ? `${t('foe.hp')} —` : `${t('foe.hp')} ${n0(c.hp)}`,
+      c.deaths ? t('enc.killedYou', { n: c.deaths }) : '',
+      modosDe(c),
+    ].filter(Boolean).join('\n'))}" data-foe="${esc(f.name)}" data-dkey="${diff}"
+      ><b class="num">${c.kills || '·'}</b></span>`
+    : `<span class="fcell void" title="${esc(t('enc.notFought'))}">—</span>`);
 
   return `${encCrumb()}
     <div class="enc-h">
@@ -2620,35 +2787,67 @@ function encEnemigos() {
       <span class="hint">${esc(t('enc.foes', { n: l.length }))}${
         q && l.length !== todos.length ? ` ${esc(t('enc.ofN', { n: todos.length }))}` : ''}</span>
     </div>
-    ${l.length ? `<div class="encrows">${l.map((f) => `
-      <button class="encrow foe" data-foe="${esc(f.name)}">
-        <span class="nm">${esc(f.name)}
-          <span class="dpills">${f.difs.map(pill).join('')}</span></span>
-        <span class="num">${f.hp
+    ${l.length ? `<div class="fgrid-head">
+        <span></span>
+        ${[0, 1, 2, 3, 4].map((d) => `<span class="num">D${d}</span>`).join('')}
+        <span class="zgap"></span>
+        <span class="num zunknown" title="${esc(t('enc.openWorld'))}">${esc(t('enc.noDiffCol'))}</span>
+        <span></span>
+      </div>
+      <div class="encrows">${l.map((f) => `
+      <div class="encrow foe fgrid" data-foe="${esc(f.name)}">
+        <span class="nm">${esc(f.name)}</span>
+        ${(f.rejilla ?? []).map((c, i) => celda(f, c, `D${i}`)).join('')}
+        <span class="zgap"></span>
+        ${celda(f, f.sinMarca, 'sin marca')}
+        <span class="num dim">${f.hp
           ? `${esc(t('foe.hp'))} ${n0(f.hp.avg)} <span class="dim">${
-            f.hp.diff === null ? '' : `D${f.hp.diff}`}</span>` : ''}</span>
-        <span class="num dim">${esc(t('sum.times', { n: f.fights }))}</span>
-        <span class="num dim">${f.kills ? esc(t('sum.killed', { n: f.kills }))
-          : esc(t('enc.neverFell'))}</span>
-      </button>`).join('')}</div>
-      <div class="hint">${esc(t('enc.foesNote'))}</div>`
+            esc(encDiffLabel(f.hp.diff))}</span>` : ''}</span>
+      </div>`).join('')}</div>
+      <div class="hint">${esc(t('enc.foesGridNote'))}</div>`
     : `<div class="hint">${esc(t('enc.noMatch'))}</div>`}`;
 }
 
 /**
- * El botín: cada objeto y de quién ha caído.
+ * El botín: cada objeto, de quién ha caído y en qué dificultad.
  *
  * «2 de 11» son dos cifras medidas puestas una al lado de la otra, no una
- * probabilidad de caída: mezcla todas las dificultades, porque el log atribuye
- * el objeto a un nombre y no a una instancia. Lo dice el pie, y por eso el
- * número va con la palabra «de» y no con un porcentaje, que sí prometería otra
- * cosa.
+ * probabilidad de caída, y por eso el número va con la palabra «de» y no con un
+ * porcentaje, que sí prometería otra cosa.
+ *
+ * Lo que cambió: hasta ahora esas dos cifras mezclaban las cinco dificultades,
+ * y no se puede — medido en un log real, `a fire giant warrior` suelta
+ * «Throwing Boulder» y «+1» en D0 y «Throwing Boulder +2» en D2. Son tablas de
+ * botín distintas, y sumadas describían una que no existe. Ahora cada fuente
+ * trae su reparto, y las veces que lo mataste al lado son las de ESA celda.
  */
 function encBotin() {
   const q = (state.enc.q ?? '').toLowerCase();
   const todos = state.enc.loot ?? [];
-  const l = q ? todos.filter((o) => o.item.toLowerCase().includes(q)
+  const porDif = state.enc.lootDiff ?? null;   // null = todas
+  let l = q ? todos.filter((o) => o.item.toLowerCase().includes(q)
     || o.from.some((f) => f.name.toLowerCase().includes(q))) : todos;
+  // El filtro por dificultad recorta la tarjeta entera a esa celda: enseñar el
+  // total con las fuentes filtradas descuadraría las dos cifras.
+  if (porDif !== undefined && state.enc.lootDifSet) {
+    l = l.map((o) => {
+      const g = (o.porDif ?? []).find((x) => x.diff === porDif);
+      if (!g) return null;
+      return {
+        ...o, n: g.n, sinFuente: 0,
+        from: o.from.map((f) => {
+          const c = (f.porDif ?? []).find((x) => x.diff === porDif);
+          return c ? { ...f, n: c.n, kills: c.kills } : null;
+        }).filter(Boolean),
+      };
+    }).filter(Boolean);
+  }
+
+  const pestana = (d, etiqueta) => {
+    const activa = state.enc.lootDifSet ? state.enc.lootDiff === d : d === undefined;
+    return `<button class="lootTab${activa ? ' on' : ''}" data-lootdif="${
+      d === undefined ? 'all' : (d === null ? 'null' : d)}">${esc(etiqueta)}</button>`;
+  };
 
   return `${encCrumb()}
     <div class="enc-h">
@@ -2658,11 +2857,19 @@ function encBotin() {
         placeholder="${esc(t('enc.findItem'))}" value="${esc(state.enc.q ?? '')}">
       <span class="hint">${esc(t('enc.nItems', { n: nPlural(l.length) }))}</span>
     </div>
+    <div class="loottabs">
+      ${pestana(undefined, t('enc.allDiffs'))}
+      ${[0, 1, 2, 3, 4].map((d) => pestana(d, `D${d}`)).join('')}
+      ${pestana(null, t('enc.noDiffCol'))}
+    </div>
     ${l.length ? `<div class="lootgrid">${l.map((o) => `<div class="lootcard">
       <div class="lootcard-h">
         <button class="loot-item" data-item="${esc(o.item)}">${esc(o.item)}</button>
         ${o.n > 1 ? `<span class="num dim">×${o.n}</span>` : ''}
       </div>
+      ${!state.enc.lootDifSet && (o.porDif ?? []).length > 1 ? `<div class="lootdifs">${
+    o.porDif.map((g) => `<span class="dpill" title="${esc(t('enc.outOf', { n: g.n, k: g.kills }))}">${
+      esc(encDiffLabel(g.diff))} <b>×${g.n}</b></span>`).join('')}</div>` : ''}
       ${o.from.map((f) => `<button class="lootfrom" data-foe="${esc(f.name)}">
         <span>${esc(f.name)}</span>
         <span class="num">${esc(t('enc.outOf', { n: f.n, k: f.kills }))}</span>
@@ -2872,7 +3079,8 @@ function renderEncyclopedia() {
             : e.page === 'progreso' ? encProgreso()
               : e.page === 'muertes' ? encMuertes()
                 : e.page === 'foe' ? encFoe()
-                  : encIndex();
+                  : e.page === 'foeDif' ? encFoeDif()
+                    : encIndex();
   host.innerHTML = `<div class="tabpane"><div class="enc" id="encRoot">${cuerpo}</div></div>`;
 
   host.querySelectorAll('.enccard').forEach((el) => el.addEventListener('click', () => {
@@ -2893,12 +3101,36 @@ function renderEncyclopedia() {
   // Sólo las celdas con datos. La vacía es un hueco, no un enlace a una lista
   // vacía: sin este filtro se abría una zona «undefined» en dificultad NaN.
   host.querySelectorAll('.enccell[data-base]').forEach((el) => el.addEventListener('click', () => {
-    encGo('zona', { base: el.dataset.base, diff: +el.dataset.diff });
+    encGo('zona', { base: el.dataset.base, diff: difFromCell(el.dataset.diff) });
   }));
   // De dónde vienes se apunta al saltar, que es cuando se sabe.
-  host.querySelectorAll('.encrow[data-foe]').forEach((el) => el.addEventListener('click', () => {
+  host.querySelectorAll('.encrow[data-foe]').forEach((el) => el.addEventListener('click', (ev) => {
+    // Pulsar una celda de la rejilla entra a ESA dificultad, no a la ficha
+    // entera: se atiende antes y se para, o el clic haría las dos cosas.
+    if (ev.target.closest?.('.fcell')) return;
     state.enc.from = el.classList.contains('foe') ? 'enemigos' : 'zonas';
     encGo('foe', { name: el.dataset.foe });
+  }));
+  // Una celda con datos de la rejilla de enemigos, y sólo con datos: la vacía
+  // es un hueco que dice «ahí no has peleado», no un enlace a una ficha vacía.
+  host.querySelectorAll('.fcell[data-foe]').forEach((el) => el.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    state.enc.from = 'enemigos';
+    encGo('foeDif', { name: el.dataset.foe, dkey: el.dataset.dkey });
+  }));
+  // Y desde la ficha del enemigo, o desde las pestañas de una dificultad.
+  host.querySelectorAll('[data-foedif]').forEach((el) => el.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    encGo('foeDif', { name: el.dataset.foedif, dkey: el.dataset.dkey });
+  }));
+  // Las pestañas de dificultad del botín. `all` es «todas» y no es lo mismo que
+  // «las que no la declaran», que es `null`: por eso hacen falta dos estados y
+  // no basta con que `lootDiff` sea nulo.
+  host.querySelectorAll('.lootTab').forEach((el) => el.addEventListener('click', () => {
+    const v = el.dataset.lootdif;
+    state.enc.lootDifSet = v !== 'all';
+    state.enc.lootDiff = v === 'all' ? undefined : (v === 'null' ? null : +v);
+    renderEncyclopedia();
   }));
   host.querySelectorAll('.lootfrom').forEach((el) => el.addEventListener('click', () => {
     state.enc.from = 'botin';

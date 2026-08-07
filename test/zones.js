@@ -41,7 +41,21 @@ console.log('\nnombre de zona -> base, modo y dificultad');
   ok(c('The Ruins of Old Guk 2').diff === null,
     'sin etiqueta, un número suelto NO es una dificultad', String(c('The Ruins of Old Guk 2').diff));
 
-  ok(c('The Ruins of Old Paineel - Solo').diff === null, 'un modo sin número ni etiqueta no inventa dificultad');
+  // Esta afirmación estaba al revés, y estaba bien estarlo: sin medida, decir
+  // que «- Solo» a secas era D0 habría sido inventar. Lo que cambió no es el
+  // criterio, es que ahora hay medida.
+  //
+  // Mismo enemigo, misma zona y mismo modo, la vida de estas instancias está un
+  // peldaño ENTERO por debajo de D1 —mediana 0,873 sobre once enemigos, nueve
+  // entre 0,86 y 0,88— y ese peldaño mide lo mismo que el de D1 a D2 (0,853) y
+  // el de D2 a D3 (0,884). No cae en medio de nada: es el escalón de abajo, y
+  // la base no lleva etiqueta porque `DIFICULTADES[0]` es `null`.
+  //
+  // Y hacía falta separarlo: mientras «- Solo» y «East Freeport» compartían
+  // cajón, la columna D0 de la rejilla contenía mundo abierto.
+  ok(c('The Ruins of Old Paineel - Solo').diff === 0,
+    'un modo declarado sin número es la dificultad base, D0');
+  ok(c('The Ruins of Old Paineel - Solo').mode === 'Solo', 'y el modo consta');
   ok(c('The Plane of Sky').diff === null && c('The Plane of Sky').base === 'The Plane of Sky',
     'el mundo abierto se queda como está');
   ok(labelDiff(3, 'Fused') === 'D3 Fused' && labelDiff(null, null) === null, 'la etiqueta corta');

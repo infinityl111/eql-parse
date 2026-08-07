@@ -28,7 +28,7 @@
  * una pelea es cosa del almacén, no de aquí.
  */
 
-import { parseZone } from './zones.js';
+import { parseZone, diffKey, SIN_ZONA } from './zones.js';
 
 /** Ficha en crudo, recién abierta. */
 function nuevaFicha(name) {
@@ -39,11 +39,30 @@ function nuevaFicha(name) {
   };
 }
 
-/** Ficha de una dificultad concreta de ese enemigo. */
+/**
+ * Ficha de una dificultad concreta de ese enemigo.
+ *
+ * Aquí dentro está TODO lo que cambia de una dificultad a otra, que es casi
+ * todo: cada dificultad es prácticamente un enemigo distinto. Lo que antes
+ * vivía sólo en la ficha común y ahora también aquí:
+ *
+ *   loot     lo que suelta en D0 no tiene por qué ser lo que suelta en D4.
+ *   spells   qué hechizos tuyos le entran. Se partió con una advertencia: la
+ *            muestra se fragmenta, así que cada celda enseña su `n` y una
+ *            celda con dos intentos tiene que verse que no dice nada.
+ *   deaths   las veces que te mató. Existía como campo y no lo incrementaba
+ *            nadie: estaba muerto en la ficha común y en el disco.
+ *   modes    en qué modo peleaste, y cuántas veces en cada uno. NO es un eje.
+ *            Va como dato de la celda porque el 54% de las peleas de un log
+ *            real no declara el modo, y partir por él dejaría a la mayoría en
+ *            un tercer cajón de «no consta». Guardarlo es lo que permite que
+ *            la pregunta se conteste sola cuando haya muestra.
+ */
 function nuevaDif(diff, tag) {
   return {
-    diff, tag, fights: 0, kills: 0, maxHit: 0, damageTo: 0, taken: 0,
+    diff, tag, fights: 0, kills: 0, deaths: 0, maxHit: 0, damageTo: 0, taken: 0,
     hpSamples: [], abil: new Map(), abilFights: new Map(), zones: new Set(),
+    loot: new Map(), spells: new Map(), modes: new Map(),
   };
 }
 
@@ -95,12 +114,21 @@ export class FoeLedger {
    */
   fold(f) {
     if (!f?.rows?.length) return;
-    const d = f.diff ?? null;
-    const kd = d === null ? 'sin marca' : `D${d}`;
+    // La zona se vuelve a leer del nombre completo cuando lo hay, en vez de
+    // creerse los campos guardados. No es desconfianza: el analizador mejora y
+    // los campos no. Las peleas guardadas antes de que «- Group» a secas fuera
+    // D0 traen `diff: null`, y releyendo el nombre salen bien sin reconstruir.
+    const z = f.zone ? parseZone(f.zone) : null;
+    const d = z ? z.diff : (f.diff ?? null);
+    // Sin zona no se sabe ni siquiera si había dificultad que declarar, así que
+    // va a su propio cajón y no al de «mundo abierto».
+    const kd = (!f.zone && d === null) ? SIN_ZONA : diffKey(d);
+    const tag = z?.tag ?? f.diffTag ?? null;
+    const modo = z?.mode ?? f.zoneMode ?? null;
     // La zona base, sin modo ni dificultad: «Plane of Fear», no «Plane of Fear
     // - Group 4 (Refined)». Las peleas guardadas antes de que el campo existiera
     // no la traen, y se saca del nombre completo con el mismo analizador.
-    const zonaBase = f.zoneBase ?? (f.zone ? parseZone(f.zone).base : null);
+    const zonaBase = z?.base ?? f.zoneBase ?? null;
 
     for (const r of f.rows) {
       if (r.side !== 'enemy') continue;
@@ -125,20 +153,40 @@ export class FoeLedger {
       // en D2, pega 3,6 veces más fuerte y lanza dos hechizos que en D2 no
       // tiene. La media de los dos no describe a ninguno.
       //
-      // Las resistencias NO se separan, y también es una decisión medida: en
-      // ese mismo log todo entra al 100% en las dos dificultades y la única
-      // diferencia (95% contra 86%) sale de 14 intentos. Partirlas fragmentaría
-      // una muestra ya corta a cambio de nada.
+      // Las resistencias SÍ se separan ahora, y el motivo de que antes no lo
+      // hicieran sigue siendo cierto: la muestra se fragmenta. En el log de
+      // calibración todo entraba al 100% en las dos dificultades y la única
+      // diferencia (95% contra 86%) salía de 14 intentos. Por eso cada celda
+      // lleva su `n` y quien mira ve cuándo no dice nada — que es distinto de
+      // no partirlas, porque no partirlas afirma que da igual la dificultad, y
+      // eso tampoco está medido.
       let pd = e.porDif.get(kd);
-      if (!pd) { pd = nuevaDif(d, f.diffTag ?? null); e.porDif.set(kd, pd); }
+      if (!pd) {
+        pd = nuevaDif(d, tag);
+        // Marca el tercer cajón. Sin ella habría dos celdas con `diff: null` y
+        // no habría forma de decir cuál es «mundo abierto» y cuál «no sé dónde».
+        if (kd === SIN_ZONA) pd.sinZona = true;
+        e.porDif.set(kd, pd);
+      }
       // La etiqueta la traen unas peleas y otras no. Vale cualquiera que la
       // traiga, y por la misma razón que el tipo de daño: si dependiera de cuál
       // se plegó primero, los dos caminos darían fichas distintas.
-      if (!pd.tag && f.diffTag) pd.tag = f.diffTag;
+      if (!pd.tag && tag) pd.tag = tag;
       pd.fights += 1;
       pd.taken += r.damage ?? 0;
       pd.maxHit = Math.max(pd.maxHit, r.max ?? 0);
       if (zonaBase) { pd.zones.add(zonaBase); }
+      // El modo, como dato de la celda. Ver `nuevaDif`: no es un eje.
+      suma(pd.modes, modo ?? 'sin modo', 1);
+      // Las veces que te mató ESTE enemigo, en ESTA dificultad. El campo
+      // existía en la ficha común desde el principio y no lo incrementaba
+      // nadie: se guardaba un cero, se restauraba un cero y se leía un cero.
+      //
+      // Sale de `lossesBy`, que dice quién remató, y NO de a quién apuntaba el
+      // enemigo. En una pelea con tres enemigos apuntarte no es haberte matado,
+      // y el log no obliga a adivinarlo: lo dice.
+      const remato = (f.lossesBy ?? []).filter((x) => x?.killer === r.name).length;
+      if (remato > 0) { e.deaths += remato; pd.deaths += remato; }
 
       // En cuántos ENCUENTROS apareció cada habilidad, no sólo cuánto sumó.
       //
@@ -187,7 +235,15 @@ export class FoeLedger {
       for (const l of f.loot ?? []) {
         const item = typeof l === 'string' ? l : l.item;
         const from = typeof l === 'object' ? l.from : null;
-        if (item && from === r.name) suma(e.loot, item, 1);
+        // Unidades y no recogidas, igual que en el resumen del tramo: si los
+        // dos contaran distinto, la ficha del enemigo y la sección de Botín
+        // discreparían sobre el mismo objeto.
+        if (!item || from !== r.name) continue;
+        const q = typeof l === 'object' ? (l.qty ?? 1) : 1;
+        suma(e.loot, item, q);
+        // Y en la celda de su dificultad: lo que suelta en D0 no tiene por qué
+        // ser lo que suelta en D4, y hasta ahora las dos listas eran la misma.
+        suma(pd.loot, item, q);
       }
     }
 
@@ -204,18 +260,24 @@ export class FoeLedger {
       }
     }
 
-    // Qué hechizos tuyos entran contra cada enemigo y cuáles resiste.
+    // Qué hechizos tuyos entran contra cada enemigo y cuáles resiste. Va a los
+    // dos sitios: la ficha común, que es la muestra grande, y la celda de su
+    // dificultad, que es la que puede decir algo distinto y casi nunca tiene
+    // muestra para decirlo. Las dos se enseñan con su `n`.
     for (const x of f.spellVsFoe ?? []) {
       const e = this.porNombre.get(x.foe);
       if (!e) continue;
-      const c = e.spells.get(x.spell)
-        ?? { spell: x.spell, landed: 0, resisted: 0, byInv: new Map() };
-      c.landed += x.landed; c.resisted += x.resisted;
-      const clave = x.inv ?? '';
-      const b = c.byInv.get(clave) ?? { inv: x.inv ?? null, landed: 0, resisted: 0 };
-      b.landed += x.landed; b.resisted += x.resisted;
-      c.byInv.set(clave, b);
-      e.spells.set(x.spell, c);
+      for (const destino of [e.spells, e.porDif.get(kd)?.spells]) {
+        if (!destino) continue;
+        const c = destino.get(x.spell)
+          ?? { spell: x.spell, landed: 0, resisted: 0, byInv: new Map() };
+        c.landed += x.landed; c.resisted += x.resisted;
+        const clave = x.inv ?? '';
+        const b = c.byInv.get(clave) ?? { inv: x.inv ?? null, landed: 0, resisted: 0 };
+        b.landed += x.landed; b.resisted += x.resisted;
+        c.byInv.set(clave, b);
+        destino.set(x.spell, c);
+      }
     }
   }
 
@@ -252,11 +314,19 @@ export class FoeLedger {
         byInv: [...c.byInv.values()],
       })),
       porDif: [...e.porDif].map(([k, d]) => [k, {
-        diff: d.diff, tag: d.tag, fights: d.fights, kills: d.kills,
+        diff: d.diff, tag: d.tag, sinZona: !!d.sinZona,
+        fights: d.fights, kills: d.kills,
+        deaths: d.deaths,
         maxHit: d.maxHit, damageTo: d.damageTo, taken: d.taken,
         hpSamples: d.hpSamples, zones: [...d.zones],
         abil: [...d.abil.values()].map(habJSON),
         abilFights: [...d.abilFights],
+        loot: [...d.loot],
+        modes: [...d.modes],
+        spells: [...d.spells.values()].map((c) => ({
+          spell: c.spell, landed: c.landed, resisted: c.resisted,
+          byInv: [...c.byInv.values()],
+        })),
       }]),
     }));
   }
@@ -284,11 +354,18 @@ export class FoeLedger {
       }
       for (const [k, d] of j.porDif ?? []) {
         e.porDif.set(k, {
-          diff: d.diff ?? null, tag: d.tag ?? null,
-          fights: d.fights ?? 0, kills: d.kills ?? 0, maxHit: d.maxHit ?? 0,
+          diff: d.diff ?? null, tag: d.tag ?? null, sinZona: !!d.sinZona,
+          fights: d.fights ?? 0, kills: d.kills ?? 0, deaths: d.deaths ?? 0,
+          maxHit: d.maxHit ?? 0,
           damageTo: d.damageTo ?? 0, taken: d.taken ?? 0,
           hpSamples: d.hpSamples ?? [], zones: new Set(d.zones ?? []),
           abil: habMapa(d.abil), abilFights: new Map(d.abilFights ?? []),
+          loot: new Map(d.loot ?? []),
+          modes: new Map(d.modes ?? []),
+          spells: new Map((d.spells ?? []).map((c) => [c.spell, {
+            spell: c.spell, landed: c.landed ?? 0, resisted: c.resisted ?? 0,
+            byInv: new Map((c.byInv ?? []).map((b) => [b.inv ?? '', { ...b }])),
+          }])),
         });
       }
       l.porNombre.set(e.name, e);
@@ -331,32 +408,67 @@ function terminar(e) {
     // deja de tener sentido y la interfaz enseña éstas.
     dificultades: [...e.porDif.values()]
       .map((d) => ({
-        diff: d.diff, tag: d.tag, fights: d.fights, kills: d.kills,
+        diff: d.diff, tag: d.tag, sinZona: !!d.sinZona,
+        // La clave del cajón, explícita. Hace falta porque «mundo abierto» y
+        // «sin zona conocida» tienen los dos `diff: null` y por el número no se
+        // distinguen: enlazar a una dificultad con un número las confundiría.
+        key: d.sinZona ? SIN_ZONA : diffKey(d.diff),
+        fights: d.fights, kills: d.kills,
+        deaths: d.deaths,
         maxHit: d.maxHit, damageTo: d.damageTo, taken: d.taken,
         zones: [...d.zones],
         hp: vida(d.hpSamples),
+        dps: d.fights && e.seconds ? d.damageTo / (e.seconds * d.fights / e.fights) : 0,
+        // En qué modo peleaste esta dificultad. Dato de la celda, no un eje.
+        modes: [...d.modes].sort((a, b) => b[1] - a[1]).map(([mode, n]) => ({ mode, n })),
         // Cada habilidad con en cuántos encuentros salió: es lo que se puede
         // afirmar. «Sus habilidades en D2» no; «lo que lanzó en los 2 encuentros
         // de D2» sí.
         abilities: [...d.abil.values()].map(finHabilidad)
           .map((a) => ({ ...a, inFights: d.abilFights.get(a.name) ?? 0 }))
           .sort((a, b) => b.sum - a.sum || a.name.localeCompare(b.name)).slice(0, 12),
+        // Lo que soltó EN ESTA dificultad.
+        lootList: [...d.loot].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+          .map(([item, n]) => ({ item, n })),
+        // Y qué te resistió aquí. `n` va SIEMPRE, incluso con dos intentos:
+        // partir la muestra es lo que obliga a enseñar su tamaño, porque una
+        // celda de «86% entra» sacada de 14 intentos y otra sacada de 400 se
+        // ven igual y no dicen lo mismo.
+        spells: finHechizos(d.spells),
       }))
+      // «No consta» al final y nunca antes que D0: no es una dificultad menor,
+      // es la ausencia de dato.
       .sort((a, b) => (a.diff ?? 99) - (b.diff ?? 99)),
-    spells: [...e.spells.values()]
-      .map((c) => ({
-        ...c,
-        rate: c.landed + c.resisted ? c.resisted / (c.landed + c.resisted) : 0,
-        // Sólo se desglosa si hubo intentos con más de una invocación: con una
-        // sola, repetir la misma cifra no aporta nada.
-        byInv: [...c.byInv.values()]
-          .filter((b) => b.landed + b.resisted >= 2)
-          .map((b) => ({ ...b, rate: b.resisted / (b.landed + b.resisted) }))
-          .sort((a, b) => (b.landed + b.resisted) - (a.landed + a.resisted)
-            || String(a.inv).localeCompare(String(b.inv))),
-      }))
-      .map((c) => ({ ...c, byInv: c.byInv.length > 1 ? c.byInv : [] }))
-      .sort((a, b) => (b.landed + b.resisted) - (a.landed + a.resisted)
-        || a.spell.localeCompare(b.spell)).slice(0, 12),
+    spells: finHechizos(e.spells),
   };
+}
+
+/**
+ * Hechizos tuyos contra ese enemigo, listos para enseñar.
+ *
+ * Se sacó a su propia función porque ahora hay dos juegos —el de la ficha
+ * común y el de cada dificultad— y son la misma cuenta. Si fueran dos
+ * implementaciones acabarían discrepando en algún caso raro y no habría forma
+ * de saber cuál miente, que es el mismo motivo por el que el contador es uno.
+ *
+ * `n` sale siempre y no como adorno: partido por dificultad, un «86% entra»
+ * puede venir de 14 intentos o de 400, y sin el tamaño se leen igual.
+ */
+function finHechizos(mapa) {
+  return [...mapa.values()]
+    .map((c) => ({
+      ...c,
+      n: c.landed + c.resisted,
+      rate: c.landed + c.resisted ? c.resisted / (c.landed + c.resisted) : 0,
+      // Sólo se desglosa si hubo intentos con más de una invocación: con una
+      // sola, repetir la misma cifra no aporta nada.
+      byInv: [...c.byInv.values()]
+        .filter((b) => b.landed + b.resisted >= 2)
+        .map((b) => ({ ...b, rate: b.resisted / (b.landed + b.resisted) }))
+        .sort((a, b) => (b.landed + b.resisted) - (a.landed + a.resisted)
+          || String(a.inv).localeCompare(String(b.inv))),
+    }))
+    .map((c) => ({ ...c, byInv: c.byInv.length > 1 ? c.byInv : [] }))
+    .sort((a, b) => (b.landed + b.resisted) - (a.landed + a.resisted)
+      || a.spell.localeCompare(b.spell)).slice(0, 12);
 }

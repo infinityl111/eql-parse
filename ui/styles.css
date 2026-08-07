@@ -777,6 +777,70 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
               font-size: 10.5px; color: var(--bone-faint); }
 .difcard-ab b { color: var(--bone-dim); font-family: var(--mono); }
 
+/* Las cinco columnas, siempre las cinco. Una tarjeta apagada dice «ahí no has
+   peleado», que es un dato: sin el hueco, faltar y valer cero se ven igual. */
+.difgrid.five { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.difcard.has { display: block; width: 100%; text-align: left; cursor: pointer;
+               border: 0; border-left: 2px solid var(--t-fire); font: inherit; }
+.difcard.has:hover { background: var(--slate-800); border-left-color: var(--t-cold); }
+.difcard.has:hover .difcard-go { color: var(--t-cold); }
+.difcard.void { border-left-color: var(--slate-700); opacity: .5; }
+.difcard.void .difcard-h { color: var(--bone-faint); }
+.difcard-none { font-family: var(--mono); color: var(--bone-faint); padding: 6px 0; }
+.difcard-h .dim { float: right; font-size: 9.5px; letter-spacing: .04em;
+                  text-transform: none; font-family: var(--mono); }
+.difcard-kv .foe b { color: var(--t-fire); }
+.difcard-res { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 10.5px; }
+.difcard-loot { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px 9px;
+                font-size: 10.5px; color: var(--bone-faint); }
+.difcard-loot b { font-family: var(--mono); color: var(--bone-dim); }
+.difcard-go { display: block; margin-top: 7px; font-size: 10px; letter-spacing: .06em;
+              text-transform: uppercase; font-family: var(--display); color: var(--bone-faint); }
+
+/* La muestra va SIEMPRE al lado del porcentaje. En gris cuando es corta: es la
+   forma de decir «esto no afirma nada» sin esconderlo ni escribir un párrafo. */
+.res { white-space: nowrap; color: var(--bone-faint); }
+.res b { font-family: var(--mono); }
+.res.thin { opacity: .62; }
+.reslist { display: flex; flex-wrap: wrap; gap: 5px 16px; font-size: 12px; margin-top: 6px; }
+
+/* Pestañas para saltar de una dificultad a otra sin volver atrás. */
+.dhermanas { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.dtab { background: var(--slate-850); border: 1px solid var(--slate-700); color: var(--bone-faint);
+        padding: 4px 10px; font-family: var(--display); font-size: 10.5px;
+        letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.dtab:hover { border-color: var(--t-cold); color: var(--bone); }
+.dtab.on { border-color: var(--t-fire); color: var(--t-fire); }
+.dtab .dim { font-family: var(--mono); }
+
+/* Rejilla de enemigos: una columna por dificultad, como en Zonas. */
+.fgrid-head, .encrow.fgrid { display: grid; align-items: center; gap: 0 6px;
+  grid-template-columns: minmax(150px, 1fr) repeat(5, 38px) 10px 60px minmax(90px, auto); }
+.fgrid-head { padding: 0 10px 4px; font-family: var(--display); font-size: 9.5px;
+  letter-spacing: .1em; color: var(--bone-faint); text-transform: uppercase; }
+.fgrid-head .num, .fgrid-head .zunknown { text-align: center; }
+.fcell { text-align: center; font-family: var(--mono); font-size: 12px;
+         color: var(--bone-faint); padding: 3px 0; border: 1px solid transparent; }
+.fcell.has { color: var(--bone); background: var(--slate-850); border-color: var(--slate-700); cursor: pointer; }
+.fcell.has:hover { border-color: var(--t-cold); color: var(--t-cold); }
+.fcell.void { opacity: .35; }
+
+/* El hueco que separa las dificultades medidas del cajón de «no consta». Es
+   estructura, no adorno: sin él la sexta columna se lee como una sexta
+   dificultad, que es justo lo que no es. */
+.zgap { width: 10px; }
+th.zgap, td.zgap { padding: 0; border-bottom: 0; }
+.zunknown { color: var(--bone-faint); font-style: italic; }
+
+/* Pestañas de dificultad del botín. */
+.loottabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+.lootTab { background: var(--slate-850); border: 1px solid var(--slate-700); color: var(--bone-faint);
+           padding: 4px 12px; font-family: var(--display); font-size: 10.5px;
+           letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.lootTab:hover { border-color: var(--t-cold); color: var(--bone); }
+.lootTab.on { border-color: var(--t-poison); color: var(--t-poison); }
+.lootdifs { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+
 /* ── Catálogo de hechizos ───────────────────────────── */
 /* Ocho columnas, y NUEVE cuando hay resistencias que enseñar: la de «daño
    efectivo» sólo aparece si alguna vez algo no entra al 100%, porque si no

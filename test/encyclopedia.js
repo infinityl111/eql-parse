@@ -191,16 +191,20 @@ console.log('\nlas zonas, tal y como se consultan');
   ok(!!guk && guk.celdas[2]?.foes === 1,
     'el 2 de «Old Guk 2» es parte del nombre y no una dificultad');
 
-  // El mundo abierto ES la dificultad 0. La línea de entrada no la escribe
-  // —una zona sin instanciar no dice «- Solo 0», no dice nada— y el analizador
-  // devuelve `null`, pero la pregunta «¿en qué dificultad?» tiene respuesta.
+  // Aquí ponía «el mundo abierto ES la dificultad 0», y era falso: una zona sin
+  // instanciar no tiene dificultad que declarar, no tiene la cero. Mientras las
+  // dos cosas compartieron cajón, la columna D0 de la rejilla contenía East
+  // Freeport — una columna rotulada como medida que contenía la ausencia de
+  // medida.
+  //
+  // La D0 de verdad existe y es otra cosa: «Nagafen's Lair - Group» a secas,
+  // instanciada, con la dificultad base. Medida un peldaño entero por debajo de
+  // D1 (0,873, del mismo tamaño que D1→D2 y D2→D3).
   const abierto = zonas.find((z) => z.base === 'Befallen');
-  ok(abierto.celdas[0]?.foes === 1, 'el mundo abierto cae en la columna D0',
-    JSON.stringify(abierto.celdas[0]));
-  ok(abierto.celdas[0]?.sinDeclarar === 1,
-    'y consta que el registro no llegó a declararla', abierto.celdas[0]?.sinDeclarar);
-  ok(abierto.celdas.slice(1).every((c) => c === null),
-    'sin ocupar ninguna de las otras cuatro');
+  ok(abierto.celdas.every((c) => c === null),
+    'el mundo abierto NO ocupa ninguna de las cinco columnas');
+  ok(abierto.sinMarca?.foes === 1,
+    'va a su propio cajón, rotulado como ausencia', JSON.stringify(abierto.sinMarca));
 
   const enD4 = enc.zoneFoes('Plane of Fear', 4);
   ok(enD4.length === 2 && enD4[0].name === 'Dread',

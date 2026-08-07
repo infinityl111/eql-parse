@@ -153,7 +153,10 @@ export function aggregate(fights, self = null) {
       const item = typeof l === 'string' ? l : l.item;
       if (!item) continue;
       const cur = loot.get(item) ?? { item, n: 0, from: new Set() };
-      cur.n += 1;
+      // Unidades, no recogidas: «2 Bone Chips» son dos. Las peleas guardadas
+      // antes de que la cantidad se capturase no traen `qty` y valen uno, que
+      // es lo que se supo de ellas — reconstruir el almacén las corrige.
+      cur.n += (typeof l === 'object' ? (l.qty ?? 1) : 1);
       if (typeof l === 'object' && l.from) cur.from.add(l.from);
       loot.set(item, cur);
     }
