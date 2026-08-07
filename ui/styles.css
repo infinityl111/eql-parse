@@ -841,6 +841,14 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .lootTab.on { border-color: var(--t-poison); color: var(--t-poison); }
 .lootdifs { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
 
+/* De dónde salió un compañero. Se enseña siempre y con colores distintos, por
+   lo mismo que con las clases: lo que has dicho tú y lo que se ha deducido no
+   pueden verse igual. */
+.src { font-family: var(--display); font-size: 9px; letter-spacing: .1em;
+       text-transform: uppercase; padding: 1px 5px; border: 1px solid; margin-left: 2px; }
+.src.manual { color: var(--t-cold); border-color: var(--t-cold); opacity: .8; }
+.src.auto { color: var(--bone-faint); border-color: var(--slate-700); }
+
 /* ── Catálogo de hechizos ───────────────────────────── */
 /* Ocho columnas, y NUEVE cuando hay resistencias que enseñar: la de «daño
    efectivo» sólo aparece si alguna vez algo no entra al 100%, porque si no

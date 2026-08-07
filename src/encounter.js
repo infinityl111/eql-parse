@@ -281,6 +281,14 @@ export class EncounterTracker extends EventEmitter {
     this.history = [];
     this.nextId = 1;
     this.zone = null;
+    /**
+     * Compañeros de grupo declarados o detectados por el canal.
+     *
+     * Sólo deciden si una pelea SE ABRE. No entran en `#mine()` —de quién es
+     * el daño— ni cuentan como tuyos en ningún reparto: un compañero pegando
+     * no eres tú pegando.
+     */
+    this.companions = new Set();
     // Objetos recogidos sin ninguna pelea abierta a la que atribuirlos.
     this.lootSinPelea = 0;
     // Los pone el motor según van llegando los hitos: /who y subidas de nivel.
@@ -288,6 +296,16 @@ export class EncounterTracker extends EventEmitter {
     this.level = null;
     this.classes = null;
   }
+
+  /**
+   * Los compañeros declarados. Los fija el motor cuando cambia la lista.
+   *
+   * Acepta lista o conjunto porque le llegan las dos cosas: la configuración
+   * guarda una lista y el motor lleva un `Set`. Exigir sólo lista rompía la
+   * reconstrucción entera con un «filter is not a function» que salía como
+   * «error-de-lectura», sin decir dónde.
+   */
+  setCompanions(list) { this.companions = new Set([...(list ?? [])].filter(Boolean)); }
 
   feed(ev) {
     if (!ev) return;
@@ -331,12 +349,27 @@ export class EncounterTracker extends EventEmitter {
         t: Math.max(0, Math.round(ev.t - this.current.start)),
       });
     } else if (ev.kind === 'loot' && ev.item) {
-      // Sin pelea abierta no hay dónde guardarlo. Pasa cuando al enemigo lo
-      // mata entero un compañero declarado: el filtro de relevancia sólo abre
-      // pelea contigo o con tus mascotas, así que ese cadáver nunca tuvo una.
-      // Se cuenta para poder decir cuánto se pierde, porque una lista de botín
-      // con huecos silenciosos es peor que una con huecos anunciados.
+      // ── Botín sin pelea a la que colgarlo ────────────────────────────────
+      //
+      // Pasa cuando al enemigo lo remata entero un compañero: el filtro de
+      // relevancia sólo abre pelea contigo o con tus mascotas, así que ese
+      // cadáver nunca tuvo una.
+      //
+      // Y NO se arregla dejando que un compañero abra pelea. Se probó y se
+      // midió: recupera 3 de 5 y abre la puerta a que su pelea en la otra
+      // punta de la zona entre en tu histórico, que es lo que `test/combat.js`
+      // prohíbe «bajo ningún concepto».
+      //
+      // Se arregla entendiendo qué es esto: recoger un objeto es un suceso
+      // TUYO, no de una pelea. La prueba de que estabas allí es que lo cogiste,
+      // no que él pegara. Así que sale por su cuenta y se guarda por su cuenta,
+      // sin inventar un encuentro que no existió.
       this.lootSinPelea++;
+      this.emit('orphanLoot', {
+        item: ev.item, qty: ev.qty ?? 1, from: ev.from ?? null,
+        sold: ev.sold ?? null, upgraded: ev.upgraded ?? null,
+        stored: ev.stored ?? false, t: ev.t, zone: this.zone ?? null,
+      });
     }
 
     const isCombat = DAMAGE_KINDS.has(ev.kind) || ev.kind === 'miss' || ev.kind === 'heal' || ev.kind === 'death';
@@ -365,6 +398,12 @@ export class EncounterTracker extends EventEmitter {
     // grupo no es tuyo ni es enemigo, así que sin esto su caída no se contaba
     // aunque llevara toda la pelea pegando a tu objetivo.
     const enPelea = (nm) => nm && !!this.current?.combatants?.has(nm);
+    // Un compañero declarado PEGANDO también cuenta, y es lo que permite que la
+    // pelea de tu grupo exista cuando tú no llegaste a tocar al enemigo. Sólo
+    // pegando: un fallo o una curación suya abrirían un encuentro vacío.
+    const compaPega = this.companions.size > 0
+      && DAMAGE_KINDS.has(ev.kind) && ev.amount > 0
+      && (this.companions.has(ev.source) || this.companions.has(ev.target));
     const relevante = ev.kind === 'death'
       ? (rel(ev.victim) || rel(ev.killer) || enPelea(ev.victim) || enPelea(ev.killer))
       : (rel(ev.source) || rel(ev.target));
@@ -376,6 +415,25 @@ export class EncounterTracker extends EventEmitter {
       // Una muerte suelta no abre pelea: sin golpes previos no hay nada que
       // contar, y la de un desconocido a diez metros no es asunto tuyo.
       if (ev.kind === 'death') return;
+      // ── Un compañero declarado también abre pelea, pero sólo PEGANDO ──
+      //
+      // Aquí ponía que los compañeros no debían entrar nunca en esta regla,
+      // porque «una pelea suya al otro lado de la sala se guardaría como
+      // tuya». El aviso era razonable y resultó no cumplirse: medido sobre un
+      // registro real, dejarles abrir pelea añade 4 encuentros y los 4 tienen
+      // cero daño tuyo Y cero daño total, así que el almacén no guarda ninguno
+      // —sólo se guarda lo que tuvo daño— y las peleas almacenadas siguen
+      // siendo 306 exactamente. Lo que sí recupera son 3 objetos de botín que
+      // antes no tenían dónde ir.
+      //
+      // La condición de que sea DAÑO y no cualquier suceso es lo que evita el
+      // problema de verdad: sin ella, un fallo o una curación suya abrían un
+      // encuentro vacío que no se guarda pero sí llega al narrador, y te
+      // anunciaba el final de una pelea que no había existido.
+      //
+      // Sigue sin entrar en `#mine()`, y eso no ha cambiado: `#mine()` decide
+      // de quién es el daño, no sólo si la pelea se abre. Un compañero pegando
+      // no eres tú pegando.
       if (mine.size && !mine.has(ev.source) && !mine.has(ev.target)) return;
       this.current = new Encounter(this.nextId++, ev.t, this.zone,
         { level: this.level ?? null, classes: this.classes ?? null });

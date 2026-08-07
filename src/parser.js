@@ -52,6 +52,7 @@ export class Parser {
     this.castWindow = (opts.castWindowSec ?? 12);
     this.recentCasts = [];      // [{t, source, ability}]
     this.pets = new Map();      // nombre de mascota -> dueño (confirmadas)
+    this.manualPets = new Set(); // las que has dicho tú: mandan sobre lo detectado
     this.petMaybe = new Set();  // sospechosas, sin confirmar
     this.otherPets = new Map(); // mascota ajena -> dueño, sacado de su /pet who leader
     this.currentPet = null;     // la última vista: en EQL el nombre cambia por invocación
@@ -109,20 +110,42 @@ export class Parser {
    */
   #ownPet(name) {
     if (!name) return;
-    if (this.currentPet && this.currentPet !== name) this.pets.delete(this.currentPet);
+    // Retirar la anterior es correcto —sólo se tiene una a la vez— salvo que la
+    // hubieras puesto TÚ. Lo que dices a mano no lo deshace una detección: si
+    // el registro se contradice contigo, gana lo que has dicho, y para quitarla
+    // hay un control en su fila. Sin esta excepción, marcar una mascota y que
+    // llegara un «My leader is» de otra la desmarcaba sola y sin avisar.
+    if (this.currentPet && this.currentPet !== name && !this.manualPets.has(this.currentPet)) {
+      this.pets.delete(this.currentPet);
+    }
     this.pets.set(name, this.self ?? 'You');
     this.petMaybe.delete(name);
     this.currentPet = name;
   }
 
-  /** Marca manual desde la interfaz, cuando el log no lo aclara. */
+  /**
+   * Marca manual desde la interfaz, cuando el registro no lo aclara.
+   *
+   * `manualPets` es lo que has dicho tú, y se guarda aparte de lo detectado
+   * porque manda sobre ello: ni la detección la retira ni se pierde al invocar
+   * otra. Es reversible con `unmarkPet`, que es el mismo camino al revés.
+   */
   markPet(name) {
     if (!name) return;
     this.pets.set(name, this.self ?? 'You');
+    this.manualPets.add(name);
     this.petMaybe.delete(name);
     this.currentPet = name;
   }
-  unmarkPet(name) { this.pets.delete(name); this.petMaybe.delete(name); if (this.currentPet === name) this.currentPet = null; }
+
+  /** Y el camino de vuelta, que es lo que hace reversible lo de arriba. */
+  unmarkPet(name) {
+    if (!name) return;
+    this.pets.delete(name);
+    this.manualPets.delete(name);
+    this.petMaybe.delete(name);
+    if (this.currentPet === name) this.currentPet = null;
+  }
 
   #norm(name) {
     if (name == null) return null;

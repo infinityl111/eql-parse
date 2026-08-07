@@ -45,8 +45,11 @@ import { parseZone, diffKey, labelDiff, DIFFS, SIN_MARCA } from './zones.js';
  *   2  el botín se cuenta también cuando el log no dice de quién cayó. La ficha
  *      del enemigo sólo puede quedarse con lo atribuido —es lo que la hace suya—
  *      y con eso la sección de Botín se dejaba fuera todo lo demás sin decirlo.
+ *   3  el botín recogido SIN pelea entra en el recuento y se dice aparte. Pasa
+ *      cuando el cadáver lo remató entero un compañero: ese combate nunca fue
+ *      tuyo, pero recoger el objeto sí. Antes se descartaba en silencio.
  */
-export const ENC_VERSION = 2;
+export const ENC_VERSION = 3;
 const FICHERO = 'encyclopedia.json';
 
 export class Encyclopedia {
@@ -56,6 +59,8 @@ export class Encyclopedia {
     /** Todo el botín visto, con o sin fuente. objeto -> {n, sinFuente} */
     this.loot = new Map();
     this.lastUid = -1;
+    /** Cuántas entradas de botín huérfano se han plegado ya. */
+    this.lastLoot = -1;
     this.at = null;
     this.dirty = false;
     this.saveTimer = null;
@@ -84,6 +89,7 @@ export class Encyclopedia {
     this.ledger = FoeLedger.fromJSON(guardado.foes);
     this.loot = new Map((guardado.loot ?? []).map(([k, v]) => [k, { ...v }]));
     this.lastUid = guardado.lastUid ?? -1;
+    this.lastLoot = guardado.lastLoot ?? -1;
     this.at = guardado.at ?? null;
     // Lo que pasó con la aplicación cerrada. Casi siempre son unas pocas.
     const folded = this.#alDia();
@@ -119,6 +125,39 @@ export class Encyclopedia {
       if (!f) continue;                       // registro ilegible: se salta y se dice en la auditoría
       this.#plegar({ ...f, at: s.at });
       this.lastUid = s.uid;
+      n++;
+    }
+    n += this.#plegarHuerfanos();
+    return n;
+  }
+
+  /**
+   * El botín que no tiene pelea, plegado por su cuenta.
+   *
+   * Recoger un objeto es un suceso TUYO: pasa aunque el cadáver lo rematara
+   * entero un compañero y ese combate nunca fuera tuyo. Antes se descartaba —5
+   * objetos en un registro real— y colgarlo de una pelea nunca iba a funcionar
+   * del todo, porque no pertenece a ninguna.
+   *
+   * Entra en el recuento global de Botín, que es donde la pregunta «¿cuántos
+   * tengo?» tiene respuesta. NO entra en la ficha del enemigo ni en el reparto
+   * por dificultad, y no por descuido: «2 de 11 caídas» necesita un denominador
+   * de peleas tuyas, y aquí no hay ninguna. Meterlo inflaría el numerador con
+   * un denominador que no lo acompaña. Se cuenta aparte y se dice.
+   */
+  #plegarHuerfanos() {
+    const lista = this.store.orphanLoot ?? [];
+    let n = 0;
+    for (let i = this.lastLoot + 1; i < lista.length; i++) {
+      const l = lista[i];
+      if (!l?.item) { this.lastLoot = i; continue; }
+      const e = this.loot.get(l.item) ?? { n: 0, sinFuente: 0, sinPelea: 0 };
+      const q = l.qty ?? 1;
+      e.n += q;
+      e.sinPelea = (e.sinPelea ?? 0) + q;
+      if (!l.from) e.sinFuente += q;
+      this.loot.set(l.item, e);
+      this.lastLoot = i;
       n++;
     }
     return n;
@@ -158,6 +197,9 @@ export class Encyclopedia {
     if (summary.uid <= this.lastUid) return false;
     this.#plegar({ ...fight, at: summary.at });
     this.lastUid = summary.uid;
+    // El botín sin pelea llega por su cuenta y en cualquier momento: se mira
+    // aquí porque es cuando la ficha se va a guardar de todas formas.
+    this.#plegarHuerfanos();
     this.dirty = true;
     this.#saveLater();
     return true;
@@ -169,6 +211,7 @@ export class Encyclopedia {
     this.ledger = new FoeLedger();
     this.loot = new Map();
     this.lastUid = -1;
+    this.lastLoot = -1;
     const folded = this.#alDia();
     this.rebuiltBecause = 'rebuild';
     const ok = this.#save();
@@ -190,7 +233,7 @@ export class Encyclopedia {
       this.at = Date.now();
       const cuerpo = JSON.stringify({
         version: ENC_VERSION, storeVersion: STORE_VERSION,
-        lastUid: this.lastUid, at: this.at,
+        lastUid: this.lastUid, lastLoot: this.lastLoot, at: this.at,
         foes: this.ledger.toJSON(),
         loot: [...this.loot],
       });
@@ -387,14 +430,15 @@ export class Encyclopedia {
   lootList() {
     const porObjeto = new Map();
     for (const [item, g] of this.loot) {
-      porObjeto.set(item, { item, n: g.n, sinFuente: g.sinFuente, from: [], porDif: new Map() });
+      porObjeto.set(item, { item, n: g.n, sinFuente: g.sinFuente,
+        sinPelea: g.sinPelea ?? 0, from: [], porDif: new Map() });
     }
     for (const e of this.ledger.porNombre.values()) {
       for (const [item, n] of e.loot) {
         // Un objeto atribuido a un enemigo que no está en el recuento global no
         // debería existir, pero si pasara se enseña igual antes que perderlo.
         let o = porObjeto.get(item);
-        if (!o) { o = { item, n, sinFuente: 0, from: [], porDif: new Map() }; porObjeto.set(item, o); }
+        if (!o) { o = { item, n, sinFuente: 0, sinPelea: 0, from: [], porDif: new Map() }; porObjeto.set(item, o); }
         // El desglose del enemigo, dificultad a dificultad. `kills` es el de esa
         // dificultad y no el total: decir «2 de 11» con los 11 de otra celda
         // sería un porcentaje inventado.

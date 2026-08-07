@@ -11,7 +11,6 @@ contextBridge.exposeInMainWorld('eql', {
   setNarrate: (n) => ipcRenderer.invoke('narrate:set', n),
   markPet: (name, on) => ipcRenderer.invoke('pet:mark', { name, on }),
   dismissPet: (n) => ipcRenderer.invoke('pet:dismiss', n),
-  setPetName: (name, on) => ipcRenderer.invoke('pets:names', { name, on }),
   setFlag: (key, value) => ipcRenderer.invoke('cfg:flag', { key, value }),
   onTheme: (fn) => ipcRenderer.on('theme', (_e, t) => fn(t)),
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
@@ -69,6 +68,8 @@ contextBridge.exposeInMainWorld('eql', {
   spellCatalog: (q) => ipcRenderer.invoke('catalog:spells', q),
   setExcluded: (name, on) => ipcRenderer.invoke('excluded:set', { name, on }),
   setCompanion: (name, on) => ipcRenderer.invoke('companions:set', { name, on }),
+  // Un companero detectado por el canal de grupo. Llega solo, sin pedirlo.
+  onCompanions: (fn) => ipcRenderer.on('companions', (_e, c) => fn(c)),
   setPetOwner: (pet, owner) => ipcRenderer.invoke('pet:owner', { pet, owner }),
   setTrios: (lista) => ipcRenderer.invoke('trios:set', lista),
   trioConflicts: () => ipcRenderer.invoke('trios:conflicts'),

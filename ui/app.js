@@ -289,6 +289,41 @@ const excluidos = () => new Set(state.cfg.excluded ?? []);
 const companeros = () => new Set(state.cfg.companions ?? []);
 
 /**
+ * De dónde salió que alguien es compañero: lo dijiste tú o se dedujo del canal.
+ *
+ * Se enseña siempre, como con las clases, y por lo mismo: medido y deducido no
+ * son la misma cosa y no pueden verse igual. Lo que no conste se da por dicho
+ * por ti, que es lo que era antes de que existiera la detección.
+ */
+const fuenteDe = (nombre) => ((state.cfg.companionSrc ?? {})[nombre] === 'auto' ? 'auto' : 'manual');
+
+/**
+ * Guarda la respuesta del puente sobre compañeros.
+ *
+ * Las tres listas —los declarados, de dónde salió cada uno y los que quitaste—
+ * viajan juntas y se aplican juntas. Copiar sólo una dejaba la insignia de
+ * procedencia describiendo un estado anterior, que es la clase de detalle que
+ * nadie mira hasta que miente.
+ */
+function aplicarCompaneros(r) {
+  if (!r) return;
+  if (r.companions) state.cfg.companions = r.companions;
+  if (r.companionSrc) state.cfg.companionSrc = r.companionSrc;
+  if (r.notCompanions) state.cfg.notCompanions = r.notCompanions;
+  // Quien deja de ser compañero deja de poder filtrar por él.
+  const vivos = new Set(state.cfg.companions ?? []);
+  state.filter.mates = (state.filter.mates ?? []).filter((x) => vivos.has(x));
+}
+
+// Un compañero detectado por el canal de grupo llega solo, sin haberlo pedido.
+window.eql.onCompanions?.((c) => {
+  aplicarCompaneros(c);
+  state.rowNodes.clear();
+  state.summary = null;
+  renderApp();
+});
+
+/**
  * Decir quién es alguien: excluirlo, declararlo compañero o asignar su
  * mascota a su dueño.
  *
@@ -309,40 +344,71 @@ const companeros = () => new Set(state.cfg.companions ?? []);
  * que acabar en `markPet` y no en la lista de ajenas.
  */
 async function asignarMascota(pet, dueno) {
-  if (dueno && dueno === state.snap?.self) {
+  const yo = state.snap?.self;
+  const eraMia = isMyPet(pet);
+  if (dueno && dueno === yo) {
     await window.eql.setPetOwner(pet, null);
-    await window.eql.markPet(pet, true);
+    const r = await window.eql.markPet(pet, true);
+    if (r?.myPets) { state.cfg.myPets = r.myPets; state.cfg.notPets = r.notPets; }
     return;
+  }
+  // Quitártela es tan explícito como ponértela. Sin esta línea, elegir «nadie»
+  // sobre una mascota tuya no hacía absolutamente nada: la decisión de que era
+  // tuya sólo se podía deshacer editando el fichero de configuración a mano.
+  if (eraMia) {
+    const r = await window.eql.markPet(pet, false);
+    if (r?.myPets) { state.cfg.myPets = r.myPets; state.cfg.notPets = r.notPets; }
   }
   await window.eql.setPetOwner(pet, dueno);
 }
 
+/**
+ * Los controles de una fila, y por qué salen SIEMPRE.
+ *
+ * Aquí había un `if (esMio) return ''` que dejaba sin controles a tu personaje
+ * y a tus mascotas. Para tu personaje está bien —no te asignas dueño a ti
+ * mismo—, pero para una mascota era un callejón sin salida: en cuanto la
+ * marcabas tuya, la fila perdía el desplegable y no había forma de deshacerlo
+ * desde la aplicación. Una decisión que sólo se revierte editando un fichero
+ * no es reversible.
+ *
+ * Ahora el desplegable sale también cuando ya es tuya, con tu nombre elegido, y
+ * volver a «nadie» la suelta.
+ */
 function controlesDeFila(r, filas = []) {
-  const esMio = r.name === state.snap?.self || isMyPet(r.name);
-  if (esMio) return '';
+  const yo = state.snap?.self;
+  if (r.name === yo) return '';
+  const mia = isMyPet(r.name);
   const yaEs = companeros().has(r.name);
-  // Los dueños posibles son los jugadores que están AHÍ, en lo que estás
-  // mirando. Se quitan las mascotas —ni las tuyas ni las ajenas tienen
-  // mascota— y el propio combatiente.
-  const duenos = filas
+  // Los dueños posibles: quien esté en lo que estás mirando, más TÚ siempre, y
+  // más los compañeros que hayas declarado aunque no salgan en esta pelea. Antes
+  // salían sólo los presentes, así que la mascota de un compañero que no había
+  // llegado a pegar no tenía a quién asignarse.
+  const presentes = filas
     .filter((x) => x.side !== 'enemy' && x.name !== r.name && !x.petOf
       && !isMyPet(x.name) && !x.merged)
     .map((x) => x.name);
+  const duenos = [...new Set([yo, ...presentes, ...companeros()])]
+    .filter((n) => n && n !== r.name);
+  // Si ya es tuya, el dueño actual eres tú: se dice en el desplegable en vez de
+  // dejarlo en «nadie», que sería mentir sobre lo que hay puesto.
+  const actual = mia ? yo : (r.petOf ?? '');
   const asignar = !duenos.length ? '' : `<label class="petof">
     ${esc(t('pet.ownerOf'))}
     <select class="petof-sel" data-pet="${esc(r.name)}">
-      <option value="">${esc(t('pet.ownerNone'))}</option>
+      <option value=""${actual ? '' : ' selected'}>${esc(t('pet.ownerNone'))}</option>
       ${duenos.map((n) => `<option value="${esc(n)}"${
-    r.petOf === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}
+    actual === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}
     </select></label>`;
   return `<div class="sec">
-    <button class="excl-btn" data-excl="${esc(r.name)}">${esc(t('excl.remove'))}</button>
-    ${r.petOf ? '' : `<button class="excl-btn mate" data-mate="${esc(r.name)}" data-on="${yaEs ? '0' : '1'}">${
+    ${mia ? '' : `<button class="excl-btn" data-excl="${esc(r.name)}">${esc(t('excl.remove'))}</button>`}
+    ${r.petOf || mia ? '' : `<button class="excl-btn mate" data-mate="${esc(r.name)}" data-on="${yaEs ? '0' : '1'}">${
     esc(yaEs ? t('mate.remove') : t('mate.add'))}</button>`}
     ${asignar}
-    ${r.petOf ? `<span class="hint">${esc(t('pet.ownedBy', { who: r.petOf }))}</span>`
-    : yaEs ? `<span class="hint">${esc(t('mate.declared'))}</span>`
-      : r.unidentified ? `<span class="hint">${esc(t('side.unknownNote'))}</span>` : ''}
+    ${mia ? `<span class="hint">${esc(t('pet.isMineNote'))}</span>`
+    : r.petOf ? `<span class="hint">${esc(t('pet.ownedBy', { who: r.petOf }))}</span>`
+      : yaEs ? `<span class="hint">${esc(t('mate.declared'))}</span>`
+        : r.unidentified ? `<span class="hint">${esc(t('side.unknownNote'))}</span>` : ''}
   </div>`;
 }
 
@@ -695,7 +761,7 @@ function buildRow(name) {
         ? await window.eql.setCompanion(btn.dataset.mate, btn.dataset.on === '1')
         : await window.eql.setExcluded(btn.dataset.excl, true);
       state.cfg.excluded = r.excluded ?? state.cfg.excluded;
-      state.cfg.companions = r.companions ?? state.cfg.companions;
+      aplicarCompaneros(r);
       state.rowNodes.clear();
       if ($('rows')) $('rows').innerHTML = '';
       state.summary = null;
@@ -1154,8 +1220,29 @@ async function renderNarrate(host) {
     <div class="hint">${esc(t('mate.note'))}</div>
     <div class="excl-list" id="mateList">${(state.cfg.companions ?? []).length
       ? (state.cfg.companions ?? []).map((x) => `<span class="excl-item mate"><b>${esc(x)}</b>
+          <span class="src ${fuenteDe(x)}">${esc(t(`mate.src.${fuenteDe(x)}`))}</span>
           <button class="petbtn" data-unmate="${esc(x)}">${esc(t('mate.remove'))}</button></span>`).join('')
       : `<span class="hint">${esc(t('mate.empty'))}</span>`}</div>
+    ${(state.cfg.notCompanions ?? []).length ? `<div class="hint" style="margin-top:8px">${
+    esc(t('mate.rejected'))}</div>
+    <div class="excl-list" id="notMateList">${(state.cfg.notCompanions ?? []).map((x) => `<span class="excl-item"><b>${esc(x)}</b>
+      <button class="petbtn" data-remate="${esc(x)}">${esc(t('mate.add'))}</button></span>`).join('')}</div>` : ''}
+
+    <!--
+      Las mascotas que has declarado tuyas, y las que has dicho que no lo son.
+      Esta lista no existía y hacía falta: las declaradas por versiones
+      anteriores se quedaban en la configuración sin ningún botón que las
+      quitase, porque el único camino para borrarlas nunca se llamó desde aquí.
+    -->
+    <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('pet.mineTitle'))}</div>
+    <div class="hint">${esc(t('pet.mineNote'))}</div>
+    <div class="excl-list" id="petList">${(state.cfg.myPets ?? []).length
+      ? (state.cfg.myPets ?? []).map((x) => `<span class="excl-item"><b>${esc(x)}</b>
+          <button class="petbtn" data-unpet="${esc(x)}">${esc(t('pet.notMine'))}</button></span>`).join('')
+      : `<span class="hint">${esc(t('pet.mineEmpty'))}</span>`}</div>
+    ${(state.cfg.notPets ?? []).length ? `<div class="hint" style="margin-top:8px">${esc(t('pet.notMineTitle'))}</div>
+    <div class="excl-list" id="notPetList">${(state.cfg.notPets ?? []).map((x) => `<span class="excl-item"><b>${esc(x)}</b>
+      <button class="petbtn" data-repet="${esc(x)}">${esc(t('pet.mine'))}</button></span>`).join('')}</div>` : ''}
 
     <div class="narrate-row">
       <label class="eyebrow">${t('voice.cut')}
@@ -1239,10 +1326,31 @@ async function renderNarrate(host) {
     state.summary = null;
     renderApp();
   }));
+  // «Ya no es mía» y «vuelve a serlo»: el mismo camino en los dos sentidos.
+  const declararMascota = async (nombre, on) => {
+    const r = await window.eql.markPet(nombre, on);
+    if (r?.myPets) { state.cfg.myPets = r.myPets; state.cfg.notPets = r.notPets; }
+    state.rowNodes.clear();
+    state.summary = null;
+    refreshFights();
+    renderApp();
+  };
+  host.querySelectorAll('[data-unpet]').forEach((el) => el.addEventListener('click',
+    () => declararMascota(el.dataset.unpet, false)));
+  host.querySelectorAll('[data-repet]').forEach((el) => el.addEventListener('click',
+    () => declararMascota(el.dataset.repet, true)));
+  host.querySelectorAll('[data-remate]').forEach((el) => el.addEventListener('click', async () => {
+    const r = await window.eql.setCompanion(el.dataset.remate, true);
+    aplicarCompaneros(r);
+    state.rowNodes.clear();
+    state.summary = null;
+    refreshFights();
+    renderApp();
+  }));
   host.querySelectorAll('[data-unmate]').forEach((el) => el.addEventListener('click', async () => {
     const n = el.dataset.unmate;
     const r = await window.eql.setCompanion(n, false);
-    state.cfg.companions = r.companions ?? [];
+    aplicarCompaneros(r);
     state.cfg.excluded = r.excluded ?? state.cfg.excluded;
     // Quien deja de ser compañero deja de poder filtrar por él.
     state.filter.mates = (state.filter.mates ?? []).filter((x) => x !== n);
@@ -1433,13 +1541,24 @@ function renderPetHint(snap) {
         <button class="petbtn no" data-name="${esc(c)}">${esc(t('pet.notMine'))}</button>
       </span>`).join('')}</div>
   </div>`;
+  // Responder aquí es una declaración como cualquier otra: se guarda, se puede
+  // ver en Ajustes y se puede deshacer desde allí o desde la fila.
   host.querySelectorAll('.petbtn.yes').forEach((el) => el.addEventListener('click', async () => {
-    await window.eql.markPet(el.dataset.name, true);
+    const r = await window.eql.markPet(el.dataset.name, true);
+    if (r?.myPets) { state.cfg.myPets = r.myPets; state.cfg.notPets = r.notPets; }
     host.dataset.sig = '';
+    state.rowNodes.clear();
+    renderApp();
   }));
   host.querySelectorAll('.petbtn.no').forEach((el) => el.addEventListener('click', async () => {
     await window.eql.dismissPet(el.dataset.name);
+    // «No es mía» también se recuerda: si no, la siguiente invocación con ese
+    // mismo nombre —en EQL se reciclan— volvería a preguntarte por ella.
+    const r = await window.eql.markPet(el.dataset.name, false);
+    if (r?.myPets) { state.cfg.myPets = r.myPets; state.cfg.notPets = r.notPets; }
     host.dataset.sig = '';
+    state.rowNodes.clear();
+    renderApp();
   }));
 }
 
@@ -1923,7 +2042,7 @@ function renderSummary() {
       ? await window.eql.setCompanion(btn.dataset.mate, btn.dataset.on === '1')
       : await window.eql.setExcluded(btn.dataset.excl, true);
     state.cfg.excluded = r.excluded ?? state.cfg.excluded;
-    state.cfg.companions = r.companions ?? state.cfg.companions;
+    aplicarCompaneros(r);
     state.rowNodes.clear();
     if (btn.dataset.mate) refreshFights();
     await recargarResumen();
@@ -2875,6 +2994,7 @@ function encBotin() {
         <span class="num">${esc(t('enc.outOf', { n: f.n, k: f.kills }))}</span>
       </button>`).join('')}
       ${o.sinFuente ? `<div class="hint">${esc(t('enc.noSource', { n: o.sinFuente }))}</div>` : ''}
+      ${o.sinPelea ? `<div class="hint">${esc(t('enc.noFight', { n: o.sinPelea }))}</div>` : ''}
     </div>`).join('')}</div>
     <div class="hint">${esc(t('enc.lootNote'))}</div>`
     : `<div class="hint">${esc(t('enc.noMatch'))}</div>`}`;

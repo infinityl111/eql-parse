@@ -11,6 +11,7 @@ const DEFAULTS = {
   logPath: null, self: null, idleSec: 20, fromStart: false,
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
   skipVersion: null, trios: [], mergePets: false, myPets: [], notPets: [], fpsWarned: false, excluded: [],
+  notCompanions: [], companionSrc: {},
   companions: [],
   tts: { enabled: true, voice: null, rate: 1, volume: 1 },
   sound: { enabled: true, volume: 0.5 },
@@ -193,6 +194,30 @@ async function boot() {
   engine.on('encounter', (f) => {
     if (f && overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send('fight:closed', f);
   });
+  // Alguien ha hablado por el canal de grupo: esta en tu grupo.
+  //
+  // Se anade solo y se dice que ha sido automatico, en vez de preguntar. Un
+  // cartel por cada companero que abre la boca seria peor que el problema: la
+  // senal es fiable —cero falsos positivos sobre un registro real— y quitarlo
+  // cuesta un clic, en su fila o en Ajustes. Lo que NO se hace es anadir en
+  // silencio: la lista dice de donde salio cada uno.
+  //
+  // Si ya lo quitaste una vez, no vuelve. Sin `notCompanions`, quitarlo duraria
+  // hasta que ese jugador dijera la siguiente frase.
+  engine.on('groupmate', (name) => {
+    if (!name) return;
+    if ((cfg.companions ?? []).includes(name)) return;
+    if ((cfg.notCompanions ?? []).includes(name)) return;
+    if ((cfg.excluded ?? []).includes(name)) return;
+    cfg.companions = [...(cfg.companions ?? []), name];
+    cfg.companionSrc = { ...(cfg.companionSrc ?? {}), [name]: 'auto' };
+    engine.setCompanions(cfg.companions);
+    saveConfig(cfg);
+    send('companions', {
+      companions: cfg.companions, companionSrc: cfg.companionSrc,
+      notCompanions: cfg.notCompanions ?? [], detected: name,
+    });
+  });
   // Sólo habla la ventana principal, para no oír el aviso dos veces.
   engine.on('alert', (a) => {
     if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('alert', { ...a, speak: cfg.tts.enabled ? a.speak : null });
@@ -254,9 +279,29 @@ ipcMain.handle('narrate:set', (_e, n) => {
   return cfg.narrate;
 });
 
+/**
+ * «Esta mascota es mía» / «ya no». Una sola puerta, y persistente.
+ *
+ * Antes había DOS: ésta, que sólo se lo decía al analizador y se olvidaba al
+ * cerrar, y `pets:names`, que sí guardaba pero no la llamaba nadie desde la
+ * interfaz. El resultado era que marcar una mascota duraba la sesión, y que las
+ * que había en la configuración de versiones anteriores no tenían forma de
+ * quitarse: la única vía para borrarlas estaba huérfana.
+ *
+ * `notPets` no es sólo «quítala»: es «y no vuelvas a proponérmela». Por eso una
+ * desmarcada se apunta ahí y no basta con sacarla de `myPets` — la detección la
+ * volvería a añadir en la siguiente invocación con ese mismo nombre, que en EQL
+ * se reciclan.
+ */
 ipcMain.handle('pet:mark', (_e, { name, on }) => {
-  if (on) engine.markPet(name); else engine.unmarkPet(name);
-  return true;
+  const my = new Set(cfg.myPets ?? []);
+  const not = new Set(cfg.notPets ?? []);
+  if (on) { my.add(name); not.delete(name); engine.markPet(name); }
+  else { my.delete(name); not.add(name); engine.unmarkPet(name); }
+  cfg.myPets = [...my];
+  cfg.notPets = [...not];
+  saveConfig(cfg);
+  return { myPets: cfg.myPets, notPets: cfg.notPets };
 });
 
 ipcMain.handle('onboarding:set', (_e, v) => { cfg.onboarded = !!v; saveConfig(cfg); return cfg.onboarded; });
@@ -463,14 +508,9 @@ ipcMain.handle('pet:dismiss', (_e, n) => engine.dismissPet(n));
 
 ipcMain.handle('cfg:flag', (_e, { key, value }) => { cfg[key] = value; saveConfig(cfg); return true; });
 
-ipcMain.handle('pets:names', (_e, { name, on }) => {
-  // Lista explícita del usuario: manda sobre lo que detecte el registro.
-  const my = new Set(cfg.myPets ?? []); const not = new Set(cfg.notPets ?? []);
-  if (on) { my.add(name); not.delete(name); } else { my.delete(name); not.add(name); }
-  cfg.myPets = [...my]; cfg.notPets = [...not];
-  saveConfig(cfg);
-  return { myPets: cfg.myPets, notPets: cfg.notPets };
-});
+// Aquí vivía `pets:names`, que hacía exactamente esto mismo pero sin avisar al
+// analizador y sin que lo llamara nadie. Dos puertas para la misma decisión son
+// dos sitios donde puede quedarse a medias: la que queda es `pet:mark`.
 
 // Combatientes que has dicho que no son tuyos. Se aplica al MOSTRAR, no al
 // guardar: vale para todo el historico sin reconstruir y se puede deshacer.
@@ -486,17 +526,49 @@ ipcMain.handle('excluded:set', (_e, { name, on }) => {
   return { excluded: cfg.excluded, companions: cfg.companions ?? [] };
 });
 
-// Compañeros de grupo declarados. El log de EQL no da ninguna señal de grupo
-// —se busco y no hay— asi que declararlos es la unica via. Como las
-// exclusiones, se aplican al MOSTRAR y se recuerdan entre sesiones.
-ipcMain.handle('companions:set', (_e, { name, on }) => {
+// Compañeros de grupo: declarados por ti o detectados por el canal de grupo.
+//
+// Aqui ponia que «el log de EQL no da ninguna senal de grupo — se busco y no
+// hay». Era FALSO: quien habla por el canal `group` esta en tu grupo, y esas
+// lineas ya se analizaban para leerlas en voz alta. Medido sobre un registro
+// real, los emisores de ese canal son exactamente los companeros declarados a
+// mano, sin un solo falso positivo. El de gremio no vale: un companero de
+// gremio no esta en tu grupo.
+//
+// Como las exclusiones, se aplican al MOSTRAR y se recuerdan entre sesiones.
+//
+// `companionSrc` guarda de donde salio cada uno —'auto' o 'manual'— y se
+// ensena, igual que con las clases: no es lo mismo lo que has dicho tu que lo
+// que se ha deducido. Declarar a mano uno detectado lo asciende a 'manual', que
+// es lo correcto: tu palabra es mas firme que una deduccion.
+//
+// `notCompanions` es «lo he quitado, no me lo vuelvas a proponer». Sin ella, la
+// deteccion volveria a anadirlo en cuanto ese jugador hablase otra vez, y
+// quitarlo no seria quitarlo.
+ipcMain.handle('companions:set', (_e, { name, on, src = 'manual' }) => {
   const s = new Set(cfg.companions ?? []);
-  if (on) s.add(name); else s.delete(name);
+  const no = new Set(cfg.notCompanions ?? []);
+  const fuentes = { ...(cfg.companionSrc ?? {}) };
+  if (on) {
+    s.add(name);
+    no.delete(name);
+    // Lo detectado no pisa una declaracion tuya; lo tuyo si asciende lo detectado.
+    if (src === 'manual' || !fuentes[name]) fuentes[name] = src;
+  } else {
+    s.delete(name);
+    delete fuentes[name];
+    no.add(name);
+  }
   cfg.companions = [...s];
+  cfg.notCompanions = [...no];
+  cfg.companionSrc = fuentes;
   if (on) cfg.excluded = (cfg.excluded ?? []).filter((x) => x !== name);
   engine?.setCompanions(cfg.companions);
   saveConfig(cfg);
-  return { companions: cfg.companions, excluded: cfg.excluded ?? [] };
+  return {
+    companions: cfg.companions, excluded: cfg.excluded ?? [],
+    companionSrc: cfg.companionSrc, notCompanions: cfg.notCompanions,
+  };
 });
 
 // «Esa mascota es de aquel», a mano. Dura la sesion, como el /pet who leader:

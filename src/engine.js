@@ -171,12 +171,21 @@ export class Engine extends EventEmitter {
     this.knownPets = new Set();  // todas las vistas alguna vez, entre sesiones
     this.petsSaved = 0;
     this.notMine = new Set();    // aliados que ya dijiste que no son tuyos
-    // Compañeros de grupo declarados por ti.
+    // Compañeros de grupo: declarados por ti o detectados por el canal.
     //
-    // El log de EQL no dice quién va en tu grupo —ni invitaciones, ni entradas,
-    // ni salidas: se buscó y no hay nada—, así que un jugador que pega a tus
-    // enemigos no se distingue de uno que pasaba por allí. Declararlo es la
-    // única vía.
+    // Aquí ponía que el log no da ninguna señal de grupo —«ni invitaciones, ni
+    // entradas, ni salidas: se buscó y no hay nada»— y era FALSO. Quien habla
+    // por el canal de grupo está en tu grupo, y esas líneas ya se analizaban
+    // para leerlas en voz alta. El comentario, escrito cuando se buscaron
+    // mensajes de sistema y no se encontraron, impidió durante meses ver que la
+    // señal estaba en el chat.
+    //
+    // Lo que sigue siendo cierto es lo otro: un jugador que pega a tus enemigos
+    // y no habla no se distingue de uno que pasaba por allí, así que para ése
+    // la única vía sigue siendo declararlo.
+    //
+    // De dónde salió cada uno se guarda y se enseña, como con las clases: no es
+    // lo mismo lo que has dicho tú que lo que se ha deducido.
     //
     // ESTO NO ENTRA EN #mine(). Ahí sólo van tú y tus mascotas, porque #mine()
     // decide si una pelea SE ABRE, y tu mascota pegando eres tú pegando
@@ -185,6 +194,8 @@ export class Engine extends EventEmitter {
     // dieron los nombres de mascota reciclados, pero declarado y permanente.
     // Un compañero declarado dice QUIÉN ES, no que su pelea sea tuya.
     this.companions = new Set();
+    /** Quién ha hablado por el canal de grupo en esta sesión. */
+    this.groupSeen = new Set();
     this.storePath = null;      // fichero de peleas guardadas
     this.store = null;
     this.history = [];          // peleas cerradas, la más reciente primero
@@ -238,11 +249,19 @@ export class Engine extends EventEmitter {
     this.parser = new Parser({ self: this.self });
     this.narrator.setSelf(this.self);
     this.narrator.setPets([]);
+    // Lo que declaraste tuyo se le devuelve al analizador recién creado. El
+    // analizador se rehace en cada enganche, así que sin esto una mascota
+    // marcada a mano se perdía en cuanto se reiniciaba o se cambiaba de log.
+    for (const n of opts.myPets ?? []) this.parser.markPet(n);
+    for (const n of opts.notPets ?? []) this.parser.unmarkPet(n);
+    // Y los compañeros, por lo mismo: el rastreador es nuevo en cada enganche.
+    if (opts.companions?.length) this.companions = new Set(opts.companions);
     this.tracker = new EncounterTracker({
       self: this.self,
       idleSec: opts.idleSec ?? 20,
       closeOnDeath: opts.closeOnDeath ?? false,
     });
+    this.tracker.setCompanions(this.companions);
     this.tracker.on('close', (enc) => {
       const f = this.#enc(enc);
       let cerrada = null;              // la versión recortada, para el overlay
@@ -272,11 +291,43 @@ export class Engine extends EventEmitter {
           this.closedFights.unshift(cerrada);
           if (this.closedFights.length > OVERLAY_FIGHTS) this.closedFights.length = OVERLAY_FIGHTS;
         }
+      } else if (f) {
+        // Una pelea sin daño no se guarda, y está bien: no describe nada. Pero
+        // el botín que se recogiera dentro sí existe, y se iba con ella.
+        //
+        // Un caso medido, un `Rusty Long Sword` de un esqueleto: algo abrió la
+        // pelea, nadie llegó a pegar, y el objeto desapareció sin salir en
+        // ningún contador. Va al mismo sitio que el botín sin pelea, que es lo
+        // que es — la pelea a la que se colgó no llegó a existir.
+        for (const l of f.loot ?? []) {
+          if (!l?.item) continue;
+          this.store?.appendLoot({
+            ...l, t: (f.start ?? 0) + (l.t ?? 0),
+            at: Math.round(((f.start ?? Date.now() / 1000) + (l.t ?? 0)) * 1000),
+            zone: f.zone ?? null, zoneBase: f.zoneBase ?? null,
+            diff: f.diff ?? null, diffTag: f.diffTag ?? null,
+          });
+          this.storeSeq++;
+        }
       }
       this.petPrompt(f);
       this.emit('encounter', cerrada);
     });
     this.tracker.on('open', () => { this.foes.clear(); this.narrator.fightStart(); });
+    // Botín sin pelea: va derecho al almacén, por su cuenta.
+    //
+    // No se cuelga de la pelea anterior ni de la siguiente: el último cierre
+    // podía ser ocho minutos antes y en otra zona, así que atribuírselo sería
+    // inventar. Y no se descarta, que es lo que pasaba: son objetos que tienes.
+    this.tracker.on('orphanLoot', (e) => {
+      if (this.backfilling) { /* precargado: igual entra, es un hecho del registro */ }
+      const z = e.zone ? parseZone(e.zone) : null;
+      this.store?.appendLoot({
+        ...e, at: Math.round((e.t ?? Date.now() / 1000) * 1000),
+        zoneBase: z?.base ?? null, diff: z?.diff ?? null, diffTag: z?.tag ?? null,
+      });
+      this.storeSeq++;
+    });
     // Acumulador de sesión: mismos eventos, pero no se cierra nunca. Es la
     // referencia de cómo llevas la sesión, y sólo se pone a cero cuando tú lo
     // pides. La pila de combates del overlay arranca vacía con cada log: las
@@ -424,6 +475,23 @@ export class Engine extends EventEmitter {
     this.#applyTrios(ev.t);
     // El /who de tu propio personaje es la única fuente que no admite dudas.
     if (ev.kind === 'who' && ev.who) this.whoSeen.add(ev.who);
+    // ── Compañeros de grupo, detectados por el canal ────────────────────
+    //
+    // Quien habla por el canal de grupo ESTÁ en tu grupo. Es la señal que se
+    // dio por inexistente durante meses —el comentario decía «se buscó y no hay
+    // nada»— y estaba en el chat, que ya se analizaba para leerlo en voz alta.
+    //
+    // Medido sobre un registro real: los emisores del canal `group` son
+    // exactamente los dos compañeros que el usuario había declarado a mano, sin
+    // un solo falso positivo. El canal de gremio NO vale y no se usa: un
+    // compañero de gremio no está en tu grupo.
+    //
+    // Se propone, no se impone: quien lo recibe decide, y quitarlo se recuerda.
+    if (ev.kind === 'chat' && ev.channel === 'group' && ev.from
+        && ev.from !== (this.self ?? 'You') && !this.groupSeen.has(ev.from)) {
+      this.groupSeen.add(ev.from);
+      this.emit('groupmate', ev.from);
+    }
     if (ev.kind === 'who' && ev.who === (this.self ?? 'You') && ev.classes?.length) {
       const man = this.trioActive;
       const changed = this.whoClasses && this.whoClasses.join() !== ev.classes.join();
@@ -1378,11 +1446,37 @@ export class Engine extends EventEmitter {
   /** Los compañeros que has declarado. Los fija el proceso principal. */
   setCompanions(list) {
     this.companions = new Set((list ?? []).filter(Boolean));
+    // Y al rastreador, que los necesita para saber si abrir una pelea en la que
+    // no llegaste a pegar. Sin esta línea la lista existía sólo para pintar.
+    this.tracker?.setCompanions(this.companions);
     return [...this.companions];
   }
 
-  markPet(name) { this.parser?.markPet(name); this.narrator.setPets([...(this.parser?.pets.keys() ?? [])]); }
-  unmarkPet(name) { this.parser?.unmarkPet(name); this.narrator.setPets([...(this.parser?.pets.keys() ?? [])]); }
+  markPet(name) { this.parser?.markPet(name); this.#refrescarMascotas(); }
+  unmarkPet(name) { this.parser?.unmarkPet(name); this.#refrescarMascotas(); }
+
+  /**
+   * Lo que declaraste tuyo, aplicado al arrancar.
+   *
+   * Sin esto, marcar una mascota duraba lo que durase la sesión: se guardaba en
+   * la configuración y nadie se la volvía a dar al analizador, así que tras
+   * reiniciar el filtro de relevancia no la conocía. Una decisión que hay que
+   * repetir cada vez no es una decisión, es una molestia.
+   */
+  setMyPets(list = [], notList = []) {
+    for (const n of list) this.parser?.markPet(n);
+    for (const n of notList) this.parser?.unmarkPet(n);
+    this.#refrescarMascotas();
+    return [...(this.parser?.pets.keys() ?? [])];
+  }
+
+  /** Quien lee mascotas las lee de un solo sitio, y se avisa a la vez. */
+  #refrescarMascotas() {
+    const vivas = [...(this.parser?.pets.keys() ?? [])];
+    this.narrator.setPets(vivas);
+    if (this.tracker) this.tracker.petNames = new Set(vivas);
+    return vivas;
+  }
 
   /**
    * Aliados sin identificar: pegan a lo mismo que tú pero no se sabe qué son.

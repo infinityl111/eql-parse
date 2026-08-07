@@ -76,8 +76,14 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  *                   recogido se contaba por veces y no por unidades, así que
  *                   «2 Bone Chips» valía uno. Releyendo el log salen 764
  *                   unidades donde antes se veían 583.
+ *   5               El botin recogido de un cadaver que remato entero un
+ *                   companero no tenia pelea a la que colgarse y se perdia. Se
+ *                   guarda aparte, en `loot.ndjson`, porque recoger un objeto
+ *                   es un suceso TUYO y no de un combate: la prueba de que
+ *                   estabas alli es que lo cogiste. Eran 5 objetos en un
+ *                   registro real.
  */
-export const STORE_VERSION = 4;
+export const STORE_VERSION = 5;
 const META = 'store.json';
 
 /** Generación de un almacén ya marcado. Lo que no sea un número es anterior. */
@@ -93,6 +99,12 @@ export class FightStore {
     this.self = self;
     this.dataPath = path.join(dir, 'fights.ndjson');
     this.idxPath = path.join(dir, 'fights.idx');
+    // Botín recogido sin ninguna pelea a la que colgarlo. Fichero propio y no
+    // un campo de las peleas, porque no pertenece a ninguna: recoger algo es un
+    // suceso tuyo y existe aunque no hubiera combate. Ver `orphanLoot`.
+    this.lootPath = path.join(dir, 'loot.ndjson');
+    this.orphanLoot = [];
+    this.lootSeen = new Set();
     this.index = [];        // resúmenes, del más reciente al más antiguo
     this.cache = new Map(); // uid -> pelea completa, para no releer el disco
     this.byUid = new Map();
@@ -174,6 +186,7 @@ export class FightStore {
     this.byUid.clear();
     this.seen.clear();
     this.dropped = 0;
+    this.#loadLoot();
     try {
       const raw = fs.readFileSync(this.idxPath, 'utf8');
       for (const line of raw.split('\n')) {
@@ -265,6 +278,47 @@ export class FightStore {
    * Si esa pelea ya está guardada devuelve la que había sin escribir nada: así
    * releer el log entero es idempotente y deja de multiplicar el histórico.
    */
+  /**
+   * Botín recogido sin ninguna pelea a la que colgarlo.
+   *
+   * Fichero aparte y no un campo dentro de una pelea, porque no pertenece a
+   * ninguna: el cadáver lo remató entero un compañero y ese combate nunca fue
+   * tuyo. Lo que sí es tuyo es haberlo recogido, y eso pasó.
+   *
+   * Se deduplica por (hora, objeto, de quién) para que releer el registro no lo
+   * cuente dos veces, igual que las peleas se deduplican por su identidad
+   * lógica. Sin esto, cada reconstrucción sumaría otra copia de cada objeto.
+   */
+  appendLoot(e) {
+    if (!e?.item) return null;
+    const clave = `${Math.round(e.t ?? 0)}:${e.item}:${e.from ?? ''}`;
+    if (this.lootSeen.has(clave)) return null;
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      const fila = { ...e, k: clave };
+      fs.appendFileSync(this.lootPath, `${JSON.stringify(fila)}\n`);
+      this.lootSeen.add(clave);
+      this.orphanLoot.push(fila);
+      return fila;
+    } catch { return null; }
+  }
+
+  #loadLoot() {
+    this.orphanLoot = [];
+    this.lootSeen = new Set();
+    try {
+      for (const line of fs.readFileSync(this.lootPath, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const e = JSON.parse(line);
+          if (!e?.item || this.lootSeen.has(e.k)) continue;
+          this.lootSeen.add(e.k);
+          this.orphanLoot.push(e);
+        } catch { /* línea rota: se salta, como en el índice */ }
+      }
+    } catch { /* sin fichero: no hay botín huérfano y no es un problema */ }
+  }
+
   append(fight, at = Date.now()) {
     if (!fight) return null;
     const dup = this.seen.get(logicalKey({ at, total: fight.total, duration: fight.duration }));
