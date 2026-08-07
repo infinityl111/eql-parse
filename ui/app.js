@@ -2588,11 +2588,11 @@ function encHechizo() {
     ${d.series.length ? `<div class="dos-block">
       <div class="eyebrow">${esc(t('cat.byTranche'))} · ${esc(t('foe.measured'))}</div>
       <div class="hint">${esc(t('cat.trancheNote', { n: d.minSerie }))}</div>
-      ${d.series.map((g) => `<div class="serie">
-        <div class="serie-h">
+      ${d.series.map((g) => `<div class="tramo">
+        <div class="tramo-h">
           <b>${esc(g.level ? t('lvl.level', { n: g.level }) : t('lvl.unknown'))}</b>
           <span class="dpill">${esc(encDiffLabel(g.diff))}</span>
-          <span class="dim">${esc(t('sum.fights', { n: g.fights }))}</span>
+          <span class="dim">${n0(g.fights)} ${esc(t('sum.fights', { n: g.fights }))}</span>
           ${g.uses ? `<span class="num">${esc(t('cat.avg'))} <b>${n0(g.avg)}</b></span>` : ''}
           ${g.uses ? `<span class="num dim">${esc(t('cat.max'))} ${n0(g.max)}</span>` : ''}
           ${g.uses ? `<span class="num dim">${Math.round(g.critRate * 100)}% crit</span>` : ''}
@@ -3524,6 +3524,36 @@ function encProgreso() {
         <span class="num dim">${m.n} ${esc(t('sum.fights', { n: m.n }))}</span>
       </div>`).join('')}</div>`
     : `<div class="hint" style="margin-top:16px">${esc(t('enc.progressNoSeries', { n: p.minSerie }))}</div>`}`;
+}
+
+/**
+ * El expediente, con todos los combates que has tenido contra él debajo.
+ *
+ * Estuvo borrada en la 1.7.1. No la quitó nadie a mano: un script de los que
+ * uso para editar cortaba «desde este comentario hasta `renderEncyclopedia`»
+ * y el ancla cayó una función más arriba de la cuenta. Se llevó ésta por
+ * delante y la ficha de cualquier enemigo dejó de abrirse.
+ *
+ * Lo encontró `npm run ui:check`, que abre la aplicación y mide el DOM. No lo
+ * habría cogido nada más: `node --check` da por buena una función que no
+ * existe hasta que se la llama, y las pruebas de datos ni pasan por aquí.
+ */
+function encFoe() {
+  const f = state.enc.foe;
+  if (!f) return `${encCrumb()}<div class="hint">${esc(t('foe.noData'))}</div>`;
+  const fs2 = state.enc.fights ?? [];
+  return `${encCrumb()}
+    ${foeDossier(f, encHabilidades(f))}
+    <div class="sec-title eyebrow" style="margin-top:18px">${
+  esc(t('enc.fightsHere', { n: fs2.length }))}</div>
+    ${fs2.length ? `<div class="encrows">${fs2.map((s) => `
+      <button class="encrow fight" data-uid="${s.uid}">
+        <span class="nm">${esc(cuando(s.at))}</span>
+        <span class="num dim">${secs(s.duration)}</span>
+        <span class="num">${n0(s.raidDps)} dps</span>
+        <span class="num dim">${(s.kills ?? []).includes(f.name)
+    ? esc(t('enc.fell')) : esc(t('enc.survived'))}</span>
+      </button>`).join('')}</div>` : `<div class="hint">${esc(t('flt.none'))}</div>`}`;
 }
 
 function renderEncyclopedia() {
