@@ -12,6 +12,14 @@
   --bone-dim:  #96A0B0;
   --bone-faint:#5D6879;
 
+  /* El rótulo emergente tiene fondo propio y por eso necesita sus fichas: no
+     usa el de la página. Estaba fijado en oscuro para los DOS temas, así que
+     en claro salía texto oscuro sobre fondo oscuro y no se leía nada — sólo
+     el nombre, que iba en blanco a pelo. */
+  --tip-bg:    rgba(20,25,34,.97);
+  --tip-head:  #fff;
+  --tip-shadow: 0 8px 28px rgba(0,0,0,.55);
+
   --t-magic:   #8B7BD8;
   --t-cold:    #6FC7D8;
   --t-fire:    #E08A4B;
@@ -210,11 +218,11 @@ footer .path:hover { color: var(--bone-dim); }
 .tip {
   position: fixed; z-index: 99; display: none; pointer-events: none;
   min-width: 236px; max-width: 320px;
-  background: rgba(20,25,34,.97); border: 1px solid var(--slate-600);
-  box-shadow: 0 8px 28px rgba(0,0,0,.55);
+  background: var(--tip-bg); border: 1px solid var(--slate-600);
+  box-shadow: var(--tip-shadow);
   padding: 10px 12px 9px;
 }
-.tip-head { font-size: 13px; margin-bottom: 8px; color: #fff; }
+.tip-head { font-size: 13px; margin-bottom: 8px; color: var(--tip-head); }
 .tip-grid { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; align-items: baseline; }
 .tip-grid b { font-weight: 500; font-size: 12px; text-align: right; }
 .tip-types, .tip-abils { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--slate-700); }
@@ -303,6 +311,10 @@ code { font-family: var(--mono); font-size: 11px; background: var(--slate-800); 
   --bone:      #241F18;
   --bone-dim:  #625A4C;
   --bone-faint:#8C8371;
+
+  --tip-bg:    rgba(255,253,248,.985);
+  --tip-head:  #241F18;
+  --tip-shadow: 0 8px 24px rgba(60,50,35,.22);
 
   --t-magic:   #5B4CA8;
   --t-cold:    #1F7C8C;
@@ -752,7 +764,7 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
 /* ── Ficha del objeto, con el aspecto del juego ──────── */
 .tip.item-tip { max-width: 340px; padding: 0; background: #0d1117;
                 border: 1px solid #3a4a5c; }
-:root[data-theme="light"] .tip.item-tip { background: #0d1117; }
+:root[data-theme="light"] .tip.item-tip { background: #0d1117; box-shadow: 0 8px 24px rgba(0,0,0,.3); }
 .it-head { padding: 7px 11px 5px; font-size: 13px; color: #7fe08a;
            font-family: var(--body); }
 .it-img { display: block; margin: 0 11px 6px; width: 40px; height: 40px;
