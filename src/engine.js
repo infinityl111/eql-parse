@@ -120,7 +120,8 @@ export function overlayFight(f) {
     key: fightKey(f), label: f.label, duration: f.duration, at: Date.now(),
     total: f.total, enemyTotal: f.enemyTotal, dead: f.dead ?? {},
     rows: (f.rows ?? []).map((r) => ({
-      name: r.name, side: r.side, damage: r.damage, dps: r.dps, share: r.share,
+      name: r.name, side: r.side, charmed: r.charmed === true,
+      damage: r.damage, dps: r.dps, share: r.share,
       types: r.types, petOf: r.petOf ?? null, max: r.max, crits: r.crits,
       meleeHits: r.meleeHits, misses: r.misses, accuracy: r.accuracy,
       taken: r.taken, healingDone: r.healingDone,
@@ -873,6 +874,9 @@ export class Engine extends EventEmitter {
   #row(r) {
     return {
       name: r.name,
+      // Sin esto la marca muere aquí: cada capa de estas escoge campos a mano,
+      // y lo que no se nombra no viaja.
+      charmed: r.charmed === true,
       damage: r.damage, dps: r.dps, dpsOwn: r.dpsOwn, dpsActive: r.dpsActive, share: r.share,
       hits: r.hits, meleeHits: r.meleeHits, misses: r.misses,
       crits: r.crits, critDamage: r.critDamage, critRate: r.critRate,
@@ -953,8 +957,12 @@ export class Engine extends EventEmitter {
     const deAhora = new Set(this.parser?.pets.keys() ?? []);
     const petSet = deAhora.size ? deAhora : new Set(this.knownPets);
     const foeSet = this.#sides(t.rows, me, petSet);
-    const allyRows = t.rows.filter((r) => !foeSet.has(r.name));
-    const foeRows = t.rows.filter((r) => foeSet.has(r.name));
+    // El bando se decide por NOMBRE, y un encantado comparte nombre con el
+    // salvaje del mismo tipo: sin esta excepción los dos caían en enemigos y
+    // el que peleaba para ti aparecía en el bando contrario.
+    const esEnemigo = (r) => !r.charmed && foeSet.has(r.name);
+    const allyRows = t.rows.filter((r) => !esEnemigo(r));
+    const foeRows = t.rows.filter(esEnemigo);
     const allyTotal = allyRows.reduce((a, r) => a + r.damage, 0);
     const foeTotal = foeRows.reduce((a, r) => a + r.damage, 0);
     // La zona se descompone al guardar y no al leer: la dificultad cambia de
@@ -1011,6 +1019,9 @@ export class Engine extends EventEmitter {
       stanceSpans: (enc.stanceSpans ?? []).map((x, i, arr) => ({
         ...x, to: i === arr.length - 1 ? Math.max(x.to, enc.end - enc.start) : x.to,
       })),
+      // Lo que no se pudo atribuir del encanto, para poder rotularlo. Nulo
+      // cuando no hubo ninguno, que es casi siempre.
+      charm: t.charm ?? null,
       label: (() => {
         // Nombre de la pelea: el enemigo abatido, nunca los tuyos.
         const foesDown = enc.kills.filter((k) => foeSet.has(k.victim));
@@ -1039,7 +1050,7 @@ export class Engine extends EventEmitter {
       closed: enc.closed,
       start: enc.start,
       rows: t.rows.map((r) => {
-        const enemy = foeSet.has(r.name);
+        const enemy = !r.charmed && foeSet.has(r.name);
         const base = enemy ? foeTotal : allyTotal;
         // La marca va en la fila y no en una lista aparte: las mascotas cambian
         // de nombre en cada invocación y el histórico no sabría reconocerlas.

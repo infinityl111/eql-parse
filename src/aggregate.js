@@ -103,7 +103,7 @@ function emptyRow(name, side) {
 function finishRow(r, base) {
   const top = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
   return {
-    name: r.name, side: r.side,
+    name: r.name, side: r.side, charmed: !!r.charmed,
     petOf: r.petOf ?? null, pet: !!r.pet, mate: !!r.mate, unidentified: !!r.unidentified,
     damage: r.damage, taken: r.taken, healingDone: r.healingDone,
     hits: r.hits, misses: r.misses, crits: r.crits, flurries: r.flurries,
@@ -140,8 +140,15 @@ export function aggregate(fights, self = null) {
     if (f.at) { firstAt = firstAt === null ? f.at : Math.min(firstAt, f.at); lastAt = Math.max(lastAt ?? 0, f.at); }
 
     for (const r of f.rows ?? []) {
-      const key = r.name;
-      if (!rows.has(key)) rows.set(key, emptyRow(r.name, r.side));
+      // El encantado va por su cuenta aunque comparta nombre con el salvaje:
+      // son dos filas distintas dentro de la pelea y juntarlas aquí desharía
+      // el reparto por objetivo justo al mirar varias peleas a la vez.
+      const key = r.charmed ? `${r.name}\u0000charm` : r.name;
+      if (!rows.has(key)) {
+        const fila = emptyRow(r.name, r.side);
+        fila.charmed = r.charmed === true;
+        rows.set(key, fila);
+      }
       mergeRow(rows.get(key), r);
     }
 
@@ -199,6 +206,12 @@ export function mergePets(rows = [], label = 'Mascotas', known = [], self = null
   const isPet = (r) => r.side !== 'enemy' && r.name !== self && r.name !== label
     && !r.petOf                                   // la de otro jugador no es tuya
     && !no.has(r.name)
+    // Un encantado NO se pliega aquí. Pelea para ti, sí, pero comparte nombre
+    // con el enemigo salvaje que está dos filas más abajo, y plegarlo hace
+    // desaparecer justo lo que hay que poder ver: cuánto hizo el tuyo. Se
+    // detectó al mirarlo en la aplicación — la fila existía en el almacén y no
+    // llegaba a la pantalla, tragada por «juntar mascotas».
+    && !r.charmed
     && (r.pet || set.has(r.name));
   const pets = rows.filter(isPet);
   // Con una sola mascota también se renombra: al sumar varias peleas, cada

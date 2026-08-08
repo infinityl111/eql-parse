@@ -1280,3 +1280,12 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .crash-inline { background: #2a0f10; border-left: 4px solid #e55; color: #ffd9d9;
   padding: 12px 14px; margin: 10px 0; font-family: var(--mono); font-size: 12px; }
 .crash-inline pre { margin: 6px 0 0; white-space: pre-wrap; color: #ffe6e6; }
+
+/* El encantado: de los tuyos mientras dura, y con su propio color para que no
+   se confunda ni con una mascota invocada ni con un enemigo. */
+.name.charmed { color: var(--t-magic); }
+.name.charmed::before { content: 'BB'; margin-right: 5px; opacity: .7; font-size: 11px; }
+.charm-note { margin: 6px 0 10px; padding: 7px 11px; font-size: 11.5px;
+  background: var(--slate-850); border-left: 2px solid var(--t-magic);
+  color: var(--bone-dim); }
+.charm-note b { color: var(--bone); font-family: var(--mono); }

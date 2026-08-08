@@ -848,10 +848,17 @@ function updateRow(node, r, snap, live, rank) {
     refs.sig = sig;
     refs.rank.textContent = rank;
     node.el.classList.toggle('me', r.name === snap.self);
-        refs.name.textContent = r.petOf ? `${r.name} (${t('row.petOf', { who: r.petOf })})` : r.name;
+    // El encantado lleva su nombre y la marca: es el mismo bicho que el
+    // salvaje de al lado, pero durante ese rato peleaba para ti. Sin la marca,
+    // la pelea enseña dos filas con el mismo nombre y una de ellas en tu bando,
+    // que sin explicación parece un error de la aplicación.
+    refs.name.textContent = r.charmed ? `${r.name} (${t('row.charmed')})`
+      : (r.petOf ? `${r.name} (${t('row.petOf', { who: r.petOf })})` : r.name);
     refs.name.className = `name ${r.name === snap.self ? 'self' : ''} ${
-      r.pet || snap.pets.includes(r.name) ? 'pet' : ''} ${r.petOf ? 'otherpet' : ''}`;
-    refs.name.title = r.petOf ? t('row.petOf', { who: r.petOf }) : '';
+      r.pet || snap.pets.includes(r.name) ? 'pet' : ''} ${r.petOf ? 'otherpet' : ''} ${
+      r.charmed ? 'charmed' : ''}`;
+    refs.name.title = r.charmed ? t('row.charmedNote')
+      : (r.petOf ? t('row.petOf', { who: r.petOf }) : '');
     refs.dps.textContent = n0(r.dps);
     refs.share.textContent = `${(r.share * 100).toFixed(1)}%`;
     refs.bar.innerHTML = `<div class="bar-track">${barHTML(r.types, r.share * 100)}</div>`;
@@ -892,6 +899,23 @@ function renderRows(snap) {
   const live = isLive(f);
   const seen = new Set();
 
+  // Lo que el encanto dejó sin poder atribuir, dicho y no escondido.
+  //
+  // Sale sólo cuando dos bichos del MISMO nombre se pegaron entre ellos y
+  // uno estaba encantado: ahí el registro no dice cuál era cuál. Todo lo
+  // demás se reparte por el objetivo y es medido. La cifra estimada va
+  // aparte y no está sumada al daño de nadie.
+  const notaCharm = $('charmNote');
+  if (notaCharm) {
+    const c = f.charm;
+    notaCharm.style.display = c ? 'block' : 'none';
+    if (c) {
+      notaCharm.innerHTML = `${esc(t('charm.amb', { n: c.golpes, d: n0(c.daño) }))}` +
+        (c.estimadoTuyo !== null
+          ? ` ${esc(t('charm.est', { d: n0(c.estimadoTuyo) }))}` : '');
+    }
+  }
+
   // Cabecera al pasar de los tuyos a los enemigos: sin ella parecen el mismo
   // reparto, que es justo lo que confundía en el resumen.
   // Los sin identificar van en su propio grupo, no bajo «Los tuyos». Hicieron
@@ -924,9 +948,19 @@ function renderRows(snap) {
   let rankAlly = 0, rankFoe = 0;
   const ORDEN = { ally: 0, unknown: 1, enemy: 2 };
   [...f.rows].sort((a, b) => ORDEN[grupo(a)] - ORDEN[grupo(b)]).forEach((r) => {
-    seen.add(r.name);
-    let node = state.rowNodes.get(r.name);
-    if (!node) { node = buildRow(r.name); state.rowNodes.set(r.name, node); }
+    // La clave lleva la marca: el encantado y el salvaje tienen el MISMO
+    // nombre y son dos filas. Con la clave a secas, la segunda pisaba a la
+    // primera y sólo se veía una, con los datos de una sola.
+    //
+    // Y `seen` va con la MISMA clave. Con el nombre a secas, la limpieza de
+    // abajo —que recorre `rowNodes` por su clave— no encontraba la del
+    // encantado y la borraba justo después de crearla: se pintaba y
+    // desaparecía dentro del mismo repintado, y desde fuera parecía que esa
+    // fila no llegaba a existir nunca.
+    const clave = r.charmed ? `${r.name}\u0000charm` : r.name;
+    seen.add(clave);
+    let node = state.rowNodes.get(clave);
+    if (!node) { node = buildRow(r.name); state.rowNodes.set(clave, node); }
     updateRow(node, r, snap, live, r.side === 'enemy' ? ++rankFoe : ++rankAlly);
     const g = grupo(r);
     if (grupos.size > 1 && g !== lastSide) {
@@ -3822,7 +3856,7 @@ function renderApp() {
   }
   if (!$('rows')) {
     $('bodyGrid').innerHTML = `<aside id="fightList"></aside>
-      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div id="rows"></div>
+      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div>
       <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div></main>`;
     state.rowNodes.clear();
   }
