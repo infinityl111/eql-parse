@@ -44,6 +44,10 @@ class Combatant {
     // defensiva
     this.taken = 0;
     this.swingsAgainst = 0;
+    // Daño que NO llegó porque una runa se lo comió. Aparte de `taken`, que
+    // es lo que sí llegó, y aparte de la curación, que repara lo que llegó.
+    this.absorbed = 0;
+    this.absorbHits = 0;
     this.defense = new Map();    // parry / dodge / riposte / block que ha hecho
     this.takenByType = new Map();
     this.rawTakenByType = new Map();   // sin mitigar, para el consejo de postura
@@ -124,6 +128,12 @@ class Combatant {
   }
 
   addHealTaken(ev) { this.healingTaken += ev.amount; }
+
+  addAbsorbed(ev) {
+    this.absorbed += ev.amount || 0;
+    this.absorbHits++;
+    this.#touch(ev.t);
+  }
 
   get accuracy() {
     const swings = this.meleeHits + this.misses;
@@ -306,6 +316,7 @@ export class Encounter {
       max: c.max, min: c.min === Infinity ? 0 : c.min,
       accuracy: c.accuracy, avoidance: c.avoidance,
       taken: c.taken, swingsAgainst: c.swingsAgainst, deaths: c.deaths,
+      absorbed: c.absorbed, absorbHits: c.absorbHits,
       healingDone: c.healingDone, healingTaken: c.healingTaken,
       activeSec: c.activeSeconds.size, hitSec: c.hitSeconds.size, ownSec: own,
       byAbility: sorted(c.byAbility), byTarget: sorted(c.byTarget),
@@ -475,7 +486,8 @@ export class EncounterTracker extends EventEmitter {
       });
     }
 
-    const isCombat = DAMAGE_KINDS.has(ev.kind) || ev.kind === 'miss' || ev.kind === 'heal' || ev.kind === 'death';
+    const isCombat = DAMAGE_KINDS.has(ev.kind) || ev.kind === 'miss'
+      || ev.kind === 'heal' || ev.kind === 'death' || ev.kind === 'absorb';
     if (!isCombat) return;
 
     // ── Filtro de relevancia ──────────────────────────────────────────────
@@ -518,6 +530,9 @@ export class EncounterTracker extends EventEmitter {
       // Una muerte suelta no abre pelea: sin golpes previos no hay nada que
       // contar, y la de un desconocido a diez metros no es asunto tuyo.
       if (ev.kind === 'death') return;
+      // Y una runa tampoco: dice que algo te iba a dar y no dice qué ni quién.
+      // Sin un golpe delante no hay pelea que abrir.
+      if (ev.kind === 'absorb') return;
       // ── Un compañero declarado también abre pelea, pero sólo PEGANDO ──
       //
       // Aquí ponía que los compañeros no debían entrar nunca en esta regla,
@@ -589,6 +604,10 @@ export class EncounterTracker extends EventEmitter {
     } else if (ev.kind === 'miss') {
       if (ev.source) enc.actor(ev.source).addMissDealt(ev);
       if (ev.target) enc.actor(ev.target).addAvoided(ev);
+    } else if (ev.kind === 'absorb' && ev.amount > 0) {
+      // La runa se come el golpe entero. No abre pelea por sí sola —no dice
+      // contra quién fue— pero si ya hay una, cuenta.
+      if (ev.target) enc.actor(ev.target).addAbsorbed(ev);
     } else if (ev.kind === 'heal' && ev.amount > 0) {
       // ── Sanguijuela: el log pone al ENEMIGO de sanador ──────────────────
       //

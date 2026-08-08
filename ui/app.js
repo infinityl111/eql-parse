@@ -892,6 +892,73 @@ function updateRow(node, r, snap, live, rank) {
   }
 }
 
+/**
+ * Aguantar, puesto como un rol.
+ *
+ * LOS DATOS ESTABAN TODOS y no se veían: el desglose defensivo ya se pintaba,
+ * pero DENTRO de la fila de cada uno, al desplegarla. Así se puede saber cómo
+ * te fue a ti si te acuerdas de abrir tu fila; lo que no se puede es mirar
+ * quién aguantó en esta pelea, que es la pregunta del rol. Un dato al que hay
+ * que ir no es el mismo dato que uno que está puesto.
+ *
+ * LO QUE ESTO NO DICE, Y NO ES UN DESCUIDO: si estuviste cerca de morir. El
+ * registro no da la vida de nadie —ni la tuya— así que se puede decir cuánto
+ * te llegó, cuántos golpes te tiraron y cuántos pararon en tu armadura, pero
+ * no qué parte de tu barra quedaba. Cualquier cosa que lo sugiriese estaría
+ * inventando: 3.000 recibidos es una tragedia con 3.100 de vida y un paseo con
+ * 12.000, y la aplicación no sabe cuál de las dos.
+ *
+ * Por eso no hay barras de «presión», ni colores de peligro, ni un porcentaje
+ * de nada que se parezca a la vida. Hay cuentas.
+ */
+function tanqueoHTML(f) {
+  const filas = (f?.rows ?? []).filter((r) => r.taken > 0 || r.absorbed > 0)
+    .sort((a, b) => b.taken - a.taken);
+  if (!filas.length) return '';
+
+  const total = filas.reduce((a, r) => a + r.taken, 0) || 1;
+  // Las runas son pocas y eso se dice con la cifra al lado: con veintitantos
+  // datos no hay proporción que valga, así que se enseña el bruto y cuántas
+  // veces pasó, nunca un porcentaje.
+  const runas = filas.reduce((a, r) => a + (r.absorbHits ?? 0), 0);
+
+  const fila = (r) => {
+    const paradas = (r.defense ?? []).filter(([k]) => k !== 'fallo');
+    const detenidos = paradas.reduce((a, [, n]) => a + n, 0);
+    return `<div class="tank-row">
+      <span class="tank-name">${esc(r.name)}</span>
+      <span class="num"><b>${n0(r.taken)}</b></span>
+      <span class="num dim">${pct(r.taken / total)}</span>
+      <span class="num dim">${n1(r.taken / Math.max(1, r.ownSec ?? f.duration ?? 1))}/s</span>
+      <span class="num dim">${n0(r.swingsAgainst)}</span>
+      <span class="tank-def">${paradas.length
+    ? paradas.map(([k, n]) => `<i class="tank-chip">${esc(k)} <b>${n}</b></i>`).join('')
+    : `<span class="dim">—</span>`}</span>
+      <span class="num dim">${detenidos ? `${n0(detenidos)}` : '—'}</span>
+      <span class="num">${r.absorbed
+    ? `<b class="abs">${n0(r.absorbed)}</b> <span class="dim">${
+      esc(t('tank.inRunes', { n: r.absorbHits }))}</span>` : '<span class="dim">—</span>'}</span>
+    </div>`;
+  };
+
+  return `<div class="tank">
+    <div class="sec-title eyebrow">${esc(t('tank.title'))}</div>
+    <div class="hint">${esc(t('tank.note'))}</div>
+    <div class="tank-head eyebrow">
+      <span>${esc(t('tank.who'))}</span>
+      <span class="r">${esc(t('det.taken'))}</span>
+      <span class="r">${esc(t('det.share'))}</span>
+      <span class="r">${esc(t('det.takenPerSec'))}</span>
+      <span class="r">${esc(t('tank.swings'))}</span>
+      <span>${esc(t('tank.stopped'))}</span>
+      <span class="r">${esc(t('tank.stoppedN'))}</span>
+      <span class="r">${esc(t('tank.absorbed'))}</span>
+    </div>
+    ${filas.map(fila).join('')}
+    ${runas ? `<div class="hint">${esc(t('tank.runeNote', { n: runas }))}</div>` : ''}
+  </div>`;
+}
+
 function renderRows(snap) {
   const f = withPets(fightFor(snap));
   const host = $('rows');
@@ -989,6 +1056,10 @@ function renderRows(snap) {
   for (const [name, node] of state.rowNodes) {
     if (!seen.has(name)) { node.el.remove(); state.rowNodes.delete(name); }
   }
+
+  // Aguantar, debajo de todo: es otra pregunta sobre la misma pelea.
+  const tank = $('tank');
+  if (tank) tank.innerHTML = tanqueoHTML(f);
   if (state.hover) updateTip();
 }
 
@@ -3958,7 +4029,7 @@ function renderApp() {
   }
   if (!$('rows')) {
     $('bodyGrid').innerHTML = `<aside id="fightList"></aside>
-      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div>
+      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div><div id="tank"></div>
       <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div></main>`;
     state.rowNodes.clear();
   }

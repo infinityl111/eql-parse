@@ -893,6 +893,10 @@ export class Engine extends EventEmitter {
       invocations: this.#b(r.byInvocation),
       missReasons: r.missReasons.map(([k, v]) => [k, v.n]),
       defense: r.defense.map(([k, v]) => [k, v.n]),
+      // La runa se come el golpe entero: es daño que NO llegó, y por eso
+      // viaja aparte de  —lo que sí llegó— y de la curación, que
+      // repara lo que llegó. Con su cuenta de runas al lado, que son pocas.
+      absorbed: r.absorbed ?? 0, absorbHits: r.absorbHits ?? 0,
       takenByType: this.#b(r.takenByType),
       rawTakenByType: this.#b(r.rawTakenByType), rawMeleeOut: r.rawMeleeOut,
       takenBySource: this.#b(r.takenBySource),

@@ -124,6 +124,15 @@ const rules = [
     map: (m) => ({ source: null, target: m[1], amount: +m[2], school: 'spell' }),
   },
 
+  // La runa absorbe un golpe entero. No es daño ni es curación: es daño que
+  // NO llegó, y por eso va en su propio sitio en vez de sumarse a nada.
+  //
+  // Son 29 líneas en el registro de referencia y eso hay que decirlo con la
+  // cifra al lado: con veintinueve datos no se saca ninguna proporción.
+  { kind: 'absorb', hint: 'gain a rune',
+    re: /^You gain a rune for (\d+) points? of absorption\.$/,
+    map: (m) => ({ target: 'You', amount: +m[1] }) },
+
   // ═══ FALLOS Y MITIGACIÓN (verbo en forma base tras "tries to") ═══
   {
     kind: 'miss', hint: 'tries to',
