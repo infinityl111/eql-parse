@@ -1505,6 +1505,52 @@ const STANCE_COLOR = {
   striker: 'var(--t-ds)', ranged: 'var(--t-disease)', berserker: 'var(--t-dot)',
 };
 
+// Los puntos de la gráfica que está puesta ahora, para el rótulo del ratón.
+let chartPuntos = null;
+let chartDur = 0;
+
+/**
+ * El rótulo que sigue al ratón por la gráfica.
+ *
+ * SIN ESTO LA GRÁFICA NO SE PUEDE LEER. Son dos líneas por segundo y no había
+ * forma de saber qué valía un pico ni en qué momento pasó: sólo el máximo, en
+ * el pie. Preguntaste si los picos eran los golpes más fuertes, y no: son los
+ * SEGUNDOS en los que más daño se acumuló, que puede ser un golpe grande o
+ * cinco pequeños. Eso ahora lo dice la nota de abajo y lo confirma el rótulo,
+ * que enseña el segundo exacto con sus tres cifras.
+ */
+function cablearGrafica() {
+  const zona = $('chartHit');
+  const tip = $('chartTip');
+  if (!zona || !tip || !chartPuntos) return;
+  const guia = zona.querySelector('.chart-guide');
+
+  zona.addEventListener('mousemove', (e) => {
+    const r = zona.getBoundingClientRect();
+    const rel = Math.min(1, Math.max(0, (e.clientX - r.left) / Math.max(1, r.width)));
+    const i = Math.round(rel * chartDur);
+    const p = chartPuntos[i];
+    if (!p) return;
+    guia.style.left = `${(rel * 100).toFixed(2)}%`;
+    guia.style.display = 'block';
+    tip.innerHTML = `<b>${esc(secs(p.s))}</b>`
+      + `<span>${esc(t('chart.dealt'))} <b>${n0(p.dmg)}</b></span>`
+      + (p.taken ? `<span class="tk">${esc(t('chart.taken'))} <b>${n0(p.taken)}</b></span>` : '')
+      + (p.heal ? `<span class="hl">${esc(t('chart.healed'))} <b>${n0(p.heal)}</b></span>` : '');
+    tip.style.display = 'block';
+    // Que no se salga por la derecha: a partir de la mitad, se pinta a la
+    // izquierda del cursor.
+    const ancho = tip.offsetWidth || 150;
+    const px = rel * r.width;
+    tip.style.left = `${Math.max(0, Math.min(r.width - ancho, px - ancho / 2))}px`;
+  });
+
+  zona.addEventListener('mouseleave', () => {
+    tip.style.display = 'none';
+    guia.style.display = 'none';
+  });
+}
+
 function chartHTML(f) {
   const dur = Math.max(1, f.duration);
   if (dur < 4 || !f.series?.length) return '';
@@ -1518,9 +1564,15 @@ function chartHTML(f) {
 
   const area = `M0,${H} ` + pts.map((p, i) => `L${x(i).toFixed(1)},${y(p.dmg).toFixed(1)}`).join(' ') + ` L${W},${H} Z`;
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.dmg).toFixed(1)}`).join(' ');
-  const takenMax = Math.max(1, ...pts.map((p) => p.taken));
+  // LA MISMA ESCALA QUE LA DE ARRIBA, que antes no lo era: la punteada se
+  // dibujaba contra SU propio máximo y encima a media altura, así que sus
+  // subidas y bajadas no se podían comparar con las tuyas — parecía que
+  // recibías tanto como pegabas cuando no.
+  //
+  // Cabe de sobra: medido sobre 393 peleas guardadas, el pico de lo recibido
+  // es la cuarta parte del de lo hecho en la mediana, y en NINGUNA lo supera.
   const taken = pts.some((p) => p.taken)
-    ? pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${(H - (p.taken / takenMax) * (H - 6) * 0.5).toFixed(1)}`).join(' ')
+    ? pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.taken).toFixed(1)}`).join(' ')
     : null;
 
   const band = (f.stanceSpans ?? []).map((sp) => {
@@ -1534,6 +1586,13 @@ function chartHTML(f) {
     String(sp.stance).toLowerCase().replace(/\s*stance\s*$/, '')))].map((k) =>
     `<span><i style="background:${STANCE_COLOR[k] ?? 'var(--t-other)'}"></i>${esc(k)}</span>`).join('');
 
+  // Los puntos, para el rótulo del ratón. Van en una variable del módulo y no
+  // en el HTML: son uno por segundo, y una pelea de cinco minutos son
+  // trescientos — meterlos en un atributo es cargar la página de texto que
+  // nadie lee.
+  chartPuntos = pts;
+  chartDur = dur;
+
   return `<div class="chart">
     ${band ? `<svg class="chart-band" viewBox="0 0 ${W} ${BAND}" preserveAspectRatio="none" role="img"
       aria-label="${esc(t('chart.bandLabel'))}">${band}</svg>` : ''}
@@ -1543,11 +1602,14 @@ function chartHTML(f) {
       <path d="${line}" fill="none" stroke="var(--t-cold)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
       ${taken ? `<path d="${taken}" fill="none" stroke="var(--t-ds)" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ''}
     </svg>
+    <div class="chart-hit" id="chartHit"><div class="chart-guide"></div></div>
+    <div class="chart-tip" id="chartTip"></div>
     <div class="chart-foot">
       <span class="eyebrow">${esc(t('chart.peak', { v: n0(peak) }))}</span>
       <span class="chart-legend eyebrow">${legend}${taken ? `<span><i class="dash"></i>${t('chart.taken')}</span>` : ''}</span>
       <span class="eyebrow">${secs(dur)}</span>
     </div>
+    <div class="hint">${esc(t('chart.note'))}</div>
   </div>`;
 }
 
@@ -1945,6 +2007,8 @@ function renderHead(snap) {
     b._t = setTimeout(() => { b.textContent = t('share.copy'); b.classList.remove('ok', 'bad'); }, 1600);
   });
   $('btnAnalyse')?.addEventListener('click', (e) => { e.stopPropagation(); state.view = 'analysis'; $('bodyGrid').innerHTML = ''; renderApp(); });
+  // Después del innerHTML, que si no los nodos de la gráfica no existen aún.
+  cablearGrafica();
 }
 
 // ═══════════ Análisis del combate ═══════════

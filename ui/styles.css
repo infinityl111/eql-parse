@@ -359,7 +359,22 @@ code { font-family: var(--mono); font-size: 11px; background: var(--slate-800); 
 .metric-l { margin-top: 2px; }
 
 /* ══ Gráfica ════════════════════════════════════════════ */
-.chart { margin-bottom: 18px; }
+.chart { margin-bottom: 18px; position: relative; }
+/* La zona que caza el ratón: encima de la gráfica y del mismo tamaño. Va
+   aparte del SVG porque el SVG se estira con `preserveAspectRatio: none` y
+   dentro de él las coordenadas del ratón no son las de la pantalla. */
+.chart-hit { position: absolute; left: 0; right: 0; height: 96px; bottom: 26px; cursor: crosshair; }
+.chart-guide { position: absolute; top: 0; bottom: 0; width: 1px; display: none;
+  background: var(--bone-faint); pointer-events: none; }
+.chart-tip { position: absolute; bottom: 128px; display: none; z-index: 20;
+  pointer-events: none; white-space: nowrap;
+  background: var(--tip-bg); border: 1px solid var(--slate-600);
+  box-shadow: var(--tip-shadow); padding: 6px 9px;
+  font-family: var(--mono); font-size: 11px; color: var(--bone-dim); }
+.chart-tip b { color: var(--bone); }
+.chart-tip span { margin-left: 10px; }
+.chart-tip .tk b { color: var(--t-ds); }
+.chart-tip .hl b { color: var(--t-poison); }
 .chart-band { display: block; width: 100%; height: 11px; margin-bottom: 2px; }
 .chart-svg { display: block; width: 100%; height: 96px; background: var(--slate-850); border-radius: 3px; }
 .chart-foot { display: flex; align-items: center; gap: 14px; margin-top: 5px; }
