@@ -1000,6 +1000,20 @@ export class Engine extends EventEmitter {
       // mascota», y en cuanto empezaron a contarse las muertes de los
       // compañeros de grupo, la caída de un aliado se apuntaba como una presa.
       kills: enc.kills.filter((k) => foeSet.has(k.victim)).map((k) => k.victim),
+      // CUÁNDO cayó cada uno, que es otra pregunta que `kills` no contesta.
+      //
+      // El instante ya se medía —el encuentro guarda {t, victim, killer}— y se
+      // tiraba aquí mismo, en el `.map` de arriba. Cuesta 910 marcas en todo
+      // un histórico, unos 9 KB, y es lo que hace falta para poder cortar una
+      // tanda al MIRARLA en vez de decidirlo al guardar: si tres bichos caen
+      // seguidos sin pausa, hoy son una pelea y no hay forma de separarlos
+      // después.
+      //
+      // `kills` se queda como está —una lista de nombres— porque media
+      // aplicación la compara como cadenas y porque responde a otra cosa: QUÉ
+      // cayó, no cuándo. Son dos preguntas, no dos nombres para una.
+      killTimes: enc.kills.filter((k) => foeSet.has(k.victim))
+        .map((k) => ({ name: k.victim, t: Math.round(k.t - enc.start) })),
       // Los totales del grupo son sólo de los tuyos; el enemigo va aparte.
       total: allyTotal,
       raidDps: allyTotal / t.duration,

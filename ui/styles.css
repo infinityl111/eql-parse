@@ -1360,3 +1360,13 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .up-track { position: relative; height: 14px; background: var(--slate-850); border-radius: 2px; }
 .up-track i { position: absolute; top: 2px; bottom: 2px; background: var(--t-magic); opacity: .75; }
 .up-lane .num b { color: var(--bone); font-family: var(--mono); }
+
+/* Cuándo cayó cada enemigo, sobre la gráfica. La marca es el instante exacto
+   de la muerte: entre dos marcas hay una pelea distinta, aunque el corte por
+   inactividad las haya juntado en una. */
+.chart-death { position: absolute; top: 0; height: 96px; width: 1px;
+  background: var(--t-fire); opacity: .5; pointer-events: auto; z-index: 3; }
+.chart-death::after { content: ''; position: absolute; top: 0; left: -2px;
+  border-left: 3px solid transparent; border-right: 3px solid transparent;
+  border-top: 4px solid var(--t-fire); }
+.chart-death:hover { opacity: 1; width: 2px; }

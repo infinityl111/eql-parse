@@ -1854,6 +1854,9 @@ function chartHTML(f) {
       <path d="${line}" fill="none" stroke="var(--t-cold)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
       ${taken ? `<path d="${taken}" fill="none" stroke="var(--t-ds)" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ''}
     </svg>
+    ${(f.killTimes ?? []).map((k) => `<i class="chart-death"
+      style="left:${(Math.min(dur, Math.max(0, k.t)) / dur * 100).toFixed(2)}%"
+      title="${esc(`${secs(k.t)} · ${k.name}`)}"></i>`).join('')}
     <div class="chart-hit" id="chartHit"><div class="chart-guide"></div></div>
     <div class="chart-tip" id="chartTip"></div>
     <div class="chart-foot">
@@ -1861,7 +1864,8 @@ function chartHTML(f) {
       <span class="chart-legend eyebrow">${legend}${taken ? `<span><i class="dash"></i>${t('chart.taken')}</span>` : ''}</span>
       <span class="eyebrow">${secs(dur)}</span>
     </div>
-    <div class="hint">${esc(t('chart.note'))}</div>
+    <div class="hint">${esc(t('chart.note'))}${
+  (f.killTimes ?? []).length ? ` ${esc(t('chart.deaths', { n: f.killTimes.length }))}` : ''}</div>
   </div>`;
 }
 
@@ -2811,6 +2815,17 @@ function sumRow(r, maxDmg) {
 }
 
 /** Desglose completo de un combatiente sumando todas las peleas del tramo. */
+/**
+ * «Y N más», cuando una tabla no los enseña todos.
+ *
+ * Las tres listas del resumen tienen tope, y dos estaban recortando la mitad
+ * de los datos sin decirlo: al resumir un histórico entero, «a quién pegas»
+ * tenía 193 nombres con tope 15 —el 51,5% del daño oculto— y «de quién te
+ * llega» 181 con tope 10 —el 57,3%—. Subidos a 60 se enseña el 89% y el 92%,
+ * y lo que sigue faltando se dice aquí en vez de callarse.
+ */
+const resto = (n) => (n > 0 ? `<div class="hint">${esc(t('det.andMore', { n }))}</div>` : '');
+
 function sumRowDetail(r) {
   const tbl = (title, rows, base) => rows.length ? `<div class="sd-block">
       <div class="eyebrow">${esc(title)}</div>
@@ -2838,9 +2853,12 @@ function sumRowDetail(r) {
       ${r.merged ? `<span class="dim">${esc(r.mergedFrom.join(', '))}</span>` : ''}
     </div>
     ${tbl(t('det.byAbility'), r.abilities.map((a) => [a.name, a.sum, `×${a.n}`, a.type]), dmg)}
+    ${resto(r.abilitiesMas)}
     ${tbl(t('det.byType'), r.types.map(([ty, v]) => [ty, v, '', ty]), dmg)}
     ${tbl(t('det.byTarget'), (r.targets ?? []).map((x) => [x.name, x.sum, '']), dmg)}
+    ${resto(r.targetsMas)}
     ${tbl(t('det.takenBy'), (r.takenBySource ?? []).map((x) => [x.name, x.sum, '']), r.taken || 1)}
+    ${resto(r.takenMas)}
     ${controlesDeFila(r, state.summary?.rows ?? [])}
   </div>`;
 }

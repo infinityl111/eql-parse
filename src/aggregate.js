@@ -110,10 +110,27 @@ function finishRow(r, base) {
     ripostes: r.ripostes, deaths: r.deaths, max: r.max, activeSec: r.activeSec,
     accuracy: r.meleeHits + r.misses ? r.meleeHits / (r.meleeHits + r.misses) : null,
     share: base ? r.damage / base : 0,
-    abilities: [...r.byAbility.values()].sort((a, b) => b.sum - a.sum).slice(0, 20),
+    // LOS TOPES DE ESTAS TRES LISTAS, medidos contra un histórico entero.
+    //
+    // Se pusieron a ojo y dos estaban recortando la mitad de los datos sin
+    // decirlo: sobre 412 peleas resumidas, «a quién pegas» tiene 193 nombres
+    // distintos y con tope 15 se ocultaban 178 —el 51,5% del daño—, y «de
+    // quién te llega» tiene 181 y con tope 10 se ocultaban 171 —el 57,3%—.
+    // Una tabla que enseña menos de la mitad y no lo dice miente por omisión.
+    //
+    // El de habilidades sí estaba bien: 33 distintas y las 13 que se caían son
+    // el 0,4% del daño. Ahí la cola es de verdad cola.
+    //
+    // Suben a 60 —más que cualquier máximo medido en una pelea suelta— y lo
+    // que se caiga se cuenta en `abilitiesMas`, `targetsMas` y `takenMas`,
+    // para que la interfaz pueda decir cuánto falta en vez de callarlo.
+    abilities: [...r.byAbility.values()].sort((a, b) => b.sum - a.sum).slice(0, 60),
+    abilitiesMas: Math.max(0, r.byAbility.size - 60),
+    targetsMas: Math.max(0, r.byTarget.size - 60),
+    takenMas: Math.max(0, r.takenBySource.size - 60),
     types: top(r.byType),
-    targets: top(r.byTarget).slice(0, 15).map(([name, sum]) => ({ name, sum })),
-    takenBySource: top(r.takenBySource).slice(0, 10).map(([name, sum]) => ({ name, sum })),
+    targets: top(r.byTarget).slice(0, 60).map(([name, sum]) => ({ name, sum })),
+    takenBySource: top(r.takenBySource).slice(0, 60).map(([name, sum]) => ({ name, sum })),
   };
 }
 
