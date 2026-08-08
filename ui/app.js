@@ -862,8 +862,20 @@ function updateRow(node, r, snap, live, rank) {
     refs.dps.textContent = n0(r.dps);
     refs.share.textContent = `${(r.share * 100).toFixed(1)}%`;
     refs.bar.innerHTML = `<div class="bar-track">${barHTML(r.types, r.share * 100)}</div>`;
+    // LAS DOS VELOCIDADES, y no es una duplicada.
+    //
+    // El número grande de la fila es el daño partido por la pelea ENTERA: lo
+    // que pones en el reloj del grupo, que es la pregunta del reparto. Éste de
+    // aquí es el daño partido por los segundos en los que de verdad hiciste
+    // algo: tu ritmo. Un lanzador que entra tarde puede tener un ritmo altísimo
+    // y aportar poco, y con una sola cifra no se distinguen esos dos casos.
+    //
+    // Las dos se calculaban desde siempre y las dos se pintaban... dentro del
+    // desplegable. Ésta sube a la línea que se ve sin abrir nada.
     refs.stats.innerHTML = [
       `<span>${t('row.damage')} <b>${n0(r.damage)}</b></span>`,
+      r.dpsActive && Math.abs(r.dpsActive - r.dps) > 1
+        ? `<span title="${esc(t('row.paceNote'))}">${t('row.pace')} <b>${n1(r.dpsActive)}</b></span>` : '',
       `<span>${t('row.max')} <b>${n0(r.max)}</b></span>`,
       r.meleeHits + r.misses ? `<span>${t('row.accuracy')} <b>${(r.accuracy * 100).toFixed(0)}%</b></span>` : '',
       r.crits ? `<span>${t('row.crits')} <b>${r.crits}</b></span>` : '',
@@ -930,6 +942,7 @@ function tanqueoHTML(f) {
       <span class="num"><b>${n0(r.taken)}</b></span>
       <span class="num dim">${pct(r.taken / total)}</span>
       <span class="num dim">${n1(r.taken / Math.max(1, r.ownSec ?? f.duration ?? 1))}/s</span>
+      <span class="num dim">${r.healingTaken ? n0(r.healingTaken) : '—'}</span>
       <span class="num dim">${n0(r.swingsAgainst)}</span>
       <span class="tank-def">${paradas.length
     ? paradas.map(([k, n]) => `<i class="tank-chip">${esc(k)} <b>${n}</b></i>`).join('')
@@ -949,7 +962,8 @@ function tanqueoHTML(f) {
       <span class="r">${esc(t('det.taken'))}</span>
       <span class="r">${esc(t('det.share'))}</span>
       <span class="r">${esc(t('det.takenPerSec'))}</span>
-      <span class="r">${esc(t('tank.swings'))}</span>
+      <span class="r">${esc(t('det.healTaken'))}</span>
+      <span class="r">${esc(t('det.attacksTaken'))}</span>
       <span>${esc(t('tank.stopped'))}</span>
       <span class="r">${esc(t('tank.stoppedN'))}</span>
       <span class="r">${esc(t('tank.absorbed'))}</span>

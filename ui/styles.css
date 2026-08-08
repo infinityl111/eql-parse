@@ -1316,7 +1316,7 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
    la vida de nadie, así que nada aquí puede sugerir «ibas a morir». */
 .tank { margin-top: 22px; }
 .tank-head, .tank-row { display: grid; align-items: center; gap: 0 10px;
-  grid-template-columns: minmax(120px,1fr) 78px 54px 66px 60px minmax(160px,1.4fr) 62px 130px; }
+  grid-template-columns: minmax(110px,1fr) 74px 50px 62px 66px 56px minmax(150px,1.3fr) 58px 118px; }
 .tank-head { padding: 0 11px 4px; color: var(--bone-faint); }
 .tank-row { padding: 6px 11px; background: var(--slate-850); border-left: 2px solid var(--t-cold);
   border-radius: 2px; margin-bottom: 4px; font-size: 12.5px; color: var(--bone-dim); }
