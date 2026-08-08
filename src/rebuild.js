@@ -39,7 +39,9 @@ import { FightStore, STORE_VERSION } from './store.js';
 // nadie sabría de dónde salieron. Van juntas o no van.
 const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjson', 'aa.ndjson', 'spells.ndjson'];
 
-export async function rebuildStore({ dir, logPath, self = null, idleSec = 20, trios = [] } = {}) {
+export async function rebuildStore({
+  dir, logPath, self = null, idleSec = 20, trios = [], companions = [],
+} = {}) {
   if (!dir) return { ok: false, reason: 'sin-carpeta' };
   if (!logPath || !fs.existsSync(logPath)) return { ok: false, reason: 'sin-log' };
 
@@ -76,6 +78,14 @@ export async function rebuildStore({ dir, logPath, self = null, idleSec = 20, tr
     // Lo que declaraste a mano tiene que estar puesto ANTES de releer, o el
     // nivel de cada pelea se recalcula sin ello.
     engine.setTrios(trios);
+    // Y los compañeros declarados, por el mismo motivo: sin ellos la
+    // reconstrucción se comporta como si no tuvieras ninguno, y el daño que
+    // hacen contra bichos que tú no llegas a tocar se descarta entero.
+    //
+    // Es el caso normal en grupo: varios enemigos y cada uno se encarga de los
+    // suyos, así que hay bichos que tú no tocas en toda la pelea. Medido con
+    // dos compañeros declarados, eran 65.907 de daño suyo fuera del almacén.
+    engine.setCompanions(companions);
     await engine.attach(logPath, { self, fromStart: true, idleSec });
     // attach() no resuelve hasta haber leído todo lo pendiente, pero la última
     // pelea queda abierta: se cierra con un reloj muy por delante.

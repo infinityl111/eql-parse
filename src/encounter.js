@@ -546,9 +546,24 @@ export class EncounterTracker extends EventEmitter {
     const compaPega = this.companions.size > 0
       && DAMAGE_KINDS.has(ev.kind) && ev.amount > 0
       && (this.companions.has(ev.source) || this.companions.has(ev.target));
+    // `compaPega` ENTRA AQUÍ, que es donde llevaba sin entrar desde que se
+    // escribió. Estaba calculado tres líneas más arriba y no se usaba en
+    // ninguna parte del fichero: una sola aparición, la declaración.
+    //
+    // Lo que costaba, medido sobre un registro real con dos compañeros
+    // declarados: 43.028 de daño suyo descartado —75.688 de uno y 33.543 del
+    // otro, que salen en 67 y 68 de las peleas—. Y 4 peleas partidas de más:
+    // durante unos segundos sólo pegaba el compañero, sus eventos se tiraban,
+    // y el hueco parecía inactividad. Es el mismo fallo que cortaba peleas en
+    // dos con las curaciones reflexivas, con otro disfraz.
+    //
+    // Y NO ABRE LA PUERTA A CUALQUIERA: pide `this.companions.has(…)`, o sea
+    // declarado a mano. El caso que motivó el filtro sigue igual — en ese
+    // mismo registro, `Hartemis` tiene 76.626 de daño descartado y cero peleas
+    // tuyas, y sigue fuera. El escape es para los tuyos, no para quien pase.
     const relevante = ev.kind === 'death'
       ? (rel(ev.victim) || rel(ev.killer) || enPelea(ev.victim) || enPelea(ev.killer))
-      : (rel(ev.source) || rel(ev.target));
+      : (rel(ev.source) || rel(ev.target) || compaPega);
     if (mine.size && !relevante) return;
 
     // Y una pelea sólo se abre cuando estáis metidos vosotros.
@@ -579,6 +594,16 @@ export class EncounterTracker extends EventEmitter {
       // Sigue sin entrar en `#mine()`, y eso no ha cambiado: `#mine()` decide
       // de quién es el daño, no sólo si la pelea se abre. Un compañero pegando
       // no eres tú pegando.
+      // AQUÍ NO. Se probó a meter `compaPega` también en esta guarda y lo cazó
+      // una prueba que ya existía, con su invariante escrita: «lo que no puede
+      // pasar bajo ningún concepto es que su pelea sea la tuya». Un compañero
+      // peleando solo, sin ti en ninguna parte, NO abre una pelea tuya.
+      //
+      // El comentario del escape decía «permite que la pelea de tu grupo
+      // exista cuando tú no llegaste a tocar al enemigo», y esa frase se puede
+      // leer de dos maneras: estás en la pelea pero no has tocado a ESE bicho
+      // —cierto, y lo resuelve la guarda de relevancia— o no estás en absoluto
+      // —falso, y es lo que la prueba prohíbe—. Vale la primera.
       if (mine.size && !mine.has(ev.source) && !mine.has(ev.target)) return;
       this.current = new Encounter(this.nextId++, ev.t, this.zone,
         { level: this.level ?? null, classes: this.classes ?? null });

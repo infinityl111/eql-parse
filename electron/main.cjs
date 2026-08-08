@@ -600,7 +600,10 @@ ipcMain.handle('store:rebuild', async () => {
   engine.detach();
   let r;
   try {
-    r = await rebuildStore({ dir, logPath, self: cfg.self, idleSec: cfg.idleSec ?? 20, trios: cfg.trios ?? [] });
+    r = await rebuildStore({
+      dir, logPath, self: cfg.self, idleSec: cfg.idleSec ?? 20,
+      trios: cfg.trios ?? [], companions: cfg.companions ?? [],
+    });
   } catch (err) {
     r = { ok: false, reason: 'error-de-lectura', error: err.message };
   }

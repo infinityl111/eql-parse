@@ -73,7 +73,14 @@ try { trios = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8'))
 catch { /* sin configuración: sólo lo que diga el log */ }
 if (trios.length) console.log(`  tríos declarados a mano: ${trios.length}`);
 
-const r = await rebuildStore({ dir, logPath, self, idleSec: 20, trios });
+// Los compañeros salen de la misma configuración: sin ellos la
+// reconstrucción descarta el daño que hacen contra bichos que tú no tocas.
+let companions = [];
+try { companions = JSON.parse(fs.readFileSync(path.join(dir, 'config.json'), 'utf8')).companions ?? []; }
+catch { /* sin configuración: ninguno */ }
+if (companions.length) console.log(`  compañeros declarados: ${companions.join(', ')}`);
+
+const r = await rebuildStore({ dir, logPath, self, idleSec: 20, trios, companions });
 
 if (!r.ok) {
   const porQue = {
