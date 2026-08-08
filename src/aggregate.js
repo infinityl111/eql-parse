@@ -67,7 +67,21 @@ function mergeRow(dst, r) {
   dst.ripostes += r.ripostes ?? 0;
   dst.deaths += r.deaths ?? 0;
   dst.max = Math.max(dst.max, r.max ?? 0);
+  // LA RÁFAGA SÍ SE PUEDE FUNDIR, y con el máximo, no sumando. Una ventana de
+  // diez segundos no cruza de una pelea a otra, así que la mejor del conjunto
+  // es exactamente la mejor de alguna de ellas. No es una aproximación: es la
+  // misma cifra. (Los percentiles de arriba no tienen esa suerte.)
+  dst.rafaga10 = Math.max(dst.rafaga10 ?? 0, r.rafaga10 ?? 0);
   dst.activeSec += r.activeSec ?? 0;
+  // LA FORMA DEL GOLPE NO SE FUNDE, y es a propósito.
+  //
+  // La suma y el máximo sí: uno se apila y el otro se compara. La mediana y los
+  // percentiles no: sacarlos de los de las partes no se puede —harían falta las
+  // muestras, y las muestras se quedan en la pelea que las midió—, así que aquí
+  // se caen. La alternativa era arrastrar los de una de las peleas y enseñarlos
+  // como si fueran los del conjunto, que es inventarse la muestra.
+  //
+  // Por eso `cur` nace sin ellos y de `a` nunca se copian.
   for (const a of r.abilities ?? []) {
     const k = `${a.name}\u0000${a.type ?? ''}`;
     const cur = dst.byAbility.get(k) ?? { name: a.name, type: a.type, sum: 0, n: 0, max: 0 };
@@ -96,6 +110,7 @@ function emptyRow(name, side) {
   return {
     name, side, damage: 0, taken: 0, healingDone: 0, hits: 0, meleeHits: 0,
     misses: 0, crits: 0, flurries: 0, ripostes: 0, deaths: 0, max: 0, activeSec: 0,
+    rafaga10: 0,
     byAbility: new Map(), byType: new Map(), byTarget: new Map(), takenBySource: new Map(),
   };
 }
@@ -108,6 +123,7 @@ function finishRow(r, base) {
     damage: r.damage, taken: r.taken, healingDone: r.healingDone,
     hits: r.hits, misses: r.misses, crits: r.crits, flurries: r.flurries,
     ripostes: r.ripostes, deaths: r.deaths, max: r.max, activeSec: r.activeSec,
+    rafaga10: r.rafaga10 ?? 0,
     accuracy: r.meleeHits + r.misses ? r.meleeHits / (r.meleeHits + r.misses) : null,
     share: base ? r.damage / base : 0,
     // LOS TOPES DE ESTAS TRES LISTAS, medidos contra un histórico entero.
@@ -239,6 +255,7 @@ export function mergePets(rows = [], label = 'Mascotas', known = [], self = null
     mergedFrom: pets.map((p) => p.name),
     damage: 0, taken: 0, healingDone: 0, hits: 0, meleeHits: 0, misses: 0,
     crits: 0, flurries: 0, ripostes: 0, deaths: 0, max: 0, activeSec: 0, share: 0,
+    rafaga10: null,
   };
   const ab = new Map(); const ty = new Map(); const tg = new Map();
   for (const p of pets) {
@@ -310,7 +327,13 @@ export function mergeOwnerPets(rows = []) {
     if (fuera.has(r.name)) continue;
     const suyas = porDueño.get(r.name);
     if (!suyas) { salida.push(r); continue; }
-    const dst = { ...r, mergedPets: suyas.length, mergedPetsFrom: suyas.map((p) => p.name) };
+    // Y LA RÁFAGA NO SE PLIEGA: aquí se juntan combatientes DISTINTOS, que
+    // pegaban a la vez. Su mejor tramo de diez segundos no es la suma de los
+    // dos —cada uno tuvo el suyo en otro momento— ni el mayor de ellos, que
+    // se dejaría fuera lo que puso el otro durante esa misma ventana. Haría
+    // falta la serie de los dos, y la serie no se guarda. Se dice que no se
+    // sabe, que es distinto de un cero.
+    const dst = { ...r, mergedPets: suyas.length, mergedPetsFrom: suyas.map((p) => p.name), rafaga10: null };
     const ab = new Map(); const ty = new Map(); const tg = new Map();
     for (const a of dst.abilities ?? []) ab.set(`${a.name}\u0000${a.type ?? ''}`, { ...a });
     for (const [k, v] of dst.types ?? []) ty.set(k, v);
@@ -323,11 +346,25 @@ export function mergeOwnerPets(rows = []) {
       dst.deaths += p.deaths ?? 0; dst.activeSec += p.activeSec ?? 0;
       dst.max = Math.max(dst.max ?? 0, p.max ?? 0);
       dst.share = (dst.share ?? 0) + (p.share ?? 0);
-      for (const a of p.abilities ?? []) {
-        const k = `${a.name}\u0000${a.type ?? ''}`;
-        const c = ab.get(k) ?? { name: a.name, type: a.type, sum: 0, n: 0, max: 0 };
-        c.sum += a.sum; c.n += a.n; c.max = Math.max(c.max ?? 0, a.max ?? 0);
-        ab.set(k, c);
+      // LA MASCOTA ES UNA LÍNEA, NO UN PUÑADO DE HABILIDADES SUELTAS.
+      //
+      // Aquí se volcaban sus habilidades dentro de la lista del dueño: los
+      // «bites» de la mascota quedaban entre los del jugador sin nada que
+      // dijera de quién eran. El total salía bien, y «cuánto puso la
+      // mascota» dejaba de poderse contestar — pintado, pero no puesto. Es
+      // el mismo fallo que el del tanqueo con otra ropa.
+      //
+      // Se pliega igual, porque el orden del reparto es lo que se midió,
+      // pero entra como UNA entrada con su nombre. Su desglose por habilidad
+      // no se pierde: sigue estando en la pelea sin plegar, a una casilla.
+      //
+      // No lleva forma del golpe, y no es un olvido: no es un ataque, es la
+      // suma de todos los suyos, así que no tiene mediana que enseñar.
+      if ((p.damage ?? 0) > 0) {
+        ab.set(`${p.name} pet`, {
+          name: p.name, type: null, pet: true,
+          sum: p.damage ?? 0, n: p.hits ?? 0, max: p.max ?? 0, crits: p.crits ?? 0,
+        });
       }
       for (const [k, v] of p.types ?? []) ty.set(k, (ty.get(k) ?? 0) + v);
       for (const x of p.targets ?? []) tg.set(x.name, (tg.get(x.name) ?? 0) + x.sum);

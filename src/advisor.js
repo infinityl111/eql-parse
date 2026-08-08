@@ -21,7 +21,10 @@ const MIN_HITS_FOR_VERDICT = 8;
 export function advise(row, ctx = {}) {
   if (!row) return null;
   const classes = ctx.classes ?? [];
-  const { stances, invocations } = availableFor(classes);
+  // Lo que se te ha visto usar cuenta como disponible aunque las clases no lo
+  // expliquen: ver `availableFor`. Sin esto, unas clases mal deducidas dejaban
+  // el consejo mudo.
+  const { stances, invocations } = availableFor(classes, ctx.seenStances, ctx.seenInvocations);
   if (!stances.length && !invocations.length) return null;
 
   // ── Reparto del daño entrante, en bruto ──────────────
@@ -241,7 +244,7 @@ export function liveAdvice(win, ctx = {}) {
   const { melee = 0, spell = 0, total = 0, seconds = 20, hits = 0, observed = total,
     landedMelee = 0, meleeSwings = 0 } = win;
   if (total <= 0) return null;
-  const { stances } = availableFor(ctx.classes ?? []);
+  const { stances } = availableFor(ctx.classes ?? [], ctx.seenStances);
   const usable = stances.filter((s) => s.mit.melee || s.mit.spell || s.evade?.melee || s.evade?.spell);
   if (!usable.length) return null;
 

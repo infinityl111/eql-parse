@@ -144,9 +144,18 @@ export const INVOCATIONS = {
   },
 };
 
-/** Normaliza lo que escribe el log ("a defensive stance" -> "defensive"). */
+/**
+ * Normaliza lo que escribe el log ("a defensive stance" -> "defensive").
+ *
+ * El artículo se quita aunque la regla del parser ya lo deje fuera del grupo:
+ * esta función la llaman sitios que reciben la frase entera, y devolver
+ * «a channeler» —que no casa con ninguna postura— no falla a la vista, se queda
+ * callado. Ninguna postura empieza por «a» o «an», así que no hay nada que
+ * perder quitándolo.
+ */
 export function normStance(s) {
-  return String(s ?? '').toLowerCase().replace(/\s*stance\s*$/, '').trim();
+  return String(s ?? '').toLowerCase()
+    .replace(/\s*stance\s*$/, '').replace(/^an?\s+/, '').trim();
 }
 export function normInvocation(s) {
   return String(s ?? '').toLowerCase().replace(/\s*invocation\s*$/, '').trim()
@@ -161,13 +170,42 @@ export function mitigationFor(stanceKey, school) {
   return isSpell ? (st.mit.spell ?? 0) : (st.mit.melee ?? 0);
 }
 
-/** Stances e invocaciones disponibles para una combinación de clases. */
-export function availableFor(classes) {
+/**
+ * Stances e invocaciones disponibles.
+ *
+ * DOS FUENTES, Y LA SEGUNDA MANDA MÁS QUE LA PRIMERA.
+ *
+ * La primera son tus clases, que muchas veces se deducen y se deducen mal. La
+ * segunda es lo que se te ha visto usar, y ésa no se deduce: si el registro dice
+ * «You assume a channeler stance», tienes Channeler. No hay nada más firme que
+ * eso, y sin embargo era justo lo que se estaba tirando.
+ *
+ * QUÉ PASABA SIN ESTO. Con las clases desconocidas o mal deducidas, la lista de
+ * posturas salía vacía o incompleta, el consejo de postura devolvía `null` y NO
+ * SE AVISABA DE NADA — sin decir por qué. Caso real: en una sesión con Channeler
+ * y Defensive vistas, `inferClasses` no encontraba ninguna clase común, la lista
+ * quedaba vacía y el consejo se callaba durante horas de juego. Y con un
+ * Berserker de por medio, la deducción se quedaba en BER a secas: entonces la
+ * lista traía Balanced y Mage Hunter, y la postura que llevabas puesta ni
+ * siquiera estaba en ella, así que tampoco había con qué comparar.
+ *
+ * Lo visto se añade, no sustituye: las clases siguen aportando las posturas que
+ * tienes y aún no has usado, que son las que interesa proponerte.
+ *
+ * @param {string[]} classes        clases fijadas o deducidas
+ * @param {string[]} vistas         posturas que el registro te ha visto asumir
+ * @param {string[]} vistasInv      invocaciones vistas, por lo mismo
+ */
+export function availableFor(classes, vistas = [], vistasInv = []) {
   const cs = (classes ?? []).filter(Boolean);
   const has = (list) => list.some((c) => cs.includes(c));
+  const vS = new Set((vistas ?? []).map(normStance).filter(Boolean));
+  const vI = new Set((vistasInv ?? []).map(normInvocation).filter(Boolean));
   return {
-    stances: Object.entries(STANCES).filter(([, v]) => has(v.classes)).map(([k, v]) => ({ key: k, ...v })),
-    invocations: Object.entries(INVOCATIONS).filter(([, v]) => has(v.classes)).map(([k, v]) => ({ key: k, ...v })),
+    stances: Object.entries(STANCES).filter(([k, v]) => has(v.classes) || vS.has(k))
+      .map(([k, v]) => ({ key: k, ...v })),
+    invocations: Object.entries(INVOCATIONS).filter(([k, v]) => has(v.classes) || vI.has(k))
+      .map(([k, v]) => ({ key: k, ...v })),
   };
 }
 

@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { LogTailer } from './tailer.js';
 import { Parser } from './parser.js';
-import { EncounterTracker, DAMAGE_KINDS } from './encounter.js';
+import { EncounterTracker, DAMAGE_KINDS, forma } from './encounter.js';
+import { Casteos } from './casteos.js';
 import { TriggerEngine } from './triggers.js';
 import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
@@ -144,6 +145,9 @@ export class Engine extends EventEmitter {
     this.status = 'idle';   // idle | reading | monitoring | missing | error
     this.error = null;
     this.classes = null;        // manual; si no, se deduce del log
+    // Cuánto tarda cada hechizo, medido mientras se lee. Vive en memoria y no
+    // en el almacén: sale de emparejar dos líneas, y las líneas ya están.
+    this.casteos = new Casteos();
     this.seenStances = new Set();
     this.seenInvocations = new Set();
     this.whoClasses = null;
@@ -597,6 +601,7 @@ export class Engine extends EventEmitter {
       const cut = ev.t - this.windowSec;
       while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
     }
+    this.casteos.feed(ev);
     this.tracker.feed(ev);
     this.session?.feed(ev);
     if (ev.kind === 'death' && ev.victim && !this.backfilling) this.#makeKillCard(ev);
@@ -683,6 +688,25 @@ export class Engine extends EventEmitter {
       if (!tr) continue;
       if (level) tr.level = level;
       if (classes?.length) tr.classes = classes;
+    }
+
+    // Y LA PELEA QUE ESTÁ ABIERTA AHORA MISMO, que se quedaba fuera.
+    //
+    // El encuentro copia trío y nivel al nacer, así que lo que empezó antes del
+    // /who se guardaba con lo de antes. Medido: una pelea en The Ruins of Old
+    // Guk 2 guardada con SHD/DRU/MAG y nivel 50, y el /who veintitrés segundos
+    // después decía [29 SHD/SHM/MAG]. Es la misma pelea, en la misma zona.
+    //
+    // Entre una medida tomada DENTRO de la pelea y otra de hace tres horas en
+    // otra zona, vale la de dentro. Es el mismo criterio que ya aplica
+    // `classProof` cuando un hechizo exclusivo delata un cambio de trío.
+    //
+    // Sólo la abierta: las cerradas ya están guardadas y se arreglan releyendo.
+    for (const tr of [this.tracker, this.session]) {
+      const enc = tr?.current;
+      if (!enc || enc.closed) continue;
+      if (level) enc.level = level;
+      if (classes?.length) enc.classes = classes.slice();
     }
   }
 
@@ -869,7 +893,27 @@ export class Engine extends EventEmitter {
     return this.triggers.tick();
   }
 
-  #b(list) { return list.map(([k, v]) => ({ name: k, sum: v.sum, n: v.n, max: v.max, min: v.min === Infinity ? 0 : v.min, crits: v.crits, school: v.school, type: v.type })); }
+  /**
+   * De los contadores a lo que se guarda.
+   *
+   * `forma` sólo la traen las habilidades —es la única lista que la cuenta— y
+   * sale ya resuelta en tres cifras: el recuento entero se queda en memoria.
+   * Ver `forma()` en `src/encounter.js` para el porqué.
+   *
+   * EL MÍNIMO YA NO VIAJA. Era la cifra más frágil de la tabla: una muestra de
+   * n=1 puesta al lado de sumas de cientos, y se leía como si valiera lo mismo.
+   * Lo que ocupa su sitio es el p10, que contesta la misma pregunta sin que un
+   * golpe raro se la lleve por delante.
+   */
+  #b(list) {
+    return list.map(([k, v]) => {
+      const f = forma(v);
+      return {
+        name: k, sum: v.sum, n: v.n, max: v.max, crits: v.crits, school: v.school, type: v.type,
+        ...(f ? { p10: f.p10, p50: f.p50, p90: f.p90, ...(f.bimodal ? { bimodal: true } : {}) } : {}),
+      };
+    });
+  }
 
   #row(r) {
     return {
@@ -878,6 +922,13 @@ export class Engine extends EventEmitter {
       // y lo que no se nombra no viaja.
       charmed: r.charmed === true,
       damage: r.damage, dps: r.dps, dpsOwn: r.dpsOwn, dpsActive: r.dpsActive, share: r.share,
+      // Un número por fila, no una serie por jugador: ver `mejorRafaga`.
+      rafaga10: r.rafaga10 ?? 0,
+      // Tu cadencia de ataque y el parón que NO explica tu arma. Sin nombrarlos
+      // aquí no llegan al análisis: cada capa escoge campos a mano.
+      cadencia: r.cadencia ?? null,
+      swingSec: r.swingSec ?? 0,
+      huecoReal: r.huecoReal ?? null,
       hits: r.hits, meleeHits: r.meleeHits, misses: r.misses,
       crits: r.crits, critDamage: r.critDamage, critRate: r.critRate,
       flurries: r.flurries, ripostes: r.ripostes, healPotential: r.healPotential,
@@ -1165,6 +1216,10 @@ export class Engine extends EventEmitter {
     if (!row) return null;
     return advise(row, {
       classes: this.activeClasses,
+      // Lo que se te ha VISTO asumir. Va aparte de las clases porque no es lo
+      // mismo: las clases se deducen, esto está escrito en el registro.
+      seenStances: [...this.seenStances],
+      seenInvocations: [...this.seenInvocations],
       stance: this.parser?.stance,
       invocation: this.parser?.invocation,
       resistsSuffered: enc.resistsSuffered,
@@ -1197,7 +1252,8 @@ export class Engine extends EventEmitter {
     const l = liveAdvice(
       { melee, spell, total, observed, seconds: this.windowSec, hits,
         landedMelee, meleeSwings: landedMelee + missedMelee },
-      { classes: this.activeClasses, stance: this.parser?.stance });
+      { classes: this.activeClasses, stance: this.parser?.stance,
+        seenStances: [...this.seenStances] });
     if (!l) return null;
 
     // Estabilidad: la misma recomendación debe mantenerse unos segundos antes

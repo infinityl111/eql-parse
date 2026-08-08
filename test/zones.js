@@ -38,8 +38,11 @@ console.log('\nnombre de zona -> base, modo y dificultad');
   const guk = c('The Ruins of Old Guk 2 (Adaptive)');
   ok(guk.base === 'The Ruins of Old Guk 2', 'el 2 de «Old Guk 2» se queda en el nombre', guk.base);
   ok(guk.diff === 2, 'y la dificultad sale de la etiqueta, no del número');
-  ok(c('The Ruins of Old Guk 2').diff === null,
-    'sin etiqueta, un número suelto NO es una dificultad', String(c('The Ruins of Old Guk 2').diff));
+  ok(c('The Ruins of Old Guk 2').diff === 0,
+    'sin etiqueta, un número suelto NO es una dificultad: el silencio es D0',
+    String(c('The Ruins of Old Guk 2').diff));
+  ok(c('The Ruins of Old Guk 2').base === 'The Ruins of Old Guk 2',
+    'y el 2 sigue siendo parte del nombre');
 
   // Esta afirmación estaba al revés, y estaba bien estarlo: sin medida, decir
   // que «- Solo» a secas era D0 habría sido inventar. Lo que cambió no es el
@@ -51,13 +54,33 @@ console.log('\nnombre de zona -> base, modo y dificultad');
   // el de D2 a D3 (0,884). No cae en medio de nada: es el escalón de abajo, y
   // la base no lleva etiqueta porque `DIFICULTADES[0]` es `null`.
   //
-  // Y hacía falta separarlo: mientras «- Solo» y «East Freeport» compartían
-  // cajón, la columna D0 de la rejilla contenía mundo abierto.
   ok(c('The Ruins of Old Paineel - Solo').diff === 0,
     'un modo declarado sin número es la dificultad base, D0');
   ok(c('The Ruins of Old Paineel - Solo').mode === 'Solo', 'y el modo consta');
-  ok(c('The Plane of Sky').diff === null && c('The Plane of Sky').base === 'The Plane of Sky',
-    'el mundo abierto se queda como está');
+
+  // ── EL SILENCIO ES D0, y esto lo corrige quien estuvo allí ───────────────
+  //
+  // Aquí se afirmaba que un nombre limpio es mundo abierto y que ahí no hay
+  // dificultad que medir. No: en EQL, que el registro no diga nada de
+  // dificultad significa dificultad 0, sea mundo abierto o una instancia.
+  //
+  // El registro lo enseña sin ambigüedad — tres líneas seguidas de una
+  // instancia recién creada, y ninguna trae dificultad:
+  //
+  //     Player Campeon creating instance The Plane of Sky 25.
+  //     The Plane of Sky is now available to you.
+  //     You have entered The Plane of Sky.
+  //
+  // Con la regla anterior se quedaban sin asignar 84 de 410 peleas guardadas
+  // —el 20,5%— y 70 de ellas eran esta misma zona.
+  ok(c('The Plane of Sky').diff === 0, 'una zona sin modo ni etiqueta es D0',
+    String(c('The Plane of Sky').diff));
+  ok(c('The Plane of Sky').base === 'The Plane of Sky', 'y la base es el nombre entero');
+  ok(c('East Freeport').diff === 0, 'el mundo abierto también es D0');
+
+  // Lo único que sigue siendo «no se sabe»: no saber ni dónde estabas. Eso no
+  // llega por aquí con un nombre, llega sin él.
+  ok(c(null).diff === null, 'sin zona no hay dificultad que deducir');
   ok(labelDiff(3, 'Fused') === 'D3 Fused' && labelDiff(null, null) === null, 'la etiqueta corta');
 }
 

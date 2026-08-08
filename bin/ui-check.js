@@ -24,75 +24,73 @@
  *
  * Uso:  npm run ui:check
  */
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { PUERTO, espera, puertoLibre, lanzar, conecta, cdp, evaluador, capturaPagina } from './cdp.js';
 
-const PUERTO = 9222;
 const SALIDA = path.join(os.tmpdir(), 'eql-ui-check');
 fs.mkdirSync(SALIDA, { recursive: true });
 
-const espera = (ms) => new Promise((r) => { setTimeout(r, ms); });
-
-// Si el puerto ya está cogido, esto se engancharía a la ventana ANTERIOR y
-// mediría el código viejo dando un verde que no vale nada. Pasó: una prueba
-// de revertir salió limpia porque estaba mirando la instancia de antes.
-try {
-  await fetch(`http://127.0.0.1:${PUERTO}/json/version`, { signal: AbortSignal.timeout(1500) });
-  console.error(`\nEl puerto ${PUERTO} ya está ocupado: hay otra ventana abierta con`);
-  console.error('depuración. Ciérrala antes, o esto mediría esa y no la de ahora.\n');
+if (!(await puertoLibre())) {
+  console.error('');
+  console.error(`El puerto ${PUERTO} ya está ocupado: hay otra ventana abierta con`);
+  console.error('depuración. Ciérrala antes, o esto mediría esa y no la de ahora.');
+  console.error('');
   process.exit(2);
-} catch { /* libre, que es lo que hace falta */ }
-
-async function conecta() {
-  for (let i = 0; i < 40; i++) {
-    try {
-      const lista = await (await fetch(`http://127.0.0.1:${PUERTO}/json/list`)).json();
-      const p = lista.find((x) => x.url.includes('index.html'));
-      if (p) return p;
-    } catch { /* todavía no ha levantado */ }
-    await espera(500);
-  }
-  throw new Error('la aplicación no levantó el puerto de depuración');
-}
-
-function cdp(url) {
-  const ws = new WebSocket(url);
-  let id = 0;
-  const pend = new Map();
-  ws.onmessage = (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && pend.has(m.id)) {
-      const { res, rej } = pend.get(m.id);
-      pend.delete(m.id);
-      if (m.error) rej(new Error(JSON.stringify(m.error)));
-      else res(m.result);
-    }
-  };
-  const manda = (method, params = {}) => new Promise((res, rej) => {
-    const n = ++id;
-    pend.set(n, { res, rej });
-    ws.send(JSON.stringify({ id: n, method, params }));
-  });
-  const listo = new Promise((r) => { ws.onopen = r; });
-  return { ws, manda, listo };
 }
 
 // Cada vista: cómo llegar, qué cajas no deben pisarse y por dónde pasar el
 // ratón. `raton` es un selector: se le lanzan los eventos a cada elemento que
 // case, uno a uno, y después se mira si saltó la caja de fallo.
+// NAVEGAR POR ID Y NO POR TEXTO. Estos pasos buscaban el rótulo de la
+// pestaña —/COMBATE/i, /ENCICLOPEDIA/i— y la aplicación tiene cinco idiomas:
+// con la interfaz en inglés no encontraban nada y cinco vistas salían en rojo
+// con cero cajas, que se lee como «la vista está rota» y no lo estaba. Los
+// identificadores y los `data-` no se traducen.
 const VISTAS = [
   {
     nombre: 'combate',
     // Hay que cargar una pelea del histórico: recién abierta, la lista de
     // combatientes está vacía y no hay nada por donde pasar el ratón.
     llega: [
-      "[...document.querySelectorAll('.tab')].find((x) => /COMBATE/i.test(x.textContent))?.click()",
+      "document.getElementById('tabCombat')?.click()",
       "document.querySelector('.fight[data-live=\"0\"]')?.click()",
     ],
     cajas: '.row',
     raton: '.row',
+  },
+  {
+    // Los documentos de la pelea. Se entra pulsando la ÚLTIMA pestaña, que es
+    // la que nunca está abierta por defecto: si el panel no se repinta al
+    // cambiar de pestaña, aquí se ve, porque lo que se mide es el contenido y
+    // no la barra. Y se miden las tres cajas de dentro —lo que pinte el
+    // documento abierto— además de las propias pestañas.
+    nombre: 'documentos',
+    llega: [
+      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('.fight[data-live=\"0\"]')?.click()",
+      "[...document.querySelectorAll('.doctab')].at(-1)?.click()",
+      // La captura es para mirarla: sin esto salía el principio de la pantalla
+      // y las pestañas quedaban fuera del recorte.
+      "document.querySelector('.docbar')?.scrollIntoView({ block: 'center' })",
+    ],
+    cajas: '.doctab',
+    raton: '.doctab',
+  },
+  {
+    // La reproducción: se abre, se lee el registro y se mide la escena. Es la
+    // vista que más cosas nuevas junta —lectura de disco, SVG y un bucle— así
+    // que si algo revienta al montarla, revienta aquí.
+    nombre: 'reproduccion',
+    llega: [
+      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('.fight[data-live=\"0\"]')?.click()",
+      "document.getElementById('btnReplay')?.click()",
+    ],
+    espera: 2500,
+    cajas: '.rp-act',
+    raton: '.rp-act',
   },
   {
     // La LISTA, que es donde viven las filas pulsables. La vista de abajo se
@@ -103,8 +101,8 @@ const VISTAS = [
     // migajero que pulsar, y la vista se quedaba en cero filas dando un rojo
     // por el motivo equivocado.
     llega: [
-      "[...document.querySelectorAll('.tab')].find((x) => /ENCICLOPEDIA/i.test(x.textContent))?.click()",
-      "[...document.querySelectorAll('.enccard')].find((x) => /hechizos/i.test(x.textContent))?.click()",
+      "document.getElementById('tabEnc')?.click()",
+      "document.querySelector('.enccard[data-enc=\"hechizos\"]')?.click()",
     ],
     cajas: '.cat-row',
     raton: '.cat-row.abre',
@@ -112,8 +110,8 @@ const VISTAS = [
   {
     nombre: 'hechizo',
     llega: [
-      "[...document.querySelectorAll('.tab')].find((x) => /ENCICLOPEDIA/i.test(x.textContent))?.click()",
-      "[...document.querySelectorAll('.enccard')].find((x) => /hechizos/i.test(x.textContent))?.click()",
+      "document.getElementById('tabEnc')?.click()",
+      "document.querySelector('.enccard[data-enc=\"hechizos\"]')?.click()",
       "document.querySelectorAll('.cat-row.abre')[0]?.click()",
     ],
     cajas: '.tramo',
@@ -121,16 +119,16 @@ const VISTAS = [
   {
     nombre: 'progreso',
     llega: [
-      "[...document.querySelectorAll('[data-crumb]')].find((x) => /ENCICLOPEDIA/i.test(x.textContent))?.click()",
-      "[...document.querySelectorAll('.enccard')].find((x) => /progres/i.test(x.textContent))?.click()",
+      "document.getElementById('tabEnc')?.click()",
+      "document.querySelector('.enccard[data-enc=\"progreso\"]')?.click()",
     ],
     cajas: '.encrow.serie-row',
   },
   {
     nombre: 'enemigo',
     llega: [
-      "[...document.querySelectorAll('[data-crumb]')].find((x) => /ENCICLOPEDIA/i.test(x.textContent))?.click()",
-      "[...document.querySelectorAll('.enccard')].find((x) => /enemigos/i.test(x.textContent))?.click()",
+      "document.getElementById('tabEnc')?.click()",
+      "document.querySelector('.enccard[data-enc=\"enemigos\"]')?.click()",
       "document.querySelectorAll('.encrow.foe .nm')[0]?.click()",
     ],
     cajas: '.difgrid > *',
@@ -138,8 +136,8 @@ const VISTAS = [
   {
     nombre: 'muertes',
     llega: [
-      "[...document.querySelectorAll('[data-crumb]')].find((x) => /ENCICLOPEDIA/i.test(x.textContent))?.click()",
-      "[...document.querySelectorAll('.enccard')].find((x) => /muertes/i.test(x.textContent))?.click()",
+      "document.getElementById('tabEnc')?.click()",
+      "document.querySelector('.enccard[data-enc=\"muertes\"]')?.click()",
     ],
     cajas: '.encrow',
   },
@@ -147,10 +145,7 @@ const VISTAS = [
 
 // El binario directo, no `npx`: en Windows, Node 24 se niega a lanzar un
 // `.cmd` sin shell y devuelve EINVAL. El paquete `electron` exporta la ruta.
-const { createRequire } = await import('node:module');
-const bin = createRequire(import.meta.url)('electron');
-const app = spawn(bin, ['.', `--remote-debugging-port=${PUERTO}`],
-  { stdio: 'ignore', detached: false });
+const app = lanzar();
 
 // Lo pulsable enseña la mano. No es adorno: el cursor es lo único que dice
 // si algo se puede pulsar ANTES de pulsarlo. Se descubrió que la fila de la
@@ -174,21 +169,14 @@ try {
   await manda('Runtime.enable');
   await manda('Page.enable');
 
-  const evalua = async (expr) => {
-    const r = await manda('Runtime.evaluate', {
-      expression: expr, awaitPromise: true, returnByValue: true,
-    });
-    if (r.exceptionDetails) {
-      throw new Error(r.exceptionDetails.exception?.description ?? 'error al evaluar');
-    }
-    return r.result.value;
-  };
+  const evalua = evaluador(manda);
 
   console.log(`\n${pagina.title} — midiendo el DOM de verdad\n`);
   await espera(3000);
 
   for (const v of VISTAS) {
     for (const paso of v.llega) { await evalua(paso); await espera(1600); }
+    if (v.espera) await espera(v.espera);
     let raton = 0;
 
     // EL RATÓN, que es lo que un recorrido de vistas no toca. El fallo de
@@ -214,7 +202,20 @@ try {
     }
 
     const m = await evalua(`(() => {
-      const n = [...document.querySelectorAll(${JSON.stringify(v.cajas)})];
+      const todos = [...document.querySelectorAll(${JSON.stringify(v.cajas)})];
+      // NO PINTADO A PROPÓSITO NO ES NO PINTADO.
+      //
+      // Un elemento con «display: none» mide cero, y esta comprobación lo
+      // contaba como «sin alto» — que es su forma de cazar lo contrario: algo
+      // que SÍ se pinta y sale aplastado. La reproducción tiene actores
+      // escondidos a propósito, los que aún no han entrado en la pelea, y eso
+      // daba rojo por una decisión.
+      //
+      // Se separan y se cuentan aparte: ni se ignoran en silencio ni se
+      // confunden con un fallo. Un getClientRects() vacío es exactamente «este
+      // elemento no genera ninguna caja».
+      const ocultos = todos.filter((x) => x.getClientRects().length === 0).length;
+      const n = todos.filter((x) => x.getClientRects().length > 0);
       const c = n.map((x) => { const r = x.getBoundingClientRect();
         return { t: Math.round(r.top), b: Math.round(r.bottom),
           l: Math.round(r.left), rr: Math.round(r.right), h: Math.round(r.height),
@@ -239,7 +240,7 @@ try {
         }
       }
       const caja = document.getElementById('crashBox');
-      return { n: n.length, solapes, sinAlto, desbordan,
+      return { n: n.length, ocultos, solapes, sinAlto, desbordan,
         crash: caja && caja.style.display !== 'none' ? caja.textContent.slice(0, 160) : null,
         vacia: document.querySelector('.enc')?.textContent.trim().length < 40 };
     })()`);
@@ -248,7 +249,7 @@ try {
     if (!bien) mal++;
     console.log(`  ${bien ? 'ok ' : 'MAL'}  ${v.nombre.padEnd(10)} ${
       m.n} cajas «${v.cajas}» · ${m.solapes} solapes · ${m.sinAlto} sin alto · ${
-      m.desbordan} desbordan${raton ? ` · ratón por ${raton}` : ''}${
+      m.desbordan} desbordan${m.ocultos ? ` · ${m.ocultos} ocultos a propósito` : ''}${raton ? ` · ratón por ${raton}` : ''}${
       m.crash ? `\n         REVENTÓ: ${m.crash}` : ''}${m.vacia ? '\n         la vista salió vacía' : ''}`);
 
     // El cursor de lo que haya en esta vista.
@@ -271,12 +272,11 @@ try {
       console.log(`         CURSOR: ${cursores.join(' · ')}`);
     }
 
-    const alto = await evalua('document.body.scrollHeight');
-    await manda('Emulation.setDeviceMetricsOverride', {
-      width: 1500, height: Math.min(alto + 60, 3200), deviceScaleFactor: 1, mobile: false,
-    });
-    await espera(500);
-    const shot = await manda('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+    // Por la puerta común, que además comprueba que la página no creció entre
+    // medir el alto y disparar: ver capturaPagina en cdp.js.
+    const { png, creció } = await capturaPagina({ manda, evalua });
+    if (creció) console.log(`         (la página creció al fijar el alto: ${creció.antes} → ${creció.despues})`);
+    const shot = { data: png.toString('base64') };
     fs.writeFileSync(path.join(SALIDA, `${v.nombre}.png`), Buffer.from(shot.data, 'base64'));
     await manda('Emulation.clearDeviceMetricsOverride');
     await espera(300);

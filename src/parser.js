@@ -16,8 +16,17 @@ export function normReason(raw) {
   return r.slice(0, 24) || 'fallo';
 }
 
-/** «himself», «itself»… El log los usa como destino de una curación propia. */
-const REFLEXIVO = /^(?:himself|herself|itself|themselves)$/i;
+/**
+ * «himself», «itself», «yourself»… El log los usa como destino de una acción
+ * sobre uno mismo, y ninguno es un combatiente.
+ *
+ * `yourself` faltaba, y no era inofensivo: el log lo usa para el daño que te
+ * haces tú —«You hurt yourself for 40 points.» 133 veces, «You hit yourself …
+ * by Cannibalize» 51 veces, más Siphon y Lifedraw— así que aparecía una fila
+ * llamada «yourself» en la tabla de combatientes de nueve peleas, con daño real
+ * dentro y sin ser nadie.
+ */
+const REFLEXIVO = /^(?:himself|herself|itself|themselves|yourself|yourselves|myself|oneself)$/i;
 
 const MONTHS = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
 
@@ -77,8 +86,18 @@ export class Parser {
   parse(line, seq = 0) {
     const head = parseHeader(line);
     if (!head) return null;
-    const { t, body } = head;
+    return this.parseAt(head.t, head.body, seq);
+  }
 
+  /**
+   * Lo mismo, con la hora ya separada del texto.
+   *
+   * Lo usa la reproducción: el lector del registro devuelve la hora y el cuerpo
+   * por separado —así la pestaña del registro puede enseñar el texto sin la
+   * marca delante— y volver a pegarlos para que `parse` los separe otra vez
+   * sería trabajo de ida y vuelta sobre cientos de líneas.
+   */
+  parseAt(t, body, seq = 0) {
     for (const hint of HINTS) {
       if (body.indexOf(hint) === -1) continue;
       for (const rule of RULES_BY_HINT.get(hint)) {
@@ -208,7 +227,14 @@ export class Parser {
 
   #norm(name) {
     if (name == null) return null;
-    if (name === 'You' || name === 'YOU' || name === 'you' || name === 'Yourself') {
+    // SIN MIRAR LA CAJA. Aquí se listaban las cuatro formas a mano —«You»,
+    // «YOU», «you», «Yourself»— y faltaba justo la que el log escribe más:
+    // «yourself» en minúscula, que es como sale a mitad de frase («You hurt
+    // yourself for 40 points.»). Es el mismo fallo que partía enemigos en dos
+    // según la mayúscula de principio de frase, y con la misma cura: comparar
+    // sin caja en vez de enumerar variantes.
+    const plano = name.toLowerCase();
+    if (plano === 'you' || plano === 'yourself' || plano === 'myself') {
       return this.self ?? 'You';
     }
     // EQ capitaliza al principio de frase: "A fire giant warrior" y
@@ -240,6 +266,14 @@ export class Parser {
       ev.confidence = (own || m) ? 'exact' : 'none';
     }
 
+    // EL PRONOMBRE ES LA PRUEBA DE QUE ES EL MISMO, y hay que anotarlo ANTES de
+    // normalizar, porque después ya no se distingue de una coincidencia.
+    //
+    // Que origen y destino compartan nombre NO significa que sean el mismo: un
+    // encantado pegando a un salvaje que se llama igual son dos bichos, y esa
+    // línea existe y está contada aparte como ambigua. Lo único que prueba que
+    // alguien se lo hizo a sí mismo es que el registro escriba el pronombre.
+    if (REFLEXIVO.test(String(ev.target ?? ''))) ev.selfInflicted = true;
     // Todos los campos que pueden traer "You" deben normalizarse, no sólo
     // source y target: si no, tu muerte queda a nombre de un "You" fantasma.
     ev.source = this.#norm(ev.source);

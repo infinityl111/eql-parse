@@ -8,6 +8,9 @@ import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { copiarAlPortapapeles } from './clip.js';
 import { initTriggers, renderTriggers } from './triggers.js';
 import { plate, DIBUJADAS } from './plates.js';
+import { grafica, STANCE_COLOR, W, H, BAND } from './grafica.js';
+import { montarReproduccion } from './reproduccion.js';
+import { cajaRotulo, colocarRotulo, ocultarRotulo } from './rotulo.js';
 import { mountBanner, speak, playSound, listVoices } from './alerts.js';
 import { crearFallo } from './fallo.js';
 
@@ -42,6 +45,10 @@ const state = {
   sideHeads: new Map(),
   detailStamp: new Map(),
   showAll: false,
+  // Qué documento de la pelea está abierto. Vive aquí y no en el DOM porque la
+  // barra se repinta con el snapshot; y se conserva al cambiar de pelea, que es
+  // lo que quieres cuando comparas la misma pregunta en dos peleas seguidas.
+  doc: 'tank',
   filter: { range: '24h', foe: '', mates: [] },
   fights: [],
   fightCache: new Map(),
@@ -635,8 +642,39 @@ function renderFightList(snap) {
   const html = parts.join('');
   const list = $('fightList');
   if (list.dataset.sig === html) return;
+
+  /**
+   * EL FOCO SOBREVIVE AL REPINTADO, y sin esto no sobrevivía.
+   *
+   * La barra de filtros vive dentro de la misma lista que se repinta, así que
+   * al aplicarse el filtro —350 ms después de la última tecla— el `innerHTML`
+   * destruía el campo de búsqueda y creaba otro. Escribías tres letras, la
+   * lista se actualizaba, y la cuarta se perdía: había que volver a pinchar en
+   * el campo para seguir. Desde fuera parece que el buscador «se cansa».
+   *
+   * Se guarda el foco, el cursor Y EL TEXTO. El texto hace falta porque el
+   * campo se vuelve a pintar con `state.filter.foe`, que va un rebote por
+   * detrás de lo que has escrito: lo tecleado durante esos 350 ms no está
+   * todavía en el estado y se habría perdido al restaurar.
+   */
+  const activo = document.activeElement;
+  const foco = activo && list.contains(activo) && activo.id
+    ? { id: activo.id, valor: activo.value, ini: activo.selectionStart, fin: activo.selectionEnd }
+    : null;
+
   list.dataset.sig = html;
   list.innerHTML = html;
+
+  if (foco) {
+    const el = $(foco.id);
+    if (el) {
+      if (foco.valor !== undefined && el.value !== foco.valor) el.value = foco.valor;
+      el.focus();
+      // No todos los controles admiten cursor —un <select> no— y pedírselo
+      // revienta. El foco ya está puesto, que es lo que importaba.
+      try { if (foco.ini !== null) el.setSelectionRange(foco.ini, foco.fin); } catch { /* nada */ }
+    }
+  }
 
   $('fltRange')?.addEventListener('change', (e) => { state.filter.range = e.target.value; refreshFights(); });
   $('fltMates')?.addEventListener('click', (e) => {
@@ -840,7 +878,7 @@ function buildRow(name) {
 
 function updateRow(node, r, snap, live, rank) {
   const { refs } = node;
-  const sig = `${rank}|${r.damage}|${r.dps.toFixed(1)}|${r.share.toFixed(4)}|${r.hits}|${r.misses}|${r.crits}|${r.taken}|${r.healingDone}|${r.petOf ?? ''}`;
+  const sig = `${rank}|${r.damage}|${r.dps.toFixed(1)}|${r.share.toFixed(4)}|${r.hits}|${r.misses}|${r.crits}|${r.taken}|${r.healingDone}|${r.petOf ?? ''}|${Math.round(r.rafaga10 ?? 0)}`;
   const open = state.expanded.has(r.name);
   node.el.classList.toggle('open', open);
 
@@ -876,6 +914,36 @@ function updateRow(node, r, snap, live, rank) {
       `<span>${t('row.damage')} <b>${n0(r.damage)}</b></span>`,
       r.dpsActive && Math.abs(r.dpsActive - r.dps) > 1
         ? `<span title="${esc(t('row.paceNote'))}">${t('row.pace')} <b>${n1(r.dpsActive)}</b></span>` : '',
+      // LA TERCERA VELOCIDAD: tu mejor tramo de diez segundos seguidos.
+      //
+      // Las otras dos contestan cuánto pusiste y a qué ritmo; ésta contesta si
+      // fue un momento o fue un rato. Va aquí, en la línea que se ve sin abrir
+      // nada, y no dentro del desplegable — que es donde estaban las otras dos
+      // hasta que aprendimos que un dato al que hay que ir no está puesto.
+      //
+      // Sale con el múltiplo al lado porque el número solo no dice nada: 300 de
+      // ráfaga es enorme para quien sostiene 100 y normal para quien sostiene
+      // 280.
+      //
+      // Y EL MÚLTIPLO SE MIDE CONTRA EL RITMO, no contra el reparto. Medido
+      // sobre el registro entero, 1.585 filas: contra el reparto la mediana es
+      // ×2,28 y el 97,1% de las filas pasaría cualquier umbral —el denominador
+      // está diluido por los segundos en que no hiciste nada, así que casi
+      // todo el mundo «tiene ráfaga» y la cifra no separa a nadie—. Contra el
+      // ritmo la mediana es ×1,29, el p90 ×1,97 y la mitad de las filas se
+      // queda por debajo del umbral: entonces sí dice algo cuando aparece.
+      //
+      // Puede ser MENOR que 1 y es correcto: si sólo actuaste en cinco segundos
+      // sueltos, tu ritmo es alto y ninguna ventana de diez los contiene.
+      //
+      // Aparece sólo cuando hay pico, igual que «ritmo» sólo aparece cuando
+      // difiere del reparto: es la regla que ya tenía esta línea.
+      (() => {
+        const base = r.dpsActive || r.dps;
+        if (!(r.rafaga10 > 0 && base > 0 && r.rafaga10 / base >= 1.3)) return '';
+        return `<span title="${esc(t('row.burstNote'))}">${t('row.burst')} <b>${
+          n0(r.rafaga10)}</b> <span class="dim">×${(r.rafaga10 / base).toFixed(1)}</span></span>`;
+      })(),
       `<span>${t('row.max')} <b>${n0(r.max)}</b></span>`,
       r.meleeHits + r.misses ? `<span>${t('row.accuracy')} <b>${(r.accuracy * 100).toFixed(0)}%</b></span>` : '',
       r.crits ? `<span>${t('row.crits')} <b>${r.crits}</b></span>` : '',
@@ -929,11 +997,11 @@ function updateRow(node, r, snap, live, rank) {
  * entero. El registro de EQL no da ninguno de los dos. Esto es la mitad que sí
  * se puede: el tiempo.
  */
-function uptimeHTML(f) {
+function uptimeDatos(f) {
   const dur = Math.max(1, Math.round(f?.duration ?? 0));
   const casts = f?.casts ?? [];
   const fades = f?.fades ?? [];
-  if (!fades.length && !casts.length) return '';
+  if (!fades.length && !casts.length) return null;
 
   // Sólo lo tuyo: el uptime de un buff ajeno no se puede seguir, porque de sus
   // caídas el registro sólo cuenta las que te tocan a ti.
@@ -971,7 +1039,7 @@ function uptimeHTML(f) {
     anota(c.ability, c.t, dur);
     sinCaer.add(c.ability);
   }
-  if (!tramos.size) return '';
+  if (!tramos.size) return null;
 
   const filas = [...tramos].map(([nombre, ts]) => {
     // Se unen los solapes: relanzar antes de que caiga no suma dos veces.
@@ -986,11 +1054,18 @@ function uptimeHTML(f) {
     return { nombre, unidos, seg, pct: seg / dur, veces: ts.length };
   }).sort((a, b) => b.seg - a.seg);
 
+  return { filas, deAntes, sinCaer, dur };
+}
+
+function uptimeHTML(f) {
+  const datos = uptimeDatos(f);
+  if (!datos) return '';
+  const { filas, deAntes, sinCaer, dur } = datos;
+
   const barra = (u) => u.map(([a, b]) => `<i style="left:${(a / dur * 100).toFixed(2)}%;width:${
     Math.max(0.6, (b - a) / dur * 100).toFixed(2)}%"></i>`).join('');
 
   return `<div class="uptime">
-    <div class="sec-title eyebrow">${esc(t('up.title'))}</div>
     <div class="hint">${esc(t('up.note'))}</div>
     ${filas.map((x) => `<div class="up-lane">
       <span class="up-name">${spellIcon(x.nombre)}${esc(x.nombre)}${
@@ -1051,7 +1126,6 @@ function lanzamientosHTML(f) {
     title="${esc(`${secs(c.t)} · ${c.ability}`)}"></i>`;
 
   return `<div class="casts">
-    <div class="sec-title eyebrow">${esc(t('casts.title'))}</div>
     <div class="hint">${esc(t('casts.note'))}</div>
     ${filas.map(([quien, lista]) => `<div class="cast-lane${mios.has(quien) ? ' mine' : ''}">
       <span class="cast-who">${esc(quien)}</span>
@@ -1114,7 +1188,6 @@ function tanqueoHTML(f) {
   };
 
   return `<div class="tank">
-    <div class="sec-title eyebrow">${esc(t('tank.title'))}</div>
     <div class="hint">${esc(t('tank.note'))}</div>
     <div class="tank-head eyebrow">
       <span>${esc(t('tank.who'))}</span>
@@ -1230,18 +1303,187 @@ function renderRows(snap) {
     if (!seen.has(name)) { node.el.remove(); state.rowNodes.delete(name); }
   }
 
-  // Aguantar, debajo de todo: es otra pregunta sobre la misma pelea.
-  const tank = $('tank');
-  if (tank) tank.innerHTML = tanqueoHTML(f);
-
-  // Y qué lanzó cada uno, que es otra pregunta más sobre la misma pelea.
-  const lanz = $('casts');
-  if (lanz) lanz.innerHTML = lanzamientosHTML(f);
-
-  // Y cuánto tiempo estuvo puesto lo que lanzaste.
-  const up = $('uptime');
-  if (up) up.innerHTML = uptimeHTML(f);
+  // Aguantar, lanzamientos y uptime: tres preguntas más sobre la misma pelea,
+  // cada una con su pestaña y su titular puesto en ella.
+  renderDocs(f);
   if (state.hover) updateTip();
+}
+
+/**
+ * Los documentos de la pelea: una pregunta cada uno, uno visible a la vez.
+ *
+ * POR QUÉ UNA BARRA Y NO EL APILADO DE ANTES. Aguantar, lanzamientos y uptime
+ * son tres preguntas distintas sobre la misma pelea, y estaban una debajo de
+ * otra al final de una pantalla que ya traía cabecera, gráfica, consejo y el
+ * reparto entero. El tercero no lo veía nadie: no porque estuviera cerrado,
+ * sino porque estaba a un gesto —bajar del todo— que nadie hace.
+ *
+ * Y AQUÍ ESTÁ LA CONDICIÓN QUE HACE QUE ESTO NO SEA UN CAJÓN: cada pestaña
+ * lleva su TITULAR, y el titular es la respuesta en una línea. «Aguantar ·
+ * Notarino 62%» contesta la pregunta sin abrir nada; lo que queda dentro es el
+ * detalle de esa respuesta. Una pestaña que sólo dijera «Aguantar» sería un
+ * cajón, y esconder un dato en un cajón es exactamente lo que se quería evitar.
+ *
+ * Por eso `head()` es obligatorio y no adorno: si un documento no sabe decir su
+ * titular en cuatro palabras, no está listo para ser una pestaña.
+ *
+ * `head(f)` devuelve null cuando esa pelea no tiene ese dato. Entonces la
+ * pestaña no se pinta: una pestaña vacía es una promesa incumplida.
+ */
+const DOCS = [
+  {
+    id: 'tank',
+    label: () => t('tank.title'),
+    head: (f) => {
+      const filas = (f?.rows ?? []).filter((r) => r.taken > 0 || r.absorbed > 0)
+        .sort((a, b) => b.taken - a.taken);
+      if (!filas.length) return null;
+      const total = filas.reduce((a, r) => a + r.taken, 0) || 1;
+      return `${filas[0].name} ${pct(filas[0].taken / total)}`;
+    },
+    body: tanqueoHTML,
+  },
+  {
+    id: 'casts',
+    label: () => t('casts.title'),
+    head: (f) => {
+      const n = (f?.casts ?? []).filter((c) => c.source && c.ability).length;
+      return n < 2 ? null : n0(n);
+    },
+    body: lanzamientosHTML,
+  },
+  {
+    id: 'uptime',
+    label: () => t('up.title'),
+    head: (f) => {
+      const d = uptimeDatos(f);
+      if (!d?.filas?.length) return null;
+      const x = d.filas[0];
+      return `${x.nombre} ${Math.round(x.pct * 100)}%`;
+    },
+    body: uptimeHTML,
+  },
+  {
+    /**
+     * EL REGISTRO: de dónde sale todo lo demás.
+     *
+     * No es un dato más. Todo lo que enseña esta aplicación es una cuenta sobre
+     * estas líneas, así que la última pregunta que se puede hacer de cualquier
+     * cifra es ésta, y aquí está la respuesta entera.
+     *
+     * Es el único documento que no sale de la pelea guardada: las líneas se
+     * leen del fichero cuando lo abres, por hora. Por eso su cuerpo es asíncrono
+     * y los otros tres no — se pinta un aviso de espera y se rellena al llegar.
+     */
+    id: 'log',
+    label: () => t('log.title'),
+    head: (f) => {
+      const at = f?.at ?? (f?.start ? f.start * 1000 : null);
+      if (!at) return null;
+      const h = (ms) => new Date(ms).toLocaleTimeString(langInfo().code,
+        { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return `${h(at)}–${h(at + (f.duration ?? 0) * 1000)}`;
+    },
+    body: registroHTML,
+    async: true,
+  },
+];
+
+/**
+ * El registro de una pelea, leído del fichero.
+ *
+ * Se cachea por pelea: abrir la pestaña, mirar otra cosa y volver no vuelve a
+ * leer el disco. La pelea viva no se cachea — sigue creciendo.
+ */
+const registroCache = new Map();
+
+function registroHTML(f) {
+  const at = f?.at ?? (f?.start ? f.start * 1000 : null);
+  if (!at) return `<div class="hint">${esc(t('log.noTime'))}</div>`;
+  const clave = f.uid ?? 'live';
+  const r = registroCache.get(clave);
+  if (!r) return `<div class="hint">${esc(t('log.loading'))}</div>`;
+
+  if (!r.ok) {
+    // NUNCA UNA LISTA VACÍA. Que no haya líneas y que no se puedan leer son dos
+    // cosas distintas, y la segunda tiene un motivo que se puede decir.
+    const detalle = r.motivo === 'fuera-de-rango' && r.span
+      ? t('log.outOfRangeSpan', {
+        desde: cuando(r.span.desde * 1000), hasta: cuando(r.span.hasta * 1000),
+      })
+      : '';
+    return `<div class="hallazgo">${esc(t(`log.err.${r.motivo}`) )} ${esc(detalle)}</div>`;
+  }
+
+  const hora = (ms) => new Date(ms).toLocaleTimeString(langInfo().code, { hour12: false });
+  return `<div class="hint">${esc(t('log.note'))}</div>
+    <div class="logbox">${r.lineas.map((l) => `<div class="logline">
+      <span class="lt">${l.t ? esc(hora(l.t * 1000)) : ''}</span><span class="lx">${esc(l.texto)}</span>
+    </div>`).join('')}</div>
+    ${r.recortadas ? `<div class="hint">${esc(t('log.cut', { n: r.recortadas }))}</div>` : ''}`;
+}
+
+/** Pide las líneas de una pelea y repinta cuando llegan. */
+async function pedirRegistro(f, repintar) {
+  const at = f?.at ?? (f?.start ? f.start * 1000 : null);
+  if (!at) return;
+  const clave = f.uid ?? 'live';
+  if (registroCache.has(clave) && clave !== 'live') return;
+  const desde = Math.round(at / 1000);
+  const hasta = desde + (f.duration ?? 0);
+  try {
+    const r = await window.eql.logContext?.(desde, hasta);
+    registroCache.set(clave, r ?? { ok: false, motivo: 'error' });
+  } catch {
+    registroCache.set(clave, { ok: false, motivo: 'error' });
+  }
+  repintar?.();
+}
+
+/**
+ * La barra de documentos y el que esté abierto.
+ *
+ * Se repinta con guarda de firma porque en una pelea viva esto pasa cuatro
+ * veces por segundo: sin ella, el documento abierto se reconstruiría entero y
+ * no se podría ni seleccionar una cifra para copiarla.
+ */
+function renderDocs(f) {
+  const bar = $('docBar');
+  const pane = $('docPane');
+  if (!bar || !pane) return;
+
+  const vivos = DOCS.map((d) => ({ d, titular: f ? d.head(f) : null })).filter((x) => x.titular !== null);
+  if (!vivos.length) { bar.innerHTML = ''; pane.innerHTML = ''; bar.dataset.sig = ''; pane.dataset.sig = ''; return; }
+
+  // El elegido sigue siéndolo mientras esa pelea lo tenga; si no, el primero.
+  // Se cae al primero y no a «ninguno» porque un panel vacío desperdicia el
+  // sitio: siempre hay un documento abierto.
+  const abierto = vivos.some((x) => x.d.id === state.doc) ? state.doc : vivos[0].d.id;
+  if (abierto !== state.doc) state.doc = abierto;
+
+  const sigBar = `${getLang()}|${abierto}|${vivos.map((x) => `${x.d.id}:${x.titular}`).join('|')}`;
+  if (bar.dataset.sig !== sigBar) {
+    bar.dataset.sig = sigBar;
+    bar.innerHTML = vivos.map(({ d, titular }) => `<button class="doctab${
+      d.id === abierto ? ' on' : ''}" data-doc="${d.id}" title="${esc(d.label())}">
+      <span class="doctab-l">${esc(d.label())}</span>
+      <span class="doctab-h">${esc(titular)}</span>
+    </button>`).join('');
+  }
+
+  const doc = DOCS.find((d) => d.id === abierto);
+  // El registro se lee del disco, así que su firma incluye si ya llegó: sin
+  // esto el panel se quedaría con el «cargando…» para siempre.
+  const listo = doc.async ? (registroCache.has(f.uid ?? 'live') ? 1 : 0) : '';
+  const sigPane = `${getLang()}|${abierto}|${f.uid ?? 'live'}|${f.total}|${f.duration}|${f.casts?.length ?? 0}|${listo}`;
+  if (pane.dataset.sig !== sigPane) {
+    pane.dataset.sig = sigPane;
+    pane.innerHTML = doc.body(f);
+  }
+  // Se pide DESPUÉS de pintar el aviso de espera, y sólo si el documento
+  // abierto es el que lo necesita: leer el registro de una pelea que nadie está
+  // mirando sería trabajo de disco para nada.
+  if (doc.async && !listo) pedirRegistro(f, () => renderDocs(withPets(fightFor(state.snap))));
 }
 
 // ═══════════ Tabla auxiliar ═══════════
@@ -1270,17 +1512,58 @@ function detailHTML(r) {
     ]),
   ));
 
-  const abilities = section(t('det.byAbility'), table(
+  // LA FORMA DEL GOLPE, en lugar del mínimo y el máximo.
+  //
+  // La columna «mín–máx» que había aquí eran dos muestras de n=1 puestas al
+  // lado de sumas de cientos, y se leían como si valieran lo mismo. Un ataque
+  // medido en el registro de referencia con n=557 daba 3–60 cuando hace 25 casi
+  // siempre. La mediana y el p10–p90 contestan esa misma pregunta y no se las
+  // lleva un golpe raro. El máximo se queda: el mayor golpe SÍ es una pregunta,
+  // y está en la línea de la fila y en el rótulo emergente.
+  //
+  // No se deja el mín–máx al lado de la mediana a propósito. Una cifra frágil
+  // junto a cifras robustas invita a leerla como las demás, que es justo lo que
+  // hacía daño.
+  const dosModas = r.abilities.filter((a) => a.bimodal);
+  // Distinguir «pocos golpes» de «pelea vieja» se puede, así que se dice cuál
+  // de las dos es: la primera se arregla peleando y la segunda reconstruyendo.
+  // La línea de la mascota no cuenta para ninguna de las dos: no es un ataque.
+  const sinContar = r.abilities.some((a) => !a.pet && a.p50 === undefined && a.n >= 8);
+
+  const celdas = (a) => {
+    if (a.p50 !== undefined) return { med: n0(a.p50), rango: `${n0(a.p10)}–${n0(a.p90)}` };
+    // La mascota plegada es una fila de otra naturaleza: la suma de todos sus
+    // ataques. No tiene mediana que enseñar, y decir «reconstruye para verla»
+    // prometería algo que no va a aparecer nunca.
+    const falta = a.pet ? t('det.petLine')
+      : a.n < 8 ? t('det.shapeFew', { n: 8 - a.n })
+        : t('det.shapeOld');
+    return { med: `<span class="gap" title="${esc(falta)}">—</span>`, rango: '' };
+  };
+
+  const abilities = section(t('det.byAbility'), `${table(
     [{ label: t('det.ability') }, { label: 'Tipo', w: '74px' }, { label: t('det.dmg'), right: true, w: '84px' },
      { label: t('det.share'), right: true, w: '58px' }, { label: t('det.uses'), right: true, w: '48px' },
-     { label: t('det.avg'), right: true, w: '62px' }, { label: t('det.minmax'), right: true, w: '96px' },
+     { label: t('det.avg'), right: true, w: '62px' }, { label: t('det.median'), right: true, w: '62px' },
+     { label: t('det.spread'), right: true, w: '86px' }, { label: t('det.max'), right: true, w: '62px' },
      { label: t('det.crit'), right: true, w: '48px' }],
-    r.abilities.map((a) => [
-      esc(a.name), `<i class="seg ${typeClass(a.type)}"></i>${esc(a.type ?? '—')}`,
-      n0(a.sum), pct(a.sum / dmgTotal), a.n, n0(a.sum / a.n),
-      `${n0(a.min)}–${n0(a.max)}`, a.crits || '—',
-    ]),
-  ));
+    r.abilities.map((a) => {
+      const fa = celdas(a);
+      return [
+        `${esc(a.name)}${a.pet ? `<i class="petline" title="${esc(t('det.petLine'))}">${
+          esc(t('det.pet'))}</i>` : ''}${a.bimodal ? `<i class="dosmodas" title="${esc(t('det.twoModesTip'))}">${
+          esc(t('det.twoModes'))}</i>` : ''}`,
+        a.pet ? '<span class="dim">—</span>'
+          : `<i class="seg ${typeClass(a.type)}"></i>${esc(a.type ?? '—')}`,
+        n0(a.sum), pct(a.sum / dmgTotal), a.n, n0(a.sum / a.n),
+        fa.med, fa.rango, n0(a.max), a.crits || '—',
+      ];
+    }),
+  )}
+    ${dosModas.length ? `<div class="hallazgo">${esc(t('det.twoModesNote', {
+    list: dosModas.map((a) => a.name).join(', '),
+  }))}</div>` : ''}
+    ${sinContar ? `<div class="hint">${esc(t('det.shapeOld'))}</div>` : ''}`);
 
   const targets = r.targets.length > 1 ? section(t('det.byTarget'), table(
     [{ label: t('det.target') }, { label: t('det.dmg'), right: true, w: '90px' }, { label: t('det.share'), right: true, w: '64px' }, { label: t('det.hits'), right: true, w: '64px' }],
@@ -1369,32 +1652,13 @@ function detailHTML(r) {
 }
 
 // ═══════════ Tooltip de hover ═══════════
-let tipEl = null;
-let mouse = { x: 0, y: 0 };
-document.addEventListener('mousemove', (e) => {
-  mouse = { x: e.clientX, y: e.clientY };
-  if (tipEl && tipEl.style.display === 'block') placeTip();
-});
-
-function ensureTip() {
-  if (!tipEl) {
-    tipEl = document.createElement('div');
-    tipEl.className = 'tip';
-    document.body.appendChild(tipEl);
-  }
-  return tipEl;
-}
-function placeTip() {
-  const caja = ensureTip();
-  const r = caja.getBoundingClientRect();
-  let x = mouse.x + 16, y = mouse.y + 14;
-  if (x + r.width > window.innerWidth - 8) x = mouse.x - r.width - 14;
-  if (y + r.height > window.innerHeight - 8) y = window.innerHeight - r.height - 8;
-  caja.style.left = `${Math.max(8, x)}px`;
-  caja.style.top = `${Math.max(8, y)}px`;
-}
-function hideTip() { if (tipEl) tipEl.style.display = 'none'; }
-function showTip() { updateTip(); if (tipEl) { tipEl.style.display = 'block'; placeTip(); } }
+// LA CAJA es de `ui/rotulo.js`, compartida con la reproducción; el CONTENIDO
+// se queda aquí, porque no es el mismo dato: en combate son los totales de una
+// pelea cerrada y allí es lo que se lleva hasta el segundo que estás mirando.
+const ensureTip = cajaRotulo;
+const placeTip = colocarRotulo;
+const hideTip = ocultarRotulo;
+function showTip() { updateTip(); const el = cajaRotulo(); el.style.display = 'block'; placeTip(); }
 
 const wikiCache = new Map();     // nombre -> ficha, o null si la wiki no la tiene
 let hoverItem = null;
@@ -1751,11 +2015,6 @@ async function renderNarrate(host) {
 }
 
 // ═══════════ Gráfica: daño por segundo + franja de postura ═══════════
-const STANCE_COLOR = {
-  defensive: 'var(--t-cold)', 'mage hunter': 'var(--t-magic)', channeler: 'var(--t-spell)',
-  offensive: 'var(--t-fire)', balanced: 'var(--t-melee)', evasive: 'var(--t-poison)',
-  striker: 'var(--t-ds)', ranged: 'var(--t-disease)', berserker: 'var(--t-dot)',
-};
 
 // Los puntos de la gráfica que está puesta ahora, para el rótulo del ratón.
 let chartPuntos = null;
@@ -1804,39 +2063,13 @@ function cablearGrafica() {
 }
 
 function chartHTML(f) {
-  const dur = Math.max(1, f.duration);
-  if (dur < 4 || !f.series?.length) return '';
-  const W = 600, H = 96, BAND = 11;
-  const byS = new Map(f.series.map((p) => [p.s, p]));
-  const pts = [];
-  for (let i = 0; i <= dur; i++) pts.push(byS.get(i) ?? { s: i, dmg: 0, taken: 0, heal: 0 });
-  const peak = Math.max(1, ...pts.map((p) => p.dmg));
-  const x = (i) => (i / dur) * W;
-  const y = (v) => H - (v / peak) * (H - 6);
-
-  const area = `M0,${H} ` + pts.map((p, i) => `L${x(i).toFixed(1)},${y(p.dmg).toFixed(1)}`).join(' ') + ` L${W},${H} Z`;
-  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.dmg).toFixed(1)}`).join(' ');
-  // LA MISMA ESCALA QUE LA DE ARRIBA, que antes no lo era: la punteada se
-  // dibujaba contra SU propio máximo y encima a media altura, así que sus
-  // subidas y bajadas no se podían comparar con las tuyas — parecía que
-  // recibías tanto como pegabas cuando no.
-  //
-  // Cabe de sobra: medido sobre 393 peleas guardadas, el pico de lo recibido
-  // es la cuarta parte del de lo hecho en la mediana, y en NINGUNA lo supera.
-  const taken = pts.some((p) => p.taken)
-    ? pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.taken).toFixed(1)}`).join(' ')
-    : null;
-
-  const band = (f.stanceSpans ?? []).map((sp) => {
-    const x0 = x(sp.from), x1 = x(Math.max(sp.to, sp.from + 1));
-    const key = String(sp.stance).toLowerCase().replace(/\s*stance\s*$/, '');
-    return `<rect x="${x0.toFixed(1)}" y="0" width="${Math.max(2, x1 - x0).toFixed(1)}" height="${BAND}"
-      fill="${STANCE_COLOR[key] ?? 'var(--t-other)'}" opacity=".85"><title>${esc(sp.stance)}</title></rect>`;
-  }).join('');
-
-  const legend = [...new Set((f.stanceSpans ?? []).map((sp) =>
-    String(sp.stance).toLowerCase().replace(/\s*stance\s*$/, '')))].map((k) =>
-    `<span><i style="background:${STANCE_COLOR[k] ?? 'var(--t-other)'}"></i>${esc(k)}</span>`).join('');
+  // El DIBUJO vive en `ui/grafica.js`, compartido con la reproducción, que usa
+  // esta misma gráfica como línea de tiempo. Dos funciones dibujando la misma
+  // gráfica se separan con el tiempo y acaban diciendo cosas distintas de la
+  // misma pelea; aquí sólo queda lo que esta pantalla hace con ella.
+  const gr = grafica(f);
+  if (!gr) return '';
+  const { dur, pts, peak, legend, band, taken, svg, hitos } = gr;
 
   // Los puntos, para el rótulo del ratón. Van en una variable del módulo y no
   // en el HTML: son uno por segundo, y una pelea de cinco minutos son
@@ -1849,14 +2082,10 @@ function chartHTML(f) {
     ${band ? `<svg class="chart-band" viewBox="0 0 ${W} ${BAND}" preserveAspectRatio="none" role="img"
       aria-label="${esc(t('chart.bandLabel'))}">${band}</svg>` : ''}
     <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
-      aria-label="${esc(t('chart.svgLabel', { v: n0(peak) }))}">
-      <path d="${area}" fill="var(--t-cold)" opacity=".16"/>
-      <path d="${line}" fill="none" stroke="var(--t-cold)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
-      ${taken ? `<path d="${taken}" fill="none" stroke="var(--t-ds)" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ''}
-    </svg>
-    ${(f.killTimes ?? []).map((k) => `<i class="chart-death"
-      style="left:${(Math.min(dur, Math.max(0, k.t)) / dur * 100).toFixed(2)}%"
-      title="${esc(`${secs(k.t)} · ${k.name}`)}"></i>`).join('')}
+      aria-label="${esc(t('chart.svgLabel', { v: n0(peak) }))}">${svg}</svg>
+    ${hitos.filter((h) => h.clase === 'muerte').map((h) => `<i class="chart-death"
+      style="left:${(h.s / dur * 100).toFixed(2)}%"
+      title="${esc(`${secs(h.s)} · ${h.texto}`)}"></i>`).join('')}
     <div class="chart-hit" id="chartHit"><div class="chart-guide"></div></div>
     <div class="chart-tip" id="chartTip"></div>
     <div class="chart-foot">
@@ -2026,11 +2255,50 @@ function renderAdvice(snap) {
   // que siempre miraba la que estuviera en curso: bastaba una escaramuza suelta
   // donde no hubieras pegado para que no encontrara tu fila y no aconsejara nada.
   const f = withPets(fightFor(snap));
-  const classes = snap.classes ?? [];
+  const enVivo = f ? isLive(f) : true;
+
+  /**
+   * EL TRÍO Y LA POSTURA SON LOS DE LA PELEA, NO LOS DE AHORA.
+   *
+   * El consejo ya se calculaba sobre la pelea seleccionada, pero el trío y la
+   * postura seguían saliendo del snapshot, que describe este instante. Mirando
+   * una pelea de anoche eso pintaba el trío que llevas AHORA sobre ella —y con
+   * el rótulo «clases fijadas por ti», que la da por buena.
+   *
+   * Se vio así: 94 peleas en The Ruins of Old Guk guardadas con SHD/SHM/MAG, y
+   * el panel enseñando SHD/DRU/MAG en todas, que es el trío de la sesión de
+   * después. Los datos estaban bien; lo que mentía era la etiqueta.
+   *
+   * Y no era sólo la etiqueta: con el trío de ahora cambian las posturas que se
+   * comparan, así que el consejo de una pelea vieja se calculaba con una lista
+   * de posturas que no eran las que tenías entonces.
+   *
+   * Lo mismo con la postura: «ya estabas en Defensive» salía de la postura
+   * actual, no de la que llevabas en esa pelea. De las que llevaste se toma la
+   * que aguantó más tiempo, que es la que describe la pelea.
+   */
+  const trioDe = (x) => (x?.classesAt?.length ? x.classesAt : null);
+  const classes = (enVivo ? snap.classes : trioDe(f)) ?? snap.classes ?? [];
+  const posturaDe = (x) => {
+    const spans = x?.stanceSpans ?? [];
+    if (!spans.length) return null;
+    const dur = new Map();
+    spans.forEach((sp, i) => {
+      const fin = i === spans.length - 1 ? Math.max(sp.to, x.duration ?? sp.to) : sp.to;
+      dur.set(sp.stance, (dur.get(sp.stance) ?? 0) + Math.max(0, fin - sp.from));
+    });
+    return [...dur].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  };
+  const postura = (enVivo ? snap.stance : posturaDe(f)) ?? snap.stance;
+  // El trío de la pelea puede no ser el de ahora, y eso hay que decirlo en vez
+  // de dejar que parezca el tuyo de hoy.
+  const trioViejo = !enVivo && trioDe(f) && (snap.classes ?? []).join('/') !== trioDe(f).join('/');
+
   const myRow = f?.rows.find((r) => r.name === snap.self);
   const a = (myRow && classes.length)
     ? advise(myRow, {
-        classes, stance: snap.stance, invocation: snap.invocation,
+        classes, stance: postura, invocation: snap.invocation,
+        seenStances: (f.stanceSpans ?? []).map((x) => x.stance),
         resistsSuffered: f.resistsSuffered, interrupts: f.interrupts,
       })
     : null;
@@ -2042,7 +2310,7 @@ function renderAdvice(snap) {
   const conflict = snap.classConflict && state.dismissedConflict !== JSON.stringify(snap.classConflict)
     ? snap.classConflict : null;
   const sig = JSON.stringify([getLang(), f.uid ?? 'live', a?.incoming, a?.current,
-    a?.defence.map((d) => d.prevented), classes, conflict,
+    a?.defence.map((d) => d.prevented), classes, postura, trioViejo, conflict,
     live && [live.kind, live.bestKey, live.suggest]]);
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
@@ -2115,8 +2383,10 @@ function renderAdvice(snap) {
   host.innerHTML = `<div class="advice">
     <div class="adv-head">
       <span class="eyebrow">${t('adv.title')}</span>
-      <span class="src eyebrow">${snap.classSource && snap.classSource !== 'desconocidas'
-        ? esc(t(`adv.src.${snap.classSource}`)) : ''}</span>
+      <span class="src eyebrow">${trioViejo
+        ? esc(t('adv.src.pelea'))
+        : (snap.classSource && snap.classSource !== 'desconocidas'
+          ? esc(t(`adv.src.${snap.classSource}`)) : '')}</span>
       <span class="adv-classes">${sel(0)}${sel(1)}${sel(2)}</span>
       ${trioBtn}
     </div>
@@ -2221,6 +2491,7 @@ function renderHead(snap) {
       </div>
       <div class="head-actions">
         ${!live ? `<button class="primary" id="btnAnalyse">${t('an.button')}</button>
+        <button id="btnReplay">${t('rp.button')}</button>
         <button id="btnExport">${t('fight.save')}</button>` : ''}
         <button id="btnChat" title="${esc(t('share.tip'))}">${t('share.copy')}</button>
       </div>
@@ -2263,8 +2534,97 @@ function renderHead(snap) {
     b._t = setTimeout(() => { b.textContent = t('share.copy'); b.classList.remove('ok', 'bad'); }, 1600);
   });
   $('btnAnalyse')?.addEventListener('click', (e) => { e.stopPropagation(); state.view = 'analysis'; $('bodyGrid').innerHTML = ''; renderApp(); });
+  $('btnReplay')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.view = 'replay';
+    $('bodyGrid').innerHTML = '';
+    renderApp();
+  });
   // Después del innerHTML, que si no los nodos de la gráfica no existen aún.
   cablearGrafica();
+}
+
+// ═══════════ Reproducción ═══════════
+/**
+ * La reproducción de una pelea, leyendo sus líneas del registro.
+ *
+ * NO SALE DE LA PELEA GUARDADA, y no por capricho: allí el crítico es un
+ * contador por habilidad y el contraataque un contador por combatiente, así que
+ * un flotante sacado de ahí estaría colocado a ojo. Las líneas sí tienen su
+ * instante, y las 410 peleas del histórico siguen dentro del fichero.
+ *
+ * Cuando la pelea ya no está en el registro no se reproduce nada y se dice por
+ * qué. Es la misma regla que la pestaña del registro.
+ */
+let repro = null;
+
+async function renderReplay(snap) {
+  const host = $('rpView');
+  if (!host) return;
+  const f = withPets(fightFor(snap));
+  const back = `<button id="rpBack">← ${esc(t('tab.combat'))}</button>`;
+  const sig = `${getLang()}|${f?.uid ?? 'live'}`;
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+
+  repro?.destruir();
+  repro = null;
+
+  if (!f || isLive(f)) {
+    host.innerHTML = `<div class="an-head">${back}</div>
+      <div class="hint">${esc(t('rp.soloCerradas'))}</div>`;
+    host.querySelector('#rpBack').addEventListener('click', volverACombate);
+    return;
+  }
+
+  host.innerHTML = `<div class="an-head">${back}
+      <h2>${esc(f.label ?? t('fight.skirmish'))}</h2></div>
+    <div class="hint" id="rpCarga">${esc(t('log.loading'))}</div>`;
+  host.querySelector('#rpBack').addEventListener('click', volverACombate);
+
+  // El mismo respaldo que en `guion`: la pelea completa guarda `start` en
+  // segundos y `at` sólo vive en el índice. Según por dónde llegue, trae uno.
+  const desde = f.at ? Math.round(f.at / 1000) : Math.round(f.start ?? 0);
+  const r = desde ? await window.eql.logContext?.(desde, desde + (f.duration ?? 0), 20000) : null;
+  if (host.dataset.sig !== sig) return;      // te has ido mientras leía
+
+  const caja = host.querySelector('#rpCarga');
+  if (!r?.ok || !r.lineas?.length) {
+    caja.classList.add('hallazgo');
+    caja.textContent = t('rp.noLineas');
+    return;
+  }
+  caja.remove();
+  const zona = document.createElement('div');
+  host.appendChild(zona);
+  // LOS RETRATOS SE ESPERAN, no se piden y se sigue.
+  //
+  // Se pedían en paralelo y la escena se montaba con lo que hubiera en la
+  // caché — que la primera vez está vacía—, así que un enemigo CON retrato en
+  // la wiki salía con la silueta genérica y ya no cambiaba: nada repinta la
+  // escena después. Es un viaje más antes de empezar, y la reproducción ya
+  // estaba esperando a que se leyera el registro.
+  await pedirRetratos((f.rows ?? []).filter((x) => x.side === 'enemy').map((x) => x.name), null);
+  if (host.dataset.sig !== sig) return;      // te has ido mientras llegaban
+  // Cuánto tarda cada hechizo, medido por el motor al leer el registro.
+  // Si falla, la barra sale sin duración en vez de no salir: ver `barra()`.
+  let casteos = {};
+  try { casteos = (await window.eql.castTimes?.(desde)) ?? {}; } catch { /* sin tabla */ }
+  if (host.dataset.sig !== sig) return;
+  repro = montarReproduccion(zona, {
+    f, self: snap.self, lineas: r.lineas, retratos: retratoCache, casteos,
+    // La ficha del objeto es la misma que en la lista de botín: vive aquí con
+    // su caché de la wiki, y la reproducción la pide en vez de traérsela.
+    onObjeto: showItemTip, onObjetoFuera: hideItemTip,
+  });
+}
+
+function volverACombate() {
+  repro?.destruir();
+  repro = null;
+  state.view = 'combat';
+  $('bodyGrid').innerHTML = '';
+  renderApp();
 }
 
 // ═══════════ Análisis del combate ═══════════
@@ -2314,7 +2674,15 @@ function renderAnalysis(snap) {
     </div>`).join('');
 
   const findings = a.findings.length ? a.findings.map((x) => `<div class="an-find ${x.level}">
-      <div class="an-find-h"><span class="an-ico">${LEVEL_ICON[x.level]}</span><b>${esc(x.title)}</b></div>
+      <div class="an-find-h"><span class="an-ico">${LEVEL_ICON[x.level]}</span><b>${esc(x.title)}</b>${
+  // QUÉ CLASE DE COSA ES, escrito al lado del título.
+  //
+  // Sin esto, «llevabas la postura equivocada» y «te enraizaron cuatro veces»
+  // salían con la misma pinta y el mismo color, y sólo uno de los dos se puede
+  // corregir peleando distinto. El rótulo dice de cuál de los tres se trata, y
+  // al pasar el ratón, por qué.
+  x.accion ? `<i class="acc acc-${esc(x.accion)}" title="${esc(t(`an.accion.${x.accion}Note`))}">${
+    esc(t(`an.accion.${x.accion}`))}</i>` : ''}</div>
       <div class="an-find-d">${esc(x.detail)}</div>
       ${x.impact ? `<div class="an-find-i">${esc(x.impact)}</div>` : ''}
     </div>`).join('') : `<div class="hint">${esc(t('an.noFindings'))}</div>`;
@@ -3880,11 +4248,13 @@ function encProgreso() {
     const v = m.serie.map((x) => x.dps);
     const max = Math.max(...v) || 1;
     const min = Math.min(...v);
-    const W = 240; const H = 34;
-    const px = (i) => (m.serie.length === 1 ? W / 2 : (i / (m.serie.length - 1)) * W);
-    const py = (y) => H - ((y - min) / Math.max(1, max - min)) * (H - 6) - 3;
+    // ANCHO y ALTO, no W y H: esos nombres son ahora los de la gráfica compartida
+    // y un local con el mismo nombre haría leer 600 donde pone 240.
+    const ANCHO = 240; const ALTO = 34;
+    const px = (i) => (m.serie.length === 1 ? ANCHO / 2 : (i / (m.serie.length - 1)) * ANCHO);
+    const py = (y) => ALTO - ((y - min) / Math.max(1, max - min)) * (ALTO - 6) - 3;
     const d = m.serie.map((x, i) => `${i ? 'L' : 'M'}${px(i).toFixed(1)} ${py(x.dps).toFixed(1)}`).join('');
-    return `<svg class="serie" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    return `<svg class="serie" viewBox="0 0 ${ANCHO} ${ALTO}" preserveAspectRatio="none" aria-hidden="true">
       <path d="${d}" fill="none" stroke="var(--t-fire)" stroke-opacity=".85" stroke-width="1.6"/>
       ${m.serie.map((x, i) => `<circle cx="${px(i).toFixed(1)}" cy="${py(x.dps).toFixed(1)}" r="2"
         fill="var(--t-fire)" fill-opacity=".9"/>`).join('')}
@@ -4209,6 +4579,12 @@ function renderApp() {
     renderAnalysis(state.snap);
     return;
   }
+  if (state.view === 'replay') {
+    if (!$('rpView')) $('bodyGrid').innerHTML = '<aside id="fightList"></aside><main id="rpView"></main>';
+    renderFightList(state.snap);
+    renderReplay(state.snap);
+    return;
+  }
   if (state.view === 'triggers') {
     if (!$('narrateBox')) {
       $('bodyGrid').innerHTML = '<div class="tabpane"><div id="narrateBox"></div><div id="trigBox"></div></div>';
@@ -4228,9 +4604,18 @@ function renderApp() {
   }
   if (!$('rows')) {
     $('bodyGrid').innerHTML = `<aside id="fightList"></aside>
-      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div><div id="tank"></div><div id="casts"></div><div id="uptime"></div>
-      <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div></main>`;
+      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div>
+      <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div>
+      <div class="docbar" id="docBar"></div><div class="docpane" id="docPane"></div></main>`;
     state.rowNodes.clear();
+    // La barra no se repinta en cada snapshot, así que el clic se atiende por
+    // delegación en el contenedor, que sí es estable.
+    $('docBar').addEventListener('click', (e) => {
+      const b = e.target.closest?.('.doctab');
+      if (!b) return;
+      state.doc = b.dataset.doc;
+      renderDocs(withPets(fightFor(state.snap)));
+    });
   }
   renderFightList(state.snap);
   renderTimers(state.snap);
@@ -4559,18 +4944,88 @@ async function showMigration() {
 }
 
 /** Aviso de versión nueva. Sólo informa: la descarga la decides tú. */
+/**
+ * El cartel de versión nueva, con la descarga dentro.
+ *
+ * TRES REGLAS, y las tres se ven en la pantalla:
+ *
+ *   EL TAMAÑO ANTES DE PULSAR. Son 75 MB. Quien esté con datos limitados o mala
+ *   conexión tiene que poder decir que no con el número delante, no descubrirlo
+ *   cuando ya va por la mitad. Sale de la propia release, no de una estimación.
+ *
+ *   DESCARGAR NO ES INSTALAR. Son dos botones y dos decisiones. Con la descarga
+ *   hecha no pasa nada hasta que lo digas, ni siquiera al cerrar.
+ *
+ *   Y SI NO SE PUEDE HACER CON SEGURIDAD, SE QUEDA EL ENLACE. Sin `latest.yml`
+ *   en la release no hay sha512 con el que comprobar lo descargado, y un
+ *   ejecutable que no se puede comprobar no se lanza: el cartel se queda como
+ *   siempre, con su enlace manual.
+ */
 function showUpdate(u) {
   const bar = $('updBar');
   if (!bar || !u) return;
-  bar.innerHTML = `<span>${esc(t('upd.title', { v: u.version }))}</span>
-    <button class="primary" id="updGet">${esc(t('upd.get'))}</button>
-    <button id="updSkip">${esc(t('upd.skip'))}</button>`;
-  bar.style.display = 'flex';
-  $('updGet').addEventListener('click', () => window.eql.openUpdate());
-  $('updSkip').addEventListener('click', () => {
-    window.eql.skipUpdate(u.version);
-    bar.style.display = 'none';
-  });
+  const mb = (n) => `${(n / 1024 / 1024).toFixed(0)} MB`;
+
+  const pintar = (estado, extra = '') => {
+    bar.innerHTML = `<span>${esc(t('upd.title', { v: u.version }))}</span>${extra}
+      ${estado === 'listo' && u.descargable
+    ? `<button class="primary" id="updDl">${esc(t('upd.download', { mb: mb(u.bytes) }))}</button>` : ''}
+      ${estado === 'listo' && !u.descargable
+    ? `<button class="primary" id="updGet">${esc(t('upd.get'))}</button>` : ''}
+      ${estado === 'bajando' ? `<button id="updCancel">${esc(t('upd.cancel'))}</button>` : ''}
+      ${estado === 'hecho' ? `<button class="primary" id="updInstall">${esc(t('upd.install'))}</button>` : ''}
+      ${estado !== 'bajando' ? `<button id="updSkip">${esc(t('upd.skip'))}</button>` : ''}`;
+    bar.style.display = 'flex';
+    cablear(estado);
+  };
+
+  function cablear(estado) {
+    $('updGet')?.addEventListener('click', () => window.eql.openUpdate());
+    $('updSkip')?.addEventListener('click', () => {
+      window.eql.skipUpdate(u.version);
+      bar.style.display = 'none';
+    });
+    $('updCancel')?.addEventListener('click', async () => {
+      await window.eql.cancelUpdate?.();
+      pintar('listo');
+    });
+    $('updDl')?.addEventListener('click', async () => {
+      pintar('bajando', `<span class="upd-prog"><i style="width:0%"></i></span>
+        <span class="upd-pct num">0%</span>`);
+      const r = await window.eql.downloadUpdate?.();
+      if (r?.ok) {
+        // El aviso de Windows: lo que se puede afirmar y lo que no. Bajarlo
+        // desde aquí evita el cartel de «Windows protegió su PC», que lo
+        // dispara la marca de Internet que añade el navegador. Lo que haga
+        // Defender por reputación no se puede prometer, así que se dice.
+        pintar('hecho', `<span class="upd-nota">${esc(t('upd.smartscreen'))}</span>`);
+      } else if (r?.motivo === 'cancelado') {
+        pintar('listo');
+      } else {
+        pintar('listo', `<span class="upd-nota bad">${esc(t(`upd.err.${r?.motivo ?? 'error'}`))}</span>`);
+      }
+    });
+    $('updInstall')?.addEventListener('click', async () => {
+      const r = await window.eql.installUpdate?.();
+      if (!r?.ok) pintar('listo', `<span class="upd-nota bad">${esc(t('upd.err.sin-fichero'))}</span>`);
+    });
+  }
+
+  // UNA SOLA VEZ. `showUpdate` se llama al arrancar y otra vez cuando llega el
+  // aviso del proceso principal; registrando aquí sin guarda quedaban dos
+  // escuchadores pintando la misma barra, y al tercer aviso tres.
+  if (!showUpdate.escuchando) {
+    showUpdate.escuchando = true;
+    window.eql.onUpdateProgress?.((p) => {
+      const barra = document.querySelector('#updBar .upd-prog i');
+      const pct = document.querySelector('#updBar .upd-pct');
+      if (!barra) return;
+      barra.style.width = `${(p.pct * 100).toFixed(1)}%`;
+      if (pct) pct.textContent = `${Math.round(p.pct * 100)}% · ${mb(p.hechos)} / ${mb(p.total)}`;
+    });
+  }
+
+  pintar('listo');
 }
 
 window.eql.onUpdate?.(showUpdate);

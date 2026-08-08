@@ -52,18 +52,20 @@ let wiki = null;      // cliente de la wiki
 let latest = null;    // { version, url } si hay una versión más nueva publicada
 let migration = null; // { needed, from, fights } si el almacén es de una versión anterior
 
-const REPO = 'infinityl111/eql-parse-spain';
+/**
+ * El repositorio, para mirar si hay versión nueva.
+ *
+ * Se llamaba `eql-parse-spain` y ahora es `eql-parse`: el dominio es
+ * eqlparse.com y un enlace de descarga que dice «spain» no lo acompaña.
+ *
+ * LAS INSTALACIONES ANTIGUAS NO SE QUEDAN SIN AVISO. Llevan el nombre viejo
+ * cocido en su propio ejecutable y no hay forma de cambiárselo, pero GitHub
+ * mantiene la redirección: comprobado contra la API después de renombrar, la
+ * URL antigua responde 200, redirige por identificador de repositorio y
+ * devuelve la última versión. Así que una 1.6.3 sigue enterándose.
+ */
+const REPO = 'infinityl111/eql-parse';
 
-/** Compara 1.2.10 con 1.3.0 sin traerse una librería para tres números. */
-function newerThan(a, b) {
-  const pa = String(a).replace(/^v/, '').split('.').map(Number);
-  const pb = String(b).replace(/^v/, '').split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return true;
-    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return false;
-  }
-  return false;
-}
 
 /**
  * Mira si hay versión nueva publicada. Sólo consulta y avisa: no descarga ni
@@ -73,15 +75,10 @@ function newerThan(a, b) {
  */
 async function checkUpdate() {
   try {
-    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-      headers: { 'User-Agent': 'EQL-Parse', Accept: 'application/vnd.github+json' },
-    });
-    if (!r.ok) return;
-    const j = await r.json();
-    const tag = j.tag_name ?? '';
-    if (!tag || !newerThan(tag, app.getVersion())) { latest = null; return; }
-    latest = { version: tag.replace(/^v/, ''), url: j.html_url };
-    if (cfg.skipVersion !== latest.version) mainWin?.webContents.send('update', latest);
+    const { consultar } = await import('../src/actualizar.js');
+    const info = await consultar(REPO, app.getVersion());
+    latest = info;
+    if (info && cfg.skipVersion !== info.version) mainWin?.webContents.send('update', info);
   } catch { /* sin red: se reintenta en la próxima comprobación */ }
 }
 
@@ -444,6 +441,58 @@ ipcMain.handle('history:query', (_e, q) => engine.queryHistory(q ?? {}));
 // `uid` (byte de inicio del registro), no el `id` de la pelea: el id se repite
 // entre sesiones y devolvía la pelea equivocada.
 ipcMain.handle('history:fight', (_e, uid) => engine.getFight(uid));
+/**
+ * Las líneas del registro detrás de una cifra.
+ *
+ * Vive en el proceso principal porque es lectura de disco, y se pide con un
+ * TRAMO DE HORAS y no con números de línea: el contador de líneas del motor
+ * arranca en el punto de enganche y sólo coincide con el fichero después de
+ * una reconstrucción. La hora está escrita en la propia línea.
+ *
+ * El fichero es el que está enganchado AHORA. Si la pelea que miras vino de
+ * otro registro —o el suyo se rotó— la respuesta lo dice con `fuera-de-rango`
+ * en vez de devolver una lista vacía, que se leería como una avería.
+ */
+ipcMain.handle('log:context', async (_e, { desde, hasta, tope } = {}) => {
+  const { tramo } = await import('../src/registro.js');
+  const ruta = engine?.path ?? cfg.logPath ?? null;
+  if (!ruta) return { ok: false, motivo: 'sin-fichero' };
+  if (!(desde >= 0) || !(hasta >= desde)) return { ok: false, motivo: 'tramo-malo' };
+  return tramo(ruta, Math.round(desde), Math.round(hasta), tope);
+});
+/**
+ * Cuánto tarda cada hechizo, medido de una VENTANA del registro.
+ *
+ * No se usa lo que el motor lleva acumulado en esta sesión: al arrancar sólo
+ * lee los últimos KB del fichero, así que su tabla está casi vacía y hechizos
+ * lanzados cientos de veces salían como «sin medir». Se ve enseguida —la barra
+ * decía «unmeasured» de un ataque que sale 456 veces en el registro.
+ *
+ * Una ventana alrededor de la pelea es además MÁS correcta que todo el
+ * histórico: el tiempo de casteo cambia con la postura y al mejorar el hechizo,
+ * así que lo de hace tres días describe otro personaje. Tres horas alrededor
+ * son la misma sesión.
+ *
+ * Y es barato: medido sobre el registro real, ±180 minutos son 42.106 líneas,
+ * 66 ms de leer y 209 de parsear. La lectura se queda aquí y por el puente
+ * cruza sólo la tabla, que son unos pocos KB.
+ */
+ipcMain.handle('spells:castTimes', async (_e, { centro, margenMin = 180 } = {}) => {
+  const ruta = engine?.path ?? cfg.logPath ?? null;
+  if (!ruta || !(centro >= 0)) return {};
+  const [{ tramo }, { Parser }, { Casteos }] = await Promise.all([
+    import('../src/registro.js'), import('../src/parser.js'), import('../src/casteos.js'),
+  ]);
+  const r = await tramo(ruta, centro - margenMin * 60, centro + margenMin * 60, 500000);
+  if (!r.ok) return {};
+  const p = new Parser({ self: engine?.self ?? null });
+  const c = new Casteos();
+  for (const l of r.lineas) {
+    const ev = p.parseAt(l.t, l.texto, 0);
+    if (ev) c.feed(ev);
+  }
+  return c.tabla();
+});
 ipcMain.handle('history:aggregate', (_e, q) => engine.aggregate(q ?? {}));
 ipcMain.handle('history:foes', (_e, sinceMs) => engine.foeList(sinceMs));
 ipcMain.handle('history:stats', () => engine.storeStats());
@@ -620,6 +669,37 @@ ipcMain.handle('store:rebuild', async () => {
 ipcMain.handle('update:get', () => (cfg.skipVersion === latest?.version ? null : latest));
 ipcMain.handle('update:open', () => { if (latest) shell.openExternal(latest.url); return true; });
 ipcMain.handle('update:skip', (_e, v) => { cfg.skipVersion = v; saveConfig(cfg); return true; });
+
+/**
+ * DESCARGAR E INSTALAR SON DOS ACCIONES, y entre ellas no pasa nada solo.
+ *
+ * Es la condición: que nunca se actualice sin que lo digas. Descargar deja un
+ * fichero comprobado en temporal y ahí se queda; instalar es un segundo clic.
+ * Cerrar la aplicación con la descarga hecha no instala nada.
+ */
+let descarga = null;     // { abort, ruta } mientras hay una en marcha o hecha
+
+ipcMain.handle('update:download', async () => {
+  if (!latest?.descargable) return { ok: false, motivo: 'no-descargable' };
+  const { descargar } = await import('../src/actualizar.js');
+  const ctrl = new AbortController();
+  descarga = { abort: () => ctrl.abort(), ruta: null };
+  const r = await descargar(latest, (p) => send('update:progress', p), ctrl.signal);
+  descarga = r.ok ? { abort: null, ruta: r.ruta } : null;
+  return r;
+});
+
+ipcMain.handle('update:cancel', () => { descarga?.abort?.(); descarga = null; return true; });
+
+ipcMain.handle('update:install', async () => {
+  if (!descarga?.ruta) return { ok: false, motivo: 'sin-descarga' };
+  const { instalar } = await import('../src/actualizar.js');
+  const r = instalar(descarga.ruta);
+  // Sólo se cierra si el instalador ARRANCÓ. Si no, la aplicación se queda
+  // como estaba y el cartel enseña el motivo.
+  if (r.ok) setTimeout(() => app.quit(), 400);
+  return r;
+});
 ipcMain.handle('app:version', () => app.getVersion());
 
 ipcMain.handle('wiki:spellIcons', async (_e, names) => {

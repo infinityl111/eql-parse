@@ -1,26 +1,39 @@
 /**
- * Las cinco columnas, y el cajón que no es una de ellas.
+ * Las cinco columnas, y el único cajón que no es una de ellas.
  *
- * Todo lo que hay aquí sale de medir un log real de 278.299 líneas, no de
- * suponerlo.
+ * Casi todo lo que hay aquí sale de medir un log real de 278.299 líneas.
  *
- * EL FALLO DE FONDO. Había un `nivel = (d) => d ?? 0` escrito en cinco sitios
- * que convertía «no consta» en la dificultad 0. La consecuencia era que la
- * columna D0 de la rejilla contenía East Freeport: una columna rotulada como
- * una dificultad medida que en realidad contenía la ausencia de medida. Un dato
- * ausente con aspecto de dato medido es peor que no tener la columna.
+ * EL SILENCIO ES D0, y esto ha ido y vuelto: conviene dejar escrito dónde acabó.
  *
- * Y LO QUE PERMITIÓ ARREGLARLO. «Nagafen's Lair - Group.» —modo declarado, sin
- * número ni etiqueta— es la dificultad base, D0. No es una deducción por el
- * formato: mismo enemigo, misma zona y mismo modo, la vida de esas instancias
- * está un peldaño ENTERO por debajo de D1 (mediana 0,873 sobre once enemigos,
- * nueve de ellos entre 0,86 y 0,88), y ese peldaño mide lo mismo que el de D1 a
- * D2 (0,853) y el de D2 a D3 (0,884). No cae en medio: es el escalón de abajo.
+ * Primero, un `nivel = (d) => d ?? 0` repetido en cinco sitios metía en D0 todo
+ * lo que no tuviera dificultad, incluidas las peleas de las que no se sabía ni
+ * la zona. Al arreglarlo se separaron TRES cajones, y uno de ellos —«sin
+ * marca», para el mundo abierto— partía de una idea falsa: que una zona sin
+ * instanciar no tiene dificultad.
  *
- * Los tres cajones son tres cosas distintas y se comprueban por separado:
- *   D0          instancia con dificultad base. Medida.
- *   sin marca   mundo abierto: la zona no declara dificultad porque no la hay.
- *   sin zona    peleas anteriores a la primera línea de zona: no se sabe dónde.
+ * La corrige quien juega: en EQL, que el registro no diga nada de dificultad
+ * SIGNIFICA dificultad 0, sea mundo abierto o una instancia. El registro no deja
+ * lugar a dudas — una instancia creada por ti no trae ni una línea con
+ * dificultad:
+ *
+ *     Player Campeon creating instance The Plane of Sky 25.
+ *     The Plane of Sky is now available to you.
+ *     You have entered The Plane of Sky.
+ *
+ * Separarlas dejaba 84 de 410 peleas guardadas sin asignar —el 20,5%— y 70 eran
+ * esa zona: instancias propias, todas D0, metidas en «no se sabe».
+ *
+ * Lo que sí se midió y sigue en pie es que D0 es un peldaño de verdad: mismo
+ * enemigo, misma zona y mismo modo, la vida de las instancias base está un
+ * escalón entero por debajo de D1 (mediana 0,873 sobre once enemigos, nueve
+ * entre 0,86 y 0,88), del mismo tamaño que el de D1 a D2 (0,853) y el de D2 a
+ * D3 (0,884).
+ *
+ * Quedan DOS cosas distintas, y se comprueban por separado:
+ *   D0          no consta dificultad, luego es la base. Mundo abierto o
+ *               instancia sin marcar: las dos son cero y comparten celda.
+ *   sin zona    peleas anteriores a la primera línea de zona del registro: no
+ *               se sabe dónde estabas, que no es lo mismo que saber que era D0.
  */
 import { parseZone, diffKey, labelDiff, SIN_MARCA, SIN_ZONA, DIFFS } from '../src/zones.js';
 import { FoeLedger } from '../src/foes.js';
@@ -31,8 +44,8 @@ const ok = (cond, msg, extra) => {
   console.log(`  ${cond ? 'ok ' : 'MAL'}  ${msg}${extra !== undefined ? ` — ${extra}` : ''}`);
 };
 
-// ── 1. parseZone distingue D0 de «no consta» ───────────────────────────────
-console.log('\nD0 no es lo mismo que «no consta»');
+// ── 1. parseZone: el silencio es D0, no una ausencia ───────────────────────
+console.log('\nel silencio sobre la dificultad es D0');
 {
   const casos = [
     ["Nagafen's Lair - Group", 0, 'Group', "instancia base: D0"],
@@ -40,8 +53,8 @@ console.log('\nD0 no es lo mismo que «no consta»');
     ["Nagafen's Lair - Group 1 (Awakened)", 1, 'Group', 'con número'],
     ['The Plane of Fear - Solo 4 (Refined)', 4, 'Solo', 'la más alta'],
     ['The Plane of Fear 4 (Refined)', 4, null, 'etiqueta sin modo: la etiqueta manda'],
-    ['The Plane of Sky', null, null, 'mundo abierto: NO consta'],
-    ['East Freeport', null, null, 'una ciudad tampoco es D0'],
+    ['The Plane of Sky', 0, null, 'instancia sin marcar: D0'],
+    ['East Freeport', 0, null, 'y una ciudad también es D0'],
   ];
   for (const [zona, diff, modo, nota] of casos) {
     const r = parseZone(zona);
@@ -53,14 +66,17 @@ console.log('\nD0 no es lo mismo que «no consta»');
     'el número del nombre de la zona se queda en el nombre');
 }
 
-// ── 2. Las claves de cajón: null NUNCA es cero ─────────────────────────────
+// ── 2. Las claves de cajón: null sigue sin ser cero ────────────────────────
+//
+// La función no cambia, cambia quién llega a ella con un null. Ya no es «esta
+// zona no declara dificultad» —eso es cero— sino sólo «no se sabe la zona».
 console.log('\nlas claves de cajón');
 {
   ok(diffKey(0) === 'D0', 'la dificultad 0 tiene su clave');
-  ok(diffKey(null) === SIN_MARCA, '«no consta» tiene la suya, distinta');
+  ok(diffKey(null) === SIN_MARCA, 'lo que llega sin dificultad tiene la suya, distinta');
   ok(diffKey(0) !== diffKey(null), 'y NO son la misma — este es el fallo de fondo');
   ok(labelDiff(0, null) === 'D0', 'D0 se rotula como D0');
-  ok(labelDiff(null, null) === null, '«no consta» no se rotula como una dificultad');
+  ok(labelDiff(null, null) === null, 'la ausencia no se rotula como una dificultad');
   ok(DIFFS.length === 5 && DIFFS[0] === 0, 'las columnas son cinco, de la 0 a la 4');
 }
 
@@ -84,7 +100,7 @@ const pelea = ({ zone, vida, loot = [], resist = null, mataTe = false, id = 1 })
   ],
 });
 
-console.log('\ntres cajones, tres cosas distintas');
+console.log('\ndos cajones: la dificultad, y no saber dónde estabas');
 {
   const led = new FoeLedger();
   led.fold(pelea({ id: 1, zone: "Nagafen's Lair - Group", vida: 1000, loot: ['Throwing Boulder'] }));
@@ -96,15 +112,20 @@ console.log('\ntres cajones, tres cosas distintas');
   const por = new Map(f.dificultades.map((d) => [d.key, d]));
   ok(por.has('D0'), 'la instancia base cae en D0');
   ok(por.has('D2'), 'la numerada cae en D2');
-  ok(por.has(SIN_MARCA), 'el mundo abierto cae en «no consta»');
-  ok(por.has(SIN_ZONA), 'la pelea sin zona cae en su propio cajón');
-  ok(por.get('D0') !== por.get(SIN_MARCA), 'D0 y «no consta» no son la misma celda');
-  ok(por.get(SIN_MARCA).diff === null && por.get(SIN_ZONA).diff === null,
-    'los dos cajones de ausencia tienen diff null…');
-  ok(por.get(SIN_MARCA).key !== por.get(SIN_ZONA).key,
-    '…y aun así se distinguen, porque la clave no es el número');
-  ok(por.get('D0').hp.avg === 1000 && por.get('D2').hp.avg === 1300,
-    'cada celda tiene su vida, sin promediar', `${por.get('D0').hp.avg} / ${por.get('D2').hp.avg}`);
+  ok(!por.has(SIN_MARCA), 'y ya no hay cajón de «el mundo abierto no tiene dificultad»');
+  ok(por.has(SIN_ZONA), 'la pelea sin zona sí conserva el suyo');
+  ok(por.get(SIN_ZONA).diff === null,
+    'porque no saber dónde estabas no es una dificultad', String(por.get(SIN_ZONA).diff));
+
+  // LA CONSECUENCIA DE JUNTARLOS, dicha: la instancia base y el mundo abierto
+  // comparten celda, así que su vida se promedia entre las dos. Son la misma
+  // dificultad, así que promediarlas es lo correcto — pero conviene que esté
+  // escrito, porque es justo lo que antes se separaba.
+  ok(por.get('D0').fights === 2, 'D0 recoge las dos peleas de dificultad base',
+    por.get('D0').fights);
+  ok(por.get('D0').hp.avg === 900 && por.get('D2').hp.avg === 1300,
+    'cada dificultad con su vida, y D0 con la de sus dos muestras',
+    `${por.get('D0').hp.avg} / ${por.get('D2').hp.avg}`);
 }
 
 // ── 4. Botín por dificultad ────────────────────────────────────────────────

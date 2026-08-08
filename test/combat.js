@@ -172,6 +172,60 @@ console.log('\nanálisis posterior');
   ok(dt?.id === 'uptime', 'pegando sin parar no se reporta tiempo muerto', dt?.id);
   ok(/100\s*%/.test(dt?.detail ?? ''), 'y el uptime es del 100%, no del 97%', dt?.detail);
 
+  /**
+   * EL ARMA LENTA NO ES UN PARÓN, y esto es lo que el hallazgo acusaba antes.
+   *
+   * Con un arma de tres segundos, dos de cada tres segundos de la pelea no
+   * traen daño tuyo por construcción. Midiendo contra cero, eso daba un 66% de
+   * «tiempo sin pegar» y salía en rojo — acusando al equipo de algo que el
+   * jugador no hizo. Medido sobre 357 peleas reales, el aviso saltaba en el
+   * 98,9% de ellas: un aviso que sale siempre no avisa de nada.
+   *
+   * Ahora la vara es TU cadencia, deducida de tus propios huecos.
+   */
+  const lento = [];
+  for (let s = 0; s < 60; s += 3) lento.push([s, 'You slash a gorgon for 300 points of damage.']);
+  const l = analyse(correr(lento), { self: 'Campeon', classes: ['WAR'] });
+  const dtl = l.findings.find((x) => x.id === 'downtime' || x.id === 'uptime');
+  ok(dtl?.id === 'uptime', 'un arma de 3 s golpeando sin fallar no es tiempo muerto', dtl?.id);
+
+  /**
+   * Y FALLAR ES ATACAR: el segundo en que tiraste y no entró no es un parón.
+   * Medido sobre el registro, 4.798 de los 15.156 segundos con ataque tuyo
+   * fueron sólo fallos —el 31,7%— y todos contaban como tiempo parado.
+   */
+  const fallando = [];
+  for (let s = 0; s < 40; s++) {
+    fallando.push([s, s % 2 === 0
+      ? 'You slash a gorgon for 100 points of damage.'
+      : 'You try to slash a gorgon, but you miss!']);
+  }
+  const fl = analyse(correr(fallando), { self: 'Campeon', classes: ['WAR'] });
+  const dtf = fl.findings.find((x) => x.id === 'downtime' || x.id === 'uptime');
+  ok(dtf?.id === 'uptime', 'la mitad de los segundos son fallos y no es tiempo muerto', dtf?.id);
+
+  // Un parón de verdad SÍ sale: quince segundos seguidos sin tirar con un arma
+  // de un segundo. Eso ya no lo explica el arma.
+  //
+  // Quince y no veinte: veinte es justo el corte por inactividad, así que la
+  // pelea se partiría en dos y estaríamos midiendo la segunda mitad en vez del
+  // parón. Se vio al escribir la prueba, que daba «uptime» por ese motivo.
+  const parado = [];
+  for (let s = 0; s < 20; s++) parado.push([s, 'You slash a gorgon for 100 points of damage.']);
+  for (let s = 35; s < 60; s++) parado.push([s, 'You slash a gorgon for 100 points of damage.']);
+  const pa = analyse(correr(parado), { self: 'Campeon', classes: ['WAR'] });
+  const dtp = pa.findings.find((x) => x.id === 'downtime' || x.id === 'uptime');
+  ok(dtp?.id === 'downtime', 'un parón de quince segundos sí se señala', dtp?.id);
+  ok(dtp?.accion === 'tuya', 'y va rotulado como algo que puedes cambiar', dtp?.accion);
+
+  // Cada hallazgo dice de qué clase es. Sin el rótulo, «llevabas la postura
+  // equivocada» y «te enraizaron cuatro veces» salen con la misma pinta, y sólo
+  // uno de los dos se corrige peleando distinto.
+  const clases = new Set(['tuya', 'personaje', 'contexto']);
+  const sinClase = pa.findings.filter((x) => !clases.has(x.accion));
+  ok(sinClase.length === 0, 'todos los hallazgos llevan su clase escrita',
+    sinClase.map((x) => x.id).join(', '));
+
   // El daño perdido por fallar se mide en golpes de melé, no en el promedio de
   // todo lo que haces: un híbrido que castea la mitad no puede inflar la cifra.
   const hibrido = [];

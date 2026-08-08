@@ -68,6 +68,28 @@ const rules = [
     map: (m) => ({ source: m[1], target: m[2], amount: +m[3], damageType: m[4], ability: m[5], flag: m[6], school: 'spell', confidence: 'exact' }),
   },
 
+  /**
+   * ═══ LO QUE TE HACES TÚ, SIN HECHIZO QUE LO NOMBRE ═══
+   *
+   * «You hurt yourself for 40 points.» Aparece 133 veces en el registro de
+   * referencia y no casaba con ninguna regla: era daño real que no se contaba
+   * en ninguna parte. Es la forma corta —sin escuela ni hechizo— de la
+   * autolesión; la larga («You hit yourself … by Cannibalize», 54 veces) ya
+   * entraba por la regla de hechizo de arriba.
+   *
+   * Va como `spell` y no como `melee` porque no es un golpe: no tiene verbo, no
+   * tiene precisión y no debe contar como intento de ataque. Y con origen y
+   * destino iguales, el encuentro la cuenta como recibida y NO como hecha
+   * —pegarte a ti mismo no es pegar—; sin esa regla, sumar esto habría inflado
+   * tu propio DPS.
+   */
+  {
+    kind: 'spell', hint: 'yourself',
+    re: new RegExp(`^You hurt yourself for ${N} points?\\.${SUF}$`),
+    map: (m) => ({ source: 'You', target: 'yourself', amount: +m[1], flag: m[2],
+      school: 'spell', damageType: 'self', confidence: 'exact' }),
+  },
+
   // ═══ DAÑO CUERPO A CUERPO ═══
   {
     kind: 'melee', hint: 'of damage',

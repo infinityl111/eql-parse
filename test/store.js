@@ -498,6 +498,52 @@ console.log('\nrelleno del índice sin reconstruir');
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
+// ── 11b. La dificultad que faltaba se rehace al leer ──────────────────────
+//
+// Hasta ahora, una zona sin modo ni etiqueta —«The Plane of Sky»— se guardaba
+// con `diff: null`, «no consta». Es que vale 0: en EQL el silencio sobre la
+// dificultad ES la dificultad base, y el registro lo enseña sin ambigüedad —una
+// instancia recién creada por ti no trae ninguna línea con dificultad—. Con la
+// regla vieja se quedaban sin asignar 84 de 410 peleas guardadas, el 20,5%, y
+// 70 eran esa misma zona.
+//
+// Se cura al LEER, como el `uid` que faltaba en los índices antiguos: la
+// dificultad sale entera del nombre de zona, y el nombre de zona sí se guardó.
+// Ningún fichero se toca y una reconstrucción escribiría exactamente lo mismo.
+console.log('\nla dificultad que faltaba, sin reconstruir');
+{
+  const dir = tmp();
+  const s = new FightStore(dir);
+  const enZona = (id, zona) => ({ ...fight(id, 'un gorgon', 900), zone: zona });
+  s.append(enZona(1, 'The Plane of Sky'), 8_000_000);
+  s.append(enZona(2, "Nagafen's Lair - Solo 3 (Fused)"), 8_001_000);
+
+  // Se pone el índice como lo escribían las versiones anteriores.
+  const idxPath = path.join(dir, 'fights.idx');
+  const datosAntes = fs.readFileSync(path.join(dir, 'fights.ndjson'), 'utf8');
+  fs.writeFileSync(idxPath, fs.readFileSync(idxPath, 'utf8').split('\n').filter(Boolean)
+    .map((l) => {
+      const o = JSON.parse(l);
+      if (o.zone === 'The Plane of Sky') o.diff = null;
+      return JSON.stringify(o);
+    }).join('\n') + '\n');
+
+  const s2 = new FightStore(dir);
+  s2.load();
+  const sky = s2.index.find((x) => x.zone === 'The Plane of Sky');
+  ok(sky.diff === 0, 'la pelea guardada sin dificultad pasa a ser D0', String(sky.diff));
+  ok(s2.filter({ diff: 0 }).some((x) => x.zone === 'The Plane of Sky'),
+    'y el filtro por D0 ya la encuentra');
+  ok(s2.get(sky.uid)?.diff === 0, 'la pelea entera también, que es de donde lee el expediente');
+
+  // Lo que YA tenía dificultad no se toca: puede venir de una etiqueta.
+  const naga = s2.index.find((x) => x.zone?.startsWith("Nagafen's"));
+  ok(naga.diff === 3, 'una dificultad que ya constaba se respeta', String(naga.diff));
+  ok(fs.readFileSync(path.join(dir, 'fights.ndjson'), 'utf8') === datosAntes,
+    'y el fichero de datos sigue intacto');
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
 // ── 12. Selección a mano de un grupo de peleas ───────────────────────────
 //
 // Los filtros describen un criterio; esto describe una lista. Sirve para lo
@@ -571,7 +617,23 @@ console.log('\nmascota ajena asignada a su dueño');
   ok(n.mergedPets === 1 && n.mergedPetsFrom[0] === 'Gobobn',
     'diciendo cuántas y cuáles, para que no parezca todo suyo');
   ok(Math.abs(n.share - 0.5) < 1e-9, 'el reparto también se suma', String(n.share));
-  ok(n.hits === 20 && n.abilities[0].n === 20, 'y los golpes y habilidades');
+  ok(n.hits === 20, 'y los golpes', String(n.hits));
+
+  // LA MASCOTA ES UNA LÍNEA DENTRO DE SU DUEÑO, no un puñado de habilidades
+  // sueltas. Antes sus «golpe» se sumaban a los del dueño y quedaban entre los
+  // suyos sin nada que dijera de quién eran: el total salía bien y «cuánto puso
+  // la mascota» dejaba de poderse contestar. Es el fallo del tanqueo otra vez.
+  const suGolpe = n.abilities.find((a) => a.name === 'golpe');
+  const suPet = n.abilities.find((a) => a.pet);
+  ok(suGolpe.n === 10, 'lo del dueño sigue siendo lo del dueño', String(suGolpe.n));
+  ok(!!suPet && suPet.name === 'Gobobn', 'y la mascota entra con su nombre', suPet?.name);
+  ok(suPet.sum === 200 && suPet.n === 10,
+    'con lo que puso ella, que es lo que había que poder contestar',
+    `${suPet?.sum}/${suPet?.n}`);
+  ok(n.abilities.reduce((a, x) => a + x.sum, 0) === n.damage,
+    'y las dos líneas suman exactamente el total del dueño');
+  ok(suPet.p50 === undefined,
+    'la línea de la mascota no finge tener forma del golpe: es una suma, no un ataque');
   ok(plegado.find((r) => r.name === 'Campeon').damage === 500, 'a nadie más le toca nada');
   ok(plegado.find((r) => r.name === 'a gorgon'), 'y el enemigo sigue donde estaba');
 

@@ -1,4 +1,5 @@
 import { RANGES } from './ranges.js';
+import { parseZone } from './zones.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -82,9 +83,49 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  *                   es un suceso TUYO y no de un combate: la prueba de que
  *                   estabas alli es que lo cogiste. Eran 5 objetos en un
  *                   registro real.
+ *
+ *   6               El dano que te hacias tu mismo se contaba como dano hecho:
+ *                   inflaba tu total y llego a crear una pelea entera contra
+ *                   «yourself». Y ninguna pelea guardada lleva la forma del
+ *                   golpe —p10, mediana, p90—, que se empezo a contar despues,
+ *                   asi que el reproductor y las tablas la dan por ausente en
+ *                   todo el historico.
+ *
+ * SUBIR ESTE NUMERO ES LO QUE HACE QUE EL ARREGLO LLEGUE. El aviso de
+ * reconstruir se dispara con `generacion(meta) < STORE_VERSION` y con nada mas:
+ * corregir el calculo y no tocar esto deja el arreglo escrito en el codigo y
+ * fuera del historico de todo el mundo. Al cambiarlo, repasa `mig.body` — el
+ * cartel explica los motivos de ESTA migracion, y un texto puesto por un motivo
+ * que ya no aplica sobrevive porque nadie lo relee.
  */
-export const STORE_VERSION = 5;
+export const STORE_VERSION = 6;
 const META = 'store.json';
+
+/**
+ * La dificultad que falta, sacada de la zona que sí está guardada.
+ *
+ * Hasta ahora, una zona sin modo ni etiqueta —«The Plane of Sky»— se guardaba
+ * con `diff: null`, «no consta». Es que vale 0: en EQL el silencio sobre la
+ * dificultad ES la dificultad base. Con la regla corregida, las peleas que ya
+ * estaban guardadas seguirían sin asignar hasta reconstruir el histórico.
+ *
+ * No hace falta: la dificultad sale ENTERA del nombre de zona, y el nombre de
+ * zona sí está guardado. Así que se recalcula al leer, en memoria, como ya se
+ * hacía con el `uid` que faltaba en los índices viejos. Ningún fichero se toca,
+ * y una reconstrucción posterior escribe exactamente lo mismo.
+ *
+ * Se recalcula SÓLO si falta. Lo que ya trae dificultad se respeta: puede venir
+ * de una etiqueta que hoy no supiéramos leer.
+ */
+function rehacerDif(s) {
+  if (!s || s.diff !== null && s.diff !== undefined) return s;
+  if (!s.zone) return s;                       // sin zona no se deduce nada
+  const z = parseZone(s.zone);
+  s.diff = z.diff;
+  if (s.diffTag === null || s.diffTag === undefined) s.diffTag = z.tag;
+  if (s.zoneBase === null || s.zoneBase === undefined) s.zoneBase = z.base;
+  return s;
+}
 
 /** Generación de un almacén ya marcado. Lo que no sea un número es anterior. */
 export function generacion(meta) {
@@ -210,6 +251,7 @@ export class FightStore {
           // Índices escritos antes de que `uid` existiera: el byte de inicio ya
           // estaba ahí, así que la migración no toca ningún fichero.
           if (s.uid === undefined) s.uid = s.off;
+          rehacerDif(s);
           const k = logicalKey(s);
           // La misma pelea guardada dos veces por una relectura del log. Se
           // queda la primera copia; el .ndjson no se toca.
@@ -448,7 +490,9 @@ export class FightStore {
       const buf = Buffer.allocUnsafe(s.len);
       fs.readSync(fd, buf, 0, s.len, s.off);
       fs.closeSync(fd);
-      const f = JSON.parse(buf.toString('utf8'));
+      // La misma cura que en el índice: la pelea entera también lleva su
+      // dificultad, y el expediente del enemigo la lee de aquí.
+      const f = rehacerDif(JSON.parse(buf.toString('utf8')));
       this.cache.set(uid, f);
       if (this.cache.size > 40) this.cache.delete(this.cache.keys().next().value);
       return f;
@@ -485,7 +529,7 @@ export class FightStore {
     if (q.zoneBase) {
       out = out.filter((s) => (s.zoneBase ?? null) === q.zoneBase);
     }
-    // `diff: null` es una dificultad —«sin marca», el mundo abierto— y no «no
+    // `diff: null` es un valor que se filtra —«no se sabe ni la zona»— y no «no
     // filtres». Se distingue por que la clave venga o no, no por su valor.
     if (Object.hasOwn(q, 'diff') && q.diff !== undefined) {
       out = out.filter((s) => (s.diff ?? null) === q.diff);

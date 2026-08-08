@@ -1,0 +1,537 @@
+/**
+ * Construye la web estática de eqlparse.com.
+ *
+ * SIN DEPENDENCIAS, como el resto del proyecto: lee, arma cadenas y escribe.
+ *
+ * DE DÓNDE SALE CADA COSA, que es lo que evita que la web y la aplicación
+ * cuenten cosas distintas:
+ *
+ *   Los nombres de las funciones      `src/i18n.js`, el diccionario de la app
+ *   Las novedades                     la API de GitHub, al construir
+ *   Las capturas                      `docs/`, las mismas de los README
+ *   La muestra del reproductor        la que genera `npm run ui:gif`
+ *   La versión y el tamaño            la última release
+ *
+ * LAS NOVEDADES NO SE COPIAN A MANO. Las notas de versión ya están escritas en
+ * las releases —es lo que ve quien descarga— y `notas/` está en el .gitignore
+ * porque son borradores. Dos copias de lo mismo divergen, así que se piden a la
+ * API al construir y quedan horneadas en el HTML: sin llamadas desde el
+ * navegador de nadie y sin límites de peticiones.
+ *
+ * Y SI GITHUB NO RESPONDE AL DESPLEGAR, no se cae el despliegue: se usa la
+ * copia guardada de la última vez. Una web sin la página de novedades por un
+ * fallo de red de treinta segundos sería absurda.
+ */
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { IDIOMAS, CON_PROSA, NOMBRE_IDIOMA, T, FUNCIONES } from './textos.js';
+import { setLang, t } from '../src/i18n.js';
+
+const RAIZ = path.dirname(fileURLToPath(import.meta.url));
+const PROY = path.join(RAIZ, '..');
+const DIST = path.join(RAIZ, 'dist');
+const CACHE = path.join(RAIZ, 'releases.json');
+const REPO = 'infinityl111/eql-parse';
+const DOMINIO = 'https://eqlparse.com';
+
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/**
+ * Qué imagen va en cada página, en este orden de preferencia:
+ *
+ *   1. `docs/i18n/<lang>/x.png`  la aplicación EN EL IDIOMA DE LA PÁGINA
+ *   2. `docs/x.webp`             la versión ligera, si `web:webp` la hizo
+ *   3. `docs/x.png`              lo que haya
+ *
+ * LO PRIMERO ES LO QUE IMPORTA. La portada española enseñaba la aplicación en
+ * inglés en las cinco páginas: el mismo defecto que el párrafo incrustado en
+ * la muestra. Y enseñar la aplicación en el idioma de quien lee demuestra que
+ * está traducida, que convence bastante más que escribir que lo está.
+ *
+ * Lo segundo es sólo para la foto del juego: `docs/overlay.png` son 2,9 MB de
+ * PNG para un contenido fotográfico, y en WebP baja a 312 KB. No tiene versión
+ * por idioma porque es una captura del juego, no de la interfaz. El PNG sigue
+ * ahí porque es el que enlazan los README de GitHub.
+ *
+ * Y si nadie ha ejecutado `ui:docs` ni `web:webp`, la web se construye igual
+ * con lo que haya: en inglés y pesada, pero construye.
+ *
+ * @returns {string} ruta relativa dentro de `docs/`, que se conserva en `img/`
+ */
+function paraWeb(fichero, lang) {
+  const porIdioma = path.posix.join('i18n', lang, fichero);
+  if (fs.existsSync(path.join(PROY, 'docs', porIdioma))) return porIdioma;
+  const webp = fichero.replace(/\.png$/, '.webp');
+  return fs.existsSync(path.join(PROY, 'docs', webp)) ? webp : fichero;
+}
+
+/**
+ * LA IMAGEN DE LA CABECERA, y por qué es ésta y no la tabla de daño.
+ *
+ * Quien llega buscando «EQ log parser» ya da por supuesto que esto cuenta
+ * daño: la portada de cualquier medidor es una tabla de DPS, así que enseñar
+ * otra contesta la mitad que nadie preguntaba. Lo que hay que contestar es por
+ * qué no le vale el que ya tiene.
+ *
+ * El bloque de postura lo contesta sin leerlo entero: dice cuánto habría
+ * evitado cada una y —esto es lo que lo hace creíble— lo que cuesta en aguante
+ * y en maná. Un consejo que sólo tiene ventajas no se lo cree nadie.
+ *
+ * Va recortado al bloque y no a la pantalla entera: a ancho de página, una
+ * captura de 1500 píxeles con hallazgos, fases y barras no se lee en diez
+ * segundos, y diez segundos es lo que hay.
+ */
+const PRUEBA = 'postura.png';
+
+/** Las capturas que se enseñan, con la clave de su pie en el diccionario. */
+const CAPTURAS = [
+  { fichero: 'combate.png', clave: 'tab.combat' },
+  { fichero: 'analisis.png', clave: 'an.button' },
+  { fichero: 'enciclopedia.png', clave: 'tab.encyclopedia' },
+  { fichero: 'overlay.png', clave: 'ov.session' },
+];
+
+// ── Las novedades ───────────────────────────────────────────────────────────
+async function releases() {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`,
+      { headers: { 'User-Agent': 'eqlparse-web', Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error(`GitHub devolvió ${r.status}`);
+    const j = await r.json();
+    const limpio = j.map((x) => ({
+      tag: x.tag_name, nombre: x.name ?? x.tag_name, fecha: x.published_at,
+      cuerpo: (x.body ?? '').slice(0, 6000), url: x.html_url,
+      exe: (x.assets ?? []).find((a) => /\.exe$/i.test(a.name)) ?? null,
+    })).map((x) => ({ ...x, bytes: x.exe?.size ?? 0, descarga: x.exe?.browser_download_url ?? x.url }));
+    await fsp.writeFile(CACHE, JSON.stringify(limpio, null, 1));
+    console.log(`  novedades: ${limpio.length} versiones desde la API`);
+    return limpio;
+  } catch (err) {
+    // La copia de la última vez. Se avisa: una web construida con datos viejos
+    // y sin decirlo es peor que una que lo dice.
+    if (fs.existsSync(CACHE)) {
+      const c = JSON.parse(fs.readFileSync(CACHE, 'utf8'));
+      console.log(`  novedades: GitHub no respondió (${err.message}); se usa la copia de ${c.length} versiones`);
+      return c;
+    }
+    console.log(`  novedades: sin API y sin copia (${err.message}) — la página saldrá vacía y lo dirá`);
+    return [];
+  }
+}
+
+/**
+ * Markdown de una nota de versión a HTML.
+ *
+ * Deliberadamente pequeño: las notas usan párrafos, listas, `código`, negrita
+ * y poco más. Un conversor completo sería una dependencia o trescientas líneas
+ * para un texto que escribimos nosotros y cuya forma conocemos.
+ *
+ * LAS NOTAS VIENEN CORTADAS A LO ANCHO, que es como se escriben para leerlas en
+ * un editor. Una línea NO es un párrafo: hay que juntar las seguidas antes de
+ * nada. Si no, cada corte de línea sale como un párrafo aparte —con su hueco— y
+ * lo que peor queda es que la negrita y los enlaces que cruzan el corte no se
+ * convierten y salen los asteriscos crudos en la página.
+ */
+function md(s) {
+  const lineas = String(s ?? '').replace(/\r/g, '').split('\n');
+  const out = [];
+  /**
+   * Las imágenes ANTES que los enlaces: la insignia de PayPal de las notas es
+   * `[![texto](imagen)](destino)`, y al revés el enlace se come el `![` y
+   * apunta a la imagen en vez de al destino.
+   */
+  const linea = (x) => esc(x)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/!\[([^\]]*)\]\((https?:[^)\s]+)\)/g, '<img src="$2" alt="$1" loading="lazy">')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2">$1</a>');
+
+  let enLista = false;
+  let junta = [];
+  const cierra = () => {
+    if (!junta.length) return;
+    const texto = linea(junta.join(' '));
+    out.push(enLista ? `<li>${texto}</li>` : `<p>${texto}</p>`);
+    junta = [];
+  };
+  const cierraLista = () => { if (enLista) { out.push('</ul>'); enLista = false; } };
+
+  for (const l of lineas) {
+    if (!l.trim()) { cierra(); cierraLista(); continue; }
+    const li = /^\s*[-*]\s+(.*)$/.exec(l);
+    if (li) {
+      cierra();
+      if (!enLista) { out.push('<ul>'); enLista = true; }
+      junta.push(li[1].trim());
+      continue;
+    }
+    const h = /^(#{1,4})\s+(.*)$/.exec(l);
+    if (h) { cierra(); cierraLista(); out.push(`<h3>${linea(h[2])}</h3>`); continue; }
+    junta.push(l.trim());   // continuación del párrafo o del punto anterior
+  }
+  cierra();
+  cierraLista();
+  return out.join('\n');
+}
+
+// ── La plantilla ────────────────────────────────────────────────────────────
+function pagina({ lang, pag, titulo, descripcion, cuerpo, version }) {
+  const tt = T[lang];
+  const nav = [['inicio', ''], ['instalar', 'instalacion.html'],
+    ['novedades', 'novedades.html'], ['mide', 'que-mide.html']];
+  /**
+   * `hreflang` para los cinco: es lo que le dice al buscador que son la misma
+   * página en otro idioma en vez de cinco páginas que se hacen la competencia.
+   * Sin esto, publicar en cinco idiomas puede posicionar peor que en uno.
+   */
+  const alternos = IDIOMAS.map((l) =>
+    `<link rel="alternate" hreflang="${l}" href="${DOMINIO}/${l}/${pag}">`).join('\n  ')
+    + `\n  <link rel="alternate" hreflang="x-default" href="${DOMINIO}/es/${pag}">`;
+
+  return `<!doctype html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(titulo)}</title>
+<meta name="description" content="${esc(descripcion)}">
+<link rel="canonical" href="${DOMINIO}/${lang}/${pag}">
+${alternos}
+<meta property="og:title" content="${esc(titulo)}">
+<meta property="og:description" content="${esc(descripcion)}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="${DOMINIO}/${lang}/${pag}">
+<link rel="stylesheet" href="../estilo.css">
+<link rel="icon" href="../icon.png">
+</head>
+<body>
+<header class="top">
+  <a class="marca" href="./">EQL<span>·</span>Parse</a>
+  <nav>${nav.map(([k, destino]) =>
+    `<a href="./${destino}" class="${pag === (destino || 'index.html') ? 'on' : ''}">${esc(tt.nav[k])}</a>`).join('')}</nav>
+  <div class="idiomas" title="${esc(tt.idioma)}">${IDIOMAS.map((l) =>
+    `<a href="../${l}/${pag}" class="${l === lang ? 'on' : ''}" hreflang="${l}">${l}</a>`).join('')}</div>
+</header>
+<main>${cuerpo}</main>
+<footer>
+  <span>${esc(tt.pie)}</span>
+  <a href="https://github.com/${REPO}">${esc(tt.verGithub)}</a>
+  ${version ? `<span class="ver">v${esc(version)}</span>` : ''}
+</footer>
+</body>
+</html>`;
+}
+
+const botonDescarga = (tt, rel) => {
+  const mb = rel?.bytes ? ` <span class="mb">${(rel.bytes / 1024 / 1024).toFixed(0)} MB</span>` : '';
+  return `<a class="boton" href="${esc(rel?.descarga ?? `https://github.com/${REPO}/releases/latest`)}">
+    ${esc(tt.descargar)}${mb}</a>`;
+};
+
+/**
+ * Los umbrales de la muestra, escritos en el idioma de la página.
+ *
+ * Esta frase estaba DENTRO del PNG, y por tanto en el idioma en el que se
+ * hubiera capturado: la portada española enseñaba un párrafo en inglés. Ahora
+ * `bin/ui-gif.js` recorta la muestra sin ella y deja sus cifras medidas en un
+ * fichero al lado; aquí se reescribe con `rp.reglas`, que es la MISMA clave
+ * que usa la aplicación y ya existe en los cinco idiomas.
+ *
+ * Las cifras siguen siendo las medidas de esa pelea: lo que cambia de idioma
+ * es la frase, no el dato.
+ */
+const DATOS_MUESTRA = (() => {
+  const dir = path.join(process.env.TEMP ?? '/tmp', 'eql-ui-check');
+  const f = path.join(dir, 'reproduccion.datos.json');
+  const apng = path.join(dir, 'reproduccion.apng.png');
+  try {
+    /**
+     * Las cifras y la imagen tienen que ser de la MISMA captura.
+     *
+     * `ui-gif` escribe primero las cifras y al final la imagen, así que las
+     * cifras siempre son más viejas. Si salen más nuevas es que una captura
+     * reventó a mitad y dejó cifras de una pelea con la imagen de otra: un pie
+     * que describe una escena que no se está viendo, y nada que lo delate.
+     * Antes que eso, sin pie.
+     */
+    if (fs.statSync(f).mtimeMs > fs.statSync(apng).mtimeMs) {
+      console.log('  (las cifras de la muestra son de otra captura: la portada irá sin pie)');
+      return null;
+    }
+    return JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch { return null; }
+})();
+
+function reglasMuestra(lang) {
+  if (!DATOS_MUESTRA) return '';
+  setLang(lang);
+  const num = (x) => Number(x).toLocaleString(lang);
+  const frase = t('rp.reglas', { pico: num(DATOS_MUESTRA.pico), mediana: num(DATOS_MUESTRA.mediana) })
+    + ' ' + t(DATOS_MUESTRA.conForma ? 'rp.reglasForma' : 'rp.reglasSinForma');
+  return `<p class="pieMuestra">${esc(frase)}</p>`;
+}
+
+// ── Las cuatro páginas ──────────────────────────────────────────────────────
+function portada(lang, rels) {
+  const tt = T[lang];
+  const rel = rels[0];
+  /**
+   * EL NOMBRE SALE DEL DICCIONARIO, LA DESCRIPCIÓN SE ESCRIBE AQUÍ.
+   *
+   * La segunda línea era también una clave de `src/i18n.js`, para no traducir
+   * nada dos veces. Pero esas claves son rótulos de la interfaz —«ritmo»,
+   * «Mediana», «sesión»—, y de rótulo suelto no sale una frase: la portada
+   * decía «El registro · Mediana», que no explica nada a quien no conoce ya la
+   * aplicación. El nombre sigue viniendo del diccionario; lo que se añade es
+   * una línea escrita para leerse sola.
+   */
+  const funciones = FUNCIONES.map((f) => `<div class="tarjeta">
+      <h3>${esc(t(f.clave))}</h3>
+      <p>${esc(tt.desc[f.icono])}</p>
+    </div>`).join('');
+  /**
+   * LAS CAPTURAS SE RECORTAN A LA MISMA FORMA, y se pueden abrir enteras.
+   *
+   * Sin esto, la rejilla la manda la más alta: `combate.png` mide 1500×1749 y
+   * su celda estiraba la fila entera, dejando medio metro de hueco al lado del
+   * análisis. Y a trescientos píxeles de ancho no se lee ni un rótulo de
+   * ninguna de las cuatro, así que recortarlas no quita información: la que
+   * hay se ve pinchando, que es donde de verdad se puede leer.
+   */
+  const capturas = CAPTURAS.filter((c) => fs.existsSync(path.join(PROY, 'docs', c.fichero)))
+    .map((c) => {
+      const f = paraWeb(c.fichero, lang);
+      const pie = esc(tt.pies[c.fichero]);
+      return `<figure><a href="../img/${f}" title="${pie}">
+        <img src="../img/${f}" alt="${pie}" loading="lazy"></a>
+      <figcaption>${pie}</figcaption></figure>`;
+    }).join('');
+  const hayMuestra = fs.existsSync(path.join(DIST, 'img', 'reproduccion.png'));
+  const hayPrueba = fs.existsSync(path.join(PROY, 'docs', paraWeb(PRUEBA, lang)));
+
+  /**
+   * LA REPRODUCCIÓN, LA ÚLTIMA — y estuvo la primera, que fue un error mío.
+   *
+   * La subí porque medí que cargaba rápido, y eso justificaba que se PUDIERA
+   * poner arriba, no que DEBIERA. Puesta de primera después del titular le da
+   * rango de tesis a una función: se lee como que la aplicación sirve para
+   * repetir combates. Es una más, como la enciclopedia o el overlay, y va
+   * entre las demás.
+   *
+   * Abajo recupera además `loading="lazy"`, así que sus 5,6 MB salen del
+   * camino crítico: la primera pantalla baja de 6,5 MB a unos 200 KB.
+   */
+  const muestra = hayMuestra ? `<section>
+    <h2>${esc(tt.reproductor)}</h2>
+    <p class="ancho">${esc(tt.reproductorP)}</p>
+    <img class="muestra" src="../img/reproduccion.png" alt="${esc(tt.reproductor)}" loading="lazy">
+    ${reglasMuestra(lang)}
+  </section>` : '';
+
+  /**
+   * EL ORDEN DICE QUÉ IMPORTA: afirmación, prueba, definición, lo demás.
+   *
+   * Antes empezaba definiéndose —«Qué es», con un párrafo— y acababa
+   * demostrando. Y «Qué es» era un `<h2>` justo debajo de un `<h1>` que ya lo
+   * había dicho: un escalón de más. Su párrafo se queda, sin encabezado,
+   * después de la prueba, para quien quiera la descripción sobria.
+   */
+  return `<section class="hero">
+    <h1>${esc(tt.tagline)}</h1>
+    <p class="sub">${esc(tt.sub)}</p>
+    ${botonDescarga(tt, rel)}
+    <p class="gratis">${esc(tt.gratis)}${rel ? ` · v${esc(rel.tag.replace(/^v/, ''))}` : ''}</p>
+  </section>
+  ${hayPrueba ? `<section class="prueba">
+    <img src="../img/${paraWeb(PRUEBA, lang)}" alt="${esc(tt.pies[PRUEBA])}">
+    <p class="pieMuestra">${esc(tt.pies[PRUEBA])}</p>
+  </section>` : ''}
+  <section>
+    <p class="ancho">${esc(tt.queEsP)}</p>
+  </section>
+  <section>
+    <h2>${esc(tt.funciones)}</h2>
+    <div class="rejilla">${funciones}</div>
+  </section>
+  <section>
+    <h2>${esc(tt.capturas)}</h2>
+    <div class="capturas">${capturas}</div>
+  </section>
+  ${muestra}`;
+}
+
+function instalacion(lang, rels) {
+  const tt = T[lang];
+  return `<section><h1>${esc(tt.instalarT)}</h1>
+    <p class="ancho">${esc(tt.instalarP)}</p>
+    ${botonDescarga(tt, rels[0])}
+    <ol class="pasos">
+      <li>${esc(tt.paso1)}</li><li>${esc(tt.paso2)}</li>
+      <li>${esc(tt.paso3)}</li><li>${esc(tt.paso4)}</li>
+    </ol></section>
+  <section><h2>${esc(tt.requisitos)}</h2><p class="ancho">${esc(tt.requisitosP)}</p></section>
+  <section><h2>${esc(tt.privacidad)}</h2><p class="ancho">${esc(tt.privacidadP)}</p></section>`;
+}
+
+function novedades(lang, rels) {
+  const tt = T[lang];
+  const fecha = (s) => (s ? new Date(s).toLocaleDateString(lang, { year: 'numeric', month: 'long', day: 'numeric' }) : '');
+  return `<section><h1>${esc(tt.novedadesT)}</h1><p class="ancho">${esc(tt.novedadesP)}</p></section>
+  ${rels.map((r) => `<article class="version">
+      <h2>${esc(r.nombre)}</h2>
+      <div class="fecha">${esc(fecha(r.fecha))}</div>
+      <div class="notas">${md(r.cuerpo)}</div>
+    </article>`).join('')}
+  <p><a href="https://github.com/${REPO}/releases">${esc(tt.verTodas)}</a></p>`;
+}
+
+/**
+ * «Qué mide» es la página que nos distingue, y la única con prosa larga.
+ *
+ * En los idiomas sin prosa propia NO se deja una página a medias ni se traduce
+ * a máquina: se dice que sólo está en dos idiomas y se enlaza la inglesa. Un
+ * hueco explicado informa; una traducción inventada desinforma.
+ */
+function queMide(lang) {
+  const tt = T[lang];
+  if (!CON_PROSA.includes(lang)) {
+    return `<section><h1>${esc(tt.mideT)}</h1>
+      <p class="ancho">${esc(tt.mideP)}</p>
+      <p class="aviso">${esc(tt.soloIngles)}</p>
+      <a class="boton" href="../en/que-mide.html">${esc(tt.verEnIngles)}</a></section>`;
+  }
+  const bloques = lang === 'es' ? [
+    ['Medido, deducido o declarado — nunca mezclados',
+      'Cada cifra lleva de dónde sale. «Medido» es lo que cuenta el registro; «deducido» lo que se infiere de ello con una regla escrita; «declarado» lo que has dicho tú. Un dato ausente con aspecto de dato medido es peor que no tener la columna.'],
+    ['La forma del golpe, no su mínimo y su máximo',
+      'El mínimo y el máximo de un ataque son las dos únicas cifras de su fila que un solo golpe raro puede mover. Medido sobre un registro real, un ataque con 557 muestras da 3 / 25 / 60: el mínimo es 0,12× la mediana. Se enseña la mediana con el p10 y el p90, que contestan la misma pregunta y no se las lleva un golpe raro.'],
+    ['El tiempo sin pegar se mide contra tu arma, no contra cero',
+      'Contar como parado todo segundo sin daño acusa al equipo de algo que el jugador no hizo: con un arma de tres segundos, dos de cada tres segundos no traen daño por construcción. Y fallar es atacar — el 31,7% de los segundos con ataque son sólo fallos. Se mide contra tu propia cadencia, deducida de tus huecos.'],
+    ['Lo que el registro no dice, no se dice',
+      'El registro de EQL no escribe la vida de nadie. Así que no hay barras de presión, ni «casi mueres», ni porcentajes que se parezcan a una barra de vida: 3.000 recibidos son una tragedia con 3.100 de vida y un paseo con 12.000, y la aplicación no sabe cuál de las dos.'],
+    ['Y el orden es dato, el espaciado no',
+      'Dentro de un segundo, las líneas están en el orden en que ocurrieron: se comprobó con una predicción que podía fallar —el golpe que mata tiene que aparecer antes que la línea de muerte— y salió 952 de 952. El espaciado dentro de ese segundo no existe en el registro, así que la reproducción no lo dibuja.'],
+  ] : [
+    ['Measured, inferred or declared — never mixed',
+      'Every figure carries where it came from. "Measured" is what the log counts; "inferred" is what follows from it by a written rule; "declared" is what you told it. A missing datum dressed as a measured one is worse than not having the column.'],
+    ['The shape of a hit, not its min and max',
+      'A move’s minimum and maximum are the only two figures in its row that a single freak hit can move. Measured on a real log, an attack with 557 samples gives 3 / 25 / 60: the minimum is 0.12× the median. What is shown is the median with p10 and p90, which answer the same question and survive a freak hit.'],
+    ['Idle time is measured against your weapon, not against zero',
+      'Counting every second without damage as idle blames your gear for something you did not do: with a three-second weapon, two seconds in three carry no damage by construction. And missing is attacking — 31.7% of the seconds with an attack are misses only. It is measured against your own cadence, inferred from your own gaps.'],
+    ['What the log does not say is not said',
+      'The EQL log never writes anyone’s health. So there are no pressure bars, no "you nearly died", no percentages that look like a health bar: 3,000 taken is a tragedy with 3,100 health and a stroll with 12,000, and the app does not know which.'],
+    ['And order is data, spacing is not',
+      'Within a second, lines are in the order they happened: checked with a prediction that could have failed — the killing blow must appear before the death line — and it came out 952 of 952. The spacing inside that second does not exist in the log, so the replay does not draw it.'],
+  ];
+  return `<section><h1>${esc(tt.mideT)}</h1><p class="ancho">${esc(tt.mideP)}</p></section>
+    ${bloques.map(([h, p]) => `<section class="bloque"><h2>${esc(h)}</h2><p class="ancho">${esc(p)}</p></section>`).join('')}`;
+}
+
+// ── Construir ───────────────────────────────────────────────────────────────
+async function copiar(origen, destino) {
+  await fsp.mkdir(path.dirname(destino), { recursive: true });
+  await fsp.copyFile(origen, destino);
+}
+
+async function main() {
+  console.log('\nConstruyendo eqlparse.com…');
+  await fsp.rm(DIST, { recursive: true, force: true });
+  await fsp.mkdir(DIST, { recursive: true });
+
+  // LAS CLAVES SE COMPRUEBAN ANTES DE NADA. Si una función se renombra en la
+  // aplicación, aquí saldría su clave en crudo —«tank.title»— en cinco
+  // idiomas. Mejor que no construya.
+  setLang('es');
+  const faltan = FUNCIONES.map((f) => f.clave).filter((k) => t(k) === k);
+  if (faltan.length) throw new Error(`claves que no existen en el diccionario: ${faltan.join(', ')}`);
+
+  // Y LOS TEXTOS PROPIOS, EN LOS CINCO. Una descripción que falte saldría como
+  // «undefined» en una tarjeta de la portada, que es peor que no construir.
+  const huecos = IDIOMAS.flatMap((l) => [
+    ...FUNCIONES.filter((f) => !T[l].desc?.[f.icono]).map((f) => `${l}.desc.${f.icono}`),
+    ...CAPTURAS.filter((c) => !T[l].pies?.[c.fichero]).map((c) => `${l}.pies.${c.fichero}`),
+    ...(T[l].pies?.[PRUEBA] ? [] : [`${l}.pies.${PRUEBA}`]),
+  ]);
+  if (huecos.length) throw new Error(`textos sin escribir: ${huecos.join(', ')}`);
+
+  const rels = await releases();
+
+  // Imágenes: las capturas de los README y la muestra del reproductor.
+  // Una copia por cada ruta distinta que pidan las cinco páginas. Si sólo hay
+  // el juego en inglés, las cinco piden la misma y se copia una vez.
+  const rutas = new Set(IDIOMAS.flatMap((l) =>
+    [...CAPTURAS.map((c) => c.fichero), PRUEBA].map((f) => paraWeb(f, l))));
+  let porIdioma = 0;
+  for (const rel of rutas) {
+    const o = path.join(PROY, 'docs', rel);
+    if (!fs.existsSync(o)) continue;
+    await copiar(o, path.join(DIST, 'img', rel));
+    if (rel.startsWith('i18n/')) porIdioma++;
+  }
+  console.log(porIdioma
+    ? `  capturas: ${rutas.size} ficheros, ${porIdioma} con la aplicación en su idioma`
+    : '  capturas: sin versión por idioma (lanza `npm run ui:docs` para tenerlas)');
+  const muestra = path.join(process.env.TEMP ?? '/tmp', 'eql-ui-check', 'reproduccion.apng.png');
+  if (fs.existsSync(muestra)) {
+    await copiar(muestra, path.join(DIST, 'img', 'reproduccion.png'));
+    console.log('  muestra del reproductor incluida');
+  } else {
+    console.log('  (sin muestra del reproductor: lanza `npm run ui:gif` antes)');
+  }
+  if (fs.existsSync(path.join(PROY, 'build', 'icon.png'))) {
+    await copiar(path.join(PROY, 'build', 'icon.png'), path.join(DIST, 'icon.png'));
+  }
+  await copiar(path.join(RAIZ, 'estilo.css'), path.join(DIST, 'estilo.css'));
+
+  const paginas = [
+    ['index.html', portada, (tt) => tt.tagline, (tt) => tt.sub],
+    ['instalacion.html', instalacion, (tt) => tt.instalarT, (tt) => tt.instalarP],
+    ['novedades.html', novedades, (tt) => tt.novedadesT, (tt) => tt.novedadesP],
+    ['que-mide.html', queMide, (tt) => tt.mideT, (tt) => tt.mideP],
+  ];
+
+  let n = 0;
+  for (const lang of IDIOMAS) {
+    setLang(lang);            // los nombres de las funciones, en su idioma
+    const tt = T[lang];
+    for (const [fichero, hacer, tit, desc] of paginas) {
+      const cuerpo = hacer(lang, rels);
+      const html = pagina({
+        lang, pag: fichero, titulo: `${tit(tt)} · EQL Parse`,
+        descripcion: desc(tt), cuerpo, version: rels[0]?.tag?.replace(/^v/, ''),
+      });
+      await fsp.mkdir(path.join(DIST, lang), { recursive: true });
+      await fsp.writeFile(path.join(DIST, lang, fichero), html);
+      n++;
+    }
+  }
+
+  /**
+   * LA RAÍZ MANDA AL INGLÉS, y no al español pese a ser el idioma del autor.
+   *
+   * Quien llega a este dominio llega buscando «EQ log parser», y eso se busca
+   * en inglés. El español está a un clic en el selector, y quien escribe la
+   * dirección de memoria es justo quien sabe llegar. No se negocia por
+   * `Accept-Language` porque eso pide una Function de Pages: aquí es una regla
+   * estática, sin JavaScript y sin código que mantener.
+   *
+   * A los buscadores esto no les confunde: las cinco versiones se declaran con
+   * `hreflang` y cada una tiene su canónica.
+   */
+  await fsp.writeFile(path.join(DIST, '_redirects'), '/  /en/  302\n');
+  // Un mapa para los buscadores, con las cinco versiones de cada página.
+  const urls = IDIOMAS.flatMap((l) => paginas.map(([f]) => `${DOMINIO}/${l}/${f}`));
+  await fsp.writeFile(path.join(DIST, 'sitemap.xml'),
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${
+      urls.map((u) => `  <url><loc>${u}</loc></url>`).join('\n')}\n</urlset>\n`);
+  await fsp.writeFile(path.join(DIST, 'robots.txt'),
+    `User-agent: *\nAllow: /\nSitemap: ${DOMINIO}/sitemap.xml\n`);
+
+  console.log(`  ${n} páginas en ${IDIOMAS.length} idiomas`);
+  console.log(`  salida: ${DIST}\n`);
+}
+
+main().catch((err) => { console.error('\nMAL ', err.message, '\n'); process.exit(1); });

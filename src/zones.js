@@ -31,7 +31,8 @@ const MODOS = ['Solo', 'Group', 'Raid', 'Multiplayer'];
  *   name  el nombre completo, como se guardaba antes
  *   base  la zona sin modo ni dificultad
  *   mode  'Solo' | 'Group' | … | null
- *   diff  0-4, o null si NO CONSTA. Las dos cosas son distintas: ver abajo.
+ *   diff  0-4. Sólo es null cuando no se sabe ni la zona: que el registro no
+ *         diga dificultad no es no saberla, es que vale 0.
  *   tag   'Adaptive' | 'Fused' | … | null
  */
 export function parseZone(zona) {
@@ -66,11 +67,29 @@ export function parseZone(zona) {
     // ellos entre 0,86 y 0,88. No cae en medio de nada: es el escalón de abajo.
     return { name, base: m[1], mode: m[2], diff: porNumero ?? porEtiqueta ?? 0, tag };
   }
-  // Sin modo declarado no hay instancia que valga: la etiqueta sigue contando
-  // —«The Plane of Hate 3 (Fused)» existe y no dice el modo—, pero un nombre
-  // limpio es mundo abierto y ahí NO hay dificultad que medir. `null` significa
-  // «no consta» y no se convierte en cero en ninguna parte.
-  return { name, base: resto, mode: null, diff: tag ? POR_ETIQUETA[tag] : null, tag };
+  // ── Sin modo y sin etiqueta: D0, no «no consta» ──────────────────────────
+  //
+  // Esto decía antes que un nombre limpio es mundo abierto y que ahí no hay
+  // dificultad que medir. Es falso, y lo corrige quien estuvo allí: en EQL, que
+  // el registro no diga nada de dificultad SIGNIFICA dificultad 0. Da igual que
+  // sea mundo abierto o una instancia; el cero es el mismo.
+  //
+  // La prueba de que ese silencio no es ignorancia está en el propio registro:
+  //
+  //     Player Campeon creating instance The Plane of Sky 25.
+  //     The Plane of Sky is now available to you.
+  //     You have entered The Plane of Sky.
+  //
+  // Tres líneas seguidas para una instancia recién creada, y ninguna trae
+  // dificultad. Tratar eso como «no se sabe» dejaba sin asignar 84 de 410
+  // peleas guardadas —un 20,5%—, y 70 de ellas eran esta misma zona.
+  //
+  // La etiqueta sigue mandando cuando la hay: «The Plane of Hate 3 (Fused)»
+  // existe, no dice el modo y es D3.
+  //
+  // Lo que NO se toca es no saber dónde estabas: eso vive en `SIN_ZONA` y
+  // llega aquí como `name` nulo, que sale arriba con `diff: null`.
+  return { name, base: resto, mode: null, diff: tag ? POR_ETIQUETA[tag] : 0, tag };
 }
 
 /** Etiqueta corta para enseñar: «D3 Fused», «D2», o nada. */

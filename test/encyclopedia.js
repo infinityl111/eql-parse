@@ -191,20 +191,36 @@ console.log('\nlas zonas, tal y como se consultan');
   ok(!!guk && guk.celdas[2]?.foes === 1,
     'el 2 de «Old Guk 2» es parte del nombre y no una dificultad');
 
-  // Aquí ponía «el mundo abierto ES la dificultad 0», y era falso: una zona sin
-  // instanciar no tiene dificultad que declarar, no tiene la cero. Mientras las
-  // dos cosas compartieron cajón, la columna D0 de la rejilla contenía East
-  // Freeport — una columna rotulada como medida que contenía la ausencia de
-  // medida.
+  // ── EL MUNDO ABIERTO ES D0 ───────────────────────────────────────────────
   //
-  // La D0 de verdad existe y es otra cosa: «Nagafen's Lair - Group» a secas,
-  // instanciada, con la dificultad base. Medida un peldaño entero por debajo de
-  // D1 (0,873, del mismo tamaño que D1→D2 y D2→D3).
+  // Esto ha ido y vuelto, así que conviene dejar escrito dónde acabó y por qué.
+  //
+  // Primero decía «el mundo abierto ES la dificultad 0». Luego se separó, con
+  // el argumento de que una zona sin instanciar no tiene dificultad que
+  // declarar y que la columna D0 no debía contener East Freeport.
+  //
+  // Y ahora vuelve, corregido por quien juega: en EQL, que el registro no diga
+  // nada de dificultad SIGNIFICA dificultad 0. La prueba está en el propio
+  // registro —una instancia creada por ti no trae ni una línea con dificultad:
+  //
+  //     Player Campeon creating instance The Plane of Sky 25.
+  //     The Plane of Sky is now available to you.
+  //     You have entered The Plane of Sky.
+  //
+  // Separarlas dejaba sin asignar 84 de 410 peleas guardadas —el 20,5%—, y 70
+  // eran Plane of Sky: instancias propias, todas en D0, en el cajón de «no se
+  // sabe».
+  //
+  // Lo que sí sigue siendo ausencia, y por eso el cajón no desaparece: no saber
+  // ni en qué zona estabas. Eso es `SIN_ZONA`, y son las peleas anteriores a la
+  // primera línea de zona del registro.
   const abierto = zonas.find((z) => z.base === 'Befallen');
-  ok(abierto.celdas.every((c) => c === null),
-    'el mundo abierto NO ocupa ninguna de las cinco columnas');
-  ok(abierto.sinMarca?.foes === 1,
-    'va a su propio cajón, rotulado como ausencia', JSON.stringify(abierto.sinMarca));
+  ok(abierto.celdas[0]?.foes === 1, 'el mundo abierto ocupa la columna D0',
+    JSON.stringify(abierto.celdas[0]));
+  ok(abierto.celdas.slice(1).every((c) => c === null),
+    'y sólo ésa: no se reparte por las demás');
+  ok(!abierto.sinMarca, 'y ya no cae en el cajón de la ausencia',
+    JSON.stringify(abierto.sinMarca));
 
   const enD4 = enc.zoneFoes('Plane of Fear', 4);
   ok(enD4.length === 2 && enD4[0].name === 'Dread',
@@ -214,7 +230,8 @@ console.log('\nlas zonas, tal y como se consultan');
     'con la vida sostenida por sus dos caídas en ESA dificultad');
   ok(enc.zoneFoes('Plane of Fear', 3).length === 1,
     'y la misma zona en otra dificultad es otra lista');
-  ok(enc.zoneFoes('Befallen', null)[0].hp === null,
+  // `0` y no `null`: Befallen es mundo abierto, y el mundo abierto es D0.
+  ok(enc.zoneFoes('Befallen', 0)[0].hp === null,
     'un enemigo que nunca ha caído no tiene vida estimada, y no es un cero');
 }
 

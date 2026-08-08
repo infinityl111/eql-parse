@@ -4,7 +4,7 @@ DPS parser for **EverQuest Legends**.
 
 [Español](README.md) · **English**
 
-[![Download](https://img.shields.io/github/v/release/infinityl111/eql-parse-spain?label=Download&style=for-the-badge&color=1f7c8c)](https://github.com/infinityl111/eql-parse-spain/releases/latest)
+[![Download](https://img.shields.io/github/v/release/infinityl111/eql-parse?label=Download&style=for-the-badge&color=1f7c8c)](https://github.com/infinityl111/eql-parse/releases/latest)
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/eqcampeon)
 
 Real-time combat parser for EverQuest Legends. It measures your damage, tells

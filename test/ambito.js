@@ -155,7 +155,15 @@ for (const rel of FICHEROS) {
 
   const importados = new Set();
   for (const m of bruto.matchAll(/import\s+([^;]+?)\s+from\s+/g)) {
-    for (const n of m[1].matchAll(/([\w$]+)/g)) importados.add(n[1]);
+    // CON `x as y`, EL NOMBRE EN ÁMBITO ES `y` Y NO `x`. Cogiendo los dos, un
+    // local llamado como el nombre original salía marcado sin tapar nada — y
+    // renombrar al importar es justamente lo que se hace para NO chocar, así
+    // que la prueba castigaba la solución.
+    for (const trozo of m[1].replace(/[{}]/g, ' ').split(',')) {
+      const alias = /([\w$]+)\s+as\s+([\w$]+)/.exec(trozo);
+      if (alias) { importados.add(alias[2]); continue; }
+      for (const n of trozo.matchAll(/([\w$]+)/g)) importados.add(n[1]);
+    }
   }
   importados.delete('from');
 

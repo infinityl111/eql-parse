@@ -168,6 +168,179 @@ main { overflow-y: auto; padding: 16px 20px; min-height: 0; }
 .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--slate-800); }
 .legend i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; }
 
+/* ── Documentos de la pelea ───────────────────────────────
+   Una pregunta por pestaña, una abierta a la vez. La pestaña lleva dentro su
+   TITULAR —la respuesta en una línea—, así que lo que está puesto es la
+   respuesta y lo que está a un clic es el detalle. Por eso el titular se pinta
+   en el color del texto vivo y la etiqueta en el apagado: si el titular se
+   leyera como un rótulo más, la pestaña volvería a ser un cajón.
+
+   La barra NO se desplaza con el panel: es lo que anuncia que estas preguntas
+   existen, y anunciarlas sólo cuando ya has bajado sería no anunciarlas. */
+.docbar { display: flex; gap: 2px; flex-wrap: wrap; margin-top: 22px;
+  border-bottom: 1px solid var(--slate-700); }
+.doctab { display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  padding: 7px 14px 6px; text-transform: none; letter-spacing: 0; margin-bottom: -1px; }
+.doctab:hover { background: var(--slate-850); }
+.doctab-l { font-family: var(--display); font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--bone-faint); }
+.doctab-h { font-family: var(--mono); font-size: 12px; color: var(--bone-dim);
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doctab.on { border-bottom-color: var(--t-cold); background: var(--slate-850); }
+.doctab.on .doctab-l { color: var(--t-cold); }
+.doctab.on .doctab-h { color: var(--bone); }
+.docpane { padding-top: 4px; }
+/* Los tres bloques traían su propia separación de cuando iban apilados; dentro
+   del panel ya la pone la barra. */
+.docpane > * { margin-top: 0; }
+
+/* ── La reproducción ──────────────────────────────────────
+   Los flotantes salen A LA VEZ dentro de un segundo y escalonados en ALTURA,
+   nunca separados en el tiempo: el registro sella al segundo, así que el orden
+   es dato —se respeta con el apilado— y el espaciado no existe. Animarlos con
+   retardos distintos dibujaría un ritmo que nadie midió. */
+.rp { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 16px; }
+.rp-barra { display: flex; align-items: center; gap: 12px; }
+.rp-play { width: 34px; font-size: 13px; }
+.rp-vel { display: flex; gap: 2px; }
+.rp-v { padding: 5px 9px; background: var(--slate-800); }
+.rp-v.on { background: var(--t-cold); color: var(--slate-900); border-color: var(--t-cold); font-weight: 700; }
+.rp-reloj { font-family: var(--mono); font-size: 13px; }
+.rp-nota { margin-left: auto; color: var(--t-cold); }
+
+/* La línea de tiempo es la gráfica de combate: los picos se ven y se arrastra
+   hasta ellos. Alta y con el cursor grande porque aquí se pulsa, no se lee. */
+.rp-tiempo { position: relative; height: 84px; cursor: pointer; touch-action: none;
+  background: var(--slate-850); border: 1px solid var(--slate-700); border-radius: 2px; }
+.rp-band { position: absolute; inset: 0 0 auto 0; width: 100%; height: 9px; }
+.rp-graf { position: absolute; inset: 9px 0 0 0; width: 100%; height: calc(100% - 9px); }
+.rp-lisa { position: absolute; inset: 0; background: var(--slate-800); }
+.rp-hitos { position: absolute; inset: 9px 0 0 0; pointer-events: none; }
+.rp-hito { position: absolute; top: 0; width: 1px; height: 100%; }
+.rp-hito.muerte { background: var(--t-ds); width: 2px; }
+.rp-hito[class*="lanza"] { background: var(--bone-faint); height: 34%; top: auto; bottom: 0; opacity: .7; }
+.rp-cursor { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--bone);
+  pointer-events: none; }
+.rp-punto { position: absolute; bottom: -7px; width: 14px; height: 14px; padding: 0;
+  transform: translateX(-50%); border-radius: 50%; background: var(--bone);
+  border: 2px solid var(--slate-900); cursor: grab; }
+.rp-punto:active { cursor: grabbing; }
+
+/* El escenario tiene tope y se desplaza por dentro.
+   Sin él, una pelea de diecisiete combatientes lo estiraba hasta empujar el
+   panel de texto y los medidores fuera de la pantalla — y esos se miran más que
+   el decimotercer esqueleto. Lo que no cabe se alcanza rodando aquí dentro, sin
+   mover lo demás de su sitio. */
+.rp-escena { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px;
+  min-height: 210px; max-height: 360px; overflow-y: auto;
+  padding: 14px 10px; background: var(--slate-850);
+  border-left: 2px solid var(--slate-700); }
+/* APILADOS HACIA ABAJO, y pegados al centro.
+   En una fila, seis personajes ya empujan al enemigo fuera de la pantalla y una
+   pelea de diecisiete no cabe de ninguna manera. Se apilan en rejilla y crecen
+   hacia abajo, que es donde hay sitio.
+   El tope de ancho es lo que hace que se enfrenten: sin él, con `1fr` a cada
+   lado, los dos bandos se iban a los bordes y quedaba un vacío enorme en medio
+   con el «versus» flotando solo. Ahora las dos columnas se arriman al centro y
+   se lee de un vistazo quién está contra quién. */
+.rp-col { display: grid; grid-template-columns: repeat(auto-fill, 92px); gap: 14px 10px;
+  max-width: 390px; align-content: flex-start; }
+.rp-aliado { justify-self: end; justify-content: end; }
+.rp-enemigo { justify-self: start; justify-content: start; }
+/* Los que no consta que sean tuyos: abajo y con su rótulo, nunca mezclados con
+   tu bando. El registro de EQL no dice quién va en tu grupo. */
+.rp-sinbando { padding: 10px 12px; background: var(--slate-850);
+  border-left: 2px solid var(--slate-700); }
+.rp-sinbando .rp-col { max-width: none; justify-content: start; margin-top: 8px; }
+.rp-medio { align-self: center; color: var(--bone-faint); }
+.rp-act { width: 92px; text-align: center; transition: transform .12s; }
+/* Quien todavía no ha entrado en la pelea no ocupa sitio: se va de la rejilla
+   entera. Dejarle el hueco reservado sería contar que va a venir, y en el
+   segundo 3 nadie sabe que en el 18 llega otro. */
+.rp-act.fuera { display: none; }
+.rp-act.entra { animation: rpEntra .35s ease-out; }
+@keyframes rpEntra {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.rp-act.yo .rp-nom { color: var(--t-cold); }
+/* EL CAÍDO SE APAGA POR PARTES, no entero, y esto es una corrección.
+   Estaba como `.rp-act.caido { opacity: .35 }`, y entonces el botín que soltó
+   se apagaba con él y no había forma de subirlo: la opacidad de un padre crea
+   un grupo y ningún hijo puede pasar de ella —`opacity: 2.9` ni siquiera es un
+   valor, se limita a 1 y no habría servido igual—.
+   La figura se atenúa porque ha caído; lo que soltó es un dato y se lee igual
+   de bien muerto que vivo. */
+.rp-act.caido .rp-fig,
+.rp-act.caido .rp-nom,
+.rp-act.caido .rp-dps { opacity: .35; }
+.rp-act.caido .rp-svg, .rp-act.caido .rp-retrato { transform: rotate(-14deg); }
+.rp-act.golpea { transform: translateY(-3px); }
+.rp-act.lanzando .rp-fig { filter: brightness(1.5); }
+.rp-fig { position: relative; height: 74px; display: flex; align-items: flex-end; justify-content: center; }
+.rp-svg { width: 52px; height: 66px; color: var(--bone-dim); transition: transform .2s; }
+.rp-retrato { max-width: 66px; max-height: 66px; object-fit: contain; transition: transform .2s; }
+.rp-nom { font-size: 11px; color: var(--bone-dim); margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-nom i { font-style: normal; font-family: var(--display); font-size: 8px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--bone-faint); }
+.rp-dps { font-size: 10.5px; color: var(--bone-faint); }
+.rp-dps b { font-family: var(--mono); color: var(--bone-dim); }
+
+/* El flotante. `--i` es su sitio en la pila del segundo, no un retardo. */
+.rp-flot { position: absolute; inset: 0; pointer-events: none; }
+.rp-num { position: absolute; left: 50%; bottom: calc(38% + var(--i) * 15px);
+  transform: translateX(-50%); font-family: var(--mono); font-size: 13px;
+  font-weight: 700; white-space: nowrap; text-shadow: 0 1px 2px rgba(0,0,0,.55);
+  animation: rpSube var(--vida) ease-out forwards; }
+@keyframes rpSube {
+  0%   { opacity: 0; transform: translate(-50%, 6px) scale(.9); }
+  18%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -26px) scale(1); }
+}
+.rp-num.crit { font-size: 16px; }
+.rp-num .rp-x { font-style: normal; font-size: 10px; opacity: .8; }
+.rp-num .rp-marca { font-style: normal; font-family: var(--display); font-size: 8.5px;
+  letter-spacing: .08em; text-transform: uppercase; margin-left: 4px; opacity: .9; }
+.rp-num.evit { color: var(--bone-faint); font-weight: 500; font-size: 11px; }
+.rp-num.cura { color: var(--t-cold); }
+.rp-num.muere { color: var(--t-ds); font-family: var(--display); letter-spacing: .1em;
+  text-transform: uppercase; font-size: 11px; }
+.rp-num.estado { color: var(--bone-dim); font-weight: 500; font-size: 11px; }
+.rp-num.d-melee { color: var(--t-melee); }
+.rp-num.d-magic { color: var(--t-magic); }
+.rp-num.d-cold  { color: var(--t-cold); }
+.rp-num.d-fire  { color: var(--t-fire); }
+.rp-num.d-poison { color: var(--t-poison); }
+.rp-num.d-disease { color: var(--t-disease); }
+.rp-num.d-ds    { color: var(--t-ds); }
+.rp-num.d-dot   { color: var(--t-dot); }
+.rp-num.d-spell { color: var(--t-spell); }
+.rp-num.d-other { color: var(--bone-dim); }
+
+/* El panel de texto: lo que pasa un umbral, con el umbral escrito al lado. */
+.rp-texto { height: 168px; overflow-y: auto; background: var(--slate-850);
+  border-left: 2px solid var(--slate-600); padding: 6px 10px; }
+.rp-l { display: grid; grid-template-columns: 46px 1fr auto; gap: 10px;
+  font-size: 11.5px; line-height: 1.6; color: var(--bone-dim); }
+.rp-l .lt { font-family: var(--mono); color: var(--bone-faint); }
+.rp-l .lp { color: var(--bone-faint); }
+.rp-l.muerte .lx { color: var(--t-ds); }
+.rp-l.critico .lx, .rp-l.sobreP90 .lx { color: var(--bone); }
+
+/* El registro. Monoespaciado y con su hora a la izquierda: es texto crudo y
+   tiene que parecerlo — si se maquillara, dejaría de servir para comprobar.
+   Se desplaza por dentro para que la pestaña no empuje la página hacia abajo,
+   que es justo lo que la barra vino a evitar. */
+.logbox { max-height: 420px; overflow-y: auto; margin-top: 8px;
+  background: var(--slate-850); border-left: 2px solid var(--slate-600); padding: 8px 10px; }
+.logline { display: grid; grid-template-columns: 70px 1fr; gap: 10px;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.55; }
+.logline .lt { color: var(--bone-faint); }
+.logline .lx { color: var(--bone-dim); white-space: pre-wrap; word-break: break-word; }
+.logline:hover .lx { color: var(--bone); }
+
 .empty { color: var(--bone-faint); padding: 48px 0; text-align: center; }
 .empty h2 { font-family: var(--display); font-weight: 600; letter-spacing: .04em; color: var(--bone-dim); font-size: 17px; }
 
@@ -515,6 +688,15 @@ header > * { flex: none; }
 .an-find.good { border-left-color: var(--t-poison); }
 .an-find-h { display: flex; align-items: baseline; gap: 9px; margin-bottom: 3px; }
 .an-find-h b { font-weight: 500; font-size: 13.5px; }
+/* Qué clase de hallazgo es. Va al final de la línea del título, apagado: no
+   compite con el título, pero está siempre. El único que se resalta es el que
+   pide acción — los otros dos son iguales entre sí en lo que importa aquí, que
+   es que no hay nada que hacer distinto en la siguiente pelea. */
+.an-find-h .acc { margin-left: auto; font-style: normal; font-family: var(--display);
+  font-size: 9px; letter-spacing: .1em; text-transform: uppercase; cursor: help;
+  color: var(--bone-faint); border: 1px solid transparent; border-radius: 2px;
+  padding: 1px 5px; white-space: nowrap; }
+.an-find-h .acc-tuya { color: var(--t-cold); border-color: var(--t-cold); }
 .an-ico { font-family: var(--mono); font-size: 11px; width: 16px; height: 16px; line-height: 16px;
           text-align: center; border-radius: 50%; background: var(--slate-700); color: var(--bone-dim); flex: none; }
 .an-find.bad .an-ico { background: var(--t-ds); color: #fff; }
@@ -1005,6 +1187,22 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .est { font-style: italic; color: var(--bone-faint); cursor: help; }
 /* Y por debajo del mínimo, ni número: el hueco explica qué falta. */
 .gap { color: var(--bone-faint); cursor: help; border-bottom: 1px dotted var(--bone-faint); }
+
+/* La doble joroba. No es un aviso de error ni un peligro —de ahí que no sea
+   rojo—: es un hallazgo sobre lo que hay bajo un nombre, y se lee como se leen
+   los hallazgos de esta aplicación, con su frase debajo de la tabla. */
+.dosmodas { font-style: normal; font-family: var(--display); font-size: 9px;
+  letter-spacing: .08em; text-transform: uppercase; cursor: help;
+  color: var(--t-cold); border: 1px solid var(--t-cold); border-radius: 2px;
+  padding: 1px 4px; margin-left: 7px; vertical-align: 1px; white-space: nowrap; }
+/* La mascota plegada dentro del dueño. Misma forma que la marca de la fila
+   —«PET» al lado del nombre— para que se reconozca como lo mismo que es. */
+.petline { font-style: normal; font-family: var(--display); font-size: 9px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--bone-faint);
+  margin-left: 7px; vertical-align: 1px; cursor: help; white-space: nowrap; }
+.hallazgo { margin-top: 8px; padding: 8px 10px; background: var(--slate-850);
+  border-left: 2px solid var(--t-cold); font-size: 11.5px; line-height: 1.5;
+  color: var(--bone-dim); }
 .tagx { font-size: 10px; color: var(--t-poison); cursor: help; }
 
 /* ── Mejores marcas, agrupadas por nivel ─────────────── */
@@ -1370,3 +1568,61 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
   border-left: 3px solid transparent; border-right: 3px solid transparent;
   border-top: 4px solid var(--t-fire); }
 .chart-death:hover { opacity: 1; width: 2px; }
+
+/* ── La barra de casteo ───────────────────────────────────
+   Cuatro estados, y los cuatro dicen algo distinto:
+     con barra          se sabe cuánto tarda ese hechizo, medido sobre sus
+                        propios lanzamientos
+     con barra «pasada» tardó más de lo suyo: la barra llega llena a lo
+                        esperado y sigue en otro color hasta donde acabó. Que
+                        un hechizo de 4 s tardara 9 es información — algo lo
+                        retrasó — y acabar tarde sin más lo escondería
+     sin barra, «ya»    es instantáneo, y eso está medido
+     sin barra, «?»     no hay muestra suficiente: NO SE SABE
+   Los dos últimos se ven distintos a propósito: acaban igual —sin barra— y no
+   son lo mismo. */
+.rp-cast { min-height: 22px; margin-top: 3px; font-size: 10px; }
+.rp-cast:empty { visibility: hidden; }
+.rp-cast-n { display: block; color: var(--bone-dim); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.rp-cast-t { display: block; height: 4px; margin-top: 2px; background: var(--slate-700);
+  border-radius: 2px; overflow: hidden; }
+/* EL COLOR DE LA BARRA NO ES `--t-spell`, y ése fue mi primer error aquí.
+   `--t-spell` es #6D7A8C, el gris azulado de la escuela «spell», que en esta
+   paleta está apagado a propósito — queda a un paso de `--bone-faint` (#5D6879)
+   y de la propia canaleta. Una barra que avanza tiene que verse avanzar, así
+   que va con el acento de la aplicación, el mismo del cursor y la gráfica. */
+.rp-cast-t i { display: block; height: 100%; width: 0; background: var(--t-cold);
+  animation: rpCast var(--dur) linear forwards; }
+@keyframes rpCast { from { width: 0; } to { width: 100%; } }
+/* Lo esperado se marca con un filete: hasta ahí es lo normal, de ahí en
+   adelante es lo que se pasó. */
+.rp-cast.pasado .rp-cast-t { position: relative; }
+.rp-cast.pasado .rp-cast-t::after { content: ''; position: absolute; top: 0; bottom: 0;
+  left: var(--pct); width: 1px; background: var(--bone); }
+.rp-cast.pasado .rp-cast-t i { background: linear-gradient(to right,
+  var(--t-cold) 0 var(--pct), var(--t-fire) var(--pct) 100%); }
+.rp-cast.roto .rp-cast-t i { background: var(--t-ds); animation-play-state: paused; }
+.rp-cast.roto .rp-cast-n { text-decoration: line-through; }
+.rp-cast-m { font-family: var(--display); font-size: 8px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--bone-faint); }
+.rp-cast.ya .rp-cast-m { color: var(--t-cold); }
+
+/* El botín, debajo de quien lo soltó. Cada objeto aparece en SU segundo, que
+   el registro sella por separado — el bicho cae en el 67 y sus objetos se
+   recogen en el 67 y el 69. Se quedan puestos: lo recogido no se descoge. */
+.rp-botin { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin-top: 3px; }
+.rp-obj { font-style: normal; font-size: 9.5px; line-height: 1.3; cursor: help;
+  color: var(--t-melee); border-bottom: 1px dotted var(--t-melee);
+  max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-obj:hover { color: var(--bone); border-bottom-color: var(--bone); }
+
+/* El cartel de actualización con su descarga. La barra de progreso y el tamaño
+   van dentro del propio cartel: quien decide si pulsa tiene que ver los 75 MB
+   antes, no descubrirlos a mitad. */
+.upd-prog { flex: 1; max-width: 260px; height: 5px; background: var(--slate-700);
+  border-radius: 3px; overflow: hidden; }
+.upd-prog i { display: block; height: 100%; background: var(--t-cold); transition: width .2s; }
+.upd-pct { font-family: var(--mono); font-size: 11px; color: var(--bone-dim); }
+.upd-nota { font-size: 11.5px; color: var(--bone-dim); }
+.upd-nota.bad { color: var(--t-ds); }

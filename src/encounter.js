@@ -15,6 +15,147 @@ function push(map, key, amt, crit) {
   if (crit) b.crits++;
   return b;
 }
+
+/**
+ * LA FORMA DEL GOLPE, y por qué no basta con el mínimo y el máximo.
+ *
+ * El mínimo y el máximo de un ataque son los dos únicos números de su fila que
+ * UN SOLO golpe raro puede mover: son muestras de n=1. Medido sobre el registro
+ * de referencia, `a zol ghoul knight · hits` con n=557 da 3 / 25 / 60 — el
+ * mínimo es 0,12× la mediana. Decir «entre 3 y 60» de un ataque que hace 25
+ * casi siempre no es informar de menos: es informar de otra cosa.
+ *
+ * Así que se cuenta la distribución y se enseñan tres cifras que sí aguantan
+ * un golpe raro: p10, mediana y p90.
+ *
+ * QUÉ SE GUARDA Y QUÉ NO. El recuento vive AQUÍ, en memoria, mientras dura la
+ * pelea. A disco van tres números por habilidad. Guardar los cubos habría sido
+ * multiplicar el almacén por un dibujo que casi nadie abre: 60 habilidades por
+ * 10 filas por pelea.
+ *
+ * El precio de eso, dicho: los percentiles NO se pueden fundir. Al sumar varias
+ * peleas se caen a propósito en vez de arrastrar el de una de ellas, que sería
+ * inventarse la muestra.
+ *
+ * Cada valor guarda [cuántas veces, de ellas críticas]. Las críticas hacen
+ * falta aparte por lo de la doble joroba: un ataque con críticos tiene dos
+ * montones por definición, y eso ya se cuenta en su columna. La joroba que
+ * merece decirse es la que queda DESPUÉS de quitarlos.
+ */
+const DIST_TOPE = 2000;     // guarda contra un ataque con miles de valores distintos
+
+function pushDist(b, amt, crit) {
+  if (!b.dist) b.dist = new Map();
+  const v = b.dist.get(amt);
+  if (v) { v[0]++; if (crit) v[1]++; return; }
+  // Al llegar al tope se deja de anotar valores NUEVOS y se marca: con la
+  // cuenta incompleta los percentiles ya no son exactos, y prefiero no darlos
+  // a darlos mal.
+  if (b.dist.size >= DIST_TOPE) { b.distTrunc = true; return; }
+  b.dist.set(amt, [1, crit ? 1 : 0]);
+}
+
+/** El valor que deja por debajo la fracción `q` de las muestras. */
+function percentil(pares, total, q) {
+  const meta = q * total;
+  let acc = 0;
+  for (const [valor, n] of pares) {
+    acc += n;
+    if (acc >= meta) return valor;
+  }
+  return pares.length ? pares[pares.length - 1][0] : 0;
+}
+
+/**
+ * ¿Hay dos montones bajo este nombre?
+ *
+ * No es un adorno del dibujo: es un hallazgo de atribución. Si los golpes de un
+ * mismo nombre se agrupan en dos sitios y el valle entre ellos está vacío, lo
+ * más probable es que bajo ese nombre haya DOS cosas —dos armas, dos ataques
+ * que el registro llama igual— y entonces la media de la fila no describe a
+ * ninguna de las dos.
+ *
+ * Se mira sobre los golpes NO críticos, porque el crítico ya tiene su columna y
+ * un ataque con críticos es bimodal por construcción: decirlo sería anunciar
+ * como hallazgo algo que ya está contado al lado.
+ *
+ * Las condiciones son deliberadamente duras, porque esto se dice CON PALABRAS y
+ * una frase que se equivoca cuesta más que un dibujo que no se entiende:
+ *   · 40 muestras o más — con menos, cualquier hueco es azar
+ *   · dos cimas separadas, cada una con el 15% de las muestras como poco
+ *   · un valle que baje al 40% de la cima más baja
+ *   · y las dos cimas separadas por un cuarto del golpe mayor: dos montones
+ *     pegados son el mismo montón visto con demasiado aumento
+ *
+ * LA ÚLTIMA CONDICIÓN SE MIDE EN DAÑO, no en anchura del dibujo, y ahí estaba
+ * el fallo que cazó la prueba. Medida en anchura, un ataque que sólo hace 20 o
+ * 21 salía bimodal: los cubos se reparten sobre el rango observado, así que dos
+ * valores pegados acaban en los extremos opuestos del dibujo y parecen dos
+ * montones. Veinte y veintiuno son el mismo golpe; veinte y cien no.
+ */
+function dosJorobas(dist) {
+  const base = [...dist].map(([v, [n, c]]) => [v, n - c]).filter(([, n]) => n > 0)
+    .sort((a, b) => a[0] - b[0]);
+  const total = base.reduce((a, [, n]) => a + n, 0);
+  if (total < 40 || base.length < 2) return false;
+
+  const lo = base[0][0], hi = base[base.length - 1][0];
+  if (hi <= lo) return false;
+  const BINS = 12;
+  const bins = new Array(BINS).fill(0);
+  for (const [v, n] of base) {
+    bins[Math.min(BINS - 1, Math.floor((v - lo) / (hi - lo) * BINS))] += n;
+  }
+  // Suavizado de tres: sin él, un valor repetido mucho abre valles de mentira.
+  const s = bins.map((_, i) => (bins[i - 1] ?? 0) + bins[i] + (bins[i + 1] ?? 0));
+
+  const cimas = [];
+  for (let i = 0; i < BINS; i++) {
+    if (s[i] >= (s[i - 1] ?? -1) && s[i] > (s[i + 1] ?? -1) && s[i] >= total * 0.15) cimas.push(i);
+  }
+  if (cimas.length < 2) return false;
+
+  const centro = (i) => lo + (i + 0.5) * (hi - lo) / BINS;
+  for (let a = 0; a < cimas.length; a++) {
+    for (let b = a + 1; b < cimas.length; b++) {
+      const i = cimas[a], j = cimas[b];
+      if (j - i < 2) continue;                       // cimas pegadas: un montón
+      const alto = centro(j), bajo = centro(i);
+      if (alto - bajo < alto * 0.25) continue;       // y separadas en DAÑO
+      const valle = Math.min(...s.slice(i + 1, j));
+      if (valle <= Math.min(s[i], s[j]) * 0.4) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * De la cuenta a lo que viaja: tres cifras y, si acaso, el aviso.
+ *
+ * Por debajo de ocho muestras no se dan percentiles. Es el mismo mínimo que ya
+ * usa el catálogo de hechizos para decir «medido»: un hueco explicado informa,
+ * y tres cifras sacadas de cuatro golpes desinforman.
+ */
+export const MIN_MUESTRAS = 8;
+
+export function forma(b) {
+  if (!b?.dist || b.distTrunc || b.n < MIN_MUESTRAS) return null;
+  // En una pelea viva esto se pide cuatro veces por segundo para cada
+  // habilidad de cada fila. La cuenta sólo cambia cuando entra un golpe nuevo,
+  // así que se guarda con el número de muestras del que salió.
+  if (b.formaN === b.n) return b.formaCache;
+  const pares = [...b.dist].map(([v, [n]]) => [v, n]).sort((a, b2) => a[0] - b2[0]);
+  const total = pares.reduce((a, [, n]) => a + n, 0);
+  if (!total) return null;
+  const out = {
+    p10: percentil(pares, total, 0.10),
+    p50: percentil(pares, total, 0.50),
+    p90: percentil(pares, total, 0.90),
+    bimodal: dosJorobas(b.dist),
+  };
+  b.formaN = b.n; b.formaCache = out;
+  return out;
+}
 const sorted = (map) => [...map].sort((a, b) => b[1].sum - a[1].sum || b[1].n - a[1].n);
 
 class Combatant {
@@ -66,6 +207,108 @@ class Combatant {
     this.last = null;
     this.activeSeconds = new Set();
     this.hitSeconds = new Set();     // sólo cuando pegas: recibir no cuenta como actividad
+    /**
+     * TU MEJOR RATO, que no es tu mejor segundo.
+     *
+     * La pregunta que contesta: ¿esto fue un momento o fue un rato? El número
+     * grande de la fila reparte el daño entre la pelea entera y el ritmo entre
+     * los segundos en que hiciste algo; ninguno de los dos distingue a quien dio
+     * un pico de quien sostuvo.
+     *
+     * Y NO SE MIDE POR SEGUNDOS SUELTOS, aunque fuera lo apuntado. El registro
+     * de EQL sella la hora al segundo y no hay nada por debajo: dos golpes
+     * separados 1,9 s pueden caer en la misma marca y un frenesí mete tres en
+     * una. Un «mejor segundo» es una muestra de n=1 y encima medio artefacto de
+     * la cuadrícula. El pico de n=1 ya está puesto en la fila: es el máximo.
+     *
+     * Diez segundos es la misma ventana que ya usa el análisis para la ráfaga
+     * del grupo, así que las dos cifras se pueden comparar entre sí.
+     *
+     * Se guarda el daño por segundo —no la serie del jugador— y la ventana se
+     * calcula al pedir los totales. A disco va UN número por fila.
+     */
+    this.porSegundo = new Map();     // segundo -> daño hecho
+    /**
+     * SEGUNDOS EN LOS QUE ATACASTE, y fallar es atacar.
+     *
+     * `hitSeconds` sólo cuenta los segundos en que hiciste daño, y con eso se
+     * medía el «tiempo sin pegar». Medido sobre el registro: de los 15.156
+     * segundos en que atacaste, 4.798 —el 31,7%— fueron sólo fallos, y todos
+     * ellos contaban como tiempo parado. Estabas pegando; no entró.
+     */
+    this.swingSeconds = new Set();
+  }
+
+  /**
+   * TU CADENCIA, deducida de tus propios huecos entre ataques.
+   *
+   * Por qué hace falta: el registro sella al segundo y tu arma no golpea cada
+   * segundo, así que una pelea con uptime perfecto tiene la mitad de los
+   * segundos sin daño. Medido sobre el registro entero, los huecos entre
+   * segundos con ataque tuyo son 1s (34,7%), 2s (30,5%) y 3s (27,0%): el 92,2%
+   * está entre uno y tres, y a partir de cuatro se desploma al 3,9%. Hay una
+   * cadencia natural y hay un codo.
+   *
+   * Se toma el p90 de tus huecos en esta pelea: el hueco más largo que aún es
+   * tu arma. Lo que pase de ahí ya no lo explica el arma.
+   *
+   * Es una propiedad de tu equipo, no de cómo jugaste, y por eso sirve de vara:
+   * medir contra cero acusaba al arma; medir contra esto acusa a los parones.
+   */
+  cadencia() {
+    const segs = [...this.swingSeconds].sort((a, b) => a - b);
+    if (segs.length < 5) return null;          // sin muestra no se afirma un ritmo
+    const huecos = [];
+    for (let i = 1; i < segs.length; i++) {
+      const d = segs[i] - segs[i - 1];
+      if (d <= 12) huecos.push(d);             // un hueco de dos minutos no es el arma
+    }
+    if (huecos.length < 4) return null;
+    huecos.sort((a, b) => a - b);
+    const p90 = huecos[Math.min(huecos.length - 1, Math.floor(huecos.length * 0.9))];
+    // Tope: si una pelea rara da un p90 enorme, dejaría de acusar cualquier
+    // parón. Seis segundos es más del doble del p90 medido en el registro.
+    return Math.max(1, Math.min(6, p90));
+  }
+
+  /**
+   * Lo que de verdad estuviste parado: la suma de lo que cada hueco pasa de tu
+   * cadencia. Un hueco de tu tamaño no es un parón, es el arma.
+   */
+  huecoReal(desde, hasta) {
+    const cad = this.cadencia();
+    if (cad === null) return null;
+    const segs = [...this.swingSeconds].sort((a, b) => a - b);
+    let muerto = 0;
+    // La entrada y la salida cuentan igual: si llegaste tarde a la pelea o la
+    // dejaste antes de acabar, eso también fue tiempo sin atacar.
+    const puntos = [desde - cad, ...segs, hasta + 1];
+    for (let i = 1; i < puntos.length; i++) {
+      muerto += Math.max(0, puntos[i] - puntos[i - 1] - cad);
+    }
+    return Math.round(muerto);
+  }
+
+  /** El mejor tramo de `ventana` segundos seguidos, en daño por segundo. */
+  mejorRafaga(ventana = 10) {
+    if (!this.porSegundo.size) return 0;
+    if (this.rafagaN === this.hits) return this.rafagaCache;
+    const segs = [...this.porSegundo.keys()];
+    const desde = Math.min(...segs);
+    const hasta = Math.max(...segs);
+    // Una pelea más corta que la ventana no tiene ráfaga que comparar: sería
+    // el total repartido entre diez, que es otra cifra y más pequeña.
+    if (hasta - desde + 1 < ventana) { this.rafagaN = this.hits; this.rafagaCache = 0; return 0; }
+    let suma = 0;
+    for (let s = desde; s < desde + ventana; s++) suma += this.porSegundo.get(s) ?? 0;
+    let mejor = suma;
+    for (let s = desde + ventana; s <= hasta; s++) {
+      suma += (this.porSegundo.get(s) ?? 0) - (this.porSegundo.get(s - ventana) ?? 0);
+      if (suma > mejor) mejor = suma;
+    }
+    this.rafagaN = this.hits;
+    this.rafagaCache = mejor / ventana;
+    return this.rafagaCache;
   }
 
   #touch(t) {
@@ -76,7 +319,10 @@ class Combatant {
 
   addDamage(ev) {
     const amt = ev.amount;
-    this.hitSeconds.add(Math.round(ev.t));
+    const seg = Math.round(ev.t);
+    this.hitSeconds.add(seg);
+    this.porSegundo.set(seg, (this.porSegundo.get(seg) ?? 0) + amt);
+    this.swingSeconds.add(seg);
     const type = ev.damageType ?? ev.school ?? 'other';
     this.damage += amt;
     this.hits++;
@@ -92,6 +338,10 @@ class Combatant {
     const b = push(this.byAbility, ev.ability || ev.verb || ev.school || '?', amt, ev.crit);
     b.school = ev.school ?? '?';
     b.type = type;
+    // La forma sólo se cuenta por habilidad. Es donde se pregunta «¿cuánto pega
+    // esto?»; el reparto por objetivo o por escuela contesta otra cosa y no
+    // merece el recuento.
+    pushDist(b, amt, ev.crit);
     push(this.byTarget, ev.target ?? '?', amt, ev.crit);
     push(this.bySchool, ev.school ?? '?', amt, ev.crit);
     push(this.byType, type, amt, ev.crit);
@@ -101,6 +351,8 @@ class Combatant {
 
   addMissDealt(ev) {
     this.misses++;
+    // Fallar es atacar: este segundo NO es tiempo parado.
+    this.swingSeconds.add(Math.round(ev.t));
     push(this.missReasons, ev.reason ?? 'fallo', 0, false);
     this.#touch(ev.t);
   }
@@ -317,6 +569,14 @@ export class Encounter {
       dps: c.damage / inclusive,
       dpsOwn: c.damage / own,
       dpsActive: c.damage / Math.max(1, c.activeSeconds.size),
+      // Tu mejor tramo de diez segundos seguidos. Cero cuando la pelea no llega
+      // a diez, que no es «no tuviste ráfaga» sino que no cabe la pregunta.
+      rafaga10: c.mejorRafaga(10),
+      // Tu cadencia de ataque y lo que de verdad estuviste parado, medido
+      // contra ella y no contra cero. Ver `cadencia()`.
+      cadencia: c.cadencia(),
+      swingSec: c.swingSeconds.size,
+      huecoReal: c.huecoReal(this.start, this.end),
       hits: c.hits, meleeHits: c.meleeHits, misses: c.misses,
       crits: c.crits, critDamage: c.critDamage, critRate: c.critRate,
       flurries: c.flurries, ripostes: c.ripostes, healPotential: c.healPotential,
@@ -622,11 +882,33 @@ export class EncounterTracker extends EventEmitter {
       // el porcentaje de todos los demás: se aparta, que es lo que promete el
       // README, y el que lo recibe sí lo contabiliza.
       const huerfano = ev.confidence === 'none' && ev.source === 'Unknown';
+
+      // PEGARTE A TI MISMO NO ES PEGAR, y se estaba contando como tal.
+      //
+      // «You hit yourself for 62 points of unresistable damage by Cannibalize»
+      // entraba como daño HECHO por ti además de recibido: 62 puntos de tu
+      // propia vida sumando a tu DPS y al total del grupo, con Cannibalize
+      // apareciendo en tu tabla de habilidades y tú mismo en la de objetivos.
+      // Lo mismo hace «You hurt yourself for N points».
+      //
+      // Recibido sí: es vida que pierdes. Hecho no: no se lo has quitado a
+      // nadie. Y fuera del total del grupo, que es la suma de lo que le habéis
+      // hecho al enemigo.
+      //
+      // LA MARCA VIENE DEL PRONOMBRE, no de comparar nombres. Que origen y
+      // destino se llamen igual no prueba que sean el mismo: un encantado
+      // pegando a un salvaje del mismo nombre son dos bichos, y esa línea ya
+      // está contada aparte como ambigua. Comparando nombres, aquello caía aquí
+      // dentro y se descontaba un golpe que sí ocurrió.
+      const aTiMismo = ev.selfInflicted === true;
+
       if (huerfano) enc.unattributed += ev.amount;
-      else if (ev.source) this.#deQuien(enc, ev, true).addDamage(ev);
+      else if (ev.source && !aTiMismo) this.#deQuien(enc, ev, true).addDamage(ev);
       if (ev.target) this.#deQuien(enc, ev, false).addTaken(ev);
-      if (!huerfano) enc.tick(ev.t, 'dmg', ev.amount);
-      if (ev.source === this.self) enc.tick(ev.t, 'mine', ev.amount);
+      if (!huerfano && !aTiMismo) enc.tick(ev.t, 'dmg', ev.amount);
+      // `mine` es la línea de TU daño en la gráfica: la autolesión tampoco
+      // pinta ahí, por lo mismo.
+      if (ev.source === this.self && !aTiMismo) enc.tick(ev.t, 'mine', ev.amount);
       if (ev.target === this.self) {
         // Bruto y separado por escuela: sin esto no se puede juzgar la
         // postura tramo a tramo, sólo la media de toda la pelea.

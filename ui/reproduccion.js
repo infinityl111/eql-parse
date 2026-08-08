@@ -1,0 +1,712 @@
+/**
+ * La reproducción de una pelea.
+ *
+ * QUÉ ES: los sucesos del registro, en su orden, sobre las figuras de quienes
+ * pelearon. No es una animación inventada sobre unas cifras: cada número que
+ * sale flotando es una línea del registro releída para esto.
+ *
+ * LAS DOS REGLAS QUE LA GOBIERNAN, y las dos salen de medir el registro:
+ *
+ *   EL ORDEN ES DATO. Dentro de un segundo, las líneas están en el orden en que
+ *   pasaron —comprobado con una predicción falsable, 952 de 952—. Se respeta.
+ *
+ *   EL ESPACIADO ES PRESENTACIÓN. El registro sella al segundo y no hay nada por
+ *   debajo. Los sucesos de un mismo segundo salen A LA VEZ, escalonados en
+ *   altura y no en tiempo. Separarlos en el tiempo dibujaría un dato que no
+ *   existe, y encima el más creíble de los inventados, que es el peor.
+ *
+ * Y por eso el reloj avanza de segundo en segundo, a saltos: la forma de moverse
+ * ya dice cuál es la resolución, sin tener que leerlo en ninguna nota.
+ */
+import { t } from '../src/i18n.js';
+import { guion, agrupar } from '../src/guion.js';
+import { Parser } from '../src/parser.js';
+import { grafica, W, H, BAND } from './grafica.js';
+import { barra as barraCasteo } from '../src/casteos.js';
+import { mostrarRotulo, ocultarRotulo, visible as rotuloVisible } from './rotulo.js';
+
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const n0 = (v) => Math.round(v || 0).toLocaleString('es-ES');
+const n1 = (v) => (v || 0).toLocaleString('es-ES', { maximumFractionDigits: 1 });
+
+const TIPOS = ['magic', 'cold', 'fire', 'poison', 'disease', 'melee', 'ds', 'dot', 'spell'];
+const claseTipo = (x) => (TIPOS.includes(x) ? x : 'other');
+
+/**
+ * Las velocidades. Tres y no más: con la resolución de un segundo, entre ×2 y
+ * ×5 no hay nada que ver que no se vea en una de las dos, y cada botón de más
+ * es una decisión de más que tomar antes de mirar.
+ *
+ * Medido sobre 410 peleas: la mediana dura 1m13 y el p90 3m35. A ×5 son 15
+ * segundos y 43. La más larga del histórico, 15m45, se queda en 3m09.
+ */
+const VELOCIDADES = [1, 2, 5];
+
+/**
+ * Cuánto vive un flotante, y por qué depende de la velocidad.
+ *
+ * Sobre la misma figura y el mismo segundo caen 3 sucesos de mediana y 7 en el
+ * p90. A ×1 un segundo dura 1.000 ms y sólo hay una tanda viva: se lee. A ×5
+ * dura 200 ms, así que con una vida fija de un segundo habría cinco tandas
+ * encima —quince flotantes de mediana sobre una figura— y no se lee nada.
+ *
+ * Se ata la vida al paso para que SIEMPRE haya como mucho dos tandas vivas, a
+ * la velocidad que sea.
+ */
+const vidaFlotante = (paso) => Math.min(1000, paso * 2);
+
+/** Las siluetas. Dibujadas aquí, como las láminas: ni una imagen por la red. */
+const FIGURAS = {
+  // Humanoide de pie. La misma para todos los jugadores: la raza y la clase se
+  // dicen con letras, que es como se saben, y no dibujando doce siluetas que
+  // nadie ha medido.
+  jugador: `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="24" cy="12" r="7"/>
+      <path d="M24 19v20M24 24l-10 8M24 24l10 8M24 39l-7 15M24 39l7 15"/>
+    </g>`,
+  // Cuadrúpedo: la mascota no es un jugador y no debe parecerlo.
+  mascota: `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M12 34h20l6-6M38 28l4-4"/>
+      <circle cx="42" cy="24" r="5"/>
+      <path d="M14 34v12M20 34v12M28 34v12M32 34v12M12 34l-4-6"/>
+    </g>`,
+  // El enemigo sin retrato: masa con hombros, distinta de un jugador de un
+  // vistazo y sin fingir que sabemos qué bicho es.
+  enemigo: `<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M24 8c8 0 12 5 12 11s-4 9-12 9-12-3-12-9S16 8 24 8Z"/>
+      <path d="M12 30l-4 16h32l-4-16M18 46v8M30 46v8"/>
+      <path d="M16 17h4M28 17h4"/>
+    </g>`,
+};
+
+/**
+ * El panel de texto: qué merece salir.
+ *
+ * CON LOS UMBRALES A LA VISTA, que es la condición. Un filtro que dice «lo que
+ * destaca» no se puede discutir; uno que dice «por encima del p90 de esa
+ * habilidad» sí. Cada regla lleva su número y el pie los enseña.
+ *
+ * `pico` sale de la propia pelea y no de un valor fijo: lo que rompe el ritmo
+ * en una pelea de 15 dps no es lo mismo que en una de 300.
+ */
+function reglas(f) {
+  const p90PorHabilidad = new Map();
+  for (const r of f?.rows ?? []) {
+    for (const a of r.abilities ?? []) {
+      if (a.p90 !== undefined) p90PorHabilidad.set(`${r.name}|${a.name}`, a.p90);
+    }
+  }
+  const serie = (f?.series ?? []).map((x) => x.dmg ?? 0).filter((x) => x > 0).sort((a, b) => a - b);
+  const medianaSeg = serie.length ? serie[Math.floor(serie.length / 2)] : 0;
+  return {
+    p90PorHabilidad,
+    // Tres veces el segundo mediano. En el corpus, el segundo pico de una pelea
+    // trae 4,2 veces lo del segundo corriente, así que tres deja pasar los
+    // picos de verdad sin llenarse de ruido.
+    picoSegundo: medianaSeg * 3,
+    medianaSeg,
+    // Si la pelea es anterior a que se contara la forma del golpe, esa regla no
+    // se puede aplicar y el pie lo dice en vez de callarlo.
+    conForma: p90PorHabilidad.size > 0,
+  };
+}
+
+function destacable(x, s, reg, totalSegundo) {
+  if (x.tipo === 'muere') return { por: 'muerte', peso: 3 };
+  if (x.tipo === 'lanza') return { por: 'lanzamiento', peso: 1 };
+  if (x.tipo === 'daño') {
+    if (x.crit) return { por: 'critico', peso: 2 };
+    const p90 = reg.p90PorHabilidad.get(`${x.origen}|${x.habilidad}`);
+    if (p90 !== undefined && x.cantidad > p90) return { por: 'sobreP90', peso: 2, p90 };
+  }
+  if (x.tipo === 'estado' && (x.clase === 'stun' || x.clase === 'interrupt')) {
+    return { por: 'corte', peso: 2 };
+  }
+  if (reg.picoSegundo > 0 && totalSegundo > reg.picoSegundo) return { por: 'pico', peso: 1 };
+  return null;
+}
+
+/**
+ * Monta la reproducción entera dentro de `host`.
+ *
+ * @returns {{destruir: Function}}
+ */
+export function montarReproduccion(host, { f, self, lineas, retratos = new Map(), casteos = {},
+  onObjeto = null, onObjetoFuera = null }) {
+  const g = guion(f, lineas, Parser, self);
+  const reg = reglas(f);
+
+  // Tres bandos, como en la tabla: los tuyos, los enemigos, y los que hicieron
+  // daño pero de los que no consta que sean tuyos. Ver `guion`.
+  const porDano = (a, b) => b.danoTotal - a.danoTotal;
+  const aliados = g.actores.filter((a) => a.lado === 'aliado')
+    .sort((a, b) => (b.esTu ? 1 : 0) - (a.esTu ? 1 : 0) || porDano(a, b));
+  const enemigos = g.actores.filter((a) => a.lado === 'enemigo').sort(porDano);
+  const sinBando = g.actores.filter((a) => a.lado === 'sinBando').sort(porDano);
+
+  // ── Estado de la reproducción ──────────────────────────
+  let s = 0;                 // segundo actual
+  let corriendo = false;
+  let velocidad = 1;
+  let acumulado = 0;
+  let ultimo = 0;
+  let raf = null;
+  const medidores = new Map();   // nombre -> daño acumulado hasta `s`
+  let sobre = null;                // la figura que tiene el ratón encima
+
+  /**
+   * ARRASTRAR TIENE QUE SER INMEDIATO, y por eso esto se calcula una vez.
+   *
+   * Mientras mueves el punto, la escena cambia en cada movimiento del ratón —
+   * sesenta veces por segundo—. Dos cosas podrían no aguantar ese ritmo:
+   *
+   *   Releer el registro. No pasa: el guion se parsea UNA vez al abrir y queda
+   *   en memoria como un array indexado por segundo. Saltar es indexar.
+   *
+   *   Rehacer los medidores. Ésta sí: son acumulados, así que al saltar al
+   *   segundo 300 hay que saber cuánto llevaba cada uno EN el 300, y sumarlo
+   *   sobre la marcha era recorrer trescientos segundos en cada movimiento.
+   *   Se precalcula la suma corrida: una tabla de actores × segundos que para
+   *   una pelea de quince minutos son quince mil números. Saltar pasa a ser
+   *   una lectura.
+   */
+  const orden = new Map(g.actores.map((a, i) => [a.nombre, i]));
+  const sumaCorrida = g.actores.map(() => new Float64Array(g.duracion + 1));
+  for (let seg = 0; seg <= g.duracion; seg++) {
+    if (seg > 0) for (const col of sumaCorrida) col[seg] = col[seg - 1];
+    for (const x of g.segundos[seg] ?? []) {
+      if (x.tipo !== 'daño' || !x.origen || x.propio) continue;
+      const i = orden.get(x.origen);
+      if (i !== undefined) sumaCorrida[i][seg] += x.cantidad;
+    }
+  }
+  // Y las muertes, ordenadas: quién había caído en un segundo dado es una
+  // búsqueda sobre una lista corta, no otro recorrido.
+  const muertes = [];
+  for (let seg = 0; seg <= g.duracion; seg++) {
+    for (const x of g.segundos[seg] ?? []) if (x.tipo === 'muere') muertes.push({ s: seg, quien: x.destino });
+  }
+
+  const idDe = (n) => `fig-${String(n).replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+  // ── El escenario ───────────────────────────────────────
+  const columna = (lista, lado) => `<div class="rp-col rp-${lado}">
+    ${lista.map((a) => {
+    const retrato = lado === 'enemigo' ? retratos.get(a.nombre) : null;
+    const fig = a.mascota ? FIGURAS.mascota : (lado === 'enemigo' ? FIGURAS.enemigo : FIGURAS.jugador);
+    return `<div class="rp-act ${a.esTu ? 'yo' : ''} fuera" data-act="${esc(a.nombre)}"
+        data-desde="${a.desde ?? ''}" id="${idDe(a.nombre)}">
+        <div class="rp-fig">
+          ${retrato
+    ? `<img class="rp-retrato" src="${esc(retrato)}" alt="">`
+    : `<svg viewBox="0 0 48 60" class="rp-svg">${fig}</svg>`}
+          <div class="rp-flot"></div>
+        </div>
+        <div class="rp-nom">${esc(a.nombre)}${a.mascota ? ` <i>${esc(t('rp.pet'))}</i>` : ''}</div>
+        <div class="rp-dps"><b class="num">0</b> <span class="u">dps</span></div>
+        <!--
+          LA BARRA VA DEBAJO, no encima de la figura.
+          Estaba arriba, que es por donde suben los flotantes: el nombre del
+          hechizo y la barra quedaban tapados por un «stunned» y un «misses»
+          justo encima. Se vio en una captura, no razonándolo — los dos
+          elementos eran correctos por separado y compartían el mismo hueco.
+        -->
+        <div class="rp-cast"></div>
+        <div class="rp-botin"></div>
+      </div>`;
+  }).join('')}
+  </div>`;
+
+  /**
+   * LA LÍNEA DE TIEMPO ES LA GRÁFICA, no una barra lisa.
+   *
+   * Es la misma de la pantalla de combate, del mismo módulo, así que trae ya la
+   * forma del daño segundo a segundo, las franjas de postura y las muertes. Y
+   * aquí se le añaden los lanzamientos, que también tienen instante propio.
+   *
+   * Así la línea deja de ser tiempo y pasa a ser un mapa: arrastras hasta el
+   * pico, o hasta donde cayó alguien, en vez de buscar a ciegas.
+   *
+   * SÓLO SE MARCA LO QUE TIENE INSTANTE MEDIDO. Una marca colocada por
+   * proporción sería peor que ninguna, precisamente porque se arrastra hasta
+   * ella: prometería que allí pasó algo.
+   */
+  const gr = grafica(f, { marcas: true });
+
+  host.innerHTML = `<div class="rp">
+    <div class="rp-barra">
+      <button class="rp-play" id="rpPlay" title="${esc(t('rp.playHint'))}">▶</button>
+      <div class="rp-vel">${VELOCIDADES.map((v) => `<button class="rp-v ${v === 1 ? 'on' : ''}" data-vel="${v}">×${v}</button>`).join('')}</div>
+      <div class="rp-reloj"><b class="num" id="rpReloj">0:00</b> <span class="dim">/ ${esc(reloj(g.duracion))}</span></div>
+      <div class="rp-nota eyebrow" id="rpNota"></div>
+    </div>
+    <div class="rp-tiempo" id="rpTiempo" title="${esc(t('rp.seekHint'))}">
+      ${gr ? `${gr.band ? `<svg class="rp-band" viewBox="0 0 ${W} ${BAND}" preserveAspectRatio="none">${gr.band}</svg>` : ''}
+        <svg class="rp-graf" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${gr.svg}</svg>
+        <div class="rp-hitos">${gr.hitos.map((h) => `<i class="rp-hito ${h.clase}"
+          style="left:${(h.s / g.duracion * 100).toFixed(3)}%" title="${esc(h.texto)}"></i>`).join('')}</div>`
+    : `<div class="rp-lisa"></div>`}
+      <div class="rp-cursor" id="rpCursor"></div>
+      <button class="rp-punto" id="rpPunto" aria-label="${esc(t('rp.seekHint'))}"></button>
+    </div>
+    <div class="rp-escena">
+      ${columna(aliados, 'aliado')}
+      <div class="rp-medio"><div class="rp-vs eyebrow">${esc(t('rp.vs'))}</div></div>
+      ${columna(enemigos, 'enemigo')}
+    </div>
+    ${sinBando.length ? `<div class="rp-sinbando">
+      <div class="eyebrow">${esc(t('side.unknownAllies'))}</div>
+      <div class="hint">${esc(t('side.unknownNote'))}</div>
+      ${columna(sinBando, 'sinbando')}
+    </div>` : ''}
+    <div class="rp-texto" id="rpTexto"></div>
+    <div class="hint" id="rpReglas"></div>
+  </div>`;
+
+  const $ = (id) => host.querySelector(`#${id}`);
+  const elReloj = $('rpReloj'), elCursor = $('rpCursor'), elTexto = $('rpTexto');
+  const elPlay = $('rpPlay'), elNota = $('rpNota'), elPunto = $('rpPunto');
+
+  const elReglas = $('rpReglas');
+  elReglas.innerHTML = esc(t('rp.reglas', {
+    pico: n0(reg.picoSegundo), mediana: n0(reg.medianaSeg),
+  })) + (reg.conForma ? ` ${esc(t('rp.reglasForma'))}` : ` ${esc(t('rp.reglasSinForma'))}`);
+  /**
+   * Los umbrales también en crudo, sin formatear ni traducir.
+   *
+   * La muestra de la web se captura de aquí, y esta frase iba DENTRO del PNG:
+   * en la página española salía en inglés, porque el idioma quedaba congelado
+   * en la imagen. Ahora la muestra se recorta sin ella y la web la reescribe
+   * con el diccionario del idioma que toque — pero las cifras tienen que ser
+   * las medidas de esta pelea, no otras. Salen por aquí.
+   */
+  elReglas.dataset.pico = String(reg.picoSegundo);
+  elReglas.dataset.mediana = String(reg.medianaSeg);
+  elReglas.dataset.forma = reg.conForma ? '1' : '0';
+
+  function reloj(seg) {
+    return `${Math.floor(seg / 60)}:${String(Math.max(0, Math.round(seg % 60))).padStart(2, '0')}`;
+  }
+
+  // ── Flotantes ──────────────────────────────────────────
+  function flotar(nombre, html, clase, i) {
+    const act = host.querySelector(`#${idDe(nombre)} .rp-flot`);
+    if (!act) return;
+    const el = document.createElement('span');
+    el.className = `rp-num ${clase}`;
+    el.innerHTML = html;
+    // Escalonado en ALTURA, no en tiempo: el orden se ve, el espaciado no se
+    // inventa. Ver la cabecera del módulo.
+    el.style.setProperty('--i', String(i));
+    el.style.setProperty('--vida', `${vidaFlotante(1000 / velocidad)}ms`);
+    act.appendChild(el);
+    setTimeout(() => el.remove(), vidaFlotante(1000 / velocidad) + 60);
+  }
+
+  function pintarSegundo(seg) {
+    const crudos = g.segundos[seg] ?? [];
+    if (!crudos.length) return;
+    const total = crudos.reduce((a, x) => a + (x.tipo === 'daño' ? x.cantidad : 0), 0);
+    // Se agrupa a partir de ×2: a tiempo real la densidad es la del juego y se
+    // lee; acelerado, no. Ver `agrupar`.
+    const lista = agrupar(crudos, velocidad > 1);
+
+    let i = 0;
+    for (const x of lista) {
+      const veces = x.veces > 1 ? ` <i class="rp-x">×${x.veces}</i>` : '';
+      if (x.tipo === 'daño') {
+        const marcas = [x.crit ? t('rp.crit') : '', x.contra ? t('rp.riposte') : '',
+          x.frenesi ? t('rp.flurry') : ''].filter(Boolean).join(' ');
+        flotar(x.destino, `${n0(x.cantidad)}${veces}${marcas ? `<i class="rp-marca">${esc(marcas)}</i>` : ''}`,
+          `d-${claseTipo(x.escuela)}${x.crit ? ' crit' : ''}`, i++);
+        if (x.origen && !x.propio) {
+          medidores.set(x.origen, (medidores.get(x.origen) ?? 0) + x.cantidad);
+        }
+      } else if (x.tipo === 'evitado') {
+        flotar(x.destino, `${esc(t(`rp.miss.${x.motivo}`) || x.motivo)}${veces}`, 'evit', i++);
+      } else if (x.tipo === 'cura') {
+        flotar(x.destino, `+${n0(x.cantidad)}${veces}`, 'cura', i++);
+      } else if (x.tipo === 'muere') {
+        flotar(x.destino, esc(t('rp.dies')), 'muere', i++);
+        host.querySelector(`#${idDe(x.destino)}`)?.classList.add('caido');
+      } else if (x.tipo === 'estado') {
+        flotar(x.destino, esc(t(`rp.estado.${x.clase}`) || x.clase), 'estado', i++);
+      } else if (x.tipo === 'lanza') {
+        lanzarBarra(x);
+      }
+      // El que pega se mueve: es lo que hace que se vea quién actúa.
+      if (x.origen && x.tipo === 'daño') {
+        const el = host.querySelector(`#${idDe(x.origen)}`);
+        if (el) { el.classList.add('golpea'); setTimeout(() => el.classList.remove('golpea'), 220); }
+      }
+    }
+
+    // El panel de texto: lo que pasa el filtro, con el porqué al lado.
+    for (const x of crudos) {
+      const d = destacable(x, seg, reg, total);
+      if (!d) continue;
+      const linea = document.createElement('div');
+      linea.className = `rp-l ${d.por}`;
+      linea.innerHTML = `<span class="lt">${esc(reloj(seg))}</span>
+        <span class="lx">${esc(frase(x))}</span>
+        <span class="lp eyebrow">${esc(t(`rp.por.${d.por}`))}${
+  d.p90 !== undefined ? ` ${esc(t('rp.porP90', { n: n0(d.p90) }))}` : ''}</span>`;
+      elTexto.appendChild(linea);
+      while (elTexto.children.length > 120) elTexto.firstChild.remove();
+      elTexto.scrollTop = elTexto.scrollHeight;
+    }
+  }
+
+  /**
+   * LA BARRA DE CASTEO, con sus cuatro estados.
+   *
+   *   medido        se sabe cuánto suele tardar: barra que avanza.
+   *   se pasó       tardó más de lo suyo. La barra llega llena a lo esperado y
+   *                 SIGUE en otro color hasta donde acabó de verdad. Que un
+   *                 hechizo de 4 s tardara 9 no es un detalle: algo lo retrasó,
+   *                 y acabar tarde sin más lo escondería.
+   *   instantáneo   sale en el mismo segundo, medido sobre ocho lanzamientos o
+   *                 más. No hay barra porque no hay nada que recorrer.
+   *   sin muestra   menos de ocho lanzamientos: NO SE SABE. También sin barra,
+   *                 pero por lo contrario, y se rotula distinto — decir
+   *                 «instantáneo» de un hechizo desconocido sería inventarlo.
+   *
+   * El interrumpido corta la barra donde lo cortaron a él, que es un instante
+   * medido.
+   */
+  function lanzarBarra(x) {
+    const el = host.querySelector(`#${idDe(x.origen)}`);
+    if (!el) return;
+    el.classList.add('lanzando');
+    setTimeout(() => el.classList.remove('lanzando'), 300);
+
+    const b = barraCasteo(casteos, x.habilidad, x.duro ?? null);
+    const caja = el.querySelector('.rp-cast');
+    if (!caja) return;
+    const paso = 1000 / velocidad;
+    const roto = x.desenlace === 'interrumpido';
+    // Lo que se ve avanzar: lo que duró de verdad si consta, y si no, lo que
+    // suele durar. Nunca una duración inventada.
+    const segs = x.duro ?? b.esperado ?? 0;
+
+    if (b.estado === 'medido' && segs > 0) {
+      const pct = b.exceso > 0 ? (b.esperado / segs) * 100 : 100;
+      caja.className = `rp-cast ${roto ? 'roto' : ''} ${b.exceso > 0 ? 'pasado' : ''}`;
+      caja.innerHTML = `<span class="rp-cast-n">${esc(x.habilidad)}</span>
+        <span class="rp-cast-t"><i style="--pct:${pct.toFixed(1)}%;--dur:${segs * paso}ms"></i></span>`;
+      caja.title = b.exceso > 0
+        ? t('rp.cast.pasado', { que: x.habilidad, esp: b.esperado, real: segs, n: b.n })
+        : t('rp.cast.medido', { que: x.habilidad, esp: b.esperado, n: b.n });
+    } else {
+      caja.className = `rp-cast sinbarra ${b.estado === 'instantaneo' ? 'ya' : 'nose'}`;
+      caja.innerHTML = `<span class="rp-cast-n">${esc(x.habilidad)}</span>
+        <span class="rp-cast-m">${esc(t(b.estado === 'instantaneo' ? 'rp.cast.ya' : 'rp.cast.nose'))}</span>`;
+      caja.title = b.estado === 'instantaneo'
+        ? t('rp.cast.yaNota', { n: b.n }) : t('rp.cast.noseNota', { n: b.n });
+    }
+    clearTimeout(caja._t);
+    caja._t = setTimeout(() => { caja.className = 'rp-cast'; caja.innerHTML = ''; },
+      Math.max(600, segs * paso + 400));
+  }
+
+  /**
+   * EL RESUMEN DE UN COMBATIENTE, HASTA EL SEGUNDO EN EL QUE ESTÁS.
+   *
+   * Es la misma caja que el rótulo de la tabla de combate, y a propósito NO el
+   * mismo contenido: allí describe una pelea cerrada y son sus totales; aquí
+   * describe lo que se lleva. Enseñar el total final mientras el reloj va por
+   * el segundo diez contaría el desenlace antes de tiempo, y encima
+   * contradiría al medidor de debajo de la figura, que sí es acumulado.
+   *
+   * Se recorre el guion hasta `s` en el momento de pedirlo. Son unos miles de
+   * sucesos en la pelea más larga del histórico: se nota menos que el retardo
+   * de aparecer.
+   */
+  function resumenHasta(nombre, hasta) {
+    const r = {
+      dano: 0, recibido: 0, curado: 0, curaRecibida: 0,
+      golpes: 0, fallos: 0, crits: 0, max: 0,
+      porTipo: new Map(), porHabilidad: new Map(), caido: false,
+    };
+    for (let i = 0; i <= hasta; i++) {
+      for (const x of g.segundos[i] ?? []) {
+        if (x.tipo === 'daño') {
+          if (x.origen === nombre && !x.propio) {
+            r.dano += x.cantidad; r.golpes++;
+            if (x.crit) r.crits++;
+            if (x.cantidad > r.max) r.max = x.cantidad;
+            const ty = claseTipo(x.escuela);
+            r.porTipo.set(ty, (r.porTipo.get(ty) ?? 0) + x.cantidad);
+            const h = x.habilidad ?? x.escuela;
+            r.porHabilidad.set(h, (r.porHabilidad.get(h) ?? 0) + x.cantidad);
+          }
+          if (x.destino === nombre) r.recibido += x.cantidad;
+        } else if (x.tipo === 'evitado') {
+          if (x.origen === nombre) r.fallos++;
+        } else if (x.tipo === 'cura') {
+          if (x.origen === nombre) r.curado += x.cantidad;
+          if (x.destino === nombre) r.curaRecibida += x.cantidad;
+        } else if (x.tipo === 'muere' && x.destino === nombre) r.caido = true;
+      }
+    }
+    return r;
+  }
+
+  function pintarRotulo(nombre) {
+    const a = g.actores.find((x) => x.nombre === nombre);
+    if (!a) return;
+    const r = resumenHasta(nombre, s);
+    const seg = Math.max(1, s);
+    const intentos = r.golpes + r.fallos;
+    const fila = (k, v) => `<span class="eyebrow">${esc(k)}</span><b class="num">${v}</b>`;
+    const total = r.dano || 1;
+    mostrarRotulo(`<div class="tip-head">${esc(nombre)}${
+      r.caido ? ` <i class="dim">${esc(t('rp.dies'))}</i>` : ''}</div>
+      <div class="tip-grid">
+        ${fila('dps', n1(r.dano / seg))}
+        ${fila(t('det.dmg'), n0(r.dano))}
+        ${intentos ? fila(t('row.accuracy'), `${Math.round((r.golpes / intentos) * 100)}% · ${r.golpes}/${intentos}`) : ''}
+        ${r.crits ? fila(t('row.crits'), r.crits) : ''}
+        ${r.max ? fila(t('row.max'), n0(r.max)) : ''}
+        ${r.recibido ? fila(t('row.taken'), n0(r.recibido)) : ''}
+        ${r.curado ? fila(t('det.healDone'), n0(r.curado)) : ''}
+        ${r.curaRecibida ? fila(t('det.healTaken'), n0(r.curaRecibida)) : ''}
+      </div>
+      ${r.porTipo.size ? `<div class="tip-types">${[...r.porTipo].sort((x, y) => y[1] - x[1])
+        .map(([ty, v]) => `<div class="tip-type"><i class="seg ${ty}"></i><span>${esc(ty)}</span>
+          <b class="num">${n0(v)}</b><span class="num dim">${Math.round((v / total) * 100)}%</span></div>`).join('')}</div>` : ''}
+      ${r.porHabilidad.size ? `<div class="tip-abils">${[...r.porHabilidad].sort((x, y) => y[1] - x[1]).slice(0, 4)
+        .map(([h, v]) => `<div class="tip-type"><span>${esc(h)}</span><b class="num">${n0(v)}</b></div>`).join('')}</div>` : ''}
+      <div class="tip-foot eyebrow">${esc(t('rp.tipFoot', { t: reloj(s) }))}</div>`);
+  }
+
+  function frase(x) {
+    if (x.tipo === 'muere') return t('rp.f.muere', { quien: x.destino, por: x.origen ?? '—' });
+    if (x.tipo === 'lanza') return t('rp.f.lanza', { quien: x.origen, que: x.habilidad });
+    if (x.tipo === 'daño') {
+      return t('rp.f.dano', { quien: x.origen ?? '—', a: x.destino ?? '—',
+        n: n0(x.cantidad), que: x.habilidad ?? x.escuela });
+    }
+    if (x.tipo === 'estado') return t('rp.f.estado', { quien: x.destino, que: t(`rp.estado.${x.clase}`) });
+    return '';
+  }
+
+  function pintarMedidores() {
+    const transcurrido = Math.max(1, s);
+    for (const a of g.actores) {
+      const el = host.querySelector(`#${idDe(a.nombre)} .rp-dps b`);
+      if (el) el.textContent = n0((medidores.get(a.nombre) ?? 0) / transcurrido);
+    }
+  }
+
+  /**
+   * Quién está en el escenario ahora mismo.
+   *
+   * Se recalcula en cada segundo y en cada salto, no sólo al entrar: al
+   * arrastrar hacia atrás el que llegó tarde tiene que volver a irse, o la
+   * reproducción enseñaría el reparto del final sobre el principio.
+   */
+  /**
+   * EL BOTÍN, DEBAJO DE QUIEN LO SOLTÓ.
+   *
+   * Y CADA OBJETO EN SU SEGUNDO, no todos de golpe al morir. El registro sella
+   * cada línea de botín por su cuenta: en la pelea de referencia el bicho cae
+   * en el 67 y sus dos objetos se recogen en el 67 y el 69, y el del segundo
+   * enemigo en el 78 cuando cayó en el 77. Sacarlos todos en el instante de la
+   * muerte sería juntar tres instantes medidos en uno inventado.
+   *
+   * Se quedan puestos a partir de ahí: un objeto recogido no se descoge.
+   */
+  const botin = (f?.loot ?? []).filter((l) => l && l.from && l.item);
+  function pintarBotin() {
+    const porQuien = new Map();
+    for (const l of botin) {
+      if ((l.t ?? 0) > s) continue;
+      if (!porQuien.has(l.from)) porQuien.set(l.from, []);
+      porQuien.get(l.from).push(l);
+    }
+    for (const el of host.querySelectorAll('.rp-act')) {
+      const caja = el.querySelector('.rp-botin');
+      if (!caja) continue;
+      const lista = porQuien.get(el.dataset.act) ?? [];
+      const firma = lista.map((l) => `${l.item}×${l.qty ?? 1}`).join('|');
+      if (caja.dataset.sig === firma) continue;
+      caja.dataset.sig = firma;
+      caja.innerHTML = lista.map((l) => `<i class="rp-obj" data-obj="${esc(l.item)}"
+        >${esc(l.item)}${(l.qty ?? 1) > 1 ? ` ×${l.qty}` : ''}</i>`).join('');
+    }
+  }
+
+  function pintarPresentes() {
+    for (const el of host.querySelectorAll('.rp-act')) {
+      const d = el.dataset.desde;
+      // Sin instante de entrada no llegó a aparecer en el registro: nunca sale.
+      const dentro = d !== '' && d !== undefined && Number(d) <= s;
+      // El que entra justo ahora se anuncia con su llegada; el que ya estaba,
+      // no. Sin esto, saltar hacia adelante haría «entrar» a todos otra vez.
+      if (dentro && el.classList.contains('fuera') && Number(d) === s) {
+        el.classList.add('entra');
+        setTimeout(() => el.classList.remove('entra'), 400);
+      }
+      el.classList.toggle('fuera', !dentro);
+    }
+  }
+
+  function pintarReloj() {
+    elReloj.textContent = reloj(s);
+    const pct = `${(s / g.duracion * 100).toFixed(3)}%`;
+    elCursor.style.left = pct;
+    elPunto.style.left = pct;    // el punto se mueve solo mientras reproduce
+    pintarPresentes();
+    pintarBotin();
+    pintarMedidores();
+    if (sobre && rotuloVisible()) pintarRotulo(sobre);
+  }
+
+  // ── El bucle ───────────────────────────────────────────
+  function tic(ahora) {
+    if (!corriendo) return;
+    const paso = 1000 / velocidad;
+    acumulado += ahora - ultimo;
+    ultimo = ahora;
+    // Con la pestaña en segundo plano el navegador para el rAF y al volver
+    // llegaría un salto enorme: se limita a tres pasos por cuadro.
+    let n = 0;
+    while (acumulado >= paso && n < 3) {
+      acumulado -= paso; n++;
+      if (s >= g.duracion) { parar(); pintarReloj(); return; }
+      s++;
+      pintarSegundo(s);
+    }
+    if (n) pintarReloj();
+    raf = requestAnimationFrame(tic);
+  }
+
+  function arrancar() {
+    if (corriendo) return;
+    if (s >= g.duracion) irA(0);
+    corriendo = true;
+    ultimo = performance.now();
+    acumulado = 0;
+    elPlay.textContent = '⏸';
+    raf = requestAnimationFrame(tic);
+  }
+  function parar() {
+    corriendo = false;
+    elPlay.textContent = '▶';
+    if (raf) cancelAnimationFrame(raf);
+    raf = null;
+  }
+
+  /**
+   * Saltar a un segundo.
+   *
+   * Los medidores se recalculan desde el principio hasta ahí: son acumulados, y
+   * saltar sin rehacerlos enseñaría el dps de otro momento. Es una suma sobre
+   * unos cientos de sucesos, así que se hace y no se aproxima.
+   */
+  function irA(seg) {
+    const antes = s;
+    s = Math.max(0, Math.min(g.duracion, Math.round(seg)));
+    if (s === antes) return;
+    // Lectura de la suma corrida, no un recorrido: ver `sumaCorrida`.
+    medidores.clear();
+    for (const [nombre, i] of orden) medidores.set(nombre, sumaCorrida[i][s]);
+    // Quién había caído ya, para no enseñar de pie a un muerto.
+    host.querySelectorAll('.rp-act.caido').forEach((el) => el.classList.remove('caido'));
+    for (const m of muertes) {
+      if (m.s > s) break;
+      host.querySelector(`#${idDe(m.quien)}`)?.classList.add('caido');
+    }
+    // Los flotantes de donde estabas no valen para donde vas.
+    host.querySelectorAll('.rp-num').forEach((el) => el.remove());
+    elTexto.innerHTML = '';
+    pintarReloj();
+  }
+
+  // ── Controles ──────────────────────────────────────────
+  // El resumen al pasar por encima, y se actualiza solo mientras corre: es lo
+  // que se lleva HASTA AHORA, así que quedarse quieto sería mentir a los dos
+  // segundos.
+  host.querySelectorAll('.rp-act').forEach((el) => {
+    el.addEventListener('mouseenter', () => { sobre = el.dataset.act; pintarRotulo(sobre); });
+    el.addEventListener('mouseleave', () => { sobre = null; ocultarRotulo(); });
+  });
+
+  // La ficha del objeto es la misma que en la lista de botín de la pelea: se
+  // pide hacia fuera en vez de traerse aquí el cliente de la wiki, que ya vive
+  // en la pantalla principal. Delegado porque la caja del escenario se repinta.
+  host.addEventListener('mouseover', (e) => {
+    const o = e.target.closest?.('.rp-obj');
+    if (o) onObjeto?.(o.dataset.obj);
+  });
+  host.addEventListener('mouseout', (e) => {
+    if (e.target.closest?.('.rp-obj')) onObjetoFuera?.();
+  });
+
+  elPlay.addEventListener('click', () => (corriendo ? parar() : arrancar()));
+  host.querySelectorAll('.rp-v').forEach((b) => b.addEventListener('click', () => {
+    velocidad = +b.dataset.vel;
+    host.querySelectorAll('.rp-v').forEach((x) => x.classList.toggle('on', x === b));
+    elNota.textContent = velocidad > 1 ? t('rp.agrupado') : '';
+  }));
+
+  /**
+   * EL PUNTO: se arrastra y la escena va cambiando mientras se mueve.
+   *
+   * Tres cosas que lo hacen comportarse como un reproductor y no como un
+   * formulario:
+   *
+   *   Mientras arrastras, cada movimiento coloca la escena en ESE segundo. No
+   *   se espera a soltar. Es una lectura, así que aguanta el ritmo del ratón —
+   *   ver `sumaCorrida`.
+   *
+   *   Al empezar a arrastrar se PAUSA, y al soltar sigue desde donde lo dejaste
+   *   si estaba corriendo. Reanudar desde el principio sería castigar el gesto
+   *   de mirar.
+   *
+   *   Y el punto se mueve solo mientras reproduce: es dónde estás.
+   */
+  const barra = $('rpTiempo');
+  let veniaCorriendo = false;
+  const desdeRaton = (e) => {
+    const r = barra.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    irA(frac * g.duracion);
+  };
+  const empezar = (e) => {
+    e.preventDefault();
+    barra.setPointerCapture?.(e.pointerId);
+    barra.dataset.arrastrando = '1';
+    veniaCorriendo = corriendo;
+    if (corriendo) parar();
+    desdeRaton(e);
+  };
+  barra.addEventListener('pointerdown', empezar);
+  barra.addEventListener('pointermove', (e) => { if (barra.dataset.arrastrando) desdeRaton(e); });
+  const soltar = (e) => {
+    if (!barra.dataset.arrastrando) return;
+    delete barra.dataset.arrastrando;
+    barra.releasePointerCapture?.(e.pointerId);
+    // Desde donde lo dejaste, no desde el principio.
+    if (veniaCorriendo) arrancar();
+    veniaCorriendo = false;
+  };
+  barra.addEventListener('pointerup', soltar);
+  barra.addEventListener('pointercancel', soltar);
+
+  // Espacio para pausar: es lo que espera cualquiera que haya visto un vídeo.
+  const teclas = (e) => {
+    if (e.code === 'Space') { e.preventDefault(); corriendo ? parar() : arrancar(); }
+    else if (e.code === 'ArrowRight') irA(s + 1);
+    else if (e.code === 'ArrowLeft') irA(s - 1);
+  };
+  document.addEventListener('keydown', teclas);
+
+  pintarReloj();
+  return {
+    destruir() { parar(); ocultarRotulo(); document.removeEventListener('keydown', teclas); },
+    guion: g,
+  };
+}

@@ -1,0 +1,129 @@
+/**
+ * La web, con la paleta de la aplicación.
+ *
+ * Los mismos colores y las mismas familias que la interfaz: quien llega desde
+ * la web y abre el programa tiene que reconocerlo. Y se adapta al tema del
+ * sistema, como la aplicación.
+ */
+:root {
+  --slate-900: #12161E; --slate-850: #161B25; --slate-800: #1A202B;
+  --slate-700: #232A38; --slate-600: #2E3746;
+  --bone: #E6DCC6; --bone-dim: #96A0B0; --bone-faint: #5D6879;
+  --cold: #6FC7D8; --fire: #E08A4B;
+  --display: 'Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  --mono: 'Cascadia Mono', 'Consolas', monospace;
+  --fondo: var(--slate-900); --panel: var(--slate-850);
+  --texto: var(--bone); --tenue: var(--bone-dim); --linea: var(--slate-700);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --fondo: #F8F5EF; --panel: #FFFDF8;
+    --texto: #2A2620; --tenue: #6B6558; --linea: #E2DCCE;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--texto);
+  font: 16px/1.65 'Segoe UI', system-ui, sans-serif;
+}
+a { color: var(--cold); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Cabecera ─────────────────────────────────────────── */
+.top {
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+  padding: 14px 24px; border-bottom: 1px solid var(--linea); background: var(--panel);
+  position: sticky; top: 0; z-index: 10;
+}
+.marca {
+  font-family: var(--display); font-weight: 700; font-size: 18px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--texto);
+}
+.marca span { color: var(--cold); margin: 0 2px; }
+.top nav { display: flex; gap: 18px; flex-wrap: wrap; }
+.top nav a { color: var(--tenue); font-size: 14px; }
+.top nav a.on { color: var(--texto); border-bottom: 2px solid var(--cold); }
+.idiomas { margin-left: auto; display: flex; gap: 4px; }
+.idiomas a {
+  font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+  color: var(--bone-faint); padding: 3px 6px; border: 1px solid transparent; border-radius: 2px;
+}
+.idiomas a.on { color: var(--cold); border-color: var(--cold); }
+
+/* ── Cuerpo ───────────────────────────────────────────── */
+main { max-width: 980px; margin: 0 auto; padding: 0 24px 64px; }
+section { margin: 48px 0; }
+h1 { font-family: var(--display); font-size: 40px; line-height: 1.15; margin: 0 0 12px; letter-spacing: .01em; }
+h2 { font-family: var(--display); font-size: 24px; margin: 0 0 10px; letter-spacing: .02em; }
+h3 { font-family: var(--display); font-size: 16px; margin: 0 0 6px; letter-spacing: .03em; }
+.ancho { max-width: 68ch; color: var(--tenue); }
+
+.hero { margin: 64px 0 40px; }
+.hero .sub { font-size: 19px; color: var(--tenue); max-width: 60ch; margin: 0 0 24px; }
+.gratis { font-size: 13px; color: var(--bone-faint); margin-top: 12px; }
+
+.boton {
+  display: inline-block; background: var(--cold); color: var(--slate-900);
+  font-family: var(--display); font-size: 15px; letter-spacing: .06em; text-transform: uppercase;
+  font-weight: 700; padding: 13px 24px; border-radius: 3px;
+}
+.boton:hover { filter: brightness(1.1); text-decoration: none; }
+.boton .mb { font-family: var(--mono); font-size: 12px; opacity: .75; text-transform: none; }
+
+.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.tarjeta { background: var(--panel); border: 1px solid var(--linea); border-left: 2px solid var(--cold);
+  border-radius: 3px; padding: 16px 18px; }
+.tarjeta p { margin: 0; color: var(--tenue); font-size: 14px; }
+
+.capturas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+figure { margin: 0; }
+figure img { width: 100%; border: 1px solid var(--linea); border-radius: 3px; display: block; }
+/*
+ * Todas a la misma forma. Sin esto la rejilla la manda la más alta —el combate
+ * mide 1500×1749— y su celda estira la fila entera dejando un hueco enorme al
+ * lado. Se recorta por abajo y no por el centro: lo que identifica una pantalla
+ * está arriba.
+ */
+.capturas figure img { aspect-ratio: 16 / 10; object-fit: cover; object-position: top center; }
+.capturas figure a { display: block; }
+.capturas figure a:hover img { border-color: var(--cold); }
+figcaption { font-size: 13px; color: var(--bone-faint); margin-top: 6px; }
+.muestra { width: 100%; max-width: 900px; border: 1px solid var(--linea); border-radius: 3px; }
+/*
+ * La prueba de la cabecera. Va pegada al titular —margen de arriba corto— para
+ * que entre en la primera pantalla: si hay que bajar para verla, no prueba nada.
+ */
+.prueba { margin: 24px 0 40px; }
+.prueba img { width: 100%; max-width: 900px; display: block;
+  border: 1px solid var(--linea); border-left: 2px solid var(--cold); border-radius: 3px; }
+/* Los umbrales de la muestra: iban dentro del PNG y ahora son texto. */
+.pieMuestra { max-width: 900px; margin: 8px 0 0; font-size: 13px;
+  line-height: 1.55; color: var(--bone-faint); }
+
+.pasos { max-width: 68ch; color: var(--tenue); padding-left: 20px; }
+.pasos li { margin-bottom: 12px; }
+.aviso { max-width: 68ch; background: var(--panel); border-left: 2px solid var(--fire);
+  padding: 12px 16px; color: var(--tenue); }
+
+.version { border-top: 1px solid var(--linea); padding-top: 24px; margin-top: 32px; }
+.version .fecha { font-family: var(--mono); font-size: 12px; color: var(--bone-faint); margin-bottom: 10px; }
+.notas { max-width: 72ch; color: var(--tenue); }
+.notas code { font-family: var(--mono); font-size: 13px; background: var(--panel);
+  padding: 1px 5px; border-radius: 2px; }
+.notas strong { color: var(--texto); }
+/* Una insignia suelta en una nota no debe desbordar la columna. */
+.notas img { max-width: 100%; vertical-align: middle; }
+.bloque { border-top: 1px solid var(--linea); padding-top: 28px; }
+
+footer {
+  border-top: 1px solid var(--linea); padding: 24px; display: flex; gap: 18px;
+  flex-wrap: wrap; align-items: center; color: var(--bone-faint); font-size: 13px;
+  max-width: 980px; margin: 0 auto;
+}
+footer .ver { margin-left: auto; font-family: var(--mono); }
+
+@media (max-width: 620px) {
+  h1 { font-size: 30px; }
+  .idiomas { margin-left: 0; width: 100%; }
+}

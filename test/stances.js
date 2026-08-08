@@ -17,7 +17,8 @@
  * números: cualquier postura futura que repita la confusión falla aquí, aunque
  * nadie se acuerde de por qué existe este fichero.
  */
-import { STANCES, INVOCATIONS, mitigationFor, CLASSES } from '../src/stances.js';
+import { STANCES, INVOCATIONS, mitigationFor, CLASSES, availableFor } from '../src/stances.js';
+import { liveAdvice } from '../src/advisor.js';
 
 let failed = 0;
 const ok = (cond, label, extra = '') => {
@@ -129,6 +130,88 @@ for (const [key, iv] of Object.entries(INVOCATIONS)) {
   ok(Array.isArray(iv.classes) && iv.classes.every((c) => CLASSES.includes(c)),
     `${key}: todas sus clases existen`);
   ok(Array.isArray(iv.good) && iv.good.length > 0, `${key}: declara para qué sirve`);
+}
+
+/**
+ * LA POSTURA QUE LLEVAS PUESTA ESTÁ DISPONIBLE, POR DEFINICIÓN.
+ *
+ * El consejo de postura salía de `availableFor(clases)`, y las clases muchas
+ * veces se deducen. Cuando se deducían mal o no se deducían, pasaba lo peor que
+ * puede pasar con un aviso: no salía ninguno, y sin decir por qué.
+ *
+ * Caso real, seis peleas contra Eye of Veeshan. En esa sesión el registro había
+ * visto Channeler, Defensive, Mage Hunter, Offensive y Berserker. Con Berserker
+ * de por medio, `inferClasses` no encuentra un trío único y se queda con lo
+ * común a todos los candidatos: BER a secas. Y BER no tiene ni Defensive ni
+ * Channeler, así que la lista de posturas a comparar traía Balanced y Mage
+ * Hunter, la postura que llevabas puesta ni siquiera estaba en ella —y
+ * `suggest` exige encontrarla para poder comparar—, y el aviso no salió nunca.
+ *
+ * Con el reparto de esas peleas —dos tercios del daño no era melé— Channeler
+ * evitaba un 9,5% más del daño total que Defensive: por encima del umbral del
+ * 8%, o sea justo el aviso que tenía que haber salido.
+ */
+console.log('\nlo que se te ha visto usar, lo tienes');
+{
+  // Ni una sola clase: es el caso de «no se ha podido deducir nada».
+  const vacio = availableFor([]);
+  ok(vacio.stances.length === 0, 'sin clases y sin nada visto, no hay nada que comparar');
+
+  const visto = availableFor([], ['a channeler stance', 'defensive']);
+  const claves = visto.stances.map((s) => s.key).sort();
+  ok(claves.join(',') === 'channeler,defensive',
+    'pero lo visto en el registro entra aunque no haya clases', claves.join(','));
+
+  // El caso exacto del fallo: la deducción se queda en BER y la postura que
+  // llevabas puesta no está en su lista.
+  const ber = availableFor(['BER']);
+  ok(!ber.stances.some((s) => s.key === 'channeler'),
+    'BER por sí sola no trae Channeler: así se quedaba fuera la que usabas');
+  const berVisto = availableFor(['BER'], ['channeler', 'defensive']);
+  ok(berVisto.stances.some((s) => s.key === 'channeler')
+    && berVisto.stances.some((s) => s.key === 'defensive'),
+    'con lo visto, las dos vuelven a la comparación');
+  ok(berVisto.stances.some((s) => s.key === 'berserker'),
+    'y lo que aportan las clases no se pierde: se suma');
+
+  // Y no se cuela cualquier cosa: sólo lo que existe.
+  ok(!availableFor([], ['una postura inventada']).stances.length,
+    'un nombre que no es una postura no crea ninguna');
+}
+
+/**
+ * Y la consecuencia medible: con la postura en la lista, el consejo compara y
+ * avisa. Con el reparto real de aquellas peleas —12.300 no melé y 6.662 melé—
+ * Channeler evita más que Defensive, que es lo contrario de lo que pasa cuando
+ * casi todo el daño es físico.
+ */
+console.log('\nel aviso que no salía');
+{
+  const win = { melee: 6662, spell: 12300, total: 18962, observed: 18962,
+    seconds: 20, hits: 60, landedMelee: 40, meleeSwings: 60 };
+
+  const sinVer = liveAdvice(win, { classes: ['BER'], stance: 'defensive' });
+  ok(!sinVer || !sinVer.suggest,
+    'antes: con las clases mal deducidas no se sugería nada');
+
+  const conVer = liveAdvice(win, { classes: ['BER'], stance: 'defensive',
+    seenStances: ['defensive', 'channeler'] });
+  ok(!!conVer, 'ahora hay consejo');
+  ok(conVer.bestKey === 'channeler',
+    'y la mejor con este reparto es Channeler, no Defensive', conVer.bestKey);
+  ok(conVer.suggest === true, 'y se sugiere: la mejora pasa del umbral',
+    `${Math.round(conVer.worth * 100)}%`);
+
+  // La otra mitad: con el daño casi todo melé, Defensive gana y no se sugiere
+  // cambiar. Si esto se cayera, el consejo estaría empujando a Channeler
+  // siempre, que es un fallo tan malo como no avisar.
+  const fisico = { melee: 17000, spell: 1900, total: 18900, observed: 18900,
+    seconds: 20, hits: 60, landedMelee: 40, meleeSwings: 60 };
+  const conFisico = liveAdvice(fisico, { classes: ['BER'], stance: 'defensive',
+    seenStances: ['defensive', 'channeler'] });
+  ok(conFisico.bestKey === 'defensive',
+    'con casi todo melé, Defensive sigue siendo la mejor', conFisico.bestKey);
+  ok(conFisico.suggest === false, 'y no se sugiere cambiar de la que ya llevas');
 }
 
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');

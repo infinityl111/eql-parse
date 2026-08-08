@@ -115,8 +115,11 @@ function stanceAt(f, sec) {
   return cur;
 }
 
-function bestStanceFor(melee, spell, classes) {
-  const { stances } = availableFor(classes ?? []);
+function bestStanceFor(melee, spell, classes, vistas = []) {
+  // Las posturas de esta misma pelea cuentan como disponibles: las llevabas
+  // puestas. Ver `availableFor` — sin ellas, unas clases mal deducidas dejan
+  // fuera de la comparación la postura que de verdad usaste.
+  const { stances } = availableFor(classes ?? [], vistas);
   const usable = stances.filter((s) => s.mit.melee || s.mit.spell);
   if (!usable.length || (melee + spell) <= 0) return null;
   return usable.map((s) => ({
@@ -154,24 +157,45 @@ export function analyse(f, ctx = {}) {
   const ph = phases(f, series);
 
   // ── 1. Tiempo muerto ───────────────────────────────
-  // El hueco sin pegar es la pérdida más grande y la más fácil de corregir.
-  if (mine && f.duration >= 20) {
-    // `duration` ya es la convención inclusiva (último - primero + 1), así que
-    // sumarle otro uno contaba un segundo parado de más en todas las peleas:
-    // con uptime perfecto salía «1 segundo sin pegar».
-    const idle = Math.max(0, f.duration - (mine.hitSec ?? mine.activeSec));
+  //
+  // ESTE HALLAZGO ACUSABA AL ARMA. Contaba como parado todo segundo sin daño
+  // tuyo, y eso son dos cosas que no son un parón:
+  //
+  //   · los segundos en que atacaste y FALLASTE. Medido sobre el registro:
+  //     4.798 de los 15.156 segundos con ataque tuyo, el 31,7%.
+  //   · los huecos que pone tu arma. Tus huecos entre ataques son 1s (34,7%),
+  //     2s (30,5%) y 3s (27,0%): con una cadencia así, media pelea no tiene
+  //     daño por construcción.
+  //
+  // El resultado era un aviso que no avisaba de nada: sobre 357 peleas de 20 s
+  // o más, saltaba en el 98,9% y en rojo en el 82,4%, con una mediana del 42%
+  // «sin pegar». Un aviso que sale siempre es ruido con forma de aviso.
+  //
+  // Ahora se mide contra TU cadencia —el p90 de tus propios huecos en esta
+  // pelea— y sólo cuenta lo que cada hueco pasa de ella. Lo que queda sí es
+  // algo que hiciste: correr, morir, mirar el inventario, no tener objetivo.
+  //
+  // Las peleas viejas no traen la cadencia. No se aproxima con lo anterior: se
+  // callan, que es lo que se sabe de ellas hasta reconstruir.
+  if (mine && f.duration >= 20 && mine.cadencia && mine.huecoReal !== null
+      && mine.huecoReal !== undefined) {
+    const idle = mine.huecoReal;
     const share = idle / f.duration;
-    if (share > 0.15) {
-      const lost = Math.round(idle * (mine.damage / Math.max(1, mine.hitSec ?? mine.activeSec)));
+    // Diez segundos de parón real, o un quinto de la pelea. Con la vara buena
+    // el umbral puede ser más exigente: ya no acusa a nadie por su arma.
+    if (share > 0.20 && idle >= 10) {
+      const activos = Math.max(1, mine.swingSec ?? mine.hitSec ?? mine.activeSec);
+      const lost = Math.round(idle * (mine.damage / activos) / mine.cadencia);
       add({
-        id: 'downtime', level: share > 0.3 ? 'bad' : 'warn',
+        id: 'downtime', level: share > 0.35 ? 'bad' : 'warn',
+        accion: 'tuya',
         title: t('an.downtime'),
-        detail: t('an.downtimeDetail', { s: idle, pct: Math.round(share * 100) }),
+        detail: t('an.downtimeDetail', { s: idle, pct: Math.round(share * 100), cad: mine.cadencia }),
         impact: t('an.downtimeImpact', { n: lost.toLocaleString('es-ES') }),
       });
     } else {
-      add({ id: 'uptime', level: 'good', title: t('an.uptime'),
-        detail: t('an.uptimeDetail', { pct: Math.round((1 - share) * 100) }) });
+      add({ id: 'uptime', level: 'good', accion: 'tuya', title: t('an.uptime'),
+        detail: t('an.uptimeDetail', { pct: Math.round((1 - share) * 100), cad: mine.cadencia }) });
     }
   }
 
@@ -181,7 +205,8 @@ export function analyse(f, ctx = {}) {
     const bad = [];
     for (const p of ph) {
       if (p.meleeShare === null || (p.rawMelee + p.rawSpell) < 200) continue;
-      const best = bestStanceFor(p.rawMelee, p.rawSpell, classes);
+      const best = bestStanceFor(p.rawMelee, p.rawSpell, classes,
+        (f.stanceSpans ?? []).map((x) => x.stance));
       const had = normStance(stanceAt(f, p.from));
       if (!best) continue;
       const hadMit = STANCES[had];
@@ -194,14 +219,14 @@ export function analyse(f, ctx = {}) {
     }
     if (bad.length) {
       add({
-        id: 'stance', level: wasted > (mine?.taken ?? 0) * 0.15 ? 'bad' : 'warn',
+        id: 'stance', accion: 'tuya', level: wasted > (mine?.taken ?? 0) * 0.15 ? 'bad' : 'warn',
         title: t('an.stance'),
         detail: bad.slice(0, 3).map((b) =>
           t('an.stanceWindow', { from: b.from, to: b.to, had: b.had, best: b.best, n: b.gain })).join(' '),
         impact: t('an.stanceImpact', { n: Math.round(wasted).toLocaleString('es-ES') }),
       });
     } else if (ph.length) {
-      add({ id: 'stanceOk', level: 'good', title: t('an.stanceOk'), detail: t('an.stanceOkDetail') });
+      add({ id: 'stanceOk', accion: 'tuya', level: 'good', title: t('an.stanceOk'), detail: t('an.stanceOkDetail') });
     }
   }
 
@@ -218,7 +243,7 @@ export function analyse(f, ctx = {}) {
       const meleeDmg = (mine.schools ?? []).find((s) => s.name === 'melee')?.sum ?? 0;
       const perHit = mine.meleeHits ? meleeDmg / mine.meleeHits : 0;
       add({
-        id: 'accuracy', level: missShare > 0.5 ? 'bad' : 'warn',
+        id: 'accuracy', accion: 'personaje', level: missShare > 0.5 ? 'bad' : 'warn',
         title: t('an.accuracy'),
         detail: t('an.accuracyDetail', { pct: Math.round(missShare * 100), n: mine.misses,
           reason: plainMiss ? plainMiss[0] : '—' }),
@@ -231,7 +256,7 @@ export function analyse(f, ctx = {}) {
   const heals = enemyCasts.filter((c) => c.cat === 'heal');
   if (heals.length) {
     add({
-      id: 'enemyHeal', level: heals.length > 2 ? 'bad' : 'warn',
+      id: 'enemyHeal', accion: 'tuya', level: heals.length > 2 ? 'bad' : 'warn',
       title: t('an.enemyHeal'),
       detail: t('an.enemyHealDetail', { n: heals.length, who: heals[0].source,
         when: heals.slice(0, 4).map((h) => `${h.t}s`).join(', ') }, undefined),
@@ -247,7 +272,7 @@ export function analyse(f, ctx = {}) {
   const control = enemyCasts.filter((c) => controlKind(c.cat, c.ability) === 'duro');
   if (control.length >= 2) {
     add({
-      id: 'control', level: 'warn', title: t('an.control'),
+      id: 'control', accion: 'contexto', level: 'warn', title: t('an.control'),
       detail: t('an.controlDetail', { n: control.length,
         kinds: [...new Set(control.map((c) => c.cat))].map((c) => t(`cat.${c}`)).join(', ') }),
       impact: t('an.controlImpact'),
@@ -256,15 +281,15 @@ export function analyse(f, ctx = {}) {
 
   // ── 6. Interrupciones y resistencias ───────────────
   if ((f.interrupts ?? 0) >= 3) {
-    add({ id: 'interrupts', level: 'warn', title: t('an.interrupts'),
+    add({ id: 'interrupts', accion: 'personaje', level: 'warn', title: t('an.interrupts'),
       detail: t('an.interruptsDetail', { n: f.interrupts }), impact: t('an.interruptsImpact') });
   }
   if ((f.resistsCaused ?? 0) >= 3) {
-    add({ id: 'resistsCaused', level: 'good', title: t('an.resistsCaused'),
+    add({ id: 'resistsCaused', accion: 'contexto', level: 'good', title: t('an.resistsCaused'),
       detail: t('an.resistsCausedDetail', { n: f.resistsCaused }) });
   }
   if ((f.resistsSuffered ?? 0) >= 4) {
-    add({ id: 'resists', level: 'warn', title: t('an.resists'),
+    add({ id: 'resists', accion: 'personaje', level: 'warn', title: t('an.resists'),
       detail: t('an.resistsDetail', { n: f.resistsSuffered }), impact: t('an.resistsImpact') });
   }
 
@@ -274,7 +299,7 @@ export function analyse(f, ctx = {}) {
   const totalHeal = sum(healers, (r) => r.healingDone);
   if (totalHeal > 0 && wastedHeal > totalHeal * 0.25) {
     add({
-      id: 'overheal', level: 'warn', title: t('an.overheal'),
+      id: 'overheal', accion: 'tuya', level: 'warn', title: t('an.overheal'),
       detail: t('an.overhealDetail', { pct: Math.round((wastedHeal / (wastedHeal + totalHeal)) * 100) }),
       impact: t('an.overhealImpact', { n: Math.round(wastedHeal).toLocaleString('es-ES') }),
     });
@@ -286,7 +311,7 @@ export function analyse(f, ctx = {}) {
     const top = (mine.targets ?? [])[0];
     if (top && top.sum / tot < 0.55) {
       add({
-        id: 'focus', level: 'warn', title: t('an.focus'),
+        id: 'focus', accion: 'tuya', level: 'warn', title: t('an.focus'),
         detail: t('an.focusDetail', { n: (mine.targets ?? []).length, pct: Math.round((top.sum / tot) * 100) }),
         impact: t('an.focusImpact'),
       });
@@ -297,7 +322,7 @@ export function analyse(f, ctx = {}) {
   const dead = allies.filter((r) => r.deaths > 0);
   if (dead.length) {
     add({
-      id: 'deaths', level: 'bad', title: t('an.deaths'),
+      id: 'deaths', accion: 'contexto', level: 'bad', title: t('an.deaths'),
       detail: dead.map((r) => {
         const killer = (r.takenBySource ?? [])[0];
         return t('an.deathsDetail', { who: r.name, killer: killer ? killer.name : '—',
@@ -311,7 +336,7 @@ export function analyse(f, ctx = {}) {
   const worst = ph.slice().sort((a, b) => b.dtps - a.dtps)[0];
   if (worst && worst.dtps > 0 && ph.length > 1) {
     add({
-      id: 'danger', level: 'info', title: t('an.danger'),
+      id: 'danger', accion: 'contexto', level: 'info', title: t('an.danger'),
       detail: t('an.dangerDetail', { from: worst.from, to: worst.to, dtps: Math.round(worst.dtps),
         kind: worst.meleeShare === null ? '—'
           : worst.meleeShare > 0.7 ? t('adv.kind.fisico')
@@ -329,7 +354,7 @@ export function analyse(f, ctx = {}) {
     const ratio = f.raidDps ? best10 / f.raidDps : 0;
     if (ratio > 2.2) {
       add({
-        id: 'burst', level: 'info', title: t('an.burst'),
+        id: 'burst', accion: 'contexto', level: 'info', title: t('an.burst'),
         detail: t('an.burstDetail', { peak: Math.round(best10), avg: Math.round(f.raidDps),
           x: ratio.toFixed(1) }),
         impact: t('an.burstImpact'),
@@ -337,8 +362,22 @@ export function analyse(f, ctx = {}) {
     }
   }
 
+  /**
+   * EL ORDEN: primero lo grave, y dentro de lo grave, lo que puedes cambiar.
+   *
+   * La gravedad manda —una muerte va arriba aunque no sea una acción— pero
+   * entre dos avisos igual de graves va delante el que señala algo que harías
+   * distinto en la siguiente pelea. Que te enraícen cuatro veces y que lleves
+   * la postura equivocada eran los dos «warn» y salían mezclados; sólo uno de
+   * los dos se puede corregir.
+   *
+   * Y cada hallazgo lleva su clase escrita, que es la otra mitad: sin el rótulo,
+   * ordenarlos sólo cambia el sitio y sigue sin decir por qué está ahí.
+   */
   const order = { bad: 0, warn: 1, info: 2, good: 3 };
-  findings.sort((a, b) => order[a.level] - order[b.level]);
+  const orderAccion = { tuya: 0, personaje: 1, contexto: 2 };
+  findings.sort((a, b) => order[a.level] - order[b.level]
+    || (orderAccion[a.accion] ?? 9) - (orderAccion[b.accion] ?? 9));
 
   return {
     phases: ph,

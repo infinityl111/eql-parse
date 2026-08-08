@@ -121,8 +121,17 @@ console.log('desconocidas:', parser.unrecognized);
   const fs = await import('node:fs');
   const { t } = await import('../src/i18n.js');
   const usadas = new Set();
-  for (const f of ['ui/app.js', 'ui/overlay.js', 'ui/plates.js', 'ui/alerts.js', 'ui/triggers.js']) {
-    const s = fs.readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  // EL DIRECTORIO ENTERO, no una lista escrita a mano. La lista tenía cinco
+  // ficheros y la interfaz ya tenía ocho: los que se añadieron después nunca
+  // pasaron por aquí, así que una clave sin traducir en uno de ellos salía en
+  // pantalla y la prueba decía que todo estaba bien. Pasó con la reproducción,
+  // que enseñaba «ROW.PET» debajo de la mascota.
+  //
+  // Leyendo la carpeta, un fichero nuevo entra solo el día que se crea, que es
+  // justo el día en que a nadie se le ocurre venir a apuntarlo aquí.
+  const dirUI = new URL('../ui/', import.meta.url);
+  for (const f of fs.readdirSync(dirUI).filter((x) => x.endsWith('.js'))) {
+    const s = fs.readFileSync(new URL(f, dirUI), 'utf8');
     for (const m of s.matchAll(/\bt\(\s*'([^']+)'/g)) usadas.add(m[1]);
   }
   const vars = { n: 1, foes: 1, fights: 1, k: 1, d: '', who: '', levels: '', total: 1, inv: '' };

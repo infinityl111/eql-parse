@@ -34,6 +34,10 @@ contextBridge.exposeInMainWorld('eql', {
   onSessionCleared: (fn) => ipcRenderer.on('session:cleared', () => fn()),
   queryHistory: (q) => ipcRenderer.invoke('history:query', q),
   getFight: (uid) => ipcRenderer.invoke('history:fight', uid),
+  // Las líneas del registro de un tramo de horas: de dónde sale una cifra.
+  logContext: (desde, hasta, tope) => ipcRenderer.invoke('log:context', { desde, hasta, tope }),
+  // Duración medida de cada hechizo, para la barra de casteo.
+  castTimes: (centro, margenMin) => ipcRenderer.invoke('spells:castTimes', { centro, margenMin }),
   foeList: (sinceMs) => ipcRenderer.invoke('history:foes', sinceMs),
   aggregate: (q) => ipcRenderer.invoke('history:aggregate', q),
   storeStats: () => ipcRenderer.invoke('history:stats'),
@@ -65,6 +69,11 @@ contextBridge.exposeInMainWorld('eql', {
   onUpdate: (fn) => ipcRenderer.on('update', (_e, u) => fn(u)),
   openUpdate: () => ipcRenderer.invoke('update:open'),
   skipUpdate: (v) => ipcRenderer.invoke('update:skip', v),
+  // Descargar e instalar son DOS acciones: entre ellas no pasa nada solo.
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  cancelUpdate: () => ipcRenderer.invoke('update:cancel'),
+  onUpdateProgress: (fn) => ipcRenderer.on('update:progress', (_e, p) => fn(p)),
   appVersion: () => ipcRenderer.invoke('app:version'),
 
   // Migración del almacén al formato de la 1.1.0.
