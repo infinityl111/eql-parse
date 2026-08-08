@@ -211,9 +211,50 @@ export class Encounter {
     this.stanceSpans.push({ from: k, to: k, stance });
   }
 
+  /**
+   * El combatiente con ese nombre, creándolo si es la primera vez.
+   *
+   * LA MAYÚSCULA DE PRINCIPIO DE FRASE NO CREA COMBATIENTES. EQ capitaliza la
+   * primera letra de la línea, así que el mismo bicho llega como «Ice boned
+   * skeleton» cuando pega y «ice boned skeleton» cuando le pegan, y se
+   * partía en dos filas: una con todo el daño y cero recibido, otra al revés.
+   * Medido sobre 415 peleas guardadas: 10 afectadas, 4 nombres partidos y unos
+   * 14.800 de daño repartido entre filas que no existen. La mayor, «Heart
+   * harpie» contra «heart harpie», con 11.260.
+   *
+   * Y SI CHOCAN, GANA LA MINÚSCULA, que no es una preferencia sino lo único
+   * que puede ser: un nombre propio como «Lord Nagafen» se escribe igual en
+   * medio de la frase que al principio, así que NUNCA produce un par. Si hay
+   * dos formas, la de verdad es la minúscula y la otra es la frase.
+   *
+   * Se hace aquí y no al analizar porque aquí no depende del orden: al
+   * analizar, lo emitido antes de aprender la forma buena se quedaba mal, y
+   * probándolo salían tres nombres partidos en vez de cuatro — mejor, pero
+   * todavía mal.
+   */
   actor(name) {
     let c = this.combatants.get(name);
-    if (!c) { c = new Combatant(name); this.combatants.set(name, c); }
+    if (c) return c;
+
+    const baja = name && name.charAt(0).toLowerCase() + name.slice(1);
+    if (baja !== name) {
+      // Llega capitalizado: si ya está el mismo en minúscula, es ése.
+      const yaEsta = this.combatants.get(baja);
+      if (yaEsta) return yaEsta;
+    } else {
+      // Llega en minúscula: si estaba guardado capitalizado, se corrige.
+      const alta = name.charAt(0).toUpperCase() + name.slice(1);
+      const viejo = this.combatants.get(alta);
+      if (viejo) {
+        viejo.name = name;
+        this.combatants.delete(alta);
+        this.combatants.set(name, viejo);
+        return viejo;
+      }
+    }
+
+    c = new Combatant(name);
+    this.combatants.set(name, c);
     return c;
   }
 

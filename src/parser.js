@@ -248,6 +248,7 @@ export class Parser {
     ev.killer = this.#norm(ev.killer);
     ev.caster = this.#norm(ev.caster);
 
+
     switch (ev.kind) {
       case 'zone':
         this.zone = ev.zone;
