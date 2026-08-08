@@ -1048,7 +1048,13 @@ export class Engine extends EventEmitter {
       })(),
 
       resistsSuffered: enc.resistsSuffered,
-      casts: (enc.casts ?? []).slice(0, 300),
+      // El tope sube de 300 a 1200 porque ahora se guardan TODOS los
+      // lanzamientos, no sólo las utilidades: el máximo medido en una pelea
+      // real es 349 y con 300 se habría recortado sin decirlo. Y si algún día
+      // se recorta, se anota — un recorte callado se lee como que no hubo más.
+      casts: (enc.casts ?? []).slice(0, 1200),
+      fades: (enc.fades ?? []).slice(0, 400),
+      castsCut: Math.max(0, (enc.casts ?? []).length - 1200),
       resistsCaused: enc.resistsCaused,
       interrupts: enc.interrupts,
       closed: enc.closed,
@@ -1148,7 +1154,9 @@ export class Engine extends EventEmitter {
       stance: this.parser?.stance,
       invocation: this.parser?.invocation,
       resistsSuffered: enc.resistsSuffered,
-      casts: enc.casts.slice(0, 300),
+      casts: enc.casts.slice(0, 1200),
+      fades: (enc.fades ?? []).slice(0, 400),
+      castsCut: Math.max(0, enc.casts.length - 1200),
       resistsCaused: enc.resistsCaused,
       interrupts: enc.interrupts,
     });

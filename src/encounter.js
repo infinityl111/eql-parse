@@ -201,6 +201,13 @@ export class Encounter {
     this.targetFirst = new Map();  // nombre -> primer segundo en que le pegaron
     this.resistsSuffered = 0;
     this.casts = [];           // {t, source, ability, cat} — el análisis filtra por bando
+    // Cuándo se cayó cada buff, con su nombre. Es la MITAD que se puede
+    // emparejar: la caída lleva nombre en las 1.020 líneas del registro de
+    // referencia, y la entrada NO lo lleva en ninguna de las 2.839 —«notas una
+    // curación floreciendo en ti» no dice de qué hechizo—. Así que el tiempo
+    // que algo estuvo puesto se mide de LANZAMIENTO a caída, nunca de entrada
+    // a caída.
+    this.fades = [];           // {t, ability}
     this.resistsCaused = 0;    // hechizos enemigos que TÚ resististe
     this.interrupts = 0;
     this.stancesSeen = new Set();
@@ -443,8 +450,28 @@ export class EncounterTracker extends EventEmitter {
         }
       } else if (ev.kind === 'resist_by_you') this.current.resistsCaused++;
       else if (ev.kind === 'interrupt') this.current.interrupts++;
-      else if (ev.kind === 'cast' && ev.ability && ev.castCat && ev.source) {
-        this.current.casts.push({ t: Math.round(ev.t - this.current.start), source: ev.source, ability: ev.ability, cat: ev.castCat });
+      else if (ev.kind === 'buff_fade' && ev.ability) {
+        this.current.fades.push({ t: Math.round(ev.t - this.current.start), ability: ev.ability });
+      }
+      // TODOS los lanzamientos, no sólo los categorizados.
+      //
+      // Antes hacía falta `castCat` para guardarlo, y la categoría sólo la
+      // tienen las utilidades —curas, raíces, mez, miedo—. Medido: de 18.921
+      // lanzamientos con nombre se guardaban 2.333, un 12%. Y de los TUYOS,
+      // 702 de 6.457.
+      //
+      // Lo que se caía era justo lo que hace falta para leer una línea de
+      // tiempo: los nukes. «Water Elemental Attack» 4.408 veces, «Drain
+      // Spirit» 1.851, «Cinder Bolt» 371 — nada de eso se guardaba, así que la
+      // pregunta «¿estaba usando sus hechizos?» no se podía contestar.
+      //
+      // Cuesta 1,3 MB sobre un almacén de 7. La categoría se sigue guardando
+      // cuando se conoce, que es lo que usa el consejero.
+      else if (ev.kind === 'cast' && ev.ability && ev.source) {
+        this.current.casts.push({
+          t: Math.round(ev.t - this.current.start),
+          source: ev.source, ability: ev.ability, cat: ev.castCat ?? null,
+        });
       }
       else if (ev.kind === 'stance' && ev.stance) this.current.stancesSeen.add(ev.stance);
       else if (ev.kind === 'invocation' && ev.invocation) this.current.invocationsSeen.add(ev.invocation);

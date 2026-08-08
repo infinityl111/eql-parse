@@ -905,6 +905,165 @@ function updateRow(node, r, snap, live, rank) {
 }
 
 /**
+ * Cuánto tiempo estuvo puesto cada cosa que lanzaste.
+ *
+ * SE MIDE DE LANZAMIENTO A CAÍDA, y no de entrada a caída, porque el registro
+ * no deja hacerlo de la otra forma. Medido sobre uno real: las 1.020 líneas de
+ * caída llevan el nombre del hechizo, y las 2.839 de entrada NO llevan ninguno
+ * —«notas una curación floreciendo en ti» no dice de qué—. Así que la entrada
+ * es inservible para emparejar y el lanzamiento ocupa su sitio.
+ *
+ * CUATRO CASOS, y tres se pueden medir dentro de la pelea:
+ *
+ *   lanzado dentro + caído dentro   -> el intervalo exacto
+ *   lanzado dentro, sin caer        -> desde el lanzamiento hasta el final;
+ *                                      si hubiera caído habría línea de caída
+ *   caído dentro, lanzado antes     -> desde el principio hasta la caída
+ *   ni lanzado ni caído dentro      -> INVISIBLE, y se dice
+ *
+ * El cuarto es el agujero de verdad: un buff que te pusieron antes de empezar
+ * y que sigue puesto al acabar no deja ni una línea en esta pelea. No se
+ * cuenta como 0% ni como 100%: no se cuenta, y la nota lo dice.
+ *
+ * Y NO SE MIDE EL MANÁ NI EL VIGOR, que es lo que otros parsers llaman ADPS
+ * entero. El registro de EQL no da ninguno de los dos. Esto es la mitad que sí
+ * se puede: el tiempo.
+ */
+function uptimeHTML(f) {
+  const dur = Math.max(1, Math.round(f?.duration ?? 0));
+  const casts = f?.casts ?? [];
+  const fades = f?.fades ?? [];
+  if (!fades.length && !casts.length) return '';
+
+  // Sólo lo tuyo: el uptime de un buff ajeno no se puede seguir, porque de sus
+  // caídas el registro sólo cuenta las que te tocan a ti.
+  const yo = f.self ?? 'Campeon';
+  const mios = casts.filter((c) => c.source === yo && c.ability);
+
+  // Emparejar por nombre, en orden: cada lanzamiento con la primera caída
+  // posterior que no esté ya cogida.
+  const usadas = new Set();
+  const tramos = new Map();          // hechizo -> [[desde, hasta], …]
+  const anota = (nombre, a, b) => {
+    if (!tramos.has(nombre)) tramos.set(nombre, []);
+    tramos.get(nombre).push([Math.max(0, a), Math.min(dur, b)]);
+  };
+
+  for (const c of mios) {
+    const i = fades.findIndex((x, k) => !usadas.has(k) && x.ability === c.ability && x.t >= c.t);
+    if (i >= 0) { usadas.add(i); anota(c.ability, c.t, fades[i].t); }
+  }
+  // Las caídas sin lanzamiento delante: venía puesto de antes.
+  const deAntes = new Set();
+  fades.forEach((x, k) => {
+    if (usadas.has(k)) return;
+    anota(x.ability, 0, x.t);
+    deAntes.add(x.ability);
+  });
+  // Y lo lanzado que nunca cayó: si hubiera caído habría línea.
+  const sinCaer = new Set();
+  for (const c of mios) {
+    const yaTiene = (tramos.get(c.ability) ?? []).some(([a]) => a === c.t);
+    if (yaTiene) continue;
+    // Sólo si es algo que en esta partida SÍ produce línea de caída; si no, no
+    // se sabe si era un buff o un nuke, y un nuke no tiene «tiempo puesto».
+    if (!fades.some((x) => x.ability === c.ability)) continue;
+    anota(c.ability, c.t, dur);
+    sinCaer.add(c.ability);
+  }
+  if (!tramos.size) return '';
+
+  const filas = [...tramos].map(([nombre, ts]) => {
+    // Se unen los solapes: relanzar antes de que caiga no suma dos veces.
+    const orden = ts.slice().sort((a, b) => a[0] - b[0]);
+    const unidos = [];
+    for (const [a, b] of orden) {
+      const u = unidos.at(-1);
+      if (u && a <= u[1]) u[1] = Math.max(u[1], b);
+      else unidos.push([a, b]);
+    }
+    const seg = unidos.reduce((n, [a, b]) => n + Math.max(0, b - a), 0);
+    return { nombre, unidos, seg, pct: seg / dur, veces: ts.length };
+  }).sort((a, b) => b.seg - a.seg);
+
+  const barra = (u) => u.map(([a, b]) => `<i style="left:${(a / dur * 100).toFixed(2)}%;width:${
+    Math.max(0.6, (b - a) / dur * 100).toFixed(2)}%"></i>`).join('');
+
+  return `<div class="uptime">
+    <div class="sec-title eyebrow">${esc(t('up.title'))}</div>
+    <div class="hint">${esc(t('up.note'))}</div>
+    ${filas.map((x) => `<div class="up-lane">
+      <span class="up-name">${spellIcon(x.nombre)}${esc(x.nombre)}${
+  deAntes.has(x.nombre) ? `<i class="up-mark" title="${esc(t('up.beforeNote'))}">${esc(t('up.before'))}</i>` : ''}${
+  sinCaer.has(x.nombre) ? `<i class="up-mark" title="${esc(t('up.openNote'))}">${esc(t('up.open'))}</i>` : ''}</span>
+      <span class="up-track">${barra(x.unidos)}</span>
+      <span class="num"><b>${Math.round(x.pct * 100)}%</b></span>
+      <span class="num dim">${secs(x.seg)}</span>
+    </div>`).join('')}
+    <div class="hint">${esc(t('up.blind'))}</div>
+  </div>`;
+}
+
+/**
+ * Qué lanzó cada uno y cuándo, en orden.
+ *
+ * PARA QUÉ SIRVE, que es lo que decide la forma: para ver si alguien estaba
+ * usando lo suyo. Un líder de raid mira esto y ve que el que va equipado tiene
+ * la fila medio vacía. Con una tabla de totales eso no se ve —puede haber
+ * lanzado mucho al principio y nada después— y con una lista cronológica sin
+ * separar por persona tampoco, porque se mezclan todos.
+ *
+ * Por eso es UNA FILA POR LANZADOR: la pregunta es de quién, no de cuándo.
+ *
+ * LO QUE NO SE GUARDABA. Hasta ahora sólo se guardaba el lanzamiento que
+ * tuviera CATEGORÍA, y la categoría la tienen las utilidades: curas, raíces,
+ * mez, miedo. Medido, se guardaba el 12% — y lo que se caía eran justo los
+ * nukes, que es lo que se viene a mirar aquí. De 6.457 lanzamientos tuyos se
+ * guardaban 702.
+ *
+ * NO ES UNA ESCALA DE TIEMPO REAL en el sentido de que cada marca tenga
+ * anchura: una marca es un instante, no una duración. Lo que sí es real es su
+ * POSICIÓN: el segundo en el que se lanzó, sobre la duración de la pelea.
+ */
+function lanzamientosHTML(f) {
+  const casts = f?.casts ?? [];
+  const dur = Math.max(1, f?.duration ?? 1);
+  if (casts.length < 2) return '';
+
+  const porQuien = new Map();
+  for (const c of casts) {
+    if (!c.source || !c.ability) continue;
+    if (!porQuien.has(c.source)) porQuien.set(c.source, []);
+    porQuien.get(c.source).push(c);
+  }
+  if (!porQuien.size) return '';
+
+  // Los tuyos primero y luego por número de lanzamientos: la pregunta habitual
+  // es sobre tu grupo, y los enemigos son contexto.
+  const mios = new Set([f.self, ...(f.rows ?? []).filter((r) => r.side !== 'enemy').map((r) => r.name)]);
+  const filas = [...porQuien].sort((a, b) => {
+    const ma = mios.has(a[0]) ? 0 : 1, mb = mios.has(b[0]) ? 0 : 1;
+    return ma - mb || b[1].length - a[1].length;
+  });
+
+  const marca = (c) => `<i class="cast-tick${c.cat ? ` cat-${esc(c.cat)}` : ''}"
+    style="left:${(Math.min(dur, Math.max(0, c.t)) / dur * 100).toFixed(2)}%"
+    title="${esc(`${secs(c.t)} · ${c.ability}`)}"></i>`;
+
+  return `<div class="casts">
+    <div class="sec-title eyebrow">${esc(t('casts.title'))}</div>
+    <div class="hint">${esc(t('casts.note'))}</div>
+    ${filas.map(([quien, lista]) => `<div class="cast-lane${mios.has(quien) ? ' mine' : ''}">
+      <span class="cast-who">${esc(quien)}</span>
+      <span class="cast-track">${lista.map(marca).join('')}</span>
+      <span class="num dim">${lista.length}</span>
+    </div>`).join('')}
+    <div class="cast-foot eyebrow"><span>0s</span><span>${esc(secs(Math.round(dur)))}</span></div>
+    ${f.castsCut ? `<div class="hint">${esc(t('casts.cut', { n: f.castsCut }))}</div>` : ''}
+  </div>`;
+}
+
+/**
  * Aguantar, puesto como un rol.
  *
  * LOS DATOS ESTABAN TODOS y no se veían: el desglose defensivo ya se pintaba,
@@ -1074,6 +1233,14 @@ function renderRows(snap) {
   // Aguantar, debajo de todo: es otra pregunta sobre la misma pelea.
   const tank = $('tank');
   if (tank) tank.innerHTML = tanqueoHTML(f);
+
+  // Y qué lanzó cada uno, que es otra pregunta más sobre la misma pelea.
+  const lanz = $('casts');
+  if (lanz) lanz.innerHTML = lanzamientosHTML(f);
+
+  // Y cuánto tiempo estuvo puesto lo que lanzaste.
+  const up = $('uptime');
+  if (up) up.innerHTML = uptimeHTML(f);
   if (state.hover) updateTip();
 }
 
@@ -4043,7 +4210,7 @@ function renderApp() {
   }
   if (!$('rows')) {
     $('bodyGrid').innerHTML = `<aside id="fightList"></aside>
-      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div><div id="tank"></div>
+      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div><div id="tank"></div><div id="casts"></div><div id="uptime"></div>
       <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div></main>`;
     state.rowNodes.clear();
   }

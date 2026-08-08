@@ -1327,3 +1327,36 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
   padding: 1px 5px; background: var(--slate-800); border-radius: 2px; color: var(--bone-faint); }
 .tank-chip b { color: var(--bone-dim); }
 .tank-row .abs { color: var(--t-magic); }
+
+/* La línea de lanzamientos: una fila por lanzador, una marca por lanzamiento.
+   La marca es un instante, no una duración: por eso son rayas y no barras. */
+.casts { margin-top: 22px; }
+.cast-lane { display: grid; grid-template-columns: 130px 1fr 40px; align-items: center;
+  gap: 10px; margin-bottom: 3px; }
+.cast-who { font-size: 12px; color: var(--bone-faint); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.cast-lane.mine .cast-who { color: var(--bone); }
+.cast-track { position: relative; height: 16px; background: var(--slate-850);
+  border-radius: 2px; overflow: hidden; }
+.cast-tick { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px;
+  background: var(--bone-faint); }
+.cast-lane.mine .cast-tick { background: var(--t-cold); }
+.cast-tick.cat-heal { background: var(--t-poison); }
+.cast-tick.cat-root, .cast-tick.cat-mez { background: var(--t-magic); }
+.cast-tick.cat-charm { background: var(--t-dot); }
+.cast-tick:hover { background: var(--bone); width: 3px; }
+.cast-foot { display: flex; justify-content: space-between; margin: 4px 0 0 140px;
+  color: var(--bone-faint); }
+
+/* Cuánto tiempo estuvo puesto cada cosa. Barras, no rayas: aquí lo que se
+   mide SÍ es una duración, al revés que en la línea de lanzamientos. */
+.uptime { margin-top: 22px; }
+.up-lane { display: grid; grid-template-columns: 190px 1fr 48px 52px; align-items: center;
+  gap: 10px; margin-bottom: 3px; }
+.up-name { font-size: 12px; color: var(--bone-dim); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.up-mark { font-style: normal; font-size: 9px; margin-left: 5px; padding: 0 4px;
+  background: var(--slate-800); color: var(--bone-faint); border-radius: 2px; }
+.up-track { position: relative; height: 14px; background: var(--slate-850); border-radius: 2px; }
+.up-track i { position: absolute; top: 2px; bottom: 2px; background: var(--t-magic); opacity: .75; }
+.up-lane .num b { color: var(--bone); font-family: var(--mono); }
