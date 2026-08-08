@@ -22,6 +22,19 @@ export const MELEE_VERBS = {
   claw: 'claws', gore: 'gores', maul: 'mauls', punch: 'punches',
   slam: 'slams', sting: 'stings', strike: 'strikes', smash: 'smashes',
   rend: 'rends', slice: 'slices', cleave: 'cleaves', reave: 'reaves',
+  // `smite` y `shoot` faltaban, y eran daño que la aplicación TIRABA: sobre un
+  // registro real, 961 líneas y 18.675 puntos.
+  //
+  // LA CIFRA, MEDIDA Y NO SUPUESTA. Casi todo es de un mismo compañero, y al
+  // verlo se dijo que era «la mayor parte de su daño». No lo es: Kalforgelp
+  // pasa de 613.528 a 632.203, un 3,0% de lo suyo. Sigue siendo un fallo —una
+  // cifra mal dada en cada pelea a alguien que no puede saberlo, y él es el
+  // 22,4% del daño de las 74 peleas en las que sale— pero es un 3%, no un 90%.
+  //
+  // `shoot` es a distancia y entra como melé porque no hay escuela propia para
+  // eso: el daño se cuenta y el verbo se ve, que es mejor que perderlo.
+  //
+  smite: 'smites', shoot: 'shoots',
   'frenzy on': 'frenzies on',
   'round kick': 'round kicks', 'flying kick': 'flying kicks',
   'dragon punch': 'dragon punches', 'eagle strike': 'eagle strikes',
