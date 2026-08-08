@@ -1304,3 +1304,10 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
   background: var(--slate-850); border-left: 2px solid var(--t-magic);
   color: var(--bone-dim); }
 .charm-note b { color: var(--bone); font-family: var(--mono); }
+
+/* El retrato del enemigo. Donde no hay, no va nada: ni hueco ni silueta. */
+.foeicon { width: 20px; height: 20px; object-fit: cover; vertical-align: -5px;
+  margin-right: 7px; border-radius: 2px; image-rendering: auto; }
+.foeportrait { width: 72px; height: 72px; object-fit: cover; border-radius: 3px;
+  border: 1px solid var(--slate-700); flex: none; }
+.dos-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

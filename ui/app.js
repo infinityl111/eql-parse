@@ -2467,6 +2467,8 @@ function foeDossier(f, habilidades = '') {
 
   return `<div class="dossier">
     <div class="dos-head">
+      ${retratoCache.get(f.name)
+    ? `<img class="foeportrait" src="${retratoCache.get(f.name)}" alt="">` : ''}
       <h3>${esc(f.name)}</h3>
       <!--
         La insignia dice DOS cosas, y las dos hacen falta: si es jefe y de dónde
@@ -2908,6 +2910,39 @@ const ENC_ABIERTAS = ['zonas', 'enemigos', 'botin', 'hechizos', 'progreso', 'mue
  */
 const iconCache = new Map();
 
+/**
+ * El retrato de un enemigo, si la wiki lo tiene.
+ *
+ * SÓLO LOS FICHEROS «Npc», nunca los del botín. Las páginas de bicho llevan
+ * también iconos de los objetos que suelta, y poner uno al lado de un nombre
+ * sería una imagen que miente sobre lo que es.
+ *
+ * NO HAY LISTA Y NO HACE FALTA: se cruza el nombre con el índice de ficheros
+ * de la wiki, que caduca a la semana. El bicho que hoy no tiene foto la tendrá
+ * en cuanto alguien la suba, sin tocar una línea. Hoy son 51 de tus 196
+ * enemigos, un 26%.
+ *
+ * Y donde no hay, no va nada: ni hueco, ni interrogante, ni silueta genérica.
+ */
+const retratoCache = new Map();
+
+async function pedirRetratos(nombres, repintar) {
+  const faltan = [...new Set(nombres.filter(Boolean))].filter((n) => !retratoCache.has(n));
+  if (!faltan.length) return;
+  for (const n of faltan) retratoCache.set(n, null);
+  try {
+    const pares = (await window.eql.foePortraits?.(faltan)) ?? [];
+    for (const [n, d] of pares) retratoCache.set(n, d);
+    if (pares.length) repintar?.();
+  } catch { /* sin red: se queda sin retrato, que no es un error */ }
+}
+
+/** El retrato pequeño, al lado del nombre. */
+const foeIcon = (name) => {
+  const d = retratoCache.get(name);
+  return d ? `<img class="foeicon" src="${d}" alt="" aria-hidden="true">` : '';
+};
+
 async function pedirIconos(nombres, repintar) {
   const faltan = [...new Set(nombres.filter(Boolean))].filter((n) => !iconCache.has(n));
   if (!faltan.length) return;
@@ -2977,6 +3012,7 @@ async function encGo(page, args = {}) {
     if (page === 'zona') e.foes = (await window.eql.encZoneFoes?.(e.base, e.diff)) ?? [];
     if (page === 'enemigos') {
       e.todos = (await window.eql.encFoes?.()) ?? [];
+      pedirRetratos(e.todos.map((x) => x.name), renderEncyclopedia);
       // Las zonas hacen falta aquí para poder sugerirlas: el buscador encuentra
       // enemigos por su zona, así que la zona tiene que ser un destino.
       if (!e.zonas?.length) e.zonas = (await window.eql.encZones?.()) ?? [];
@@ -3002,10 +3038,12 @@ async function encGo(page, args = {}) {
       // promediado con las demás. `diff` puede ser `null` a propósito — es el
       // cajón de «no consta», y es un destino como cualquier otro.
       e.foeDif = (await window.eql.encFoeAt?.(e.name, e.dkey)) ?? null;
+      pedirRetratos([e.name], renderEncyclopedia);
       pedirIconos((e.foeDif?.abilities ?? []).map((a) => a.name), renderEncyclopedia);
     }
     if (page === 'foe') {
       e.foe = (await window.eql.encFoe?.(e.name)) ?? null;
+      pedirRetratos([e.name], renderEncyclopedia);
       // Desde la lista de enemigos no hay zona ni dificultad de por medio, así
       // que salen TODOS sus combates. Desde una zona salen los de esa zona y
       // esa dificultad, que es de donde vienes mirando.
@@ -3173,7 +3211,7 @@ function encZona() {
     </div>
     ${l.length ? `<div class="encrows">${l.map((f) => `
       <button class="encrow" data-foe="${esc(f.name)}">
-        <span class="nm">${esc(f.name)}</span>
+        <span class="nm">${foeIcon(f.name)}${esc(f.name)}</span>
         <span class="num">${f.hp ? `${esc(t('foe.hp'))} ${n0(f.hp.avg)}` : ''}</span>
         <span class="num dim">${esc(t('sum.times', { n: f.fights }))}</span>
         <span class="num dim">${f.kills ? esc(t('sum.killed', { n: f.kills })) : esc(t('enc.neverFell'))}</span>
@@ -3309,7 +3347,7 @@ function encEnemigos() {
       </div>
       <div class="encrows">${l.map((f) => `
       <div class="encrow foe fgrid" data-foe="${esc(f.name)}">
-        <span class="nm">${esc(f.name)}</span>
+        <span class="nm">${foeIcon(f.name)}${esc(f.name)}</span>
         ${(f.rejilla ?? []).map((c, i) => celda(f, c, `D${i}`)).join('')}
         <span class="zgap"></span>
         ${celda(f, f.sinMarca, 'sin marca')}

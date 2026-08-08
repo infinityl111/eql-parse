@@ -626,6 +626,11 @@ ipcMain.handle('wiki:spellIcons', async (_e, names) => {
   try { return [...(await wiki.spellIcons(names))]; } catch { return []; }
 });
 
+ipcMain.handle('wiki:foePortraits', async (_e, names) => {
+  if (!wiki || !Array.isArray(names)) return [];
+  try { return [...(await wiki.foePortraits(names))]; } catch { return []; }
+});
+
 ipcMain.handle('wiki:item', async (_e, name) => {
   if (!wiki) return null;
   try { return await wiki.item(name); } catch { return null; }
