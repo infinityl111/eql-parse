@@ -249,6 +249,13 @@ export class Parser {
     ev.caster = this.#norm(ev.caster);
 
 
+    // ¿Estaban encantados en este instante? El analizador sólo dice eso; de
+    // decidir el bando se encarga el encuentro, que es quien sabe qué es tuyo.
+    if (this.charmed.size) {
+      if (ev.source && this.charmedAt(ev.source, ev.t)) ev.charmSrc = true;
+      if (ev.target && this.charmedAt(ev.target, ev.t)) ev.charmTgt = true;
+    }
+
     switch (ev.kind) {
       case 'zone':
         this.zone = ev.zone;

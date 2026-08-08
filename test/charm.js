@@ -41,6 +41,7 @@
  * y lo que quede de verdad ambiguo, estimado y rotulado como tal.
  */
 import { Parser } from '../src/parser.js';
+import { EncounterTracker as Encuentros } from '../src/encounter.js';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -143,6 +144,72 @@ console.log('\nel mismo bicho encantado dos veces');
   ok(v.length === 2, 'se guardan las dos, no la última', v.length);
   ok(v[0].hasta !== null && v[1].hasta === null, 'la primera cerrada y la segunda abierta');
   ok(p.charmedAt('a hardened skeleton', v[0].desde + 5), 'y la primera sigue consultable');
+}
+
+// ── 7. El bando se decide por OBJETIVO, golpe a golpe ─────────────────────
+//
+// EL CASO DIFÍCIL: dos bichos con el mismo nombre, uno encantado y otro no. El
+// registro no los distingue, pero no hace falta distinguirlos:
+//
+//   - un salvaje NO pega a otros bichos  -> si pega a un bicho, es el tuyo
+//   - un encantado NO te pega a ti       -> si te pega, es el salvaje
+//   - y a ti no te da por pegar al tuyo  -> si le pegas, es el salvaje
+//
+// Medido en el peor caso del registro: 83,3% resuelto sin estimar nada. Sobre
+// las tres peleas afectadas, 2.389 de daño atribuidos contra 158 ambiguos, un
+// 6,2%.
+console.log('\nel bando, golpe a golpe');
+{
+  const tr = new Encuentros({ self: 'Campeon', idleSec: 20 });
+  const p = nuevo();
+  const mete = (l) => { const ev = p.parse(l); if (ev) tr.feed(ev); };
+
+  // La pelea la abres tú. Sin esto no se abre ninguna, y eso es correcto: un
+  // encantado peleando con otros bichos en la otra punta de la zona no
+  // convierte eso en una pelea tuya. Aquí hay que abrirla para poder mirar.
+  mete(`${HORA(9)}Campeon hits a ghoul for 10 points of damage.`);
+  mete(`${HORA(10)}a hardened skeleton has been charmed.`);
+  // El encantado pega a otro bicho: es tuyo.
+  mete(`${HORA(12)}A hardened skeleton hits a ghoul for 100 points of damage.`);
+  mete(`${HORA(13)}A hardened skeleton hits a ghoul for 100 points of damage.`);
+  // El salvaje del mismo nombre te pega a ti: no lo es.
+  mete(`${HORA(14)}A hardened skeleton hits Campeon for 30 points of damage.`);
+  // Y uno contra otro: ambiguo.
+  mete(`${HORA(15)}A hardened skeleton hits a hardened skeleton for 50 points of damage.`);
+
+  const t = tr.current.totals();
+  const enc = t.rows.find((r) => r.charmed);
+  const salvaje = t.rows.find((r) => r.name === 'a hardened skeleton' && !r.charmed);
+
+  ok(!!enc, 'el encantado sale en su propia fila');
+  ok(enc?.damage === 200, 'con lo que pegó a otros bichos, y sólo eso', enc?.damage);
+  ok(salvaje?.damage === 80,
+    'y el salvaje con lo que te pegó a ti más el ambiguo', salvaje?.damage);
+  ok(enc?.name === salvaje?.name, 'los dos con el mismo nombre: es el mismo bicho');
+
+  ok(t.charm?.daño === 50, 'lo ambiguo se aparta y se cuenta', t.charm?.daño);
+  ok(t.charm?.golpes === 1, 'una sola vez por golpe, no dos', t.charm?.golpes);
+  ok(typeof t.charm?.estimadoTuyo === 'number',
+    'y se estima con el ritmo que cada uno demostró', t.charm?.estimadoTuyo);
+  ok(enc.damage === 200,
+    'lo estimado NO se suma al daño medido: medido y deducido nunca en la misma casilla',
+    enc.damage);
+}
+
+// ── 8. Sin encanto no cambia nada ──────────────────────────────────────────
+console.log('\nuna pelea normal');
+{
+  const tr = new Encuentros({ self: 'Campeon', idleSec: 20 });
+  const p = nuevo();
+  const mete = (l) => { const ev = p.parse(l); if (ev) tr.feed(ev); };
+  mete(`${HORA(10)}A hardened skeleton hits Campeon for 30 points of damage.`);
+  mete(`${HORA(11)}Campeon hits a hardened skeleton for 90 points of damage.`);
+  const t = tr.current.totals();
+  ok(!t.rows.some((r) => r.charmed), 'nadie sale marcado como encantado');
+  ok(t.charm === null, 'y no hay nada ambiguo que rotular', JSON.stringify(t.charm));
+  const f = t.rows.find((r) => r.name === 'a hardened skeleton');
+  ok(f?.damage === 30 && f?.taken === 90, 'una sola fila con sus dos mitades',
+    `${f?.damage}/${f?.taken}`);
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

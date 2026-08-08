@@ -153,6 +153,9 @@ export class Encounter {
     this.start = startT;
     this.end = startT;
     this.combatants = new Map();
+    // Lo que no se puede atribuir: golpes entre dos bichos del mismo nombre
+    // cuando uno está encantado. Se cuenta para poder decir cuánto no se sabe.
+    this.charmAmbiguo = { golpes: 0, daño: 0 };
     this.kills = [];
     this.closed = false;
     this.series = new Map();        // segundo -> {dmg, taken, heal} para la gráfica
@@ -232,6 +235,24 @@ export class Encounter {
    * probándolo salían tres nombres partidos en vez de cuatro — mejor, pero
    * todavía mal.
    */
+  /**
+   * El encantado y el salvaje del mismo nombre son dos combatientes.
+   *
+   * Se separan con una clave interna; el nombre que se enseña es el mismo, con
+   * la marca `charmed` al lado. Sin separarlos, la única alternativa era
+   * elegir un bando para todo el nombre y equivocarse en la mitad.
+   */
+  actorCharmed(name) {
+    const clave = `${name}\u0000charm`;
+    let c = this.combatants.get(clave);
+    if (!c) {
+      c = new Combatant(name);
+      c.charmed = true;
+      this.combatants.set(clave, c);
+    }
+    return c;
+  }
+
   actor(name) {
     let c = this.combatants.get(name);
     if (c) return c;
@@ -272,6 +293,9 @@ export class Encounter {
     const own = (c.last ?? 0) - (c.first ?? 0) + 1;
     return {
       name: c.name,
+      // El encantado se enseña con su nombre y esta marca al lado: es el
+      // mismo bicho, pero durante ese rato peleaba para ti.
+      charmed: c.charmed === true,
       damage: c.damage,
       dps: c.damage / inclusive,
       dpsOwn: c.damage / own,
@@ -307,7 +331,45 @@ export class Encounter {
     }
     rows.sort((a, b) => b.damage - a.damage || b.healingDone - a.healingDone);
     for (const r of rows) r.share = total ? r.damage / total : 0;
-    return { rows, total, healing, duration: inclusive, raidDps: total / inclusive };
+    return {
+      rows, total, healing, duration: inclusive, raidDps: total / inclusive,
+      charm: this.#charm(rows),
+    };
+  }
+
+  /**
+   * Lo que no se pudo atribuir del encanto, y una estimación de cuánto era
+   * tuyo — APARTE, nunca sumada a las filas.
+   *
+   * El reparto por objetivo resuelve casi todo: en el registro de referencia,
+   * 2.389 de daño atribuidos con certeza y 158 ambiguos, un 6,2%. Lo ambiguo
+   * son golpes entre dos bichos del MISMO nombre, uno encantado y otro no, y
+   * ahí el registro no da ninguna pista.
+   *
+   * `estimadoTuyo` reparte ese resto según el ritmo que cada uno demostró en
+   * lo que SÍ se pudo medir. Es una deducción y va rotulada como tal: no entra
+   * en el daño de nadie, viaja en su propio campo para que la interfaz pueda
+   * decir «de esto, tanto probablemente era tuyo» sin ensuciar una cifra
+   * medida. Medido y deducido nunca en la misma casilla.
+   *
+   * Si no hubo nada ambiguo —dos de las tres peleas— esto es cero y no hay
+   * nada que rotular.
+   */
+  #charm(rows) {
+    const amb = this.charmAmbiguo ?? { golpes: 0, daño: 0 };
+    if (!amb.daño) return null;
+    const tuyo = rows.filter((r) => r.charmed).reduce((a, r) => a + r.damage, 0);
+    const suyo = rows.filter((r) => !r.charmed
+      && rows.some((x) => x.charmed && x.name === r.name)).reduce((a, r) => a + r.damage, 0);
+    const base = tuyo + suyo;
+    return {
+      golpes: amb.golpes,
+      daño: amb.daño,
+      // Sin nada medido con lo que comparar, no se estima: se dice que no.
+      estimadoTuyo: base ? Math.round(amb.daño * (tuyo / base)) : null,
+      medidoTuyo: tuyo,
+      medidoSuyo: suyo,
+    };
   }
 }
 
@@ -494,8 +556,8 @@ export class EncounterTracker extends EventEmitter {
       // README, y el que lo recibe sí lo contabiliza.
       const huerfano = ev.confidence === 'none' && ev.source === 'Unknown';
       if (huerfano) enc.unattributed += ev.amount;
-      else if (ev.source) enc.actor(ev.source).addDamage(ev);
-      if (ev.target) enc.actor(ev.target).addTaken(ev);
+      else if (ev.source) this.#deQuien(enc, ev, true).addDamage(ev);
+      if (ev.target) this.#deQuien(enc, ev, false).addTaken(ev);
       if (!huerfano) enc.tick(ev.t, 'dmg', ev.amount);
       if (ev.source === this.self) enc.tick(ev.t, 'mine', ev.amount);
       if (ev.target === this.self) {
@@ -597,6 +659,53 @@ export class EncounterTracker extends EventEmitter {
     const e = enc.spellVsFoe.get(k) ?? { foe, spell, inv: inv ?? null, landed: 0, resisted: 0 };
     e[field] += 1;
     enc.spellVsFoe.set(k, e);
+  }
+
+  /**
+   * De quién es este golpe cuando hay un encantado con ese nombre.
+   *
+   * EL OBJETIVO DELATA AL ATACANTE, que es lo que resuelve el caso difícil:
+   * dos bichos con el mismo nombre, uno encantado y otro no, y el registro sin
+   * forma de distinguirlos. No hace falta distinguirlos:
+   *
+   *   - un salvaje NO pega a otros bichos  -> si pega a un bicho, es el tuyo
+   *   - un encantado NO te pega a ti       -> si te pega, es el salvaje
+   *   - y a ti no te da por pegar al tuyo  -> si le pegas, es el salvaje
+   *
+   * Medido en el peor caso del registro de referencia —los dos «a hardened
+   * skeleton» a la vez durante 1m42s—: 727 de daño a otros bichos, 60 a mí y
+   * 158 de un «X pega a X». O sea 83,3% resuelto sin estimar nada.
+   *
+   * Ese resto, el X contra X, es el único de verdad ambiguo. No se reparte a
+   * ojo: se aparta en `charmAmbiguo` y se cuenta, para que la interfaz pueda
+   * decir cuánto no sabe en vez de inventarlo.
+   */
+  #deQuien(enc, ev, esFuente) {
+    const nombre = esFuente ? ev.source : ev.target;
+    const otro = esFuente ? ev.target : ev.source;
+    const marcado = esFuente ? ev.charmSrc : ev.charmTgt;
+    if (!marcado) return enc.actor(nombre);
+
+    // X contra X: los dos extremos son el mismo nombre y los dos podrían ser
+    // cualquiera de los dos bichos.
+    if (otro && otro === nombre) {
+      // Se cuenta una sola vez por golpe: esto se llama dos veces, una por el
+      // que pega y otra por el que recibe, y sin la condición el ambiguo salía
+      // exactamente al doble — 316 donde el registro tiene 158.
+      if (esFuente) {
+        enc.charmAmbiguo.golpes++;
+        enc.charmAmbiguo.daño += ev.amount || 0;
+      }
+      return enc.actor(nombre);
+    }
+
+    const mio = this.#mine();
+    if (esFuente) {
+      // Pega a los tuyos -> es el salvaje. Pega a otra cosa -> es el tuyo.
+      return mio.has(otro) ? enc.actor(nombre) : enc.actorCharmed(nombre);
+    }
+    // Lo golpea alguien: si eres tú, le estás pegando al salvaje.
+    return mio.has(otro) ? enc.actor(nombre) : enc.actorCharmed(nombre);
   }
 
   /** Tú y tus mascotas. */
