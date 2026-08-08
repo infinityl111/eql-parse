@@ -320,6 +320,25 @@ const rules = [
   { kind: 'coin', hint: 'from the corpse', re: /^You receive (.+?) from the corpse\.$/, map: (m) => ({ coin: m[1] }) },
   { kind: 'con', hint: ' -- ', re: /^(.+?) (?:scowls at you|glares at you|glowers at you|regards you|looks at you|considers you|judges you|kindly considers you|ponders your|looks upon you)[^-]*-- (.+?)(?: \(Lvl: (\d+)\))?$/, map: (m) => ({ mob: m[1], con: m[2], level: m[3] ? +m[3] : null }) },
   { kind: 'logging', hint: 'Logging to', re: /^Logging to '(.+?)' is now \*(ON|OFF)\*\.$/, map: (m) => ({ file: m[1], on: m[2] === 'ON' }) },
+  // ── El encanto del encantador ────────────────────────────────────────────
+  //
+  // Encantas a un enemigo y pelea para ti; cuando se rompe, vuelve a atacarte.
+  // El mismo nombre cambia de bando a mitad de la pelea, y hasta ahora estas
+  // dos líneas eran desconocidas: la aplicación se enteraba de que el bicho
+  // era tuyo —porque responde «Master», igual que una mascota de verdad— pero
+  // no de cuándo dejaba de serlo. Así que seguía contándolo de los tuyos
+  // después de romperse, y lo que te pegaba caía en el cajón equivocado.
+  //
+  // Medido sobre un registro real: cuatro encantos, los cuatro con final
+  // registrado —dos por «worn off» y dos porque el bicho muere—.
+  { kind: 'charm_on', hint: 'has been charmed',
+    re: /^(.+?) has been charmed\.$/, map: (m) => ({ target: m[1] }) },
+  { kind: 'charm_off', hint: 'Charm spell has worn off',
+    re: /^Your Charm spell has worn off of (.+?)\.$/, map: (m) => ({ target: m[1] }) },
+  // Los intentos fallidos no abren ventana, pero dejan de ser desconocidos.
+  { kind: 'noise', hint: 'cannot be charmed', re: /^This NPC cannot be charmed\.$/, map: () => ({}) },
+  { kind: 'noise', hint: 'resisted your Charm', re: /^(.+?) resisted your Charm!$/, map: (m) => ({ target: m[1] }) },
+
   // /pet who leader -> "Vaseker says, 'My leader is Campeon.'"  Fuente fiable:
   // en EQL cada invocación cambia el nombre, así que no vale memorizarlos.
   { kind: 'pet_leader', hint: 'My leader is', re: /^(.+?) says,? 'My leader is (.+?)\.?'$/, map: (m) => ({ pet: m[1], leader: m[2] }) },

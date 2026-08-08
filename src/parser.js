@@ -52,6 +52,15 @@ export class Parser {
     this.castWindow = (opts.castWindowSec ?? 12);
     this.recentCasts = [];      // [{t, source, ability}]
     this.pets = new Map();      // nombre de mascota -> dueño (confirmadas)
+    // Los encantados: nombre -> LISTA de ventanas { desde, hasta }. Aparte de
+    // `pets` porque un encantado es tuyo DURANTE UN RATO y luego vuelve a ser
+    // enemigo, con el mismo nombre; una mascota invocada no hace eso.
+    //
+    // Y una lista, no una ventana suelta: al mismo bicho lo encantas varias
+    // veces. En el registro de referencia hay cuatro encantos sobre tres
+    // nombres, y guardando sólo la última el primero de «a hardened skeleton»
+    // se perdía —dos peleas distintas, con veinte minutos de por medio—.
+    this.charmed = new Map();
     this.manualPets = new Set(); // las que has dicho tú: mandan sobre lo detectado
     this.petMaybe = new Set();  // sospechosas, sin confirmar
     this.otherPets = new Map(); // mascota ajena -> dueño, sacado de su /pet who leader
@@ -108,7 +117,13 @@ export class Parser {
    * ocurren: «My leader is <tú>», «told you 'Attacking… Master'» y tus propias
    * órdenes. Lo que se corrige no es la señal, es darla por buena para siempre.
    */
-  #ownPet(name) {
+  #ownPet(nombre) {
+    // Normalizado como cualquier otro nombre. Sin esto, «A hardened skeleton»
+    // —que es como EQ lo escribe al empezar la frase de «told you… Master»—
+    // se guardaba con la mayúscula y no casaba con sus propias filas de
+    // combate, que van en minúscula. Medido: el encantado salía en la lista
+    // de mascotas y no se le atribuía ni un golpe.
+    const name = this.#norm(nombre);
     if (!name) return;
     // Retirar la anterior es correcto —sólo se tiene una a la vez— salvo que la
     // hubieras puesto TÚ. Lo que dices a mano no lo deshace una detección: si
@@ -121,6 +136,50 @@ export class Parser {
     this.pets.set(name, this.self ?? 'You');
     this.petMaybe.delete(name);
     this.currentPet = name;
+  }
+
+  /**
+   * Abre la ventana del encanto: a partir de aquí pelea para ti.
+   *
+   * El registro lo dice con todas las letras —«X has been charmed.»— así que
+   * esto es MEDIDO, no deducido. Lo que no dice es CUÁL de los X, si hay dos
+   * con el mismo nombre; eso se resuelve por objetivo, no aquí.
+   */
+  #charmOn(nombre, t) {
+    const name = this.#norm(nombre);
+    if (!name) return;
+    if (!this.charmed.has(name)) this.charmed.set(name, []);
+    const v = this.charmed.get(name);
+    // Si quedaba una abierta, encantarlo otra vez la cierra: no puede estar
+    // encantado dos veces a la vez.
+    const ultima = v.at(-1);
+    if (ultima && ultima.hasta === null) ultima.hasta = t ?? 0;
+    v.push({ desde: t ?? 0, hasta: null });
+  }
+
+  /**
+   * Y la cierra: «Your Charm spell has worn off of X.», o su muerte.
+   *
+   * Cerrarla importa más que abrirla. Sin esto el bicho seguía contando como
+   * tuyo el resto de la pelea, así que lo que te pegaba después de soltarse
+   * caía en el cajón de los tuyos. En el registro de referencia los cuatro
+   * encantos tienen final: dos por este aviso y dos porque el bicho muere.
+   * Con n=4 no se puede afirmar que SIEMPRE haya aviso, y por eso la muerte
+   * cierra también: dos caminos para no depender de uno.
+   */
+  #charmOff(nombre, t) {
+    const name = this.#norm(nombre);
+    const v = name && this.charmed.get(name);
+    const ultima = v && v.at(-1);
+    if (!ultima || ultima.hasta !== null) return;
+    ultima.hasta = t ?? 0;
+  }
+
+  /** ¿Estaba encantado en este instante? */
+  charmedAt(nombre, t) {
+    const v = this.charmed.get(this.#norm(nombre));
+    if (!v) return false;
+    return v.some((c) => t >= c.desde && (c.hasta === null || t <= c.hasta));
   }
 
   /**
@@ -204,7 +263,30 @@ export class Parser {
 
       case 'pet_claim':
         // Lo que te responde con "Master" obedece órdenes tuyas.
+        //
+        // Salvo si es un encantado: responde «Master» igual que una mascota
+        // invocada, pero NO ocupa su sitio. Medido en un registro real: al
+        // encantar, `Kabarer` —la mascota de verdad— desaparecía de la lista,
+        // porque `#ownPet` retira la anterior. Se tiene una invocada y todos
+        // los encantados que te duren.
+        if (this.charmedAt(ev.pet, ev.t)) break;
         this.#ownPet(ev.pet);
+        break;
+
+      case 'charm_on':
+        this.#charmOn(ev.target, ev.t);
+        break;
+
+      case 'charm_off':
+        this.#charmOff(ev.target, ev.t);
+        break;
+
+      case 'death':
+        // Morirse también cierra el encanto, y hace falta: de los cuatro del
+        // registro de referencia, dos acabaron así y nunca dieron el aviso de
+        // «worn off». Depender sólo del aviso dejaría la ventana abierta para
+        // siempre en la mitad de los casos.
+        this.#charmOff(ev.victim, ev.t);
         break;
 
       case 'pet_order':
