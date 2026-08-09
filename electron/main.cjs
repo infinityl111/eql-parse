@@ -11,6 +11,7 @@ const DEFAULTS = {
   logPath: null, self: null, idleSec: 20, fromStart: false,
   overlayBounds: null, clickThrough: false, classes: null, theme: 'dark', narrate: null, lang: 'es', onboarded: false,
   skipVersion: null, trios: [], mergePets: false, myPets: [], notPets: [], fpsWarned: false, excluded: [],
+  avisoModelo: false,
   notCompanions: [], companionSrc: {},
   raidMobs: {},
   companions: [],
@@ -51,6 +52,9 @@ let pushTimer = null;
 let wiki = null;      // cliente de la wiki
 let latest = null;    // { version, url } si hay una versión más nueva publicada
 let migration = null; // { needed, from, fights } si el almacén es de una versión anterior
+// { needed, fights } si hay peleas por debajo del modelo de medición vigente:
+// sus cifras van a cambiar solas al leerlas y hay que decirlo una vez.
+let avisoModelo = null;
 
 /**
  * El repositorio, para mirar si hay versión nueva.
@@ -182,6 +186,10 @@ async function boot() {
   // aplicación: quien tenga la 1.0.7 instalada no va a leer las notas.
   // Un almacén vacío no tiene nada que corregir: se marca y en paz.
   migration = engine.store.migration();
+  // ANTES de sellar: sellar es lo que apaga esta condición, así que preguntarlo
+  // después daría siempre que no hace falta avisar de nada.
+  avisoModelo = engine.store.avisoModelo();
+  if (cfg.avisoModelo) avisoModelo = { ...avisoModelo, needed: false };
   if (!migration.needed) engine.store.stamp();
   import('../src/wiki.js').then(({ WikiClient }) => { wiki = new WikiClient(app.getPath('userData')); });
   triggerDefs = loadTriggers() ?? STARTER_TRIGGERS;
@@ -631,6 +639,9 @@ ipcMain.handle('pets:merge', (_e, v) => { cfg.mergePets = !!v; saveConfig(cfg); 
 
 // ── Migración del almacén ───────────────────────────────────────────────
 ipcMain.handle('store:migration', () => migration);
+ipcMain.handle('store:avisoModelo', () => avisoModelo);
+// La marca sólo sirve para no repetirlo. Quién lo ve lo decide `avisoModelo()`.
+ipcMain.handle('store:avisoModeloVisto', () => { cfg.avisoModelo = true; saveConfig(cfg); return true; });
 
 /**
  * Reconstruye el histórico desde el log, con el motor parado.

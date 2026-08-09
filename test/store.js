@@ -175,9 +175,9 @@ console.log('\nposturas que evaden');
 // ── 6. Migración: detectar almacenes de versiones anteriores ──────────────
 console.log('\nmigración del almacén');
 {
-  const { STORE_VERSION, generacion } = await import('../src/store.js');
+  const { FORMATO_VERSION, RECONSTRUIR_DESDE, generacion } = await import('../src/store.js');
 
-  ok(STORE_VERSION >= 2, 'la generación de los datos va por su cuenta, no por la versión de la app');
+  ok(FORMATO_VERSION >= 2, 'la generación de los datos va por su cuenta, no por la versión de la app');
   ok(generacion(null) === 0 && generacion({}) === 0, 'sin marca es la generación 0');
   ok(generacion({ version: '1.1.0' }) === 0,
     'una marca con formato de versión también: no es una generación');
@@ -201,17 +201,32 @@ console.log('\nmigración del almacén');
     `${m.from} · ${m.fights} peleas`);
 
   // Una vez marcado, no se vuelve a preguntar.
-  s2.stamp(STORE_VERSION);
+  s2.stamp(FORMATO_VERSION);
   const s3 = new FightStore(viejo); s3.load();
   ok(s3.migration().needed === false, 'tras marcarlo ya no pide migración');
-  ok(s3.meta()?.version === STORE_VERSION, 'y la marca dice la versión', s3.meta()?.version);
+  ok(s3.meta()?.version === FORMATO_VERSION, 'y la marca dice la versión', s3.meta()?.version);
 
-  // Marcado con una generación anterior: vuelve a pedirla. Es lo que pasa
-  // cuando un arreglo del parser invalida lo guardado, como el doble conteo de
-  // muertes que trajo la generación 2.
-  s3.stamp(STORE_VERSION - 1);
+  // MARCADO POR DEBAJO DE `RECONSTRUIR_DESDE`: vuelve a pedirla. Es lo que pasa
+  // cuando un arreglo del parser invalida lo guardado y no hay forma de
+  // corregirlo leyéndolo mejor, como el doble conteo de muertes de la
+  // generación 2.
+  //
+  // ANTES ESTA PRUEBA USABA `FORMATO_VERSION - 1`, y era correcta mientras los
+  // dos conceptos fueron el mismo número. Desde la 1.11.0 no lo son: el formato
+  // puede subir sin que haya que reconstruir nada, que es justo lo que hace esa
+  // versión. Esta prueba falló al separarlos, y falló bien.
+  s3.stamp(RECONSTRUIR_DESDE - 1);
   const s4 = new FightStore(viejo); s4.load();
-  ok(s4.migration().needed === true, 'una generación anterior vuelve a pedir migración');
+  ok(s4.migration().needed === true, 'por debajo del umbral de reconstruir, se pide');
+
+  // Y la otra mitad de la distinción: sellado en el umbral pero por debajo del
+  // formato de hoy, NO se pide reconstruir aunque lo guardado sea de antes.
+  s4.stamp(RECONSTRUIR_DESDE);
+  const s4b = new FightStore(viejo); s4b.load();
+  ok(s4b.migration().needed === false,
+    'sellado en el umbral, un formato nuevo NO obliga a reconstruir');
+  ok(generacion(s4b.meta()) < FORMATO_VERSION,
+    'aunque el formato haya subido por encima', `${generacion(s4b.meta())} < ${FORMATO_VERSION}`);
   // Y una marca de las de antes, con formato de versión, también.
   s4.stamp('1.1.0');
   const s5 = new FightStore(viejo); s5.load();

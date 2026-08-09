@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 /**
+ * MIGRACIÓN PUNTUAL, NO UNA HERRAMIENTA. Se escribió para UN almacén concreto
+ * —el del autor, el 9 de agosto de 2026— y por eso lleva dos marcas de tiempo
+ * codificadas en `EXCEPCIONES`. No se parametriza a propósito: `bin/` no entra
+ * en `build.files`, así que no se empaqueta y nadie más va a ejecutarla.
+ * Queda en el repositorio como registro de qué se recalculó y qué no.
+ *
  * Reparte el daño recibido de las peleas ya guardadas por la postura de cada
  * golpe, releyendo el registro.
  *

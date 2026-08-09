@@ -92,28 +92,70 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  *                   asi que el reproductor y las tablas la dan por ausente en
  *                   todo el historico.
  *
- * SUBIR ESTE NUMERO ES LO QUE HACE QUE EL ARREGLO LLEGUE. El aviso de
- * reconstruir se dispara con `generacion(meta) < STORE_VERSION` y con nada mas:
- * corregir el calculo y no tocar esto deja el arreglo escrito en el codigo y
- * fuera del historico de todo el mundo. Al cambiarlo, repasa `mig.body` — el
- * cartel explica los motivos de ESTA migracion, y un texto puesto por un motivo
- * que ya no aplica sobrevive porque nadie lo relee.
+ *   7               La postura no mitiga el daño periódico ni el escudo de daño
+ *                   y se estaba revirtiendo como si lo hiciera; el daño
+ *                   recibido pasa a guardarse partido por la postura de cada
+ *                   golpe, y la serie por segundo de dos cubos a tres.
+ *
+ * ESTE NÚMERO ERAN DOS PREGUNTAS EN UNA, Y HASTA LA 1.11.0 NUNCA SE SEPARARON
+ * PORQUE SIEMPRE HABÍAN COINCIDIDO.
+ *
+ *   ¿Ha cambiado lo que se escribe?     → `FORMATO_VERSION`, aquí abajo.
+ *   ¿Hay que releer el registro entero? → `RECONSTRUIR_DESDE`.
+ *
+ * Trece versiones seguidas las dos respuestas fueron la misma, así que un solo
+ * número las servía y nadie notó que eran dos. La 1.11.0 es la primera vez que
+ * discrepan: el formato SÍ cambia, y reconstruir NO hace falta —el importe
+ * observado está guardado al lado del reconstruido, así que la corrección se
+ * hace al leer— y además hoy sería PELIGROSO, porque el cierre de pelea usa el
+ * reloj de pared en directo y la marca del registro al reconstruir, y con un
+ * hueco de exactamente `idleSec` cada camino parte la pelea de una manera (ver
+ * el comentario de `tick()` en `src/encounter.js`).
+ *
+ * Mientras estuvieron pegadas, la única forma de decir «el formato cambió pero
+ * no reconstruyas» era no subir el número —y entonces la guarda de formato no
+ * saltaba y el cambio pasaba en silencio, que es justo el fallo que costó trece
+ * versiones—. Separadas, no hay que elegir: se sube el formato SIEMPRE y el
+ * cartel se decide aparte.
  */
-export const STORE_VERSION = 6;
+
+/**
+ * Sube SIEMPRE que cambie lo que se escribe a disco. Sin excepciones y sin
+ * ramas de escape: `test/formato.js` no deja publicar sin subirlo.
+ */
+export const FORMATO_VERSION = 7;
+
+/**
+ * Por debajo de esta generación, lo guardado NO se puede arreglar leyéndolo
+ * mejor y hay que releer el registro. Es lo único que saca el cartel de
+ * reconstruir.
+ *
+ * SE QUEDA EN 6 A PROPÓSITO. La 1.11.0 sube el formato a 7 y no toca esto,
+ * porque su corrección se hace al leer. Quien no reconstruyó cuando la 1.10.0
+ * se lo pidió sigue por debajo de 6 y sigue viendo el cartel; quien sí lo hizo
+ * no lo ve, y hace bien.
+ *
+ * Al subirlo, repasa `mig.body` — el cartel explica los motivos de ESA
+ * migración, y un texto puesto por un motivo que ya no aplica sobrevive porque
+ * nadie lo relee.
+ */
+export const RECONSTRUIR_DESDE = 6;
+
 const META = 'store.json';
 
 /**
- * MODELO DE MEDICIÓN. Es otra pregunta distinta de las dos anteriores.
+ * MODELO DE MEDICIÓN. Es la cuarta pregunta, y las cuatro son distintas.
  *
- *   package.json      qué versión del programa es esto
- *   STORE_VERSION     lo guardado está roto y hay que releer el registro
- *   MODELO_MEDICION   con qué reglas se calcularon las cifras de ESTA pelea
+ *   package.json        qué versión del programa es esto
+ *   FORMATO_VERSION     ha cambiado lo que se escribe a disco
+ *   RECONSTRUIR_DESDE   hay que releer el registro entero
+ *   MODELO_MEDICION     con qué reglas se calcularon las cifras de ESTA pelea
  *
- * Y va POR PELEA, que es lo que STORE_VERSION no puede hacer: aquélla marca el
- * almacén entero, así que en cuanto una parte del histórico se corrige y otra
- * no, deja de describir lo que hay dentro. Un número por pelea sí, y por eso no
- * es un booleano: «reparada: true» no dice reparada de qué ni a qué, y el
- * modelo que viene después lo deja mudo otra vez.
+ * Y va POR PELEA, que es lo que ninguna de las otras tres puede hacer: marcan
+ * el almacén entero, así que en cuanto una parte del histórico se corrige y
+ * otra no, dejan de describir lo que hay dentro. Un número por pelea sí, y por
+ * eso no es un booleano: «reparada: true» no dice reparada de qué ni a qué, y
+ * el modelo que viene después lo deja mudo otra vez.
  *
  *   1  La postura revertía TAMBIÉN el daño periódico y el escudo de daño, que
  *      medidos no los mitiga (ver `mitigationFor`). Y las cifras reconstruidas
@@ -132,13 +174,17 @@ const META = 'store.json';
  *      daño que ninguna postura para. Ahora son tres, con la misma lista que el
  *      resto del programa.
  *
- * NO SE SUBE `STORE_VERSION` POR ESTO, y es la propia regla de arriba la que lo
- * dice: se sube cuando lo guardado no se puede arreglar leyéndolo mejor. Esto
- * sí se puede — el importe observado está guardado al lado del reconstruido, en
- * `takenByType`, así que la corrección es una copia exacta y se hace al leer,
- * como ya se hacía con la dificultad que faltaba. Ningún fichero se toca, no
- * hay que pedirle a nadie que reconstruya su histórico, y una reconstrucción
- * posterior escribe exactamente lo mismo.
+ * ESTO SUBE `FORMATO_VERSION` Y NO TOCA `RECONSTRUIR_DESDE`, y ésa es la
+ * distinción que la 1.11.0 estrenó. Lo escrito cambia —hay campos nuevos y
+ * cifras distintas— así que el formato sube y la guarda lo exige. Pero no hace
+ * falta releer el registro: el importe observado está guardado al lado del
+ * reconstruido, en `takenByType`, así que la corrección es una copia exacta y
+ * se hace al leer, como ya se hacía con la dificultad que faltaba.
+ *
+ * El precio de hacerlo así, dicho: las cifras de las peleas ya guardadas
+ * CAMBIAN SOLAS la primera vez que se abren, sin que nadie pulse nada. Por eso
+ * hay un aviso puntual colgado de esa misma condición (ver `avisoModelo`): un
+ * histórico que cambia sin avisar es exactamente lo que este programa no hace.
  */
 export const MODELO_MEDICION = 4;
 
@@ -351,7 +397,7 @@ export class FightStore {
     catch { return null; }
   }
 
-  stamp(version = STORE_VERSION) {
+  stamp(version = FORMATO_VERSION) {
     try {
       fs.mkdirSync(this.dir, { recursive: true });
       fs.writeFileSync(path.join(this.dir, META),
@@ -367,14 +413,37 @@ export class FightStore {
    * corregir, se marca y en paz. Sin marca y con peleas dentro significa que lo
    * escribió una versión anterior a que la marca existiera, o sea la 1.0.x.
    */
+  /**
+   * ¿Hay que avisar de que las cifras van a cambiar solas?
+   *
+   * EL DISPARADOR ES TENER PELEAS POR DEBAJO DEL MODELO VIGENTE, no una marca
+   * en la configuración. La marca sirve para no repetir el aviso; decidir si
+   * toca es otra cosa, y colgarlo de la marca haría que un usuario nuevo —sin
+   * histórico y sin nada que corregir— viera un cartel sobre cifras que no
+   * tiene.
+   *
+   * Se responde con lo que ya está en disco y sin abrir ninguna pelea: si el
+   * almacén está sellado por debajo del formato de hoy, todo lo que contiene se
+   * escribió con reglas anteriores. Leer las 441 peleas para contarlas una a
+   * una costaría más que el aviso.
+   */
+  avisoModelo() {
+    const fights = this.index.length;
+    const desde = generacion(this.meta());
+    return {
+      needed: fights > 0 && desde < FORMATO_VERSION,
+      fights, desde, formato: FORMATO_VERSION, modelo: MODELO_MEDICION,
+    };
+  }
+
   migration() {
     const m = this.meta();
     const fights = this.index.length;
     const from = m?.version ?? null;
-    if (!fights) return { needed: false, from, fights, current: STORE_VERSION };
+    if (!fights) return { needed: false, from, fights, current: RECONSTRUIR_DESDE };
     return {
-      needed: generacion(m) < STORE_VERSION,
-      from, fights, current: STORE_VERSION,
+      needed: generacion(m) < RECONSTRUIR_DESDE,
+      from, fights, current: RECONSTRUIR_DESDE,
     };
   }
 
