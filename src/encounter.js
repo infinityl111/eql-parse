@@ -1,4 +1,21 @@
 import { EventEmitter } from 'node:events';
+import { SIN_MITIGACION } from './stances.js';
+
+/**
+ * En cuál de los tres cubos cae un golpe que recibes, EN UN SOLO SITIO.
+ *
+ * Melé, mágico, y lo que ninguna postura para. La tercera categoría no es un
+ * matiz: si el daño periódico y el escudo caen en el cubo mágico, cualquiera
+ * que mire la serie para preguntar «¿qué me está entrando?» concluye que es
+ * mágico y decide con eso —cortar una fase, recomendar una postura— sobre un
+ * daño que ninguna postura toca.
+ *
+ * Y sale de `SIN_MITIGACION`, la misma lista que usan el analizador al revertir,
+ * el almacén al corregir lo guardado y el consejero al puntuar. Un cuarto
+ * criterio propio aquí sería el cuarto sitio donde discrepar.
+ */
+export const cuboRecibido = (school) => (school === 'melee' ? 'tMelee'
+  : (SIN_MITIGACION.has(school) ? 'tUnmit' : 'tSpell'));
 
 export const DAMAGE_KINDS = new Set(['melee', 'spell', 'dot', 'ds']);
 
@@ -193,6 +210,25 @@ class Combatant {
     this.takenByType = new Map();
     this.rawTakenByType = new Map();   // sin mitigar, para el consejo de postura
     this.rawMeleeOut = 0;              // melé propio sin el bono de Offensive
+    /**
+     * EL DAÑO RECIBIDO, PARTIDO POR LA POSTURA QUE LLEVABAS EN CADA GOLPE.
+     *
+     * Sin esto, `rawTakenByType` funde en un solo cubo los golpes de todas las
+     * posturas de la pelea, y el consejo no tiene más remedio que colapsar la
+     * pelea a UNA postura —la que más duró— para decir cuánto evitaste. En una
+     * pelea donde bailas eso es falso por construcción: te acredita la postura
+     * equivocada durante todos los tramos que no eran suyos.
+     *
+     * Se agrupa POR POSTURA y no por franja, y no se pierde nada: lo que evita
+     * una postura es lineal en el daño, así que sumar dos tramos de Defensive
+     * en un cubo da exactamente lo mismo que llevarlos por separado. Cuándo fue
+     * cada tramo ya está en `stanceSpans`.
+     *
+     * Los fallos también entran: una postura que evade no reduce el golpe, lo
+     * quita, y eso se puntúa contando ataques. Sin los fallos del tramo no se
+     * sabe cuántos ataques hubo en él.
+     */
+    this.takenByStance = new Map();
     this.takenBySource = new Map();
     this.deaths = 0;
 
@@ -357,18 +393,38 @@ class Combatant {
     this.#touch(ev.t);
   }
 
+  /** El cubo de una postura, creándolo si es el primer golpe bajo ella. */
+  #tramo(stance) {
+    const k = stance ?? '';
+    let t = this.takenByStance.get(k);
+    if (!t) {
+      t = { stance: stance ?? null, melee: 0, spell: 0, unmit: 0, n: 0, landed: 0, avoided: 0 };
+      this.takenByStance.set(k, t);
+    }
+    return t;
+  }
+
   addTaken(ev) {
     this.taken += ev.amount;
     this.swingsAgainst++;
     push(this.takenByType, ev.damageType ?? ev.school ?? 'other', ev.amount, false);
     push(this.rawTakenByType, ev.school === 'melee' ? 'melee' : (ev.damageType ?? ev.school ?? 'other'), ev.rawAmount ?? ev.amount, false);
     push(this.takenBySource, ev.source ?? 'desconocido', ev.amount, false);
+    // Y el mismo golpe otra vez, bajo la postura que llevabas puesta. Los tres
+    // cubos son los del consejero: melé, mágico y lo que ninguna postura para.
+    const t = this.#tramo(ev.stanceAtHit);
+    const raw = ev.rawAmount ?? ev.amount;
+    t.n++;
+    if (ev.school === 'melee') { t.melee += raw; t.landed++; }
+    else if (SIN_MITIGACION.has(ev.school)) t.unmit += raw;
+    else t.spell += raw;
     this.#touch(ev.t);
   }
 
   addAvoided(ev) {
     this.swingsAgainst++;
     push(this.defense, ev.reason ?? 'fallo', 0, false);
+    this.#tramo(ev.stanceAtHit).avoided++;
   }
 
   addHealDone(ev) {
@@ -470,7 +526,11 @@ export class Encounter {
   tick(t, field, amount) {
     const k = Math.max(0, Math.round(t - this.start));
     let b = this.series.get(k);
-    if (!b) b = { s: k, dmg: 0, taken: 0, heal: 0, tMelee: 0, tSpell: 0, mine: 0 };
+    // `tUnmit` es el tercer cubo del daño que recibes: lo que ninguna postura
+    // para. Estaba dentro de `tSpell`, así que todo consumidor de la serie que
+    // preguntara «¿cuánto mágico me está entrando?» contaba también el daño
+    // periódico y el escudo, y decidía con ello. Ver `SIN_MITIGACION`.
+    if (!b) b = { s: k, dmg: 0, taken: 0, heal: 0, tMelee: 0, tSpell: 0, tUnmit: 0, mine: 0 };
     this.series.set(k, b);
     b[field] += amount;
   }
@@ -593,6 +653,10 @@ export class Encounter {
       defense: [...c.defense].sort((a, b) => b[1].n - a[1].n),
       takenByType: sorted(c.takenByType), takenBySource: sorted(c.takenBySource),
       rawTakenByType: sorted(c.rawTakenByType), rawMeleeOut: c.rawMeleeOut,
+      // Sólo si hubo golpes bajo alguna postura conocida: en una pelea sin
+      // postura observada, una lista con un cubo `null` no dice nada y encima
+      // se confundiría con haber medido algo.
+      takenByStance: [...c.takenByStance.values()].filter((t) => t.stance && (t.n || t.avoided)),
       healBySpell: sorted(c.healBySpell), healByTarget: sorted(c.healByTarget),
     };
   }
@@ -914,7 +978,11 @@ export class EncounterTracker extends EventEmitter {
         // postura tramo a tramo, sólo la media de toda la pelea.
         const raw = ev.rawAmount ?? ev.amount;
         enc.tick(ev.t, 'taken', ev.amount);
-        enc.tick(ev.t, ev.school === 'melee' ? 'tMelee' : 'tSpell', raw);
+        // Los tres cubos salen de la MISMA lista que usan el analizador, el
+        // almacén y el consejero. Aquí ponía «lo que no es melé es mágico», y
+        // ésa es la decisión que ningún consumidor debe volver a tomar por su
+        // cuenta: en cuanto hay dos criterios, discrepan.
+        enc.tick(ev.t, cuboRecibido(ev.school), raw);
       }
       if (ev.target) {
         const b = enc.targetTotals.get(ev.target) ?? 0;
@@ -997,6 +1065,38 @@ export class EncounterTracker extends EventEmitter {
     this.emit('update', enc, ev);
   }
 
+  /**
+   * PENDIENTE, Y NO ES UN DETALLE: EL ALMACÉN NO ES FUNCIÓN PURA DEL REGISTRO.
+   *
+   * Una pelea se puede cerrar por dos caminos y NO usan el mismo reloj:
+   *
+   *   `feed`, línea 830   `ev.t - this.current.end > this.idleSec`
+   *                       reloj del REGISTRO. Es el que corre al reconstruir.
+   *   `tick`, aquí        `nowSec - this.current.end > this.idleSec`, y quien
+   *                       lo llama es `engine.js:893` con `Date.now()/1000`:
+   *                       reloj de PARED. Sólo corre en directo.
+   *
+   * Con un hueco de EXACTAMENTE `idleSec` los dos caminos deciden distinto. El
+   * registro da 20,0 y `20 > 20` es falso, así que en frío la pelea NO se parte;
+   * en directo el reloj de pared sigue corriendo entre líneas, llega a 20,4
+   * antes de que aparezca la siguiente y la pelea SÍ se parte.
+   *
+   * CASO REAL MEDIDO (9 de agosto de 2026, 428 peleas). Última línea de combate
+   * a las 11:48:33, siguiente a las 11:48:53, `idleSec` = 20. En directo se
+   * guardaron dos peleas (334 s y 210 s); releyendo en frío sale una sola de
+   * 563 s. Es la ÚNICA discrepancia de todo el histórico —las otras 426 peleas
+   * emparejadas coinciden campo por campo— pero basta para que `store:rebuild`
+   * no reproduzca lo que había, y para que dos usuarios con el mismo registro
+   * puedan acabar con historiales distintos.
+   *
+   * EL ARREGLO es que el cierre se decida SIEMPRE con la marca del registro.
+   * Y tiene una arista que hay que resolver al hacerlo, no después: si `tick`
+   * deja de poder cerrar, una pelea interrumpida por cerrar el juego se queda
+   * abierta para siempre, porque no va a llegar ninguna línea más. Así que no
+   * vale con borrar esta comprobación: hace falta que cerrar por reloj de pared
+   * no fije la frontera que se guarda, o que lo haga con margen suficiente para
+   * que ninguna línea que el registro pondría dentro llegue después.
+   */
   tick(nowSec) {
     if (!Number.isFinite(this.idleSec)) return;   // acumulador de sesión: no se cierra
     if (this.current && nowSec - this.current.end > this.idleSec) this.#close();

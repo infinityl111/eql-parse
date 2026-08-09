@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { FightStore, STORE_VERSION } from '../src/store.js';
+import { FightStore, FORMATO_VERSION } from '../src/store.js';
 import { Encyclopedia, ENC_VERSION } from '../src/encyclopedia.js';
 
 /**
@@ -122,7 +122,7 @@ console.log('\ncuándo se sabe que va desfasada');
   const leer = () => JSON.parse(fs.readFileSync(p, 'utf8'));
   const escribir = (o) => fs.writeFileSync(p, JSON.stringify(o));
 
-  ok(leer().version === ENC_VERSION && leer().storeVersion === STORE_VERSION,
+  ok(leer().version === ENC_VERSION && leer().storeVersion === FORMATO_VERSION,
     'se guarda con su generación y con la del almacén');
 
   // 1. Otra generación de la ficha.
@@ -132,7 +132,7 @@ console.log('\ncuándo se sabe que va desfasada');
 
   // 2. El almacén se corrigió y se releyó el log.
   enc.flush();
-  escribir({ ...leer(), storeVersion: STORE_VERSION - 1 });
+  escribir({ ...leer(), storeVersion: FORMATO_VERSION - 1 });
   r = new Encyclopedia(store).load();
   ok(r.rebuilt && r.reason === 'almacen-corregido',
     'si el histórico se corrigió, lo contado antes ya no describe nada', r.reason);

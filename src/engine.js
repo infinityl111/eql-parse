@@ -10,10 +10,11 @@ import { TriggerEngine } from './triggers.js';
 import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
 import { setLang } from './i18n.js';
-import { FightStore } from './store.js';
+import { FightStore, MODELO_MEDICION } from './store.js';
 import { Encyclopedia } from './encyclopedia.js';
 import { aggregate, mergePets, mergeOwnerPets, ownerPets, ensureSides } from './aggregate.js';
-import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS } from './stances.js';
+import { inferClasses, availableFor, normStance, normInvocation, STANCES, INVOCATIONS,
+  SIN_MITIGACION } from './stances.js';
 import { parseZone } from './zones.js';
 import { catalog, spellDetail, spellbook } from './catalog.js';
 import { proofOf } from './classes.js';
@@ -950,6 +951,12 @@ export class Engine extends EventEmitter {
       absorbed: r.absorbed ?? 0, absorbHits: r.absorbHits ?? 0,
       takenByType: this.#b(r.takenByType),
       rawTakenByType: this.#b(r.rawTakenByType), rawMeleeOut: r.rawMeleeOut,
+      // El daño recibido partido por la postura de cada golpe. Ya viene con
+      // forma de lista de objetos desde el encuentro, así que no pasa por `#b`.
+      // Sin esta línea el campo se construía, se guardaba en la fila del
+      // encuentro y se caía aquí: el consejo seguía colapsando la pelea a una
+      // sola postura sin que nada avisara.
+      takenByStance: r.takenByStance ?? [],
       takenBySource: this.#b(r.takenBySource),
       healBySpell: this.#b(r.healBySpell),
       healByTarget: this.#b(r.healByTarget),
@@ -1026,6 +1033,10 @@ export class Engine extends EventEmitter {
     const z = parseZone(enc.zone);
     return {
       id: enc.id,
+      // Con qué reglas están calculadas estas cifras. Va en la pelea y no en el
+      // almacén: en cuanto una parte del histórico se corrige y otra no, una
+      // marca global deja de describir lo que hay dentro. Ver `MODELO_MEDICION`.
+      modelo: MODELO_MEDICION,
       // La misma identidad que llevan las cerradas: es lo que permite al
       // overlay saber que el bloque de arriba y el que acaba de llegar por el
       // otro canal son la misma pelea, y no pintarla dos veces.
@@ -1240,17 +1251,22 @@ export class Engine extends EventEmitter {
     const cut = now - this.windowSec;
     const win = this.recent.filter((r) => r.t >= cut);
     if (!win.length) return null;
-    let melee = 0, spell = 0, observed = 0, hits = 0, landedMelee = 0, missedMelee = 0;
+    let melee = 0, spell = 0, unmitigable = 0, observed = 0, hits = 0, landedMelee = 0, missedMelee = 0;
     for (const r of win) {
       if (r.miss) { missedMelee++; continue; }
       hits++;
-      if (r.school === 'melee') { melee += r.raw; landedMelee++; } else spell += r.raw;
+      // El mismo reparto en tres cubos que en la pelea cerrada, y por lo mismo:
+      // el daño periódico y el escudo no los para ninguna postura, así que no
+      // pueden contar como evitables al sugerir un cambio en mitad del combate.
+      if (r.school === 'melee') { melee += r.raw; landedMelee++; }
+      else if (SIN_MITIGACION.has(r.school)) unmitigable += r.raw;
+      else spell += r.raw;
       observed += r.amt ?? r.raw;
     }
     if (!hits) return null;
-    const total = melee + spell;
+    const total = melee + spell + unmitigable;
     const l = liveAdvice(
-      { melee, spell, total, observed, seconds: this.windowSec, hits,
+      { melee, spell, unmitigable, total, observed, seconds: this.windowSec, hits,
         landedMelee, meleeSwings: landedMelee + missedMelee },
       { classes: this.activeClasses, stance: this.parser?.stance,
         seenStances: [...this.seenStances] });

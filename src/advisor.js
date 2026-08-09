@@ -1,5 +1,6 @@
 import { t } from './i18n.js';
-import { STANCES, INVOCATIONS, availableFor, normStance, normInvocation, CLASS_NAMES } from './stances.js';
+import { STANCES, INVOCATIONS, availableFor, normStance, normInvocation, CLASS_NAMES,
+  SIN_MITIGACION } from './stances.js';
 
 const pct = (v) => `${Math.round(v * 100)}%`;
 
@@ -28,13 +29,32 @@ export function advise(row, ctx = {}) {
   if (!stances.length && !invocations.length) return null;
 
   // ── Reparto del daño entrante, en bruto ──────────────
+  //
+  // TRES CUBOS Y NO DOS, y el tercero es el que faltaba.
+  //
+  // Aquí ponía «lo que no es melé es mágico», y con eso el daño periódico y el
+  // escudo de daño entraban en el cubo mágico y se les aplicaba la mitigación
+  // de cada postura. Medido, ninguna postura los reduce (ver `mitigationFor`),
+  // así que la tabla de abajo le apuntaba a Channeler un 40% de prevención
+  // sobre un daño que Channeler no previene.
+  //
+  // No es un detalle: en un histórico real son 150.852 de los 717.467 puntos
+  // no-melé recibidos, el 21,0% de lo que el consejo trataba como evitable.
+  //
+  // EL CUBO NO SE DESCUENTA DEL DAÑO RECIBIDO. Ese daño lo recibiste: sale del
+  // total y de la vida que perdiste. Lo que no hace es entrar en `prevented` de
+  // ninguna postura — y como `share` se divide por el total, el porcentaje de
+  // cada postura baja al pasar por aquí, que es lo correcto: describe lo que
+  // esa postura te habría ahorrado de TODO lo que te entró, no de la parte que
+  // le convenía.
   const raw = row.rawTakenByType ?? [];
-  let melee = 0, spell = 0;
+  let melee = 0, spell = 0, unmitigable = 0;
   for (const t of raw) {
     if (t.name === 'melee' || t.name === 'physical') melee += t.sum;
+    else if (SIN_MITIGACION.has(t.name)) unmitigable += t.sum;
     else spell += t.sum;
   }
-  const incoming = melee + spell;
+  const incoming = melee + spell + unmitigable;
 
   // ── Evasión: se mide contando golpes, no escalando daño ──
   //
@@ -151,17 +171,83 @@ export function advise(row, ctx = {}) {
   const landed = (row.takenByType ?? []).reduce((a, x) => a + (x.n ?? 0), 0);
   const lowSample = landed > 0 && landed < MIN_HITS_FOR_VERDICT;
 
+  // ── Lo que evitaste DE VERDAD, tramo a tramo ────────
+  //
+  // AQUÍ ESTABA EL FALLO. `cur` se buscaba con una sola postura —la que más
+  // tiempo aguantó— y se aplicaba al daño ENTERO de la pelea. En una pelea
+  // donde bailas eso acredita la postura equivocada durante todos los tramos
+  // que no eran suyos, y como el veredicto compara contra `cur`, la ganancia
+  // que anuncia describe una pelea que no ocurrió.
+  //
+  // Con el daño partido por postura la cuenta es directa: cada tramo con la
+  // suya. Lo que evita una postura es lineal en el daño, así que sumar los
+  // tramos da exactamente lo mismo que integrarlos uno a uno.
+  //
+  // LA TABLA DE CANDIDATAS NO CAMBIA, y conviene entender por qué: «cuánto
+  // habría evitado Defensive» se aplica al daño entero en las dos versiones,
+  // porque la hipótesis es haberla llevado TODA la pelea. Lo único que estaba
+  // mal era el otro lado de la resta.
+  /**
+   * TRES ESTADOS Y NO DOS, y confundir los dos últimos rotula mal la pelea:
+   *
+   *   campo ausente   pelea guardada antes de que esto se midiera. Su veredicto
+   *                   se calcula contra una sola postura y hay que decirlo.
+   *   campo vacío     pelea medida, pero no consta ninguna postura en ella. No
+   *                   es lo mismo, y merece que NO se le eche encima el cartel
+   *                   de «esta pelea es vieja».
+   *   con tramos      lo normal.
+   */
+  const medidoPorPostura = Array.isArray(row.takenByStance);
+  const tramos = (row.takenByStance ?? []).filter((t) => t.stance);
+  const prevenidoEn = (t) => {
+    const st = STANCES[normStance(t.stance)];
+    if (!st) return 0;            // postura desconocida: no se le acredita nada
+    let p = (t.melee ?? 0) * (st.mit.melee ?? 0) + (t.spell ?? 0) * (st.mit.spell ?? 0);
+    const swings = (t.landed ?? 0) + (t.avoided ?? 0);
+    if (st.evade?.melee && swings > 0) {
+      const avg = t.landed ? t.melee / t.landed : 0;
+      const entrarian = swings * (1 - st.evade.melee);
+      p += Math.max(0, ((t.landed ?? 0) - entrarian) * avg);
+    }
+    return p;
+  };
+  const conDano = tramos.filter((t) => (t.melee ?? 0) + (t.spell ?? 0) + (t.unmit ?? 0) > 0);
+  const bailaste = conDano.length > 1;
+  const prevenidoReal = tramos.length ? tramos.reduce((a, t) => a + prevenidoEn(t), 0) : null;
+
   const best = defence[0];
   const current = normStance(ctx.stance);
   const cur = defence.find((d) => d.key === current);
   let verdict = null;
+  // Todo lo que te entró era de lo que ninguna postura para. No es que la que
+  // llevabas fuera la mejor: es que la pregunta no tenía respuesta, y decir
+  // «Defensive no compensa frente a Channeler» aquí sería contestar otra cosa.
+  const nadaEvitable = incoming > 0 && melee + spell === 0;
+  if (nadaEvitable) {
+    verdict = t('adv.allUnmitigable', { n: Math.round(unmitigable) });
+  }
   // Con una postura de evasión activa no se dictamina: lo que ves en el log es
   // el 5% de los ataques que se te colaron, y el log no distingue un esquive de
   // postura de una parada normal, así que no hay forma de saber cuánto te
   // entraría sin ella. Hace falta un tramo fuera de esa postura.
-  if (best && incoming > 0 && !lowSample && !unknownBase) {
-    const gain = cur ? best.prevented - cur.prevented : best.prevented;
-    if (cur && best.key === current) {
+  let gain = null;
+  if (best && incoming > 0 && !lowSample && !unknownBase && !nadaEvitable) {
+    // Contra lo que evitaste DE VERDAD si la pelea trae sus tramos; contra la
+    // postura única sólo cuando no los hay —peleas guardadas antes de que esto
+    // se midiera— y entonces se dice, en `segmentado`.
+    const base = prevenidoReal !== null ? prevenidoReal : (cur ? cur.prevented : 0);
+    gain = best.prevented - base;
+    if (bailaste) {
+      // BAILASTE, así que «ya llevabas la mejor» no es una frase que se pueda
+      // decir: no llevabas una, llevabas varias. La pregunta que sí tiene
+      // sentido es si sostener UNA sola lo habría hecho mejor que el baile.
+      const usadas = conDano.map((x) => STANCES[normStance(x.stance)]?.label ?? x.stance).join(' · ');
+      if (gain > incoming * 0.04) {
+        verdict = t('adv.dancedWorse', { stance: best.label, n: Math.round(gain), used: usadas });
+      } else {
+        verdict = t('adv.dancedFine', { used: usadas, stance: best.label });
+      }
+    } else if (cur && best.key === current) {
       verdict = t('adv.alreadyBest', { stance: best.label });
     } else if (gain > incoming * 0.04) {
       verdict = t('adv.wouldGain', { stance: best.label, n: Math.round(gain),
@@ -174,7 +260,17 @@ export function advise(row, ctx = {}) {
   return {
     classes, classNames: classes.map((c) => CLASS_NAMES[c] ?? c),
     incoming: {
-      melee, spell, total: incoming, meleeShare: incoming ? melee / incoming : 0,
+      melee, spell, total: incoming,
+      // Cuánto de lo que te entró no lo paraba NINGUNA postura. Es una cota al
+      // valor de todo lo que hay debajo, así que sale a la vista y no se queda
+      // dentro: con el 60% del daño en daño periódico, la mejor postura posible
+      // te ahorra como mucho el 40%, y eso cambia si merece la pena el cambio.
+      unmitigable, mitigable: melee + spell,
+      unmitigableShare: incoming ? unmitigable / incoming : 0,
+      // El reparto melé/mágico se mide sobre lo que SÍ se puede mitigar: es lo
+      // que decide entre Defensive y Mage Hunter, y meter ahí el periódico
+      // empujaba la elección hacia la postura mágica sin motivo.
+      meleeShare: (melee + spell) ? melee / (melee + spell) : 0,
       // Lo que recibiste de verdad, junto a la reconstrucción: sin las dos, el
       // «daño entrante (bruto)» no se puede contrastar con nada.
       observed: row.taken ?? 0, hits: landed,
@@ -185,6 +281,24 @@ export function advise(row, ctx = {}) {
     defence, offence, invocations: invAdvice.slice(0, 4),
     current: { stance: ctx.stance ?? null, invocation: ctx.invocation ?? null },
     lowSample, unknownBase, verdict,
+    /**
+     * De dónde sale la comparación, para que se pueda ver y no haya que
+     * deducirlo. `segmentado` en falso significa una pelea guardada antes de
+     * que el daño se partiera por postura: su veredicto SÍ está calculado
+     * contra una sola, y eso hay que decirlo en vez de que parezca lo mismo.
+     */
+    segmentado: medidoPorPostura,
+    conTramos: prevenidoReal !== null,
+    bailaste,
+    prevenidoReal,
+    gain,
+    tramos: conDano.map((x) => ({
+      stance: x.stance,
+      label: STANCES[normStance(x.stance)]?.label ?? x.stance,
+      melee: x.melee ?? 0, spell: x.spell ?? 0, unmit: x.unmit ?? 0,
+      hits: x.n ?? 0, avoided: x.avoided ?? 0,
+      prevented: prevenidoEn(x),
+    })).sort((a, b) => b.prevented - a.prevented),
   };
 }
 
@@ -240,10 +354,62 @@ const LIVE_MIN_TAKEN = 1200; // daño RECIBIDO mínimo en la ventana
 const LIVE_MIN_HITS = 5;     // golpes mínimos recibidos
 const LIVE_MIN_GAIN = 350;   // ganancia mínima en puntos, no sólo en porcentaje
 
+/**
+ * EL UMBRAL DEL 8%, MEDIDO. Corpus, fecha y quién.
+ *
+ * CORPUS: 428 peleas guardadas de UN SOLO JUGADOR (Campeon, SHD/DRU/MAG y
+ * SHD/SHM/MAG, niveles 24-50), sobre un registro de 378.299 líneas. Medido el
+ * 9 de agosto de 2026 reproduciendo la ventana móvil segundo a segundo.
+ *
+ * ESTO ES CALIBRACIÓN DE UN JUGADOR, NO DEL JUEGO. Las posturas que salen aquí
+ * son las de un Shadow Knight con secundarias de lanzador; un Monje con Evasive
+ * o un Berserker con Striker tienen otros saltos y podrían apelmazarse en otros
+ * valores. Quien tenga un corpus distinto debería volver a medir antes de creerse
+ * este número.
+ *
+ * LA DISTRIBUCIÓN NO ES CONTINUA, y eso es lo que gobierna la elección. `worth`
+ * se apelmaza en los saltos exactos entre mitigaciones de la tabla:
+ *
+ *     50,0%   101 peleas   de una postura sin mitigación a Defensive, melé puro
+ *     10,0%    43 peleas   Channeler 0,40 → Defensive 0,50, melé puro
+ *     30,0%    20 peleas   Mage Hunter 0,20 → Defensive 0,50
+ *     el resto: valores sueltos, ninguno más de 2 peleas
+ *
+ * Así que mover el umbral no cuesta lo mismo en todas partes. Peleas que lo
+ * cruzan en algún segundo, de 428:
+ *
+ *     4%  258      8%  232  ← el actual      10,0%  208
+ *     6%  246      9%  229                   10,1%  174
+ *
+ * De 4% a 9% el comportamiento apenas se mueve —258 a 229 en cinco puntos—. El
+ * 8% está en una meseta. El acantilado está en 10,1%: una décima por encima del
+ * pico tira 34 peleas de golpe.
+ *
+ * Y EL PICO DEL 10% NO ES UN VALOR, ES UNA NUBE. De las 43 peleas que caen ahí,
+ * sólo 15 valen exactamente 0.1 como número máquina; 19 valen
+ * 0.10000000000000002 y las otras 9 rondan 0.09999999999999996. Coinciden todas
+ * hasta la décima cifra significativa —es la misma cantidad por caminos de coma
+ * flotante distintos—, pero NO son iguales entre sí. Consecuencia práctica: un
+ * umbral puesto exactamente en 0.10 partiría ese grupo en dos por ruido de
+ * redondeo, dejando fuera unas nueve peleas sin ningún motivo que se pueda
+ * explicar. Otra razón para no poner el umbral encima de un pico.
+ *
+ * (Los otros dos picos sí son limpios: las 101 del 50% valen exactamente 0.5, y
+ * 18 de las 20 del 30% valen exactamente 0.3.)
+ *
+ * QUÉ NO DICE ESTE NÚMERO: si el consejo acierta. Dice cuántas veces habla.
+ */
+const LIVE_MIN_WORTH = 0.08;
+
 export function liveAdvice(win, ctx = {}) {
-  const { melee = 0, spell = 0, total = 0, seconds = 20, hits = 0, observed = total,
-    landedMelee = 0, meleeSwings = 0 } = win;
+  const { melee = 0, spell = 0, unmitigable = 0, total = 0, seconds = 20, hits = 0,
+    observed = total, landedMelee = 0, meleeSwings = 0 } = win;
   if (total <= 0) return null;
+  // Lo que ninguna postura para. Entra en el total —te lo estás comiendo— pero
+  // no en lo que se compara, y sobre todo no en el umbral: pedir un cambio de
+  // postura por una ventana que es casi toda daño periódico sería pedirlo por
+  // un daño que el cambio no va a tocar.
+  const mitigable = melee + spell;
   const { stances } = availableFor(ctx.classes ?? [], ctx.seenStances);
   const usable = stances.filter((s) => s.mit.melee || s.mit.spell || s.evade?.melee || s.evade?.spell);
   if (!usable.length) return null;
@@ -268,16 +434,27 @@ export function liveAdvice(win, ctx = {}) {
   const best = scored[0];
   const cur = normStance(ctx.stance);
   const curScore = scored.find((s) => s.key === cur);
-  const meleeShare = melee / total;
+  // Físico o mágico se decide sobre lo MITIGABLE: es la pregunta «¿Defensive o
+  // Mage Hunter?», y el daño periódico no vota en ella. Contándolo, una pelea
+  // de melé con dos venenos encima salía «mágica» y el consejo iba al revés.
+  const meleeShare = mitigable ? melee / mitigable : 0;
   const kind = meleeShare > 0.7 ? 'fisico' : meleeShare < 0.3 ? 'magico' : 'equilibrado';
 
-  // Umbral: por debajo del 8% de mejora no compensa gastar el cambio de postura
-  // (6 segundos de reutilización) ni la atención en mitad de la pelea.
+  // Umbral: por debajo de `LIVE_MIN_WORTH` no compensa gastar el cambio de
+  // postura (6 segundos de reutilización) ni la atención en mitad de la pelea.
+  // De dónde sale ese número y sobre qué corpus, en su constante.
+  //
+  // Y SE DIVIDE POR EL TOTAL, no por lo mitigable, a propósito. La pregunta es
+  // si el cambio te cambia la pelea, y con el 90% de lo que entra en daño
+  // periódico, mejorar el 10% restante un 40% te ahorra el 4% de lo que te
+  // están haciendo. Dividir por lo mitigable diría 40% y te sacaría del combate
+  // por nada.
   const gain = best.prevented - (curScore?.prevented ?? 0);
   const worth = total ? gain / total : 0;
 
   return {
     melee, spell, total, observed, seconds, meleeShare, kind,
+    unmitigable, mitigable, unmitigableShare: total ? unmitigable / total : 0,
     // El ritmo que se enseña es el que estás recibiendo de verdad, no el
     // reconstruido: es lo que el jugador puede contrastar con su barra de vida.
     dps: observed / seconds,
@@ -291,7 +468,7 @@ export function liveAdvice(win, ctx = {}) {
     unknownBase: activeEvades,
     suggest: !!curScore && curScore.key !== best.key && !activeEvades
       && observed >= LIVE_MIN_TAKEN && hits >= LIVE_MIN_HITS
-      && worth >= 0.08 && gain >= LIVE_MIN_GAIN,
+      && worth >= LIVE_MIN_WORTH && gain >= LIVE_MIN_GAIN,
     scored,
     text: t('ov.brief', { kind: t(`adv.kind.${kind}`), stance: best.label,
       pct: Math.round((best.prevented / total) * 100) }),

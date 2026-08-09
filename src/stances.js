@@ -162,12 +162,50 @@ export function normInvocation(s) {
     .replace('overchannel', 'over channel').replace('empowering', 'empower');
 }
 
+/**
+ * Escuelas que la postura NO mitiga. MEDIDO, no supuesto.
+ *
+ * Aquí ponía que `dot` y `ds` iban con la mitigación mágica, y el registro dice
+ * que no. La prueba es una que podía fallar y no falló:
+ *
+ *   NUEVE aplicaciones de daño periódico recibido cruzan un cambio de postura
+ *   con el hechizo ya puesto. En las nueve, el valor del tick NO se mueve ni un
+ *   punto. `Envenomed Breath` de `a loathling lich` cruza Offensive (0,00) ↔
+ *   Defensive (0,20) dos veces y vale 90 siempre; `Rotting Flesh` de
+ *   `a dracoliche` cruza Defensive (0,20) ↔ Channeler (0,40) en los dos
+ *   sentidos y vale 100 en los 42 ticks.
+ *
+ *   Y tampoco se aplica al lanzar, que era la otra lectura posible: el mismo
+ *   `Ignite Blood` del mismo `Amygdalan warrior` vale 125 bajo Defensive y 125
+ *   bajo Channeler, en aplicaciones distintas.
+ *
+ *   Con el escudo de daño, igual: `a spite golem` te pincha por 18 bajo
+ *   Defensive, bajo Channeler y bajo Offensive.
+ *
+ * NO ES SIMETRÍA CON `spell`, Y CONVIENE VERLO. El hechizo directo SÍ se
+ * mitiga, y con exactitud de libro: `Soul Devour` de `Eye of Veeshan` pega 400
+ * con Defensive (0,20), 300 con Channeler (0,40) y 250 con Mage Hunter (0,50)
+ * —368 impactos, cero varianza dentro de cada postura— que es exactamente
+ * 500×0,80, 500×0,60 y 500×0,50. Así que esto no es prudencia ante la duda:
+ * son dos escuelas medidas por separado con dos resultados distintos.
+ *
+ * QUÉ COSTABA: reconstruir daño periódico y escudo dividiendo por (1 − mit)
+ * inventaba 44.924 puntos sobre 416 peleas guardadas —27.342 de `dot` y 17.582
+ * de `ds`— y el consejo de postura los usaba como si fueran daño recibido.
+ *
+ * SE EXPORTA PORQUE HAY TRES SITIOS QUE NECESITAN LA MISMA LISTA: aquí para no
+ * revertir, el almacén para corregir lo ya guardado, y el consejero para no
+ * apuntarse como evitable un daño que ninguna postura evita. Tres copias de una
+ * lista de dos palabras acaban discrepando en cuanto se añada la tercera.
+ */
+export const SIN_MITIGACION = new Set(['dot', 'ds']);
+
 /** Fracción de daño que una postura evita para una escuela dada. */
 export function mitigationFor(stanceKey, school) {
+  if (SIN_MITIGACION.has(school)) return 0;
   const st = STANCES[normStance(stanceKey)];
   if (!st) return 0;
-  const isSpell = school === 'spell' || school === 'dot' || school === 'ds';
-  return isSpell ? (st.mit.spell ?? 0) : (st.mit.melee ?? 0);
+  return school === 'spell' ? (st.mit.spell ?? 0) : (st.mit.melee ?? 0);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { RANGES } from './ranges.js';
 import { parseZone } from './zones.js';
+import { SIN_MITIGACION } from './stances.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -91,15 +92,235 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  *                   asi que el reproductor y las tablas la dan por ausente en
  *                   todo el historico.
  *
- * SUBIR ESTE NUMERO ES LO QUE HACE QUE EL ARREGLO LLEGUE. El aviso de
- * reconstruir se dispara con `generacion(meta) < STORE_VERSION` y con nada mas:
- * corregir el calculo y no tocar esto deja el arreglo escrito en el codigo y
- * fuera del historico de todo el mundo. Al cambiarlo, repasa `mig.body` — el
- * cartel explica los motivos de ESTA migracion, y un texto puesto por un motivo
- * que ya no aplica sobrevive porque nadie lo relee.
+ *   7               La postura no mitiga el daño periódico ni el escudo de daño
+ *                   y se estaba revirtiendo como si lo hiciera; el daño
+ *                   recibido pasa a guardarse partido por la postura de cada
+ *                   golpe, y la serie por segundo de dos cubos a tres.
+ *
+ * ESTE NÚMERO ERAN DOS PREGUNTAS EN UNA, Y HASTA LA 1.11.0 NUNCA SE SEPARARON
+ * PORQUE SIEMPRE HABÍAN COINCIDIDO.
+ *
+ *   ¿Ha cambiado lo que se escribe?     → `FORMATO_VERSION`, aquí abajo.
+ *   ¿Hay que releer el registro entero? → `RECONSTRUIR_DESDE`.
+ *
+ * Trece versiones seguidas las dos respuestas fueron la misma, así que un solo
+ * número las servía y nadie notó que eran dos. La 1.11.0 es la primera vez que
+ * discrepan: el formato SÍ cambia, y reconstruir NO hace falta —el importe
+ * observado está guardado al lado del reconstruido, así que la corrección se
+ * hace al leer— y además hoy sería PELIGROSO, porque el cierre de pelea usa el
+ * reloj de pared en directo y la marca del registro al reconstruir, y con un
+ * hueco de exactamente `idleSec` cada camino parte la pelea de una manera (ver
+ * el comentario de `tick()` en `src/encounter.js`).
+ *
+ * Mientras estuvieron pegadas, la única forma de decir «el formato cambió pero
+ * no reconstruyas» era no subir el número —y entonces la guarda de formato no
+ * saltaba y el cambio pasaba en silencio, que es justo el fallo que costó trece
+ * versiones—. Separadas, no hay que elegir: se sube el formato SIEMPRE y el
+ * cartel se decide aparte.
  */
-export const STORE_VERSION = 6;
+
+/**
+ * Sube SIEMPRE que cambie lo que se escribe a disco. Sin excepciones y sin
+ * ramas de escape: `test/formato.js` no deja publicar sin subirlo.
+ */
+export const FORMATO_VERSION = 7;
+
+/**
+ * Por debajo de esta generación, lo guardado NO se puede arreglar leyéndolo
+ * mejor y hay que releer el registro. Es lo único que saca el cartel de
+ * reconstruir.
+ *
+ * SE QUEDA EN 6 A PROPÓSITO. La 1.11.0 sube el formato a 7 y no toca esto,
+ * porque su corrección se hace al leer. Quien no reconstruyó cuando la 1.10.0
+ * se lo pidió sigue por debajo de 6 y sigue viendo el cartel; quien sí lo hizo
+ * no lo ve, y hace bien.
+ *
+ * Al subirlo, repasa `mig.body` — el cartel explica los motivos de ESA
+ * migración, y un texto puesto por un motivo que ya no aplica sobrevive porque
+ * nadie lo relee.
+ */
+export const RECONSTRUIR_DESDE = 6;
+
 const META = 'store.json';
+
+/**
+ * MODELO DE MEDICIÓN. Es la cuarta pregunta, y las cuatro son distintas.
+ *
+ *   package.json        qué versión del programa es esto
+ *   FORMATO_VERSION     ha cambiado lo que se escribe a disco
+ *   RECONSTRUIR_DESDE   hay que releer el registro entero
+ *   MODELO_MEDICION     con qué reglas se calcularon las cifras de ESTA pelea
+ *
+ * Y va POR PELEA, que es lo que ninguna de las otras tres puede hacer: marcan
+ * el almacén entero, así que en cuanto una parte del histórico se corrige y
+ * otra no, dejan de describir lo que hay dentro. Un número por pelea sí, y por
+ * eso no es un booleano: «reparada: true» no dice reparada de qué ni a qué, y
+ * el modelo que viene después lo deja mudo otra vez.
+ *
+ *   1  La postura revertía TAMBIÉN el daño periódico y el escudo de daño, que
+ *      medidos no los mitiga (ver `mitigationFor`). Y las cifras reconstruidas
+ *      se guardaban con decimales, así que la suma de los cubos y el total no
+ *      cuadraban. Sobre 416 peleas: 44.924 puntos de daño recibido inventados.
+ *   2  `dot` y `ds` no se revierten, y toda reconstrucción se redondea en el
+ *      momento de reconstruirla (ver `reconstruido` en parser.js).
+ *   3  El daño recibido se guarda partido por la postura de cada golpe, así que
+ *      el veredicto del consejo compara contra lo que evitaste TRAMO A TRAMO.
+ *      Hasta aquí la pelea se colapsaba a la postura que más duró y se le
+ *      acreditaba el daño entero, que en una pelea donde bailas es falso por
+ *      construcción.
+ *   4  La serie por segundo tenía DOS cubos de daño recibido —melé y «lo
+ *      demás»— y el daño periódico y el escudo caían en el segundo. Todo el que
+ *      leyera la serie para saber qué le estaba entrando contaba como mágico un
+ *      daño que ninguna postura para. Ahora son tres, con la misma lista que el
+ *      resto del programa.
+ *
+ * ESTO SUBE `FORMATO_VERSION` Y NO TOCA `RECONSTRUIR_DESDE`, y ésa es la
+ * distinción que la 1.11.0 estrenó. Lo escrito cambia —hay campos nuevos y
+ * cifras distintas— así que el formato sube y la guarda lo exige. Pero no hace
+ * falta releer el registro: el importe observado está guardado al lado del
+ * reconstruido, en `takenByType`, así que la corrección es una copia exacta y
+ * se hace al leer, como ya se hacía con la dificultad que faltaba.
+ *
+ * El precio de hacerlo así, dicho: las cifras de las peleas ya guardadas
+ * CAMBIAN SOLAS la primera vez que se abren, sin que nadie pulse nada. Por eso
+ * hay un aviso puntual colgado de esa misma condición (ver `avisoModelo`): un
+ * histórico que cambia sin avisar es exactamente lo que este programa no hace.
+ */
+export const MODELO_MEDICION = 4;
+
+/**
+ * Modelo desde el que el arreglo de `dot`/`ds` ya está aplicado.
+ *
+ * La guarda de `repararModelo` va contra ESTE número y no contra el modelo
+ * vigente, y la diferencia importa: son dos arreglos independientes. El de
+ * `dot`/`ds` se puede hacer al leer porque el importe observado está guardado
+ * al lado; el del reparto por postura NO —el daño por tramo no está en ninguna
+ * parte— y hay que sacarlo releyendo el registro. Con una sola guarda, subir el
+ * modelo por el segundo arreglo habría vuelto a disparar el primero sobre
+ * peleas que ya estaban bien, restándoles daño de verdad.
+ */
+export const MODELO_CON_DOT_DS = 2;
+
+/**
+ * Cubos de `rawTakenByType` que el modelo 1 revertía sin deber.
+ *
+ * Es la lista de `stances.js` y no una copia: el cubo se llama como su escuela
+ * cuando el evento no trae tipo de daño, que es justo el caso del periódico y
+ * del escudo. Si algún día uno de los dos empezara a traer tipo, el cubo dejaría
+ * de llamarse igual — y por eso la copia se comprueba antes de aplicarla,
+ * cotejando el número de impactos.
+ */
+const CUBOS_SIN_REVERTIR = SIN_MITIGACION;
+
+/**
+ * Sube una pelea del modelo 1 al 2, al leerla. No toca el disco.
+ *
+ * DOS ARREGLOS, Y NINGUNO INVENTA NADA:
+ *
+ *   `dot` y `ds` vuelven a su importe OBSERVADO, que está guardado al lado en
+ *   `takenByType`. Los dos mapas usan la misma clave por construcción —ni el
+ *   daño periódico ni el escudo traen `damageType`, así que su cubo se llama
+ *   como su escuela— y eso se comprueba aquí en vez de darse por hecho: si el
+ *   número de impactos de los dos cubos no coincide, no son la misma población
+ *   y NO se copia nada.
+ *
+ *   Lo reconstruido se redondea. Ver `reconstruido` en parser.js: la política
+ *   es una y ésta es su aplicación a lo que ya estaba escrito con la anterior.
+ *
+ * SI ALGO NO CUADRA, LA PELEA SE QUEDA EN EL MODELO 1 y lo dice. Es la razón de
+ * que el campo sea un número: una pelea a medio corregir tiene que poder
+ * distinguirse de una corregida, y de una nacida ya bien.
+ */
+function repararModelo(f) {
+  if (!f || Number(f.modelo) >= MODELO_CON_DOT_DS) return f;
+  let completa = true;
+  for (const r of f.rows ?? []) {
+    const obs = new Map((r.takenByType ?? []).map((x) => [x.name, x]));
+    for (const x of r.rawTakenByType ?? []) {
+      if (CUBOS_SIN_REVERTIR.has(x.name)) {
+        const o = obs.get(x.name);
+        // Mismo cubo y misma cuenta de impactos, o no se toca. Un cubo
+        // revertido sin su observado al lado no se puede corregir: se deja como
+        // está y la pelea entera se queda marcada como modelo 1.
+        if (!o || o.n !== x.n) { completa = false; continue; }
+        x.sum = o.sum;
+      } else {
+        x.sum = Math.round(x.sum);
+      }
+    }
+    if (typeof r.rawMeleeOut === 'number') r.rawMeleeOut = Math.round(r.rawMeleeOut);
+  }
+  if (completa) {
+    f.modeloOrigen = Number(f.modelo) || 1;
+    f.modelo = MODELO_CON_DOT_DS;
+  }
+  return f;
+}
+
+/**
+ * El daño partido por postura, para peleas guardadas antes de que se midiera.
+ *
+ * VIVE EN UN FICHERO APARTE Y NO DENTRO DE LA PELEA, y no es por comodidad.
+ * `uid` ES EL BYTE donde empieza la pelea en `fights.ndjson`, y `fights.idx`
+ * guarda ese desplazamiento. Meter un campo nuevo en una línea ya escrita la
+ * alarga, corre todos los bytes siguientes y deja el índice entero apuntando a
+ * sitios equivocados — y de paso el `lastUid` de la enciclopedia. Un fichero
+ * lateral indexado por la HORA DE LA PELEA no toca ni un byte de lo que ya
+ * está, que es la misma regla que ya siguen `loot.ndjson` y `aa.ndjson`.
+ *
+ * Las peleas nuevas no pasan por aquí: nacen con `takenByStance` dentro, porque
+ * añadir al final no corre nada.
+ *
+ * DOS COSAS VIAJAN EN ESTE FICHERO, no una:
+ *   `takenByStance`  el reparto medido, releído del registro.
+ *   `serie`          los tres cubos de daño recibido por segundo, dispersos:
+ *                    sólo los segundos en que entró algo. SUSTITUYEN a los
+ *                    guardados, no se restan de ellos.
+ *   `motivo`         por qué una pelea NO lo tiene. Que se quedara fuera es un
+ *                    hecho con causa, y la causa tiene que viajar con ella: sin
+ *                    el motivo, dentro de tres meses una pelea en el modelo
+ *                    viejo es indistinguible de un fallo de la migración.
+ *
+ * LA SERIE NO SE PODÍA ARREGLAR AL LEER, y por eso viaja aquí. `tSpell` guarda
+ * la suma ya fundida de mágico + periódico + escudo por segundo, sin ninguna
+ * pareja al lado de la que restar. Los totales de `dot` y `ds` de la pelea sí
+ * están en `rawTakenByType`, pero repartir un total entre las fases sería
+ * inventarse la distribución. Hay que releer el registro, y eso es lo que hace
+ * la migración.
+ *
+ * Y SE SUSTITUYE ENTERA EN VEZ DE RESTARLE UN TROZO, que fue el primer diseño y
+ * era falso. La serie guardada no sólo tiene el daño periódico FUNDIDO en el
+ * cubo mágico: lo tiene además INFLADO, porque se escribió cuando la postura
+ * todavía revertía `dot` y `ds`, y con decimales, porque el redondeo por golpe
+ * llegó después y nunca alcanzó a la serie. Restar lo no mitigable de un cubo
+ * que arrastra los dos errores deja un resto que no describe nada. Medido: 5.321
+ * puntos de serie fraccionarios en 278 de las 441 peleas.
+ */
+function aplicarTramos(f, at, tramos) {
+  const e = tramos?.get(at);
+  if (!e) return f;
+  if (e.motivo) f.motivo = e.motivo;
+  // La guarda va contra el DATO y no contra el número de modelo: si la serie ya
+  // trae su tercer cubo, ya está reconstruida y no hay nada que sustituir.
+  if (Array.isArray(e.serie) && Array.isArray(f.series)
+      && !f.series.some((p) => typeof p.tUnmit === 'number')) {
+    const por = new Map(f.series.map((p) => [p.s, p]));
+    // Se ponen a cero los tres antes de repoblar: los segundos que la relectura
+    // deja vacíos tienen que quedar vacíos, no conservar lo que hubiera antes.
+    for (const p of f.series) { p.tMelee = 0; p.tSpell = 0; p.tUnmit = 0; }
+    for (const [s, mele, mag, sin] of e.serie) {
+      const p = por.get(s);
+      if (!p) continue;
+      p.tMelee = mele; p.tSpell = mag; p.tUnmit = sin;
+    }
+  }
+  if (Array.isArray(e.takenByStance) && e.takenByStance.length && f.rows) {
+    const mio = f.rows.find((r) => r.name === e.self);
+    if (mio && !mio.takenByStance) mio.takenByStance = e.takenByStance;
+  }
+  if (Number(e.modelo)) f.modelo = Math.max(Number(f.modelo) || 0, Number(e.modelo));
+  return f;
+}
 
 /**
  * La dificultad que falta, sacada de la zona que sí está guardada.
@@ -152,6 +373,11 @@ export class FightStore {
     this.aaPath = path.join(dir, 'aa.ndjson');
     this.aa = [];
     this.aaSeen = new Set();
+    // El daño por postura de las peleas viejas, y el motivo de las que no lo
+    // tienen. Fichero aparte para no correr los bytes de `fights.ndjson`, que
+    // es donde vive la identidad de cada pelea. Ver `aplicarTramos`.
+    this.tramosPath = path.join(dir, 'tramos.ndjson');
+    this.tramos = new Map();   // hora de la pelea -> {self, takenByStance, modelo, motivo}
     // El libro de hechizos: los que CONSTA que tienes, y de qué línea consta.
     // Fichero aparte por lo mismo que los puntos: escribir o comprar un hechizo
     // pasa fuera de cualquier pelea.
@@ -171,7 +397,7 @@ export class FightStore {
     catch { return null; }
   }
 
-  stamp(version = STORE_VERSION) {
+  stamp(version = FORMATO_VERSION) {
     try {
       fs.mkdirSync(this.dir, { recursive: true });
       fs.writeFileSync(path.join(this.dir, META),
@@ -187,14 +413,37 @@ export class FightStore {
    * corregir, se marca y en paz. Sin marca y con peleas dentro significa que lo
    * escribió una versión anterior a que la marca existiera, o sea la 1.0.x.
    */
+  /**
+   * ¿Hay que avisar de que las cifras van a cambiar solas?
+   *
+   * EL DISPARADOR ES TENER PELEAS POR DEBAJO DEL MODELO VIGENTE, no una marca
+   * en la configuración. La marca sirve para no repetir el aviso; decidir si
+   * toca es otra cosa, y colgarlo de la marca haría que un usuario nuevo —sin
+   * histórico y sin nada que corregir— viera un cartel sobre cifras que no
+   * tiene.
+   *
+   * Se responde con lo que ya está en disco y sin abrir ninguna pelea: si el
+   * almacén está sellado por debajo del formato de hoy, todo lo que contiene se
+   * escribió con reglas anteriores. Leer las 441 peleas para contarlas una a
+   * una costaría más que el aviso.
+   */
+  avisoModelo() {
+    const fights = this.index.length;
+    const desde = generacion(this.meta());
+    return {
+      needed: fights > 0 && desde < FORMATO_VERSION,
+      fights, desde, formato: FORMATO_VERSION, modelo: MODELO_MEDICION,
+    };
+  }
+
   migration() {
     const m = this.meta();
     const fights = this.index.length;
     const from = m?.version ?? null;
-    if (!fights) return { needed: false, from, fights, current: STORE_VERSION };
+    if (!fights) return { needed: false, from, fights, current: RECONSTRUIR_DESDE };
     return {
-      needed: generacion(m) < STORE_VERSION,
-      from, fights, current: STORE_VERSION,
+      needed: generacion(m) < RECONSTRUIR_DESDE,
+      from, fights, current: RECONSTRUIR_DESDE,
     };
   }
 
@@ -242,6 +491,7 @@ export class FightStore {
     this.#loadLoot();
     this.#loadAA();
     this.#loadSpells();
+    this.#loadTramos();
     try {
       const raw = fs.readFileSync(this.idxPath, 'utf8');
       for (const line of raw.split('\n')) {
@@ -426,6 +676,47 @@ export class FightStore {
     } catch { /* sin fichero: el libro sale de lo que se haya lanzado */ }
   }
 
+  /**
+   * El daño por postura de las peleas viejas. Ver `aplicarTramos`.
+   *
+   * Sólo se AÑADE al final, como los demás ficheros laterales, así que una
+   * migración que se repita deja líneas repetidas para la misma pelea. Gana la
+   * ÚLTIMA: es la que escribió la migración más reciente, y así volver a pasarla
+   * corrige en vez de duplicar.
+   */
+  #loadTramos() {
+    this.tramos = new Map();
+    try {
+      for (const line of fs.readFileSync(this.tramosPath, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const e = JSON.parse(line);
+          if (!e?.at) continue;
+          this.tramos.set(e.at, e);
+        } catch { /* línea rota: se salta, como en el índice */ }
+      }
+    } catch { /* sin fichero: ninguna pelea vieja tiene su reparto */ }
+  }
+
+  /**
+   * Anota el reparto por postura de una pelea ya guardada, o el motivo de que
+   * no lo tenga. Lo escribe la migración; en directo no hace falta, porque las
+   * peleas nuevas nacen con el reparto dentro.
+   */
+  appendTramos(e) {
+    if (!e?.at) return false;
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      fs.appendFileSync(this.tramosPath, `${JSON.stringify(e)}\n`);
+      this.tramos.set(e.at, e);
+      // La pelea puede estar en la caché con la forma vieja: se retira para que
+      // la próxima lectura la traiga ya con su reparto.
+      const sm = this.index.find((x) => x.at === e.at);
+      if (sm) this.cache.delete(sm.uid);
+      return true;
+    } catch { return false; }
+  }
+
   #loadAA() {
     this.aa = [];
     this.aaSeen = new Set();
@@ -491,8 +782,10 @@ export class FightStore {
       fs.readSync(fd, buf, 0, s.len, s.off);
       fs.closeSync(fd);
       // La misma cura que en el índice: la pelea entera también lleva su
-      // dificultad, y el expediente del enemigo la lee de aquí.
-      const f = rehacerDif(JSON.parse(buf.toString('utf8')));
+      // dificultad, y el expediente del enemigo la lee de aquí. Y el modelo de
+      // medición, por lo mismo: se arregla al leer porque se puede.
+      const f = aplicarTramos(
+        repararModelo(rehacerDif(JSON.parse(buf.toString('utf8')))), s.at, this.tramos);
       this.cache.set(uid, f);
       if (this.cache.size > 40) this.cache.delete(this.cache.keys().next().value);
       return f;

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { FoeLedger, vida } from './foes.js';
-import { STORE_VERSION } from './store.js';
+import { FORMATO_VERSION } from './store.js';
 import { parseZone, diffKey, labelDiff, DIFFS, SIN_MARCA } from './zones.js';
 
 /**
@@ -104,7 +104,7 @@ export class Encyclopedia {
   #porQueRehacer(g) {
     if (!g) return 'sin-fichero';
     if (g.version !== ENC_VERSION) return 'otra-generacion';
-    if (g.storeVersion !== STORE_VERSION) return 'almacen-corregido';
+    if (g.storeVersion !== FORMATO_VERSION) return 'almacen-corregido';
     if (!Array.isArray(g.foes)) return 'ilegible';
     // Un uid que ya no existe significa que el .ndjson se rehízo debajo y las
     // posiciones se movieron. -1 es «aún no se ha plegado nada», que sí vale.
@@ -232,7 +232,7 @@ export class Encyclopedia {
       fs.mkdirSync(this.store.dir, { recursive: true });
       this.at = Date.now();
       const cuerpo = JSON.stringify({
-        version: ENC_VERSION, storeVersion: STORE_VERSION,
+        version: ENC_VERSION, storeVersion: FORMATO_VERSION,
         lastUid: this.lastUid, lastLoot: this.lastLoot, at: this.at,
         foes: this.ledger.toJSON(),
         loot: [...this.loot],
@@ -732,7 +732,7 @@ export class Encyclopedia {
     let bytes = 0;
     try { bytes = fs.statSync(this.path).size; } catch { /* aún no hay */ }
     return {
-      version: ENC_VERSION, storeVersion: STORE_VERSION,
+      version: ENC_VERSION, storeVersion: FORMATO_VERSION,
       foes: this.ledger.porNombre.size, lastUid: this.lastUid,
       fights: this.store.index.length, pending: pendientes, bytes, at: this.at,
     };

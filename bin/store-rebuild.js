@@ -64,6 +64,25 @@ const n = (v) => Math.round(v ?? 0).toLocaleString('es-ES');
 console.log(`\n  almacén   ${dir}`);
 console.log(`  log       ${logPath}`);
 console.log(`  personaje ${self ?? '(desconocido)'}\n`);
+/**
+ * EL AVISO VA ANTES DE EMPEZAR, no en las notas de la versión ni en un
+ * comentario del código: quien ejecuta esto no los lee, y para cuando termine ya
+ * está hecho.
+ *
+ * Reconstruir hoy NO reproduce el histórico. El cierre de pelea se decide con el
+ * reloj de pared en directo y con la marca del registro al reconstruir, así que
+ * con un hueco de exactamente `idleSec` cada camino parte la pelea de una
+ * manera. Medido sobre 441 peleas reales: una se funde con la siguiente y las
+ * cifras de las dos cambian.
+ */
+console.log('  ─────────────────────────────────────────────────────────────');
+console.log('  AVISO: esto NO reproduce exactamente el histórico que tienes.');
+console.log('  El cierre de pelea usa el reloj de pared en directo y la marca');
+console.log('  del registro al reconstruir. Donde el hueco entre dos peleas sea');
+console.log('  de exactamente 20 s, la reconstrucción puede FUNDIRLAS o');
+console.log('  PARTIRLAS de otra manera, y sus cifras cambian con ellas.');
+console.log('  Lo anterior se aparta con marca de tiempo y se puede recuperar.');
+console.log('  ─────────────────────────────────────────────────────────────\n');
 console.log('  releyendo el log…\n');
 
 // La tabla de tríos que declaraste a mano vive en la configuración de la

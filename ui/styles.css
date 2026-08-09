@@ -386,6 +386,13 @@ footer .path:hover { color: var(--bone-dim); }
 
 .kv { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-bottom: 9px; font-size: 11.5px; color: var(--bone-dim); }
 .kv b { font-family: var(--mono); color: var(--bone); font-weight: 500; margin-left: 5px; }
+/*
+  Lo que ninguna postura para. Va marcado porque no es una cifra más del
+  reparto: es el techo de todo lo que la tabla de abajo promete. Se separa con
+  una barra al lado, no con color de alarma — no es un problema, es un límite.
+*/
+.kv .adv-nomit { padding-left: 8px; border-left: 1px solid var(--slate-700); }
+.kv .adv-nomit .num { margin-left: 4px; }
 
 /* ── Tooltip de hover ─────────────────────────────────── */
 .tip {
@@ -977,6 +984,18 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
           font-size: 12.5px; flex: none; }
 .updbar span { flex: 1; }
 .updbar button { font-size: 10px; }
+/*
+  Las notas de la versión ocupan su propia línea dentro del cartel: `flex-basis`
+  al 100% las manda abajo sin sacarlas de la fila ni montar otro contenedor.
+  Plegadas por defecto y con tope de altura, que son cuatro mil caracteres.
+*/
+.updbar .upd-notas { flex-basis: 100%; margin-top: 4px; }
+.updbar .upd-notas summary { cursor: pointer; font-size: 10.5px; color: var(--bone-dim); }
+.updbar .upd-notas pre {
+  margin: 8px 0 2px; max-height: 40vh; overflow: auto; white-space: pre-wrap;
+  font-family: inherit; font-size: 11.5px; line-height: 1.5; color: var(--bone-dim);
+  border-left: 2px solid var(--slate-700); padding-left: 10px;
+}
 
 /* Aviso de que el histórico guardado no es de fiar. Ocupa varias líneas a
    propósito: dice qué estaba mal, y eso no cabe en una barra de una línea. */
@@ -987,6 +1006,14 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
                  text-transform: uppercase; color: var(--t-fire); }
 .migbar .mig-h.bad { color: var(--t-ds); }
 .migbar .mig-fix { color: var(--bone-faint); }
+/*
+  El aviso de las fronteras. Va marcado y no en gris como la nota de al lado:
+  aquélla explica qué se arregla, ésta dice qué se puede romper.
+*/
+.migbar .mig-aviso {
+  color: var(--bone); border-left: 2px solid var(--t-fire);
+  padding-left: 9px; margin: 8px 0;
+}
 .migbar .mig-btns { display: flex; gap: 8px; margin-top: 10px; }
 .migbar button[disabled] { opacity: .55; cursor: default; }
 
