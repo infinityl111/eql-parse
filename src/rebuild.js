@@ -37,7 +37,38 @@ import { FightStore, STORE_VERSION } from './store.js';
 // deduplica por (hora, objeto, de quién), así que no se duplicaría — pero
 // entonces conservaría entradas de un log que ya no existe, y eso es peor:
 // nadie sabría de dónde salieron. Van juntas o no van.
-const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjson', 'aa.ndjson', 'spells.ndjson'];
+// `tramos.ndjson` va en la lista por un motivo DISTINTO de los demás, y conviene
+// no confundirlos. Los otros laterales salen de releer el registro, así que se
+// apartan para que la reconstrucción no escriba encima de las entradas de la
+// lectura anterior. Éste NO se regenera: existe sólo para rellenar el reparto
+// por postura de las peleas que se guardaron antes de que ese campo existiera, y
+// una reconstrucción se lo pone a todas por dentro. Apartarlo es hacerlo
+// desaparecer, y eso es exactamente lo correcto.
+//
+// QUÉ PASABA SIN ESTA LÍNEA, medido: el fichero sobrevivía a la reconstrucción y
+// seguía estampando lo suyo sobre peleas que ya no eran las mismas. La pelea de
+// las 11:43 se reconstruye entera —563 s, modelo 3, con su reparto dentro— y le
+// caía encima el `motivo: frontera-idle-20s` de la versión partida: una pelea
+// impecable rotulada como excepción. Y quedaba una entrada huérfana apuntando a
+// una hora de inicio que ya no existe.
+const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjson',
+  'aa.ndjson', 'spells.ndjson', 'tramos.ndjson'];
+
+/**
+ * AVISO QUE VIAJA CON EL RESULTADO, no un comentario que nadie lee.
+ *
+ * Mientras el cierre de pelea se decida con dos relojes distintos —el de pared
+ * en directo y la marca del registro al reconstruir— esta operación NO reproduce
+ * el histórico: con un hueco de exactamente `idleSec` cada camino parte la pelea
+ * de una manera. Medido el 9 de agosto de 2026 sobre 441 peleas: una se funde en
+ * otra, y las cifras de las dos cambian.
+ *
+ * Se devuelve como dato y no se escribe aquí para que cada sitio lo enseñe a su
+ * manera —la consola con texto, la aplicación con su cartel— y para que el día
+ * que se arregle la tarea baste con quitar esta constante y ver qué se rompe.
+ * Ver el comentario de `tick()` en `src/encounter.js`.
+ */
+export const AVISO_RECONSTRUIR = 'fronteras-dos-relojes';
 
 export async function rebuildStore({
   dir, logPath, self = null, idleSec = 20, trios = [], companions = [],
@@ -114,6 +145,9 @@ export async function rebuildStore({
   const resumenes = despues.filter({});
   return {
     ok: true,
+    // Viaja con el resultado para que cada interfaz lo enseñe. Ver
+    // `AVISO_RECONSTRUIR`.
+    aviso: AVISO_RECONSTRUIR,
     version: STORE_VERSION,
     peleasAntes, peleasDespues,
     danoAntes,

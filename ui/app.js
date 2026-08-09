@@ -2310,7 +2310,7 @@ function renderAdvice(snap) {
   const conflict = snap.classConflict && state.dismissedConflict !== JSON.stringify(snap.classConflict)
     ? snap.classConflict : null;
   const sig = JSON.stringify([getLang(), f.uid ?? 'live', a?.incoming, a?.current,
-    a?.defence.map((d) => d.prevented), classes, postura, trioViejo, conflict,
+    a?.defence.map((d) => d.prevented), a?.tramos, a?.segmentado, classes, postura, trioViejo, conflict,
     live && [live.kind, live.bestKey, live.suggest]]);
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
@@ -2402,6 +2402,17 @@ function renderAdvice(snap) {
         <span>${esc(t('adv.split'))} <b>${kind}</b></span>
         <span>${esc(t('adv.melee'))} <b>${n0(a.incoming.melee)}</b></span>
         <span>${esc(t('adv.magic'))} <b>${n0(a.incoming.spell)}</b></span>
+        ${/*
+          LA COTA AL VALOR DEL CONSEJO, A LA VISTA Y NO EN UN COMENTARIO.
+          Con la mitad del daño en periódico, la mejor postura posible te ahorra
+          como mucho la otra mitad — y eso decide si el cambio compensa. Sólo
+          sale cuando lo hay: una fila con un cero al lado sería ruido.
+        */''}
+        ${a.incoming.unmitigable > 0 ? `<span class="adv-nomit"
+          title="${esc(t('adv.unmitigableNote', { n: n0(a.incoming.total),
+            u: n0(a.incoming.unmitigable), pct: pct(a.incoming.unmitigableShare) }))}"
+          >${esc(t('adv.unmitigable'))} <b>${n0(a.incoming.unmitigable)}</b>
+          <span class="dim num">${pct(a.incoming.unmitigableShare)}</span></span>` : ''}
         <span>${esc(t('adv.now'))} <b>${esc(a.current.stance ?? '—')}${a.current.invocation ? ' · ' + esc(a.current.invocation) : ''}</b></span>
       </div>
       ${table(
@@ -2412,6 +2423,26 @@ function renderAdvice(snap) {
           n0(d.prevented), pct(d.share), n0(d.endurance), d.mana ? n0(d.mana) : '—',
         ]),
       )}
+      ${/*
+        LO QUE EVITASTE TRAMO A TRAMO, y sólo cuando bailaste.
+        Con una sola postura esta caja repetiría la fila de arriba. Con dos o
+        más es lo que explica el veredicto: la tabla de candidatas supone que
+        sostuviste UNA toda la pelea, y tú no.
+      */''}
+      ${a.bailaste ? `<div class="adv-tramos">
+        <div class="eyebrow">${esc(t('adv.byStance'))}</div>
+        ${table(
+    [{ label: 'Stance' }, { label: t('adv.wouldAvoid'), right: true, w: '84px' },
+      { label: t('adv.melee'), right: true, w: '72px' }, { label: t('adv.magic'), right: true, w: '72px' }],
+    a.tramos.map((x) => [esc(x.label), n0(x.prevented), n0(x.melee), n0(x.spell)]),
+  )}
+      </div>` : ''}
+      ${/*
+        Y si la pelea es anterior a que el daño se partiera por postura, se dice:
+        su veredicto SÍ está calculado contra una sola, y callarlo lo haría
+        indistinguible de uno medido tramo a tramo.
+      */''}
+      ${a.segmentado ? '' : `<div class="hint">${esc(t('adv.notSegmented'))}</div>`}
       <div class="hint">${esc(a.defence[0]?.noteKey ? t(a.defence[0].noteKey) : '')}</div>
     ` : `<div class="hint">${esc(t('adv.noDamage'))}</div>`}
 
@@ -4905,6 +4936,12 @@ async function showMigration() {
   pintar(`<div class="mig-h">${esc(t('mig.title'))}</div>
     <p>${esc(t('mig.body', { n: m.fights }))}</p>
     <p class="mig-fix">${esc(t('mig.fix'))}</p>
+    ${/*
+      El aviso va JUNTO AL BOTÓN, antes de pulsarlo. Mientras el cierre de pelea
+      se decida con dos relojes, reconstruir puede mover fronteras: quien pulsa
+      tiene que saberlo antes, no leerlo en las notas de la versión después.
+    */''}
+    <p class="mig-aviso">${esc(t('mig.fronteras'))}</p>
     <div class="mig-btns">
       <button class="primary" id="migGo">${esc(t('mig.button'))}</button>
       <button id="migLater">${esc(t('mig.later'))}</button>
