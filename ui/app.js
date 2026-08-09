@@ -2499,8 +2499,23 @@ function renderHead(snap) {
   const f = withPets(fightFor(snap));
   const host = $('fightHead');
   if (!f) {
-    host.innerHTML = `<div class="empty"><h2>${t('fight.none')}</h2>
-      <p>${t('fight.noneHint')}</p></div>`;
+    /**
+     * DOS VACÍOS QUE NO SON EL MISMO, y usar el texto de uno para el otro
+     * afirma algo falso en lo primero que se ve al abrir.
+     *
+     *   no hay peleas       el histórico está vacío de verdad. «Pega a algo y
+     *                       aparecerán aquí» describe lo que pasa.
+     *   ninguna cargada     hay peleas en la lista de la izquierda y ninguna
+     *                       está abierta todavía — al arrancar, la seleccionada
+     *                       es la viva y no hay combate. Decir aquí «todavía no
+     *                       hay peleas» con cuatrocientas al lado es mentir
+     *                       sobre lo único que el usuario puede comprobar de un
+     *                       vistazo.
+     */
+    const hayPeleas = (state.fights?.length ?? 0) > 0;
+    host.innerHTML = `<div class="empty">
+      <h2>${esc(hayPeleas ? t('fight.pick') : t('fight.none'))}</h2>
+      <p>${esc(hayPeleas ? t('fight.pickHint') : t('fight.noneHint'))}</p></div>`;
     return;
   }
   const live = isLive(f);
@@ -4888,12 +4903,31 @@ window.eql.onLang((c) => { setLang(c); applyLangToChrome(); renderLangPicker(); 
  * el fallo es silencioso — los números siguen ahí, con el mismo aspecto de
  * siempre, sólo que con el nivel de antes.
  */
+/**
+ * EL AVISO DE LAS FRONTERAS, EN UN SOLO SITIO.
+ *
+ * Reconstruir no reproduce exactamente el histórico mientras el cierre de pelea
+ * se decida con dos relojes: donde el hueco entre dos peleas sea de exactamente
+ * `idleSec`, la relectura puede fundirlas o partirlas de otra manera.
+ *
+ * Esto estuvo escrito sólo en el cartel de migración —el camino raro, el de
+ * encontrarse un almacén viejo— y faltaba en el de tríos, que es el NORMAL:
+ * tiene su propio botón «cambié de trío» dentro de la pelea y se pulsa a
+ * menudo. Mismo `rebuildStore()`, mismas consecuencias, y sólo uno avisaba.
+ *
+ * Va en una función y no copiado en los dos sitios para que no se puedan volver
+ * a separar, y hay una prueba que recorre este fichero y exige que TODA función
+ * que llame a `rebuildStore()` la use.
+ */
+const avisoFronteras = () => `<p class="mig-aviso">${esc(t('mig.fronteras'))}</p>`;
+
 function showTrioRebuild() {
   if (!state.needsRebuild) return;
   const bar = $('migBar');
   if (!bar) return;
   bar.innerHTML = `<div class="mig-h">${esc(t('trio.title'))}</div>
     <p>${esc(t('trio.rebuild'))}</p>
+    ${avisoFronteras()}
     <div class="mig-btns">
       <button class="primary" id="trioGo">${esc(t('mig.button'))}</button>
       <button id="trioLater">${esc(t('mig.later'))}</button>
@@ -4924,9 +4958,47 @@ function showTrioRebuild() {
  * tiene la 1.0.7 instalada no lee las notas: abre el programa, ve unos números
  * y se los cree. Y son incorrectos de una forma que no se nota mirándolos.
  */
+/**
+ * LAS CIFRAS DE TU HISTÓRICO HAN CAMBIADO, Y NADIE TE LO HA PREGUNTADO.
+ *
+ * La 1.10.0 pedía permiso: cartel, botón, tú decidías, y el histórico anterior
+ * se apartaba con fecha. La 1.11.0 no lo pide — su corrección se hace al leer,
+ * así que las peleas viejas enseñan otros números la primera vez que se abren y
+ * no hay nada que pulsar. Eso, sin decirlo, es exactamente lo que este programa
+ * no hace.
+ *
+ * VA DENTRO Y NO EN LAS NOTAS, por lo mismo que el cartel de migración: quien
+ * tiene una versión instalada no lee las notas, abre el programa, ve unos
+ * números y se los cree. Y desde la 1.10.0 hay una razón más — se actualiza
+ * desde dentro, así que ni siquiera pasa por la página de la release.
+ *
+ * EL DISPARADOR NO ES LA MARCA DE LA CONFIGURACIÓN, es tener peleas por debajo
+ * del formato de hoy (ver `avisoModelo` en store.js). Quien instale de cero no
+ * tiene cifras que cambiar y no ve nada; la marca sólo evita repetirlo.
+ */
+async function showAvisoModelo() {
+  const a = await window.eql.avisoModelo?.().catch(() => null);
+  if (!a?.needed) return;
+  const bar = $('migBar');
+  if (!bar) return;
+  bar.innerHTML = `<div class="mig-h">${esc(t('mod.title'))}</div>
+    <p>${esc(t('mod.body', { n: n0(a.fights) }))}</p>
+    <p>${esc(t('mod.why'))}</p>
+    <p class="mig-fix">${esc(t('mod.mixed'))}</p>
+    <div class="mig-btns"><button class="primary" id="modOk">${esc(t('mod.ok'))}</button></div>`;
+  bar.style.display = 'block';
+  $('modOk').addEventListener('click', () => {
+    window.eql.avisoModeloVisto?.();
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  });
+}
+
 async function showMigration() {
   const m = await window.eql.migration?.().catch(() => null);
-  if (!m?.needed) return;
+  // El cartel de reconstruir manda sobre el del modelo: si hay que releer el
+  // registro entero, lo que se corrige al leer es lo de menos.
+  if (!m?.needed) { await showAvisoModelo(); return; }
   const bar = $('migBar');
   if (!bar) return;
 
@@ -4941,7 +5013,7 @@ async function showMigration() {
       se decida con dos relojes, reconstruir puede mover fronteras: quien pulsa
       tiene que saberlo antes, no leerlo en las notas de la versión después.
     */''}
-    <p class="mig-aviso">${esc(t('mig.fronteras'))}</p>
+    ${avisoFronteras()}
     <div class="mig-btns">
       <button class="primary" id="migGo">${esc(t('mig.button'))}</button>
       <button id="migLater">${esc(t('mig.later'))}</button>
@@ -5011,7 +5083,24 @@ function showUpdate(u) {
     ? `<button class="primary" id="updGet">${esc(t('upd.get'))}</button>` : ''}
       ${estado === 'bajando' ? `<button id="updCancel">${esc(t('upd.cancel'))}</button>` : ''}
       ${estado === 'hecho' ? `<button class="primary" id="updInstall">${esc(t('upd.install'))}</button>` : ''}
-      ${estado !== 'bajando' ? `<button id="updSkip">${esc(t('upd.skip'))}</button>` : ''}`;
+      ${estado !== 'bajando' ? `<button id="updSkip">${esc(t('upd.skip'))}</button>` : ''}
+      ${/*
+        LAS NOTAS DE LA VERSIÓN, AQUÍ. `actualizar.js` se las traía desde la
+        1.10.0 y no las pintaba nadie: quien actualizaba desde dentro —el camino
+        que estrenó esa misma versión— no leía el registro de cambios NUNCA. Y
+        entonces una versión que corrige cifras ya guardadas se instala sin que
+        se haya podido leer qué va a cambiar.
+
+        Plegadas, porque el cartel es una fila y esto son cuatro mil caracteres.
+        Sin interpretar el markdown: no hay intérprete en esta aplicación y meter
+        uno para esto sería traerse una dependencia entera. El texto se lee bien
+        tal cual —es lo que se escribió para leerse— y así no hay forma de que
+        lo que venga de la red se convierta en etiquetas.
+      */''}
+      ${u.notas ? `<details class="upd-notas">
+        <summary>${esc(t('upd.notes'))}</summary>
+        <pre>${esc(u.notas)}</pre>
+      </details>` : ''}`;
     bar.style.display = 'flex';
     cablear(estado);
   };

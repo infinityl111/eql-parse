@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Engine } from './engine.js';
-import { FightStore, STORE_VERSION } from './store.js';
+import { FightStore, FORMATO_VERSION } from './store.js';
 
 /**
  * Reconstrucción del almacén releyendo el log entero.
@@ -69,6 +69,58 @@ const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjs
  * Ver el comentario de `tick()` en `src/encounter.js`.
  */
 export const AVISO_RECONSTRUIR = 'fronteras-dos-relojes';
+
+/**
+ * PENDIENTE PARA LA 1.12.0: PODAR LAS COPIAS. Decidido, no implementado.
+ *
+ * Apartar antes de reconstruir es lo que hace segura la operación, pero nadie
+ * borra nunca lo apartado. Medido en una carpeta real el 9 de agosto de 2026:
+ * 113 ficheros `.bak` y 140,7 MB, contra 18 MB de almacén vivo. Veintisiete
+ * generaciones de `fights.ndjson` en cuatro días.
+ *
+ * LA POLÍTICA, con el porqué de cada pieza:
+ *
+ *   SE BORRA POR TANDA, NUNCA POR FICHERO. Cada reconstrucción aparta los seis
+ *   con la misma marca de tiempo, y arriba está escrito por qué van juntas.
+ *   Media tanda es peor que ninguna: restaurarías un `fights.ndjson` con el
+ *   índice de otro momento. Una regla ingenua «los N ficheros más nuevos de
+ *   cada nombre» rompe justo esto, porque los recuentos no coinciden —27, 27,
+ *   17, 15, 13, 12— cuando alguna vez faltó alguno.
+ *
+ *   SE GUARDAN LAS 3 ÚLTIMAS TANDAS, y el criterio es la POSICIÓN, no la edad.
+ *   Una regla de «los últimos 30 días» borra la única red de quien reconstruye
+ *   cada dos meses, que es exactamente quien más la necesita. La antigüedad no
+ *   dice nada del valor de una copia; su posición en la pila sí. Tres y no una
+ *   porque se puede reconstruir dos veces antes de notar que el problema venía
+ *   de la primera.
+ *
+ *   SE PODA DESPUÉS DE UNA RECONSTRUCCIÓN CON ÉXITO, jamás al arrancar. Borrar
+ *   es destructivo y el único instante en que consta que lo nuevo está bien es
+ *   cuando acaba de salir bien. Podar al abrir tiraría copias sin haber
+ *   comprobado nada.
+ *
+ *   Y SE DICE lo que se ha borrado, con los nombres, en el resultado.
+ *
+ * LOS PUNTOS DE CONTROL CON NOMBRE QUEDAN FUERA, y esto hay que dejarlo escrito
+ * porque el día que alguien generalice la regla se los lleva por delante:
+ * `config.json.antes-de-trios.bak` y `config.json.antes-del-who.bak` no llevan
+ * marca de tiempo, no pertenecen a ninguna tanda y ocupan dos kilobytes. Los
+ * puso una persona antes de una operación concreta y su valor es justamente que
+ * siguen ahí. La poda sólo mira ficheros cuyo nombre acabe en
+ * `.<marca ISO>.bak`; cualquier otro `.bak` no se toca.
+ *
+ * DESCARTADO: «las 3 últimas más la primera de todas». La tanda más vieja sólo
+ * parece valiosa desde una circunstancia irrepetible —la semana en que se
+ * corrigió el modelo de medición—. Para un usuario cualquiera es la que menos
+ * vale: la más lejana de su estado actual y la que más probablemente ya no
+ * cuadre con su registro. Una política permanente no se construye alrededor de
+ * un caso que no se va a repetir.
+ *
+ * NO VA EN LA 1.11.0 a propósito: su instalador ya está probado, y meter
+ * después de las comprobaciones código que BORRA ficheros del usuario invalida
+ * lo que se acaba de verificar. Y es la clase de fallo que no se nota hasta que
+ * alguien necesita la copia que ya no está.
+ */
 
 export async function rebuildStore({
   dir, logPath, self = null, idleSec = 20, trios = [], companions = [],
@@ -140,7 +192,7 @@ export async function rebuildStore({
     return { ok: false, reason: 'sin-peleas', peleasAntes };
   }
 
-  despues.stamp(STORE_VERSION);
+  despues.stamp(FORMATO_VERSION);
   const peleasDespues = despues.index.length;
   const resumenes = despues.filter({});
   return {
@@ -148,7 +200,7 @@ export async function rebuildStore({
     // Viaja con el resultado para que cada interfaz lo enseñe. Ver
     // `AVISO_RECONSTRUIR`.
     aviso: AVISO_RECONSTRUIR,
-    version: STORE_VERSION,
+    version: FORMATO_VERSION,
     peleasAntes, peleasDespues,
     danoAntes,
     danoDespues: resumenes.reduce((a, s) => a + (s.total ?? 0), 0),

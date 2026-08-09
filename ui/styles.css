@@ -984,6 +984,18 @@ button.icon { padding: 5px 9px; font-family: var(--mono); font-size: 12px; lette
           font-size: 12.5px; flex: none; }
 .updbar span { flex: 1; }
 .updbar button { font-size: 10px; }
+/*
+  Las notas de la versión ocupan su propia línea dentro del cartel: `flex-basis`
+  al 100% las manda abajo sin sacarlas de la fila ni montar otro contenedor.
+  Plegadas por defecto y con tope de altura, que son cuatro mil caracteres.
+*/
+.updbar .upd-notas { flex-basis: 100%; margin-top: 4px; }
+.updbar .upd-notas summary { cursor: pointer; font-size: 10.5px; color: var(--bone-dim); }
+.updbar .upd-notas pre {
+  margin: 8px 0 2px; max-height: 40vh; overflow: auto; white-space: pre-wrap;
+  font-family: inherit; font-size: 11.5px; line-height: 1.5; color: var(--bone-dim);
+  border-left: 2px solid var(--slate-700); padding-left: 10px;
+}
 
 /* Aviso de que el histórico guardado no es de fiar. Ocupa varias líneas a
    propósito: dice qué estaba mal, y eso no cabe en una barra de una línea. */
