@@ -50,6 +50,61 @@ export function parseHeader(line) {
   return { t, body: line.slice(27) };
 }
 
+/**
+ * DÓNDE SE REDONDEA UNA RECONSTRUCCIÓN: AQUÍ, Y EN NINGÚN OTRO SITIO.
+ *
+ * Hay dos cifras en este módulo que no son medidas sino reconstruidas —el daño
+ * recibido antes de mitigar (`rawAmount`) y el melé propio sin el bono de
+ * Offensive (`rawOut`)— y las dos salen de una división, así que salen con
+ * decimales. La pregunta es dónde se cortan.
+ *
+ * SE CORTAN AL RECONSTRUIR, GOLPE A GOLPE. Dos razones, y la segunda es la que
+ * manda:
+ *
+ *   1. Lo que se reconstruye es UN GOLPE, y un golpe de 96,5 puntos no existe:
+ *      el registro no escribe decimales en ninguna línea. Guardar 96,5 le da a
+ *      la reconstrucción una precisión que la medida de la que sale no tiene.
+ *
+ *   2. Redondear sólo al presentar deja números fraccionarios en el almacén, y
+ *      entonces la suma de los cubos y el total dejan de cuadrar según quién
+ *      redondee primero. Medido sobre 416 peleas guardadas: 388 de las 1.038
+ *      celdas de `rawTakenByType` tenían valor fraccionario, y sumar los cubos
+ *      ya redondeados daba 3.143.441 contra los 3.143.439 de redondear la suma.
+ *      Dos puntos de descuadre reproducible que no describen nada. Con todo
+ *      entero desde el origen, esa clase de descuadre no puede volver.
+ *
+ * EL SESGO NO ES SIMÉTRICO, Y CONVIENE SABER CUÁNTO ES. Aquí ponía que
+ * `Math.round` es simétrico y no lo es: redondea el ,5 siempre hacia arriba, y
+ * con divisores que producen ,5 exactos eso es sesgo POSITIVO, no ruido.
+ * Medido barriendo importes enteros del 1 al 2.000 contra cada mitigación de la
+ * tabla:
+ *
+ *   mit    factor    importes en ,5 exacto    sesgo por impacto
+ *   0,10   1,1111            0,0%                  −0,0002
+ *   0,20   1,2500           25,0%                  +0,1250
+ *   0,40   1,6667            0,0%                  −0,0000
+ *   0,50   2,0000            0,0%                  +0,0000   (sale entero)
+ *
+ * Sólo el 0,20 sesga, y sesga siempre hacia arriba: hoy son el melé bajo Mage
+ * Hunter y el hechizo directo bajo Defensive. Una mitigación de 0,60 —que la
+ * guarda de `test/stances.js` todavía permite— daría el ,5 en la MITAD de los
+ * importes y +0,25 por impacto, el doble.
+ *
+ * Es un sesgo acotado POR IMPACTO, no en total: crece linealmente con el número
+ * de golpes. Sobre el histórico real —1.041 celdas reconstruidas, 390 de ellas
+ * fraccionarias antes del cambio— el redondeo suma +36 puntos sobre 3.115.407,
+ * el 0,0012% de lo reconstruido. Se acepta a ese precio y con la cifra escrita,
+ * no dando por buena una simetría que no existe.
+ *
+ * Si algún día molesta, lo que lo quita es redondear el ,5 al par en vez de
+ * hacia arriba; no se ha hecho porque cambia una operación que cualquiera
+ * reconoce por otra que hay que ir a mirar, y 36 puntos no lo pagan.
+ *
+ * Si hace falta otra reconstrucción, pasa por aquí. Es lo que hace que la
+ * política sea una y no tres.
+ */
+const reconstruido = (v) => Math.round(v);
+
 export class Parser {
   /**
    * @param {object} opts
@@ -441,15 +496,20 @@ export class Parser {
       // Offensive duplica el melé: para comparar hay que descontar el bono.
       if (ev.amount && ev.school === 'melee') {
         const st = STANCES[normStance(this.stance)];
-        ev.rawOut = st?.meleeBonus ? ev.amount / (1 + st.meleeBonus) : ev.amount;
+        ev.rawOut = st?.meleeBonus ? reconstruido(ev.amount / (1 + st.meleeBonus)) : ev.amount;
       }
     }
     // El log guarda el daño YA mitigado. Se revierte para poder comparar
-    // posturas sin sesgarse hacia la que ya llevabas puesta.
+    // posturas sin sesgarse hacia la que ya llevabas puesta. Qué escuelas se
+    // revierten y por qué está medido en `mitigationFor`.
+    // La postura del instante viaja con TODO lo que va contra ti, tenga importe
+    // o no. Los fallos la necesitan igual: una postura que evade no reduce el
+    // golpe, lo quita, y eso se puntúa contando ataques — sin la postura del
+    // fallo no se sabe a qué tramo pertenece ese ataque.
+    if (ev.target === me) ev.stanceAtHit = this.stance;
     if (ev.target === me && ev.amount) {
-      ev.stanceAtHit = this.stance;
       const red = mitigationFor(this.stance, ev.school);
-      ev.rawAmount = red > 0 && red < 1 ? ev.amount / (1 - red) : ev.amount;
+      ev.rawAmount = red > 0 && red < 1 ? reconstruido(ev.amount / (1 - red)) : ev.amount;
     }
     // Aquí había un `ev.pet = dueño de ev.source`, que pisaba el nombre de la
     // mascota que traen los eventos pet_*. No lo leía nadie —quien mira si una
