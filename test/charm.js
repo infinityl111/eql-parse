@@ -40,7 +40,7 @@
  * objetivo —un salvaje no pega a otros bichos, un encantado no te pega a ti—
  * y lo que quede de verdad ambiguo, estimado y rotulado como tal.
  */
-import { Parser } from '../src/parser.js';
+import { Parser, CHARM_MAX_SEC } from '../src/parser.js';
 import { EncounterTracker as Encuentros } from '../src/encounter.js';
 
 let failed = 0;
@@ -90,15 +90,123 @@ console.log('\nla ventana');
     'y al soltarse deja de serlo: aquí es donde se contaba mal lo que te pega');
 }
 
-// ── 3. Morirse cierra la ventana igual ─────────────────────────────────────
-console.log('\nsin aviso de «worn off»');
+// ── 3. La muerte de un NOMBRE no cierra nada ───────────────────────────────
+//
+// Aquí se probaba lo contrario, y era el fallo. La línea de muerte no trae
+// distintivo: con tres «a large skeleton» delante, «A large skeleton has been
+// slain» no dice cuál. Cerrar con eso dejaba al encantado suelto para que la
+// siguiente línea de «Master» lo ascendiera a mascota permanente.
+console.log('\nla muerte de un homónimo');
 {
   const p = nuevo();
   p.parse(`${HORA(10)}a ghoul has been charmed.`);
   p.parse(`${HORA(70)}You have slain a ghoul!`);
   const v = p.charmed.get('a ghoul')[0];
-  ok(v.hasta !== null, 'la muerte la cierra: la mitad de los casos acaban así', v.hasta);
-  ok(!p.charmedAt('a ghoul', v.hasta + 5), 'y después ya no es tuyo');
+  ok(v.hasta === null, 'la muerte NO cierra la ventana: no identifica a nadie', v.hasta);
+  ok(p.charmedAt('a ghoul', v.desde + 120), 'y el bicho sigue siendo tuyo hasta que algo fiable lo diga');
+}
+
+// ── 3b. Uno a la vez: encantar a otro cierra el anterior, y es DEDUCIDO ─────
+console.log('\nencadenar');
+{
+  const p = nuevo();
+  p.parse(`${HORA(10)}a ghoul has been charmed.`);
+  p.parse(`${HORA(70)}an ogre guard has been charmed.`);
+  const g = p.charmed.get('a ghoul')[0];
+  ok(g.hasta !== null, 'el encanto nuevo cierra el anterior: sólo se tiene uno', g.hasta);
+  ok(g.cierre === 'encadenado', 'y queda marcado como lo que es', g.cierre);
+  ok(!p.charmedAt('a ghoul', g.hasta + 5), 'después ya no es tuyo');
+  ok(p.charmedAt('an ogre guard', g.hasta + 5), 'y el nuevo sí');
+  ok(p.charmCierre('a ghoul', g.hasta + 5) === 'encadenado',
+    'y se puede preguntar de dónde sale ese cierre, que es una deducción y no una medida');
+
+  // El aviso escrito es otra cosa: eso sí está medido.
+  const q = nuevo();
+  q.parse(`${HORA(10)}a ghoul has been charmed.`);
+  q.parse(`${HORA(70)}Your Charm spell has worn off of a ghoul.`);
+  ok(q.charmed.get('a ghoul')[0].cierre === 'worn-off', 'el «worn off» se marca como medido',
+    q.charmed.get('a ghoul')[0].cierre);
+}
+
+// ── 3c. Un encantado NO asciende nunca a mascota invocada ──────────────────
+//
+// El fallo que costaba dinero: 10.004 puntos de daño enemigo metidos en tu
+// bando en siete peleas, porque una ventana mal cerrada dejaba pasar la línea
+// de «Master». Ahora la puerta mira si el nombre estuvo encantado alguna vez.
+console.log('\nel ascenso que no puede ocurrir');
+{
+  const p = nuevo();
+  p.parse(`${HORA(0)}Kabarer told you, 'Attacking a ghoul Master.'`);
+  p.parse(`${HORA(10)}a large skeleton has been charmed.`);
+  // La muerte de OTRO igual ya no cierra nada, pero aunque cerrara…
+  p.parse(`${HORA(32)}A large skeleton has been slain by a large skeleton!`);
+  p.parse(`${HORA(86)}A large skeleton told you, 'Attacking an ogre guard Master.'`);
+  ok(!p.pets.has('a large skeleton'),
+    'el encantado no entra en mascotas ni con la ventana cerrada a destiempo',
+    [...p.pets.keys()].join(','));
+  ok(p.pets.has('Kabarer'), 'y tu mascota de verdad sigue en su sitio',
+    [...p.pets.keys()].join(','));
+  ok(p.currentPet === 'Kabarer', 'sin que le hayan quitado el puesto', p.currentPet);
+
+  // Ni por la puerta del /pet who leader, que es la más fiable de las tres.
+  p.parse(`${HORA(120)}A large skeleton says, 'My leader is Campeon.'`);
+  ok(!p.pets.has('a large skeleton'), 'tampoco por «My leader is»',
+    [...p.pets.keys()].join(','));
+
+  // Lo que digas tú a mano sí manda: es tu decisión, no una detección.
+  p.markPet('a large skeleton');
+  ok(p.pets.has('a large skeleton'), 'pero marcarlo a mano sigue funcionando');
+}
+
+// ── 3d. Caducidad: una ventana no puede durar más que el hechizo ───────────
+//
+// El límite NO sale de una tabla del juego: sale de las ventanas que el propio
+// registro cierra con «worn off», que son las únicas medidas. Ver
+// `CHARM_MAX_SEC`. Es una deducción y va marcada como tal.
+console.log('\nla caducidad');
+{
+  const p = nuevo();
+  p.parse(`${HORA(10)}a ghoul has been charmed.`);
+  const v = p.charmed.get('a ghoul')[0];
+  ok(p.charmedAt('a ghoul', v.desde + CHARM_MAX_SEC - 1), 'dentro del tope sigue siendo tuyo');
+  ok(!p.charmedAt('a ghoul', v.desde + CHARM_MAX_SEC + 1),
+    'pasado el tope ya no, aunque el registro no haya dicho nada');
+
+  // Y cualquier línea con hora vale de reloj: no hace falta otra de charm.
+  p.parse(`${HORA(10 + CHARM_MAX_SEC + 60)}Campeon hits a rat for 5 points of damage.`);
+  ok(v.hasta === v.desde + CHARM_MAX_SEC,
+    'la ventana se cierra en el tope, no en la hora del evento que lo destapa', v.hasta - v.desde);
+  ok(v.cierre === 'caducado', 'y el cierre dice de dónde sale', v.cierre);
+}
+
+// ── 3e. LA COTA, RECALCULADA ───────────────────────────────────────────────
+//
+// `CHARM_MAX_SEC` son 690 s = 2 × los 333 s de la ventana medida más larga del
+// registro de referencia. Esta guarda no comprueba la constante: comprueba que
+// el margen sigue siendo de ×2. Si algún día una ventana cerrada por «worn
+// off» pasa de la mitad del tope, la muestra está diciendo que 333 s se quedó
+// corto, y entonces hay que volver a medir en vez de seguir confiando.
+console.log('\nel margen de la cota');
+{
+  const p = nuevo();
+  // Las cuatro más largas del registro real, con su nombre y su duración.
+  const medidas = [
+    ['a Teir`Dal priest', 333], ['a Teir`Dal rogue', 246],
+    ['an ogre guard', 226], ['a fire elemental', 177],
+  ];
+  let peor = 0;
+  for (const [name, dur] of medidas) {
+    const q = nuevo();
+    q.parse(`${HORA(0)}${name} has been charmed.`);
+    q.parse(`${HORA(dur)}Your Charm spell has worn off of ${name}.`);
+    const w = q.charmed.get(name.replace(/^An? /, (m) => m.toLowerCase()))[0];
+    if (w.cierre === 'worn-off') peor = Math.max(peor, w.hasta - w.desde);
+  }
+  ok(peor === 333, 'la ventana medida más larga sigue siendo la de 333 s', peor);
+  ok(peor * 2 <= CHARM_MAX_SEC,
+    `el margen sigue siendo de al menos ×2 (${peor} × 2 ≤ ${CHARM_MAX_SEC})`,
+    `${(CHARM_MAX_SEC / peor).toFixed(2)}×`);
+  void p;
 }
 
 // ── 4. No retira la mascota de verdad ──────────────────────────────────────

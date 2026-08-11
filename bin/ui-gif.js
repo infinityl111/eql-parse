@@ -11,9 +11,22 @@
  * convierte FAT a NTFS. El APNG se monta con lo que Chromium ya escribe al
  * capturar, sin recomprimir y sin perder un color. Ver `bin/apng.js`.
  *
- * Uso:  node bin/ui-gif.js [segundos] [velocidad]
- *   segundos   cuántos segundos de pelea capturar (por defecto 20)
- *   velocidad  1, 2 o 5 (por defecto 1)
+ * Uso:  node bin/ui-gif.js [opciones]
+ *
+ *   --pelea "Nagafen"   sólo peleas cuyo nombre contenga eso
+ *   --x 3               a cuántas veces la realidad se ve el clip (por defecto 1)
+ *   --segundos 30       cuántos segundos de pelea capturar (por defecto 20)
+ *   --salida nagafen    cómo se llama el fichero (por defecto «reproduccion»)
+ *
+ * Ejemplos:
+ *   npm run ui:gif                                  la muestra de la web
+ *   npm run ui:gif -- --pelea Nagafen --x 3 --salida nagafen
+ *   npm run ui:gif -- --pelea "Cazic-Thule" --x 2 --segundos 40 --salida cazic
+ *
+ * LA DE LA WEB NO SE PISA. Sin `--salida` escribe `reproduccion.apng.png`, que
+ * es la que usa `web/build.mjs`; con `--salida` escribe otro fichero y no toca
+ * esa ni su resguardo de cifras. Sacar un clip para Discord no debería obligar
+ * a rehacer la portada.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,8 +35,17 @@ import { PUERTO, espera, puertoLibre, lanzar, conecta, cdp, evaluador,
   medirCaja, capturaComprobada, fijarTema, devolverTema } from './cdp.js';
 import { montarAPNG, revisarAPNG } from './apng.js';
 
-const SEGUNDOS = Number(process.argv[2] ?? 20);
-const VELOCIDAD = Number(process.argv[3] ?? 1);
+/** Opciones con nombre. Las posicionales de antes ya no se usaban en ningún sitio. */
+const ARGS = process.argv.slice(2);
+const opt = (nombre, porDefecto = null) => {
+  const i = ARGS.indexOf(`--${nombre}`);
+  return i >= 0 && ARGS[i + 1] !== undefined ? ARGS[i + 1] : porDefecto;
+};
+
+const SEGUNDOS = Number(opt('segundos', 20));
+const NOMBRE = String(opt('salida', 'reproduccion')).replace(/[^a-z0-9_-]/gi, '');
+const ES_LA_DE_LA_WEB = NOMBRE === 'reproduccion';
+
 /**
  * Una pelea concreta, por si la automática no enseña lo que se quiere enseñar.
  *
@@ -35,7 +57,8 @@ const VELOCIDAD = Number(process.argv[3] ?? 1);
  * parte. Comprobarlo automáticamente costaría medir la tabla de casteos de
  * cada candidata, unos tres segundos por pelea.
  */
-const FILTRO = process.argv[4] ?? null;
+const FILTRO = opt('pelea', null);
+
 const SALIDA = path.join(os.tmpdir(), 'eql-ui-check');
 fs.mkdirSync(SALIDA, { recursive: true });
 
@@ -46,7 +69,32 @@ fs.mkdirSync(SALIDA, { recursive: true });
  * vez por segundo de pelea saldrían siempre en la misma fase —recién nacidos— y
  * la muestra no enseñaría lo que se ve al mirarla. A 8 por segundo se ven subir.
  */
-const MS = 125;
+const MS_CAPTURA = 125;
+
+/**
+ * CUÁNTAS VECES LA REALIDAD, y por qué no es lo mismo que la velocidad del
+ * reproductor.
+ *
+ * La aplicación sólo tiene tres velocidades —×1, ×2 y ×5— porque son las que
+ * un jugador va a usar mirando una pelea. Un clip para Discord es otra cosa:
+ * ahí lo que importa es que se lea, y ×3 no existe en la aplicación.
+ *
+ * Pero la velocidad del clip sale de DOS cosas: a qué velocidad corre la
+ * reproducción mientras se captura, y cada cuánto se enseña cada fotograma
+ * después. Con eso se llega a cualquier múltiplo:
+ *
+ *     veces = velocidad del reproductor × (125 ms / retraso del fotograma)
+ *
+ * Para ×3 se reproduce a ×2 y se enseña a 83 ms — la de la aplicación más
+ * cercana, para que los flotantes se muevan como se mueven de verdad, y el
+ * retraso ajusta el resto. Se imprimen las dos cifras: es una deducción, y una
+ * deducción que no se enseña no se puede comprobar.
+ */
+const VECES = Math.max(0.25, Math.min(10, Number(opt('x', 1))));
+const VELOCIDADES_APP = [1, 2, 5];
+const VELOCIDAD = VELOCIDADES_APP.reduce((a, b) =>
+  (Math.abs(b - VECES) < Math.abs(a - VECES) ? b : a));
+const MS = Math.max(20, Math.round(MS_CAPTURA * VELOCIDAD / VECES));
 
 if (!(await puertoLibre())) {
   console.error(`\nEl puerto ${PUERTO} está ocupado: cierra la otra ventana con depuración.\n`);
@@ -94,12 +142,34 @@ try {
 
   temaPrevio = await fijarTema(evalua, TEMA);
   console.log(`\ntema ${TEMA} (estaba en ${temaPrevio})`);
+  // Las dos cifras de las que sale la velocidad del clip, dichas antes de
+  // empezar: son una deducción, y una deducción que no se enseña no se puede
+  // comprobar. Si se pide ×3 y sale «×2 y 83 ms», se ve de dónde viene.
+  console.log(`clip a ×${VECES} — reproductor a ×${VELOCIDAD}, ${MS} ms por fotograma`
+    + (VECES !== VELOCIDAD ? `  (la aplicación no tiene ×${VECES}: se ajusta el retraso)` : ''));
+  console.log(`salida «${NOMBRE}»${ES_LA_DE_LA_WEB ? ' — LA DE LA WEB, se va a reemplazar' : ' — la de la web no se toca'}`
+    + (FILTRO ? `  ·  sólo peleas con «${FILTRO}»` : ''));
 
   // Llegar a la reproducción de una pelea concreta. Por identificadores, no por
   // el texto de los botones: la aplicación tiene cinco idiomas.
   console.log('\nabriendo la reproducción…');
   await evalua("document.getElementById('tabCombat')?.click()");
   await espera(1200);
+  /**
+   * EL HISTÓRICO ENTERO, no las últimas 24 horas.
+   *
+   * La lista arranca filtrada a un día. Una pelea contra Nagafen o Cazic-Thule
+   * puede ser de hace un mes: buscarla ahí es no encontrarla, y el mensaje
+   * diría «ninguna cumple el criterio» sin que nadie sospeche del filtro.
+   */
+  await evalua(`(() => {
+    const s = document.getElementById('fltRange');
+    if (!s) return false;
+    s.value = 'all';
+    s.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await espera(1500);
   /**
    * LA PELEA SE ELIGE POR CRITERIO Y NO POR POSICIÓN.
    *
@@ -125,7 +195,7 @@ try {
       const segs = m ? (+(m[1] ?? 0)) * 60 + (+m[2]) : 0;
       if (segs < ${SEGUNDOS + 5}) continue;
       const nombre = c.querySelector('.fight-name')?.textContent ?? '?';
-      ${FILTRO ? `if (!nombre.includes(${JSON.stringify(FILTRO)})) continue;` : ''}
+      ${FILTRO ? `if (!nombre.toLowerCase().includes(${JSON.stringify(String(FILTRO).toLowerCase())})) continue;` : ''}
       if (${exigirRetrato ? 'true' : 'false'}) {
         // El primer nombre de la etiqueta es el enemigo principal.
         const principal = nombre.split(',')[0].replace(/\\s*×\\d+\\s*$/, '').trim();
@@ -152,7 +222,14 @@ try {
     const r = await evalua(`(() => {
       const el = document.getElementById('rpReglas');
       if (!el) return null;
-      return { pico: +el.dataset.pico, mediana: +el.dataset.mediana, conForma: el.dataset.forma === '1' };
+      return { pico: +el.dataset.pico, mediana: +el.dataset.mediana, conForma: el.dataset.forma === '1',
+        // Los combatientes sin bando montan su propio bloque, y ese bloque
+        // aparece cuando entran — a mitad de la reproducción. La escena crece,
+        // le sale barra de desplazamiento y el recorte deja de encuadrar lo
+        // mismo: la comprobación saltó en el fotograma 36 con «an abhorrent, a
+        // haunted chest, an ire ghast». Para la muestra se prefiere una pelea
+        // donde todo el mundo tenga bando y la caja no se mueva.
+        sinBando: !!document.querySelector('.rp-sinbando') };
     })()`);
     if (!r || !Number.isFinite(r.pico)) {
       throw new Error('la reproducción no anotó los umbrales medidos en #rpReglas');
@@ -175,7 +252,9 @@ try {
    * tiene, se usa la mejor que haya y SE DICE: una muestra con esa nota es
    * peor que sin ella, y mucho mejor que ninguna muestra.
    */
-  const MAX_INTENTOS = 6;
+  // Con un filtro puesto hay muchas menos candidatas y conviene mirar más
+  // lejos antes de rendirse; sin filtro, seis bastan y cada intento cuesta.
+  const MAX_INTENTOS = FILTRO ? 20 : 6;
   let elegida = null;
   let reglas = null;
   let indice = 0;
@@ -185,8 +264,9 @@ try {
     if (!cand) break;
     elegida = cand; indice = i;
     reglas = await abrirReproduccion();
-    if (reglas.conForma) break;
-    console.log(`  («${elegida}» se guardó antes de la forma del golpe; probando otra)`);
+    if (reglas.conForma && !reglas.sinBando) break;
+    console.log(`  («${elegida}» ${reglas.sinBando ? 'tiene combatientes sin bando y la escena crece a mitad'
+      : 'se guardó antes de la forma del golpe'}; probando otra)`);
     await evalua("document.getElementById('tabCombat')?.click()");
     await espera(1200);
   }
@@ -220,6 +300,11 @@ try {
     console.log('       dirá que esa regla no se aplica. Rehaz el histórico o pon');
     console.log('       otra pelea con el tercer argumento.');
   }
+  if (reglas.sinBando) {
+    console.log('  OJO  esta pelea tiene combatientes sin bando: su bloque aparece');
+    console.log('       cuando entran y la escena crece, así que la comprobación de');
+    console.log('       encuadre puede saltar a mitad de la captura.');
+  }
 
   // La velocidad, y a reproducir.
   if (VELOCIDAD !== 1) {
@@ -246,7 +331,7 @@ try {
    * de paso queda como texto de verdad, seleccionable y que pesa cero.
    */
   await evalua("document.getElementById('rpReglas').style.display = 'none'");
-  fs.writeFileSync(path.join(SALIDA, 'reproduccion.datos.json'),
+  fs.writeFileSync(path.join(SALIDA, NOMBRE + '.datos.json'),
     JSON.stringify({ ...reglas, pelea: elegida }, null, 1));
   await espera(300);
 
@@ -260,8 +345,12 @@ try {
   const escala = Math.min(1, ANCHO_MAX / caja.width);
   console.log(`  recorte ${caja.width}×${caja.height} a escala ${escala.toFixed(2)}`);
 
-  const cuantos = Math.ceil((SEGUNDOS / VELOCIDAD) * 1000 / MS);
-  console.log(`  capturando ${cuantos} fotogramas cada ${MS} ms…`);
+  // Se captura al ritmo de siempre —ocho por segundo de reloj— y lo que
+  // cambia es cada cuánto se ENSEÑA cada fotograma después. Mezclar las dos
+  // cadencias en una sola constante era lo que hacía que subir la velocidad
+  // sacara clips a trompicones.
+  const cuantos = Math.ceil((SEGUNDOS / VELOCIDAD) * 1000 / MS_CAPTURA);
+  console.log(`  capturando ${cuantos} fotogramas cada ${MS_CAPTURA} ms de reloj…`);
   const fotogramas = [];
   for (let i = 0; i < cuantos; i++) {
     // Comprobado antes de cada disparo, por la puerta común: ver
@@ -272,11 +361,11 @@ try {
     } catch (e) {
       throw new Error(`fotograma ${i}: ${e.message}`);
     }
-    await espera(MS);
+    await espera(MS_CAPTURA);
   }
 
   const buf = montarAPNG(fotogramas, { msPorFotograma: MS, vueltas: 0 });
-  const destino = path.join(SALIDA, 'reproduccion.apng.png');
+  const destino = path.join(SALIDA, NOMBRE + '.apng.png');
   fs.writeFileSync(destino, buf);
 
   // Se revisa lo montado: un APNG mal cerrado se abre igual, enseñando sólo el

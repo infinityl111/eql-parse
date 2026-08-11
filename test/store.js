@@ -219,14 +219,28 @@ console.log('\nmigración del almacén');
   const s4 = new FightStore(viejo); s4.load();
   ok(s4.migration().needed === true, 'por debajo del umbral de reconstruir, se pide');
 
-  // Y la otra mitad de la distinción: sellado en el umbral pero por debajo del
-  // formato de hoy, NO se pide reconstruir aunque lo guardado sea de antes.
+  // Y la otra mitad de la distinción: sellado en el umbral, NO se pide
+  // reconstruir. Lo que se protege es QUÉ CONSTANTE MIRA CADA UNA, y por eso la
+  // prueba no puede depender de que las dos lleven números distintos: en la
+  // 1.11.0 iban separadas (7 y 6) y en la 1.12.0 vuelven a coincidir en 8,
+  // porque esta vez sí hay que releer el registro. Coincidir es una respuesta
+  // legítima, así que se comprueba la separación con la pareja que siempre la
+  // enseña: `migration` mira el umbral de reconstruir, `avisoModelo` mira el
+  // formato, y una generación por debajo del formato dispara el segundo y no
+  // necesariamente el primero.
   s4.stamp(RECONSTRUIR_DESDE);
   const s4b = new FightStore(viejo); s4b.load();
   ok(s4b.migration().needed === false,
     'sellado en el umbral, un formato nuevo NO obliga a reconstruir');
-  ok(generacion(s4b.meta()) < FORMATO_VERSION,
-    'aunque el formato haya subido por encima', `${generacion(s4b.meta())} < ${FORMATO_VERSION}`);
+
+  s4b.stamp(FORMATO_VERSION - 1);
+  const s4c = new FightStore(viejo); s4c.load();
+  ok(s4c.avisoModelo().needed === true,
+    'una generación por debajo del formato SÍ avisa de que las cifras cambian',
+    `${generacion(s4c.meta())} < ${FORMATO_VERSION}`);
+  ok(s4c.migration().needed === (FORMATO_VERSION - 1 < RECONSTRUIR_DESDE),
+    'y pedir reconstruir se decide con SU constante, no con la del formato',
+    `reconstruir ${RECONSTRUIR_DESDE}`);
   // Y una marca de las de antes, con formato de versión, también.
   s4.stamp('1.1.0');
   const s5 = new FightStore(viejo); s5.load();
@@ -662,6 +676,58 @@ console.log('\nmascota ajena asignada a su dueño');
   // Sin asignaciones no se toca nada, ni se copian las filas.
   ok(ownerPets(filas, {}) === filas, 'sin asignaciones se devuelven las mismas filas');
   ok(mergeOwnerPets(filas) === filas, 'y sin dueños tampoco hay nada que plegar');
+}
+
+// ── Las dudas: peleas que se sabe que están mal y no se pueden rehacer ─────
+//
+// Lo que se prueba aquí NO es que la marca aparezca —eso es lo fácil— sino que
+// DESAPAREZCA SOLA cuando la pelea deja de ser la que era. Es la lección de
+// `tramos.ndjson`: aquél casaba sólo por la hora, sobrevivía a las
+// reconstrucciones y seguía rotulando peleas que ya estaban bien.
+console.log('\nlas dudas sobre peleas ya guardadas');
+{
+  const dir = tmp();
+  const s = new FightStore(dir, 'Campeon');
+  const f = fight(1, 'a Teir`Dal rogue', 5015);
+  // Un enemigo colado en tu bando, como el que dejaba el charm mal cerrado.
+  f.rows.push({ name: 'a Teir`Dal rogue', side: 'ally', pet: true, charmed: false,
+    damage: 2026, taken: 2221, healingDone: 0, hits: 40, meleeHits: 40, misses: 0,
+    crits: 0, flurries: 0, ripostes: 0, deaths: 0, max: 100, activeSec: 40,
+    types: [['melee', 2026]], abilities: [], targets: [], takenBySource: [] });
+  s.append(f, 1000);
+  const at = s.index[0].at;
+
+  ok(s.get(s.index[0].uid).duda === undefined, 'sin fichero de dudas no hay nada que decir');
+
+  ok(s.appendDudas({ at, motivo: 'charm-mascota', filas: ['a Teir`Dal rogue'],
+    daño: 2026, recibido: 2221, desde: '1.11.0' }), 'se puede anotar la duda');
+
+  const conDuda = s.get(s.index[0].uid);
+  ok(conDuda.duda?.motivo === 'charm-mascota', 'y la pelea sale marcada al leerla');
+  ok(conDuda.duda?.daño === 2026 && conDuda.duda?.total === 5015,
+    'con la cifra dentro, para poder decir «de los 5.015 de tu bando, 2.026 son de un enemigo»');
+  ok(conDuda.duda?.invalida.includes('total') && conDuda.duda?.invalida.includes('raidDps'),
+    'se invalida el total del bando y su DPS');
+  ok(!conDuda.duda?.invalida.includes('mine') && !conDuda.duda?.invalida.includes('rows'),
+    'y NO tu daño personal, que ese está bien: el fallo es de quién más entra en el bando');
+
+  // Y lo que de verdad importa: si la pelea cambia, la duda se calla.
+  const s2 = new FightStore(dir, 'Campeon');
+  s2.load();
+  const uid = s2.index[0].uid;
+  ok(s2.get(uid).duda?.motivo === 'charm-mascota', 'la duda sobrevive a recargar el almacén');
+  // Se simula una reconstrucción: la misma hora, otras cifras.
+  s2.dudas.set(at, { at, motivo: 'charm-mascota', filas: ['a Teir`Dal rogue'],
+    daño: 999, recibido: 2221 });
+  s2.cache.clear();
+  ok(s2.get(uid).duda === undefined,
+    'si el importe ya no cuadra, la entrada se descarta sola: no rotula una pelea que ya está bien');
+
+  s2.dudas.set(at, { at, motivo: 'charm-mascota', filas: ['otro bicho'], daño: 2026, recibido: 2221 });
+  s2.cache.clear();
+  ok(s2.get(uid).duda === undefined, 'ni cuando la fila que señalaba ya no está');
+
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');

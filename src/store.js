@@ -97,6 +97,23 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  *                   recibido pasa a guardarse partido por la postura de cada
  *                   golpe, y la serie por segundo de dos cubos a tres.
  *
+ *   8               EL BOTÍN SE COLGABA DE LA VENTANA Y NO DE SU CADÁVER, y se
+ *                   saquea DESPUÉS de matar. Medido sobre 1.839 entradas de un
+ *                   histórico real: 34 colgadas de una pelea POSTERIOR a la
+ *                   muerte del bicho —siempre posterior, nunca al revés,
+ *                   mediana 10 minutos de distancia— y 273 (el 14,8%, en 159
+ *                   peleas) con un instante fuera de la ventana de su propia
+ *                   pelea. Y 51 objetos caían en sitio distinto según se
+ *                   grabaran en directo o releyendo, entre ellos TODO el botín
+ *                   de Innoruuk, Emperor Crush, Keeper of Souls y Maestro of
+ *                   Rancor, que en directo acababa en el fichero de sobras.
+ *                   Ahora cada objeto va a la pelea donde murió su cadáver.
+ *
+ *                   Con dos cosas más que se perdían enteras: el quinto final
+ *                   de línea («and stored it in your tradeskill depot», un
+ *                   `Essence of Rathe` que no llegó a ningún contador) y la
+ *                   moneda, 1.392 líneas reconocidas y tiradas desde siempre.
+ *
  * ESTE NÚMERO ERAN DOS PREGUNTAS EN UNA, Y HASTA LA 1.11.0 NUNCA SE SEPARARON
  * PORQUE SIEMPRE HABÍAN COINCIDIDO.
  *
@@ -123,23 +140,33 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  * Sube SIEMPRE que cambie lo que se escribe a disco. Sin excepciones y sin
  * ramas de escape: `test/formato.js` no deja publicar sin subirlo.
  */
-export const FORMATO_VERSION = 7;
+export const FORMATO_VERSION = 8;
 
 /**
  * Por debajo de esta generación, lo guardado NO se puede arreglar leyéndolo
  * mejor y hay que releer el registro. Es lo único que saca el cartel de
  * reconstruir.
  *
- * SE QUEDA EN 6 A PROPÓSITO. La 1.11.0 sube el formato a 7 y no toca esto,
- * porque su corrección se hace al leer. Quien no reconstruyó cuando la 1.10.0
- * se lo pidió sigue por debajo de 6 y sigue viendo el cartel; quien sí lo hizo
- * no lo ve, y hace bien.
+ * SUBE A 8 EN LA 1.12.0, y es de las que no se pueden arreglar leyendo mejor:
+ * dónde está colgado cada objeto se decidió al escribirlo, y lo escrito no dice
+ * de qué cadáver salió más que por el nombre. Un histórico de la generación 7
+ * tiene 34 objetos colgados de la pelea equivocada, 273 con el instante fuera
+ * de su ventana, la moneda entera sin recoger y un final de línea sin regla.
+ * Nada de eso se puede recomponer sin volver al registro.
+ *
+ * LA ARISTA QUE HAY QUE MIRAR AL RECONSTRUIR sigue ahí y no la arregla esto: el
+ * cierre de pelea usa el reloj de pared en directo y la marca del registro al
+ * releer, así que con un hueco de exactamente `idleSec` cada camino parte la
+ * pelea de una manera. Lo que sí desaparece es su efecto sobre el botín —51
+ * objetos cambiaban de sitio entre los dos caminos— porque la regla del cadáver
+ * no depende de qué reloj cerró la pelea. El aviso de `rebuild.js` se queda:
+ * las cifras de daño siguen pudiendo moverse.
  *
  * Al subirlo, repasa `mig.body` — el cartel explica los motivos de ESA
  * migración, y un texto puesto por un motivo que ya no aplica sobrevive porque
  * nadie lo relee.
  */
-export const RECONSTRUIR_DESDE = 6;
+export const RECONSTRUIR_DESDE = 8;
 
 const META = 'store.json';
 
@@ -323,6 +350,64 @@ function aplicarTramos(f, at, tramos) {
 }
 
 /**
+ * LO QUE SE SABE QUE ESTÁ MAL EN UNA PELEA YA GUARDADA.
+ *
+ * Existe porque hay un desfase entre enterarse de un fallo y poder arreglarlo.
+ * El arreglo de verdad es releer el registro, y eso hoy está bloqueado —las
+ * fronteras de pelea se deciden con dos relojes distintos, así que reconstruir
+ * NO reproduce el histórico—. Mientras tanto, esas peleas salían con sus cifras
+ * como si fueran buenas: mal y calladas, que es lo peor de las dos opciones.
+ *
+ * QUÉ SE MARCA, medido el 10 de agosto de 2026: 18 peleas en las que un enemigo
+ * cuenta en tu bando porque el encanto se cerró mal. En siete de ellas el bicho
+ * llegó a ascender a mascota permanente; en la peor, el 40% de «tu» daño es de
+ * un enemigo.
+ *
+ * ═══ LA ENTRADA SE INVALIDA SOLA, Y ESO ES LO IMPORTANTE ═══
+ *
+ * Se casa por hora Y POR CONTENIDO: la entrada guarda el importe mal atribuido
+ * y los nombres de las filas, y sólo se aplica si la pelea sigue teniendo esas
+ * cifras. En cuanto se reconstruya y la pelea cambie, la entrada deja de casar
+ * y se descarta sola.
+ *
+ * Ésa es la lección de `tramos.ndjson`, aplicada antes de tropezar en vez de
+ * después: aquél casaba sólo por la hora, sobrevivía a las reconstrucciones y
+ * seguía estampando lo suyo sobre peleas que ya no eran las mismas —una pelea
+ * impecable rotulada como excepción, y una entrada huérfana apuntando a una
+ * hora de inicio que ya no existía—. Un fichero lateral que sólo mira la clave
+ * no puede saber si sigue hablando de lo que hablaba.
+ *
+ * Va igualmente en la lista de ficheros que se apartan al reconstruir. Las dos
+ * cosas: la de arriba es el cinturón y ésta los tirantes.
+ */
+function aplicarDudas(f, at, dudas) {
+  const e = dudas?.get(at);
+  if (!e) return f;
+  // La comprobación de contenido. Si la pelea ya no es la que era, la duda no
+  // habla de ella y se va sin decir nada.
+  const filas = (f.rows ?? []).filter((r) => (e.filas ?? []).includes(r.name)
+    && r.side === 'ally' && (r.charmed === true || r.pet === true));
+  const daño = filas.reduce((a, r) => a + (r.damage ?? 0), 0);
+  const recibido = filas.reduce((a, r) => a + (r.taken ?? 0), 0);
+  if (!filas.length || daño !== e.daño || recibido !== e.recibido) return f;
+  f.duda = {
+    motivo: e.motivo,
+    filas: filas.map((r) => r.name),
+    daño, recibido,
+    // La cifra viaja con la duda para que la ficha pueda decirla en vez de
+    // soltar un aviso genérico: «de los 5.015 de tu bando, 2.026 son de un
+    // enemigo» se entiende; «esta pelea puede estar mal» no dice nada.
+    total: f.total ?? null,
+    // Qué queda invalidado y qué NO. El daño personal está bien —lo tuyo es
+    // tuyo, el fallo es de quién más entra en el bando— así que se tacha el
+    // total del bando y su DPS, y nada más.
+    invalida: ['total', 'raidDps', 'enemyTotal', 'enemyDps'],
+    arregla: 'reconstruir',
+  };
+  return f;
+}
+
+/**
  * La dificultad que falta, sacada de la zona que sí está guardada.
  *
  * Hasta ahora, una zona sin modo ni etiqueta —«The Plane of Sky»— se guardaba
@@ -365,7 +450,20 @@ export class FightStore {
     // un campo de las peleas, porque no pertenece a ninguna: recoger algo es un
     // suceso tuyo y existe aunque no hubiera combate. Ver `orphanLoot`.
     this.lootPath = path.join(dir, 'loot.ndjson');
-    this.orphanLoot = [];
+    this.orphanLoot = [];        // sin cadáver conocido: no pertenece a ninguna pelea
+    this.lootTarde = new Map();  // hora de la pelea -> objetos recogidos tras cerrarla
+    this.orphanCoins = [];       // moneda recogida sin ninguna pelea abierta
+    this.coinsDe = new Map();    // hora de la pelea -> monedas
+    /**
+     * TODAS las líneas de objeto del fichero, en el orden en que se
+     * escribieron, sueltas y tardías juntas.
+     *
+     * Existe para que la enciclopedia pueda avanzar con un puntero —«desde la
+     * que me quedé»— igual que hace con las peleas. Los mapas de arriba sirven
+     * para buscar por pelea; para plegar hace falta un orden, y un `Map` de
+     * listas no lo tiene.
+     */
+    this.lootLineas = [];
     this.lootSeen = new Set();
     // Puntos de habilidad, con su hora. Fichero aparte por lo mismo que el
     // botín sin pelea: no pertenecen a ningún combate, pasan entre unos y
@@ -378,6 +476,11 @@ export class FightStore {
     // es donde vive la identidad de cada pelea. Ver `aplicarTramos`.
     this.tramosPath = path.join(dir, 'tramos.ndjson');
     this.tramos = new Map();   // hora de la pelea -> {self, takenByStance, modelo, motivo}
+    // Lo que se sabe que está mal en peleas ya guardadas, mientras no se pueda
+    // reconstruir. Ver `aplicarDudas`: se casa por hora Y por contenido, así
+    // que una reconstrucción la invalida sola.
+    this.dudasPath = path.join(dir, 'dudas.ndjson');
+    this.dudas = new Map();    // hora de la pelea -> {motivo, filas, daño, recibido}
     // El libro de hechizos: los que CONSTA que tienes, y de qué línea consta.
     // Fichero aparte por lo mismo que los puntos: escribir o comprar un hechizo
     // pasa fuera de cualquier pelea.
@@ -492,6 +595,7 @@ export class FightStore {
     this.#loadAA();
     this.#loadSpells();
     this.#loadTramos();
+    this.#loadDudas();
     try {
       const raw = fs.readFileSync(this.idxPath, 'utf8');
       for (const line of raw.split('\n')) {
@@ -604,7 +708,32 @@ export class FightStore {
       const fila = { ...e, k: clave };
       fs.appendFileSync(this.lootPath, `${JSON.stringify(fila)}\n`);
       this.lootSeen.add(clave);
-      this.orphanLoot.push(fila);
+      this.#colocarLoot(fila);
+      return fila;
+    } catch { return null; }
+  }
+
+  /**
+   * Una moneda recogida que no cabe dentro de una pelea guardada.
+   *
+   * Se deduplica por (hora, importe) y no por (hora, objeto, cadáver): no hay
+   * objeto ni cadáver que meter en la clave. Dos monedas del mismo importe en
+   * el mismo segundo son, para el registro, indistinguibles — y son una.
+   */
+  appendCoin(e) {
+    const t = Math.round(e?.t ?? 0);
+    if (!t) return null;
+    const clave = `${t}:cp:${e.cp ?? 0}`;
+    if (this.lootSeen.has(clave)) return null;
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      const fila = {
+        cp: e.cp ?? 0, raw: e.raw ?? null, de: e.de ?? null, t,
+        at: Math.round(t * 1000), zone: e.zone ?? null, k: clave,
+      };
+      fs.appendFileSync(this.lootPath, `${JSON.stringify(fila)}\n`);
+      this.lootSeen.add(clave);
+      this.#colocarLoot(fila);
       return fila;
     } catch { return null; }
   }
@@ -717,6 +846,39 @@ export class FightStore {
     } catch { return false; }
   }
 
+  #loadDudas() {
+    this.dudas = new Map();
+    try {
+      for (const line of fs.readFileSync(this.dudasPath, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const e = JSON.parse(line);
+          if (!e?.at) continue;
+          // La última gana: una duda se puede corregir escribiendo otra encima.
+          this.dudas.set(e.at, e);
+        } catch { /* línea rota: se salta, como en el índice */ }
+      }
+    } catch { /* sin fichero: no consta que ninguna pelea esté mal */ }
+  }
+
+  /**
+   * Anota que una pelea guardada está mal, con la cifra dentro.
+   *
+   * `daño` y `recibido` no son adorno: son la huella que permite comprobar que
+   * la pelea sigue siendo la misma antes de creerse la duda. Ver `aplicarDudas`.
+   */
+  appendDudas(e) {
+    if (!e?.at || !e?.motivo) return false;
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      fs.appendFileSync(this.dudasPath, `${JSON.stringify(e)}\n`);
+      this.dudas.set(e.at, e);
+      const sm = this.index.find((x) => x.at === e.at);
+      if (sm) this.cache.delete(sm.uid);
+      return true;
+    } catch { return false; }
+  }
+
   #loadAA() {
     this.aa = [];
     this.aaSeen = new Set();
@@ -734,20 +896,73 @@ export class FightStore {
     } catch { /* sin fichero: no hay puntos anotados */ }
   }
 
+  /**
+   * `loot.ndjson` lleva DOS cosas desde la 1.12.0, y la que las separa es `de`:
+   *
+   *   de: null    suelto. No hay cadáver conocido del que colgarlo.
+   *   de: <hora>  tardío. Su cadáver murió en esa pelea, que ya estaba cerrada
+   *               cuando lo recogiste.
+   *
+   * Y una tercera, las monedas, que se distinguen por no tener `item`.
+   *
+   * Un solo fichero para los tres porque son la misma pregunta —«¿qué recogí
+   * que no cupo dentro de una pelea guardada?»— y porque partirlo daría dos
+   * sitios donde buscar el mismo objeto. `orphanLoot` conserva su nombre y su
+   * significado de siempre: SÓLO lo suelto. Lo tardío tiene dueño.
+   */
   #loadLoot() {
     this.orphanLoot = [];
+    this.lootTarde = new Map();
+    this.orphanCoins = [];
+    this.coinsDe = new Map();
+    this.lootLineas = [];
     this.lootSeen = new Set();
     try {
       for (const line of fs.readFileSync(this.lootPath, 'utf8').split('\n')) {
         if (!line.trim()) continue;
         try {
           const e = JSON.parse(line);
-          if (!e?.item || this.lootSeen.has(e.k)) continue;
+          if (!e || this.lootSeen.has(e.k)) continue;
           this.lootSeen.add(e.k);
-          this.orphanLoot.push(e);
+          this.#colocarLoot(e);
         } catch { /* línea rota: se salta, como en el índice */ }
       }
-    } catch { /* sin fichero: no hay botín huérfano y no es un problema */ }
+    } catch { /* sin fichero: no hay botín lateral y no es un problema */ }
+  }
+
+  /** Una línea del fichero lateral, en su cajón. Al cargar y al añadir. */
+  #colocarLoot(e) {
+    if (e.item) {
+      this.lootLineas.push(e);
+      if (e.de) {
+        const lista = this.lootTarde.get(e.de) ?? [];
+        lista.push(e);
+        this.lootTarde.set(e.de, lista);
+      } else this.orphanLoot.push(e);
+      return;
+    }
+    if (e.de) {
+      const lista = this.coinsDe.get(e.de) ?? [];
+      lista.push(e);
+      this.coinsDe.set(e.de, lista);
+    } else this.orphanCoins.push(e);
+  }
+
+  /**
+   * Lo que se recogió DESPUÉS de que esa pelea se cerrara, y le pertenece.
+   *
+   * Se pide por la hora de la pelea, igual que `tramos`. Devuelve las dos
+   * cosas por separado —objetos y monedas— porque se saben de forma distinta:
+   * el objeto por su cadáver, la moneda no se sabe en absoluto (aquí nunca hay
+   * monedas tardías: sin cadáver en la línea no hay a quién colgarlas, así que
+   * salen sueltas; el hueco se deja abierto por si algún día el registro las
+   * nombra).
+   */
+  lootDe(at) {
+    return {
+      loot: (this.lootTarde?.get(at) ?? []).slice().sort((a, b) => (a.t ?? 0) - (b.t ?? 0)),
+      coins: (this.coinsDe?.get(at) ?? []).slice().sort((a, b) => (a.t ?? 0) - (b.t ?? 0)),
+    };
   }
 
   append(fight, at = Date.now()) {
@@ -784,8 +999,9 @@ export class FightStore {
       // La misma cura que en el índice: la pelea entera también lleva su
       // dificultad, y el expediente del enemigo la lee de aquí. Y el modelo de
       // medición, por lo mismo: se arregla al leer porque se puede.
-      const f = aplicarTramos(
-        repararModelo(rehacerDif(JSON.parse(buf.toString('utf8')))), s.at, this.tramos);
+      const f = aplicarDudas(aplicarTramos(
+        repararModelo(rehacerDif(JSON.parse(buf.toString('utf8')))), s.at, this.tramos),
+        s.at, this.dudas);
       this.cache.set(uid, f);
       if (this.cache.size > 40) this.cache.delete(this.cache.keys().next().value);
       return f;

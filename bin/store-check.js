@@ -86,6 +86,48 @@ console.log(`\n  peleas leídas del disco    ${n(read)}${missing ? `  (${n(missi
 console.log(`  daño según el índice       ${n(sumIdx)}`);
 console.log(`  daño según los registros   ${n(sumReal)}`);
 
+/**
+ * EL BOTÍN, Y SOBRE TODO EL QUE NO SE SABE LEER.
+ *
+ * Una línea de botín con un final que no tiene regla se recoge igual —la red de
+ * `patterns.js` saca el objeto y guarda la cola literal— pero eso sólo sirve si
+ * alguien la ve. En el contador de líneas no reconocidas no se ve: tiene 39.000
+ * y una de botín no se distingue. Se ve aquí, con su nombre y su cola, que es
+ * donde se mira cuando algo huele mal.
+ *
+ * Así se destapó el quinto final: «and stored it in your tradeskill depot»
+ * apareció una vez en 55 MB y se llevó un `Essence of Rathe` sin que saltara
+ * nada.
+ */
+let objetos = 0, unidades = 0, ambiguos = 0, fueraVentana = 0;
+const colas = [];
+for (const s of list) {
+  const f = store.get(s.uid);
+  for (const l of f?.loot ?? []) {
+    objetos++;
+    unidades += l.qty ?? 1;
+    if (l.amb) ambiguos++;
+    if ((l.t ?? 0) > (f.duration ?? 0)) fueraVentana++;
+    if (l.cola) colas.push(`${l.item} — «${l.cola}»`);
+  }
+}
+const tardios = [...(store.lootTarde?.values() ?? [])].flat();
+for (const l of tardios) if (l.cola) colas.push(`${l.item} — «${l.cola}»`);
+const cp = list.reduce((t, s) => t + (store.get(s.uid)?.coins ?? []).reduce((a, c) => a + (c.cp ?? 0), 0), 0);
+
+console.log(`\n  botín dentro de peleas     ${n(objetos)}  (${n(unidades)} unidades)`);
+console.log(`  botín tardío, con su pelea ${n(tardios.length)}`);
+console.log(`  botín suelto, sin cadáver  ${n(store.orphanLoot.length)}`);
+console.log(`  moneda recogida            ${n(cp / 1000)} platino  (${n(store.orphanCoins?.length ?? 0)} recogidas sueltas)`);
+line('recogidas con dos cadáveres posibles', ambiguos, false);
+console.log(`  ·   ${'botín recogido tras cerrarse su pelea'.padEnd(38)}${n(fueraVentana)}`);
+line('FINALES DE LÍNEA SIN REGLA', colas.length, true);
+for (const c of colas.slice(0, 12)) console.log(`        ${c}`);
+if (colas.length) {
+  console.log('\n  Esos objetos SÍ están guardados: la red los recoge. Lo que falta es la\n'
+    + '  regla que lea su final, en `src/patterns.js`. Cópiala de las cinco que hay.');
+}
+
 const agg = aggregate(list.map((s) => {
   const f = store.get(s.uid);
   return f ? ensureSides({ ...f, at: s.at }, null, []) : null;

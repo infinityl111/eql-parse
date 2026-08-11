@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FoeLedger, vida } from './foes.js';
 import { FORMATO_VERSION } from './store.js';
-import { parseZone, diffKey, labelDiff, DIFFS, SIN_MARCA } from './zones.js';
+import { parseZone, diffKey, labelDiff, DIFFS, SIN_MARCA, SIN_ZONA } from './zones.js';
 
 /**
  * La enciclopedia: lo que se aprende jugando.
@@ -132,29 +132,40 @@ export class Encyclopedia {
   }
 
   /**
-   * El botín que no tiene pelea, plegado por su cuenta.
+   * El botín que no viaja dentro de una pelea guardada. Son DOS cosas.
    *
-   * Recoger un objeto es un suceso TUYO: pasa aunque el cadáver lo rematara
-   * entero un compañero y ese combate nunca fuera tuyo. Antes se descartaba —5
-   * objetos en un registro real— y colgarlo de una pelea nunca iba a funcionar
-   * del todo, porque no pertenece a ninguna.
+   *   SUELTO   no hay cadáver conocido del que colgarlo: al enemigo lo remató
+   *            entero un compañero y ese combate nunca fue tuyo. Recoger un
+   *            objeto es un suceso TUYO y pasa igual, así que se cuenta — pero
+   *            NO entra en la ficha del enemigo ni en el reparto por
+   *            dificultad, y no por descuido: «2 de 11 caídas» necesita un
+   *            denominador de peleas tuyas y aquí no hay ninguna. Meterlo
+   *            inflaría el numerador con un denominador que no lo acompaña.
    *
-   * Entra en el recuento global de Botín, que es donde la pregunta «¿cuántos
-   * tengo?» tiene respuesta. NO entra en la ficha del enemigo ni en el reparto
-   * por dificultad, y no por descuido: «2 de 11 caídas» necesita un denominador
-   * de peleas tuyas, y aquí no hay ninguna. Meterlo inflaría el numerador con
-   * un denominador que no lo acompaña. Se cuenta aparte y se dice.
+   *   TARDÍO   su cadáver SÍ murió en una pelea tuya; lo recogiste después de
+   *            que se cerrara. Aquí el denominador existe y ya está contado —la
+   *            pelea se plegó con sus muertes—, así que el objeto sí entra en la
+   *            ficha del enemigo. Sin esto, sacar el saqueo tardío de dentro de
+   *            la pelea vaciaría la tabla de caídas de los jefes en silencio.
+   *
+   * LOS DOS SE CUENTAN AQUÍ Y NO EN `#plegar`, y esa es la garantía de que
+   * ninguno se cuenta dos veces: no están dentro de ninguna pelea guardada, así
+   * que el camino de la pelea no puede verlos ni en directo ni al reconstruir.
    */
   #plegarHuerfanos() {
-    const lista = this.store.orphanLoot ?? [];
+    const lista = this.store.lootLineas ?? [];
     let n = 0;
     for (let i = this.lastLoot + 1; i < lista.length; i++) {
       const l = lista[i];
       if (!l?.item) { this.lastLoot = i; continue; }
-      const e = this.loot.get(l.item) ?? { n: 0, sinFuente: 0, sinPelea: 0 };
+      const e = this.loot.get(l.item) ?? { n: 0, sinFuente: 0, sinPelea: 0, tarde: 0 };
       const q = l.qty ?? 1;
       e.n += q;
-      e.sinPelea = (e.sinPelea ?? 0) + q;
+      if (l.de) {
+        e.tarde = (e.tarde ?? 0) + q;
+        const kd = (!l.zone && (l.diff ?? null) === null) ? SIN_ZONA : diffKey(l.diff ?? null);
+        this.ledger.foldLootTardio(l, kd);
+      } else e.sinPelea = (e.sinPelea ?? 0) + q;
       if (!l.from) e.sinFuente += q;
       this.loot.set(l.item, e);
       this.lastLoot = i;

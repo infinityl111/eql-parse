@@ -101,5 +101,73 @@ console.log('\nsin log no se toca nada');
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });
+/**
+ * LA PODA DE LAS COPIAS. Esto BORRA FICHEROS DEL USUARIO, así que lo que se
+ * prueba no es que funcione: es que no se lleve por delante lo que no debe.
+ *
+ * En una carpeta real había 113 copias en 56 tandas después de cuatro días, y
+ * conviviendo con ellas dos puntos de control con nombre —`antes-de-trios`,
+ * `antes-del-who`— que una persona puso a mano antes de una operación concreta
+ * y cuyo valor es justamente que siguen ahí.
+ */
+console.log('\nla poda de las copias de reconstrucción');
+{
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'eql-poda-'));
+  const toca = (n) => fs.writeFileSync(path.join(dir, n), 'x');
+  // Cinco tandas completas, de la más vieja a la más nueva, y desordenadas al
+  // escribirlas para que ordenar por fecha del fichero no cuele por casualidad.
+  const marcas = ['2026-08-05T09-55-26', '2026-08-06T10-06-06', '2026-08-07T11-41-43',
+    '2026-08-08T12-14-06', '2026-08-09T13-38-00'];
+  for (const m of [marcas[2], marcas[0], marcas[4], marcas[1], marcas[3]]) {
+    toca(`fights.ndjson.${m}.bak`);
+    toca(`fights.idx.${m}.bak`);
+    toca(`encyclopedia.json.${m}.bak`);
+  }
+  // Y lo que NO pertenece a ninguna tanda.
+  toca('config.json.antes-de-trios.bak');
+  toca('config.json.antes-del-who.bak');
+  toca('fights.ndjson');
+
+  const { tandas, podar } = await import('../src/rebuild.js');
+  const antes = tandas(dir);
+  ok(antes.length === 5, 'se ven las cinco tandas', antes.length);
+  ok(antes[0].marca === marcas[4], 'y la primera es la más NUEVA, por la marca y no por la fecha del fichero', antes[0].marca);
+
+  const r = podar(dir, 3);
+  const queda = fs.readdirSync(dir);
+  ok(r.borrados.length === 6, 'borra las dos tandas sobrantes enteras: 6 ficheros', r.borrados.length);
+  ok(tandas(dir).length === 3, 'quedan tres tandas', tandas(dir).length);
+  for (const m of marcas.slice(2)) {
+    ok(queda.includes(`fights.ndjson.${m}.bak`), `se conserva la tanda ${m}`);
+  }
+  // MEDIA TANDA ES PEOR QUE NINGUNA: de las que quedan tienen que quedar los
+  // tres ficheros, no uno. Restaurar un `fights.ndjson` con el índice de otro
+  // momento deja el índice apuntando a bytes que no son.
+  for (const m of marcas.slice(2)) {
+    const trozos = queda.filter((f) => f.includes(m)).length;
+    ok(trozos === 3, `y entera, no a medias (${m})`, trozos);
+  }
+  for (const m of marcas.slice(0, 2)) {
+    ok(!queda.some((f) => f.includes(m)), `se va la tanda ${m} COMPLETA`);
+  }
+
+  ok(queda.includes('config.json.antes-de-trios.bak')
+    && queda.includes('config.json.antes-del-who.bak'),
+  'los puntos de control con nombre NO se tocan: no llevan marca y no son una tanda');
+  ok(queda.includes('fights.ndjson'), 'y el almacén de verdad tampoco, evidentemente');
+
+  // Idempotente: volver a podar con tres tandas no borra nada más.
+  const otra = podar(dir, 3);
+  ok(otra.borrados.length === 0, 'podar otra vez no borra nada', otra.borrados.length);
+  ok(r.conservadas.length === 3 && r.conservadas[0] === marcas[4],
+    'y dice cuáles conserva, para poder enseñarlo', r.conservadas.join(' '));
+
+  // Una carpeta sin copias no es un error.
+  const vacia = fs.mkdtempSync(path.join(os.tmpdir(), 'eql-poda2-'));
+  ok(podar(vacia, 3).borrados.length === 0, 'una carpeta sin copias no rompe nada');
+  fs.rmSync(vacia, { recursive: true, force: true });
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

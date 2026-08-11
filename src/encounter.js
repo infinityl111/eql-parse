@@ -19,6 +19,65 @@ export const cuboRecibido = (school) => (school === 'melee' ? 'tMelee'
 
 export const DAMAGE_KINDS = new Set(['melee', 'spell', 'dot', 'ds']);
 
+/**
+ * CUÁNTO TIEMPO SIGUE SIENDO SAQUEABLE UN CADÁVER. 10 minutos.
+ *
+ * No es un número redondo elegido a ojo: sale de medir el hueco entre cada
+ * recogida y la muerte más reciente de ese mismo nombre, sobre las 1.870 líneas
+ * de botín de un registro real de 55 MB.
+ *
+ *   mediana 0 s · p90 8 s · p95 14 s · p99 42 s · p99,5 96 s
+ *   dentro de 600 s: 1.865 de 1.870 (99,73%)
+ *
+ * Y LO QUE DECIDE EL NÚMERO ES EL HUECO QUE VIENE DESPUÉS: entre 600 s y 44.062
+ * s no hay ni una sola recogida. Ninguna. Las cinco que quedan fuera están
+ * TODAS a más de doce horas, que es un bicho con el mismo nombre muerto al día
+ * siguiente — un emparejamiento falso, no un saqueo tardío. Cualquier tope
+ * entre 10 minutos y 12 horas da exactamente la misma respuesta; se elige el
+ * borde de abajo porque es el que menos falsos deja pasar el día que el
+ * histórico crezca.
+ */
+export const VENTANA_CADAVER = 600;
+
+/**
+ * CUÁNDO DOS CADÁVERES DEL MISMO NOMBRE SON DE VERDAD INDISTINGUIBLES. 30 s.
+ *
+ * «Hay otro bicho con ese nombre muerto hace un rato» NO es una ambigüedad: es
+ * lo normal, pasa en el 32% de las recogidas, y marcarlo todo dejaría la ficha
+ * llena de dudas que no lo son. Lo que hace dudosa una elección es que el otro
+ * candidato esté TAN CERCA como el elegido.
+ *
+ * Medido sobre las 1.875 recogidas del registro de referencia, las dos
+ * poblaciones no se tocan:
+ *
+ *   de la recogida al cadáver elegido        mediana 0 s · p90 7 s · p99 29 s
+ *   del elegido al competidor de otra pelea  MÍNIMO 30 s · mediana 267 s
+ *
+ * Ni un solo competidor a menos de 30 segundos. Entre «el cadáver que acabas de
+ * saquear» y «el de la pelea de antes» hay medio minuto de margen limpio, así
+ * que quedarse con el más reciente no es echarlo a suertes.
+ *
+ * Con este tope se marcan 3 recogidas de 1.875 —el 0,2%— y son las únicas donde
+ * la regla podría estar eligiendo mal. Ése es el número que la ficha puede
+ * enseñar sin mentir, y el que se pierde si se marca todo.
+ */
+export const AMBIGUO_SEG = 30;
+
+/**
+ * El nombre de un cadáver, para poder emparejarlo con su muerte.
+ *
+ * Dos cosas y ninguna más, porque cada normalización de más es un
+ * emparejamiento falso esperando su turno:
+ *
+ *   minúsculas   la muerte abre frase —«A zol ghoul knight has been slain»— y
+ *                la recogida va a mitad —«from a zol ghoul knight's corpse»—.
+ *                El juego capitaliza la primera, así que sin esto no casan.
+ *   el artículo  por lo mismo: «orc legionnaire» y «an orc legionnaire»
+ *                aparecen los dos, y son el mismo bicho.
+ */
+export const nombreCadaver = (s) => String(s ?? '').toLowerCase().trim()
+  .replace(/^(?:an?|the)\s+/, '');
+
 function bucket(map, key) {
   let b = map.get(key);
   if (!b) { b = { n: 0, sum: 0, max: 0, min: Infinity, crits: 0 }; map.set(key, b); }
@@ -474,6 +533,11 @@ export class Encounter {
     // Lo que no se puede atribuir: golpes entre dos bichos del mismo nombre
     // cuando uno está encantado. Se cuenta para poder decir cuánto no se sabe.
     this.charmAmbiguo = { golpes: 0, daño: 0 };
+    // Lo que se cuenta como enemigo PORQUE HEMOS DEDUCIDO que su encanto se
+    // rompió al encadenar otro. El registro no escribe nada cuando eso pasa, así
+    // que este montón no tiene una sola línea que lo respalde y no puede
+    // enseñarse junto a lo medido sin decirlo.
+    this.charmSoltado = { golpes: 0, daño: 0 };
     this.kills = [];
     this.closed = false;
     this.series = new Map();        // segundo -> {dmg, taken, heal} para la gráfica
@@ -496,7 +560,11 @@ export class Encounter {
     // Daño real que no se puede atribuir a nadie: escudos sin posesivo
     // («shards of ice»). No entra en el total de nadie ni en el del grupo.
     this.unattributed = 0;
-    this.loot = [];                // {item, from, sold, upgraded, t}
+    this.loot = [];                // {item, from, sold, upgraded, t, via, amb}
+    // La moneda de los cadáveres, con su instante. Aparte del botín porque se
+    // cuelga con otra regla —ventana, no cadáver— y mezclarlas haría creer que
+    // las dos se saben igual de bien. `cp` es el total en cobres.
+    this.coins = [];               // {t, cp, raw}
     this.spellVsFoe = new Map();   // 'enemigo|hechizo' -> {landed, resisted}
     this.foesSeen = new Set();     // a quién estáis pegando en esta pelea
     // A quién habéis hecho daño, y sólo eso. `foesSeen` no sirve para esto:
@@ -699,7 +767,14 @@ export class Encounter {
    */
   #charm(rows) {
     const amb = this.charmAmbiguo ?? { golpes: 0, daño: 0 };
-    if (!amb.daño) return null;
+    const sol = this.charmSoltado ?? { golpes: 0, daño: 0 };
+    // Puede no haber nada ambiguo y sí haber algo deducido: son dos cosas
+    // distintas —quién pegó, y si seguía siendo tuyo— y la ficha necesita las
+    // dos por separado.
+    if (!amb.daño && !sol.daño) return null;
+    if (!amb.daño) {
+      return { golpes: 0, daño: 0, estimadoTuyo: null, medidoTuyo: 0, medidoSuyo: 0, soltado: sol };
+    }
     const tuyo = rows.filter((r) => r.charmed).reduce((a, r) => a + r.damage, 0);
     const suyo = rows.filter((r) => !r.charmed
       && rows.some((x) => x.charmed && x.name === r.name)).reduce((a, r) => a + r.damage, 0);
@@ -711,6 +786,8 @@ export class Encounter {
       estimadoTuyo: base ? Math.round(amb.daño * (tuyo / base)) : null,
       medidoTuyo: tuyo,
       medidoSuyo: suyo,
+      // Daño contado como enemigo apoyándose en una deducción, no en una línea.
+      soltado: sol,
     };
   }
 }
@@ -734,8 +811,22 @@ export class EncounterTracker extends EventEmitter {
      * no eres tú pegando.
      */
     this.companions = new Set();
-    // Objetos recogidos sin ninguna pelea abierta a la que atribuirlos.
+    // Objetos recogidos sin ningún cadáver conocido al que atribuirlos.
     this.lootSinPelea = 0;
+    // Objetos cuyo cadáver murió en una pelea que ya estaba cerrada.
+    this.lootTarde = 0;
+    // Y aquéllos cuyo cadáver podía ser de dos peleas distintas. Se cuentan
+    // para poder decir cuánto no se sabe, no para taparlo. Ver `#deQuePelea`.
+    this.lootAmbiguo = 0;
+    /**
+     * LOS CADÁVERES RECIENTES, que es lo que permite colgar el botín de su
+     * pelea y no de la que esté abierta. `{clave, t, enc}`, en orden.
+     *
+     * Vive en el rastreador y no en la pelea A PROPÓSITO: su razón de ser es
+     * justamente sobrevivir al cierre, porque el saqueo tardío es el caso que
+     * hay que arreglar. Se poda por `VENTANA_CADAVER`, así que no crece.
+     */
+    this.cadaveres = [];
     // Los pone el motor según van llegando los hitos: /who y subidas de nivel.
     // Cada pelea se queda con los que hubiera al abrirse.
     this.level = null;
@@ -801,40 +892,82 @@ export class EncounterTracker extends EventEmitter {
       else if (ev.kind === 'invocation' && ev.invocation) this.current.invocationsSeen.add(ev.invocation);
     }
 
-    // El botín llega tras la muerte, dentro de la ventana de la pelea.
+    // ── EL BOTÍN SE CUELGA DE SU CADÁVER, NO DE LA VENTANA ───────────────────
+    //
+    // Ver `#deQuePelea`. Aquí sólo se decide dónde va lo que salga de allí.
     //
     // `qty` viaja con el objeto en vez de expandirse en dos entradas iguales:
     // «2 Bone Chips» es una recogida de dos unidades, no dos recogidas, y la
     // diferencia importa al contar de cuántos cadáveres ha salido algo.
-    if (ev.kind === 'loot' && ev.item && this.current) {
-      this.current.loot.push({
+    if (ev.kind === 'loot' && ev.item) {
+      const comun = {
         item: ev.item, qty: ev.qty ?? 1, from: ev.from ?? null,
         sold: ev.sold ?? null, upgraded: ev.upgraded ?? null,
-        stored: ev.stored ?? false,
-        t: Math.max(0, Math.round(ev.t - this.current.start)),
-      });
-    } else if (ev.kind === 'loot' && ev.item) {
-      // ── Botín sin pelea a la que colgarlo ────────────────────────────────
-      //
-      // Pasa cuando al enemigo lo remata entero un compañero: el filtro de
-      // relevancia sólo abre pelea contigo o con tus mascotas, así que ese
-      // cadáver nunca tuvo una.
-      //
-      // Y NO se arregla dejando que un compañero abra pelea. Se probó y se
-      // midió: recupera 3 de 5 y abre la puerta a que su pelea en la otra
-      // punta de la zona entre en tu histórico, que es lo que `test/combat.js`
-      // prohíbe «bajo ningún concepto».
-      //
-      // Se arregla entendiendo qué es esto: recoger un objeto es un suceso
-      // TUYO, no de una pelea. La prueba de que estabas allí es que lo cogiste,
-      // no que él pegara. Así que sale por su cuenta y se guarda por su cuenta,
-      // sin inventar un encuentro que no existió.
-      this.lootSinPelea++;
-      this.emit('orphanLoot', {
-        item: ev.item, qty: ev.qty ?? 1, from: ev.from ?? null,
-        sold: ev.sold ?? null, upgraded: ev.upgraded ?? null,
-        stored: ev.stored ?? false, t: ev.t, zone: this.zone ?? null,
-      });
+        stored: ev.stored ?? false, depot: ev.depot ?? false,
+        // La cola desconocida de un final que aún no tiene regla. Viaja hasta la
+        // ficha en vez de perderse: ver la red del final del botín en
+        // `patterns.js`.
+        cola: ev.cola ?? null,
+      };
+      const d = this.#deQuePelea(ev);
+      if (d.enc && d.enc === this.current) {
+        // El caso normal: el cadáver murió en la pelea que sigue abierta.
+        this.current.loot.push({
+          ...comun, via: 'cadaver', amb: d.amb, dt: d.dt,
+          t: Math.max(0, Math.round(ev.t - this.current.start)),
+        });
+      } else if (d.enc) {
+        // ── Botín que llega TARDE ──────────────────────────────────────────
+        //
+        // El cadáver murió en una pelea que ya está cerrada —y guardada, y
+        // `fights.ndjson` sólo se añade por el final: meterlo dentro correría
+        // todos los bytes siguientes y dejaría el índice entero apuntando a
+        // sitios equivocados—. Así que va al fichero lateral CON la pelea a la
+        // que pertenece, igual que `tramos.ndjson`. No se pierde y no se le
+        // cuelga a la pelea siguiente, que es lo que pasaba: 34 objetos de un
+        // histórico real colgados de una pelea posterior, mediana 10 minutos.
+        this.lootTarde++;
+        this.emit('lateLoot', {
+          ...comun, via: 'cadaver', amb: d.amb, dt: d.dt,
+          t: ev.t, de: Math.round(d.enc.start * 1000),
+          zone: d.enc.zone ?? this.zone ?? null,
+        });
+      } else {
+        // ── Botín sin cadáver que case ─────────────────────────────────────
+        //
+        // Pasa cuando al enemigo lo remata entero un compañero: el filtro de
+        // relevancia sólo abre pelea contigo o con tus mascotas, así que esa
+        // muerte nunca se registró y no hay cadáver al que mirar.
+        //
+        // Y NO se arregla dejando que un compañero abra pelea. Se probó y se
+        // midió: recupera 3 de 5 y abre la puerta a que su pelea en la otra
+        // punta de la zona entre en tu histórico, que es lo que `test/combat.js`
+        // prohíbe «bajo ningún concepto».
+        //
+        // Se arregla entendiendo qué es esto: recoger un objeto es un suceso
+        // TUYO, no de una pelea. La prueba de que estabas allí es que lo
+        // cogiste, no que él pegara. Sale por su cuenta y se guarda por su
+        // cuenta, sin inventar un encuentro que no existió — y la ficha lo
+        // dice, que es distinto de no enseñarlo.
+        this.lootSinPelea++;
+        this.emit('orphanLoot', {
+          ...comun, via: 'suelto', porQue: d.porQue,
+          t: ev.t, zone: this.zone ?? null,
+        });
+      }
+      return;
+    }
+
+    // ── LA MONEDA ────────────────────────────────────────────────────────────
+    //
+    // Sólo por ventana, y no por descuido: `You receive 2 gold from the corpse`
+    // NO DICE DE QUÉ CADÁVER. Sin nombre no hay nada que emparejar, así que la
+    // regla del cadáver no se le puede aplicar y se queda con la única que hay.
+    // La ficha lo etiqueta distinto porque es una certeza distinta.
+    if (ev.kind === 'coin') {
+      if (this.current) this.current.coins.push({ t: Math.max(0, Math.round(ev.t - this.current.start)), cp: ev.cp ?? 0, raw: ev.coin ?? null });
+      else this.emit('orphanCoin', { cp: ev.cp ?? 0, raw: ev.coin ?? null, t: ev.t, zone: this.zone ?? null });
+      return;
     }
 
     const isCombat = DAMAGE_KINDS.has(ev.kind) || ev.kind === 'miss'
@@ -1036,6 +1169,16 @@ export class EncounterTracker extends EventEmitter {
       }
     } else if (ev.kind === 'death') {
       enc.kills.push({ t: ev.t, victim: ev.victim, killer: ev.killer });
+      // Cae un bicho: queda un cadáver, y el cadáver sobrevive a la pelea. Se
+      // anota aquí —donde ya se sabe de qué encuentro es— y se poda por la
+      // ventana medida, así que la lista se queda en las decenas.
+      if (ev.victim) {
+        this.cadaveres.push({ clave: nombreCadaver(ev.victim), t: ev.t, enc });
+        const corte = ev.t - VENTANA_CADAVER;
+        if (this.cadaveres.length > 64 && this.cadaveres[0].t < corte) {
+          this.cadaveres = this.cadaveres.filter((c) => c.t >= corte);
+        }
+      }
       if (ev.victim) {
         enc.deadAt.set(ev.victim, Math.max(0, Math.round(ev.t - enc.start)));
         enc.actor(ev.victim).deaths++;
@@ -1137,7 +1280,15 @@ export class EncounterTracker extends EventEmitter {
     const nombre = esFuente ? ev.source : ev.target;
     const otro = esFuente ? ev.target : ev.source;
     const marcado = esFuente ? ev.charmSrc : ev.charmTgt;
-    if (!marcado) return enc.actor(nombre);
+    if (!marcado) {
+      // Vuelve a ser enemigo, sí — pero si eso lo sabemos porque encadenaste
+      // otro encanto, no lo sabemos: lo hemos deducido. Se cuenta aparte.
+      if (ev.charmSoltado && esFuente) {
+        enc.charmSoltado.golpes++;
+        enc.charmSoltado.daño += ev.amount || 0;
+      }
+      return enc.actor(nombre);
+    }
 
     // X contra X: los dos extremos son el mismo nombre y los dos podrían ser
     // cualquiera de los dos bichos.
@@ -1159,6 +1310,47 @@ export class EncounterTracker extends EventEmitter {
     }
     // Lo golpea alguien: si eres tú, le estás pegando al salvaje.
     return mio.has(otro) ? enc.actor(nombre) : enc.actorCharmed(nombre);
+  }
+
+  /**
+   * DE QUÉ PELEA ES ESTE OBJETO. Del cadáver del que salió, no de la ventana.
+   *
+   * ES UNA DEDUCCIÓN Y VIAJA MARCADA COMO TAL. El registro no numera los
+   * cadáveres: dice «from a zol ghoul knight's corpse» y de ésos han muerto
+   * nueve esta tarde. Lo único que se puede afirmar es «el más reciente de ese
+   * nombre anterior a la recogida», que es una regla, no una medición.
+   *
+   * LA GUARDA ES LA MISMA QUE LA DEL ENCANTO, y por el mismo motivo: cuando dos
+   * candidatos son indistinguibles no se reparte a ojo ni se calla. Pero hay que
+   * afinar QUÉ es indistinguible, o la guarda deja de avisar de nada:
+   *
+   *   que haya otro del mismo nombre         no es ambiguo. Es lo normal.
+   *   que esté en otra pelea                 tampoco: 32% de las recogidas.
+   *   que esté a menos de `AMBIGUO_SEG`      SÍ. Ahí los dos pueden serlo, y
+   *                                          son 3 de 1.875 en un log real.
+   *
+   * Sin cadáver que case no se inventa uno: sale como suelto y se dice por qué.
+   */
+  #deQuePelea(ev) {
+    if (!ev.from) return { enc: null, amb: false, porQue: 'sin-cadaver-en-la-linea' };
+    const clave = nombreCadaver(ev.from);
+    const desde = ev.t - VENTANA_CADAVER;
+    const cand = this.cadaveres.filter((c) => c.clave === clave && c.t <= ev.t + 1 && c.t >= desde);
+    if (!cand.length) {
+      // Distinguir «nunca vi morir a ése» de «lo vi, pero hace demasiado» no es
+      // un lujo: el primero es un cadáver que remató un compañero y el segundo
+      // es un tope que a lo mejor está mal puesto. Con un solo motivo, el día
+      // que la ventana se quede corta nadie podría notarlo.
+      const viejo = this.cadaveres.some((c) => c.clave === clave);
+      return { enc: null, amb: false, porQue: viejo ? 'cadaver-fuera-de-ventana' : 'sin-muerte-registrada' };
+    }
+    const ultimo = cand[cand.length - 1];
+    const amb = cand.some((c) => c.enc !== ultimo.enc && ultimo.t - c.t <= AMBIGUO_SEG);
+    if (amb) this.lootAmbiguo++;
+    // `dt` es lo único MEDIDO de todo esto: cuánto pasó entre esa muerte y esta
+    // recogida. Viaja con el objeto para que la ficha pueda enseñar la distancia
+    // en vez de pedir que se confíe en la regla.
+    return { enc: ultimo.enc, amb, dt: Math.round(ev.t - ultimo.t), porQue: null };
   }
 
   /** Tú y tus mascotas. */

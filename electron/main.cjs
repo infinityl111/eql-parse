@@ -485,6 +485,10 @@ ipcMain.handle('log:context', async (_e, { desde, hasta, tope } = {}) => {
  * 66 ms de leer y 209 de parsear. La lectura se queda aquí y por el puente
  * cruza sólo la tabla, que son unos pocos KB.
  */
+// El botín tardío de una pelea, por su hora. Sale del fichero lateral, que ya
+// está en memoria: no hay nada que leer del disco.
+ipcMain.handle('loot:de', (_e, at) => engine?.store?.lootDe?.(at) ?? { loot: [], coins: [] });
+
 ipcMain.handle('spells:castTimes', async (_e, { centro, margenMin = 180 } = {}) => {
   const ruta = engine?.path ?? cfg.logPath ?? null;
   if (!ruta || !(centro >= 0)) return {};

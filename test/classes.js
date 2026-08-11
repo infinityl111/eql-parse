@@ -8,8 +8,9 @@
  */
 import { Parser } from '../src/parser.js';
 import { EncounterTracker } from '../src/encounter.js';
+import { normalizeTrios } from '../src/trios.js';
 import { Engine } from '../src/engine.js';
-import { proofOf, ownersOf } from '../src/classes.js';
+import { proofOf, ownersOf, CLASES_CONOCIDAS, FUENTE } from '../src/classes.js';
 
 let failed = 0;
 const ok = (cond, label, extra = '') => {
@@ -57,8 +58,88 @@ console.log('\nqué prueba un hechizo y qué no');
     if (n === 1) { exclusivos++; if (!proofOf(s)) malos++; }
     else if (n > 1) { compartidos++; if (proofOf(s)) malos++; }
   }
-  ok(malos === 0, 'proofOf coincide con ownersOf en todos los hechizos conocidos',
+  // Ojo con lo de arriba: `proofOf` y `ownersOf` leen el MISMO mapa, así que esa
+  // comprobación no puede fallar y por sí sola no vale de nada. Es una guarda de
+  // coherencia interna, no una prueba de los datos. Lo que prueba los datos es
+  // lo que viene ahora.
+  ok(malos === 0, 'proofOf coincide con ownersOf (coherencia interna, no prueba los datos)',
     `${exclusivos} exclusivos, ${compartidos} compartidos, ${malos} discrepancias`);
+}
+
+// ── 1b. LAS DOCE TIENEN QUE ESTAR ────────────────────────────────────────
+//
+// Ésta es la guarda que faltaba, y la que habría cazado el fallo que se
+// arrastraba: la exclusividad NO SE PUEDE CALCULAR CON LISTAS PARCIALES. Con
+// cinco clases cargadas —SHD, MAG, DRU, SHM, WIZ— y sin Necromancer, 135 de
+// las 459 pruebas que este fichero afirmaba eran falsas, y sobre un registro
+// real el 67,8% de los lanzamientos «demostraba» una clase que no demuestra.
+//
+// Un test que sólo comprueba la regla sobrevive a eso sin enterarse: la regla
+// estaba bien y los datos estaban mal.
+console.log('\nlas doce clases lanzadoras');
+{
+  const esperadas = ['BRD','BST','CLR','DRU','ENC','MAG','NEC','PAL','RNG','SHD','SHM','WIZ'];
+  const faltan = esperadas.filter((c) => !CLASES_CONOCIDAS.includes(c));
+  ok(faltan.length === 0,
+    'están las doce: sin todas, un hechizo parece exclusivo sólo porque falta quien lo comparte',
+    faltan.length ? `faltan ${faltan.join(', ')}` : `${CLASES_CONOCIDAS.length}`);
+  for (const c of esperadas) {
+    const n = ownersOf.byClass(c).length;
+    if (n < 10) ok(false, `${c} tiene lista de verdad`, `${n} entradas`);
+  }
+  ok(esperadas.every((c) => ownersOf.byClass(c).length >= 10),
+    'y ninguna está vacía o a medias');
+}
+
+// ── 1c. LOS COMPARTIDOS QUE NOS ENGAÑARON, uno por uno ───────────────────
+//
+// Regresión sobre el caso concreto, no sobre la clase de fallo. Si alguien
+// vuelve a generar las listas sin Necromancer, `Drain Spirit` volverá a
+// «probar» SHD y esto lo caza en el acto. Son los cinco de más uso en el
+// registro: 3.896, 700, 523, 494 y 295 lanzamientos.
+console.log('\nlo que NO prueba, y creíamos que sí');
+{
+  const compartidos = [
+    ['Drain Spirit', 'NEC'], ['Lifedraw', 'NEC'], ['Lifespike', 'NEC'],
+    ['Siphon Life', 'NEC'], ['Feign Death', 'NEC'],
+    ['Earthquake', 'CLR'], ['Quickness', 'ENC'], ['Envenomed Breath', 'BST'],
+  ];
+  for (const [h, conQuien] of compartidos) {
+    const d = ownersOf(h);
+    ok(d.length > 1 && d.includes(conQuien),
+      `${h} lo comparte al menos con ${conQuien}`, d.join('/') || '(no está)');
+    ok(proofOf(h) === null, `${h} NO prueba ninguna clase`, String(proofOf(h)));
+  }
+}
+
+// ── 1d. El rango y la caja, que son dos formas de perder un hechizo ──────
+//
+// Las dos costaban lanzamientos medidos: `Drain Spirit X` no casaba con
+// `Drain Spirit` (2.041 lanzamientos sin probar nada) y el registro escribe
+// «Invisibility Versus Undead» donde la wiki pone «versus» (22 más).
+// Se quitan DENTRO de proofOf: un requisito que hay que recordar en cada sitio
+// se incumple en alguno.
+console.log('\nel rango y la caja');
+{
+  ok(ownersOf('Drain Spirit X').join('/') === ownersOf('Drain Spirit').join('/'),
+    'el numeral de rango no cambia de quién es el hechizo',
+    `${ownersOf('Drain Spirit X').join('/')} vs ${ownersOf('Drain Spirit').join('/')}`);
+  ok(ownersOf('Invisibility Versus Undead').length > 0,
+    'la caja del registro no tiene por qué ser la de la wiki',
+    ownersOf('Invisibility Versus Undead').join('/') || '(no está)');
+  // Y un romano que no es rango sigue siendo parte del nombre.
+  ok(proofOf('Ice Comet') === 'WIZ', 'un exclusivo de verdad sigue probando', String(proofOf('Ice Comet')));
+}
+
+// ── 1e. La procedencia va escrita, no supuesta ──────────────────────────
+console.log('\nde dónde salen las listas');
+{
+  ok(FUENTE?.tipo === 'consultado',
+    'las listas se declaran CONSULTADAS: no son medidas y no deben parecerlo', FUENTE?.tipo);
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(FUENTE?.consultado ?? ''),
+    'con fecha, que es lo que permite saber que un parche las ha dejado viejas',
+    FUENTE?.consultado);
+  ok(FUENTE?.origen === 'eqlwiki.com', 'y con el origen dicho', FUENTE?.origen);
 }
 
 // ── 2. Un hechizo exclusivo que no cuadra con el trío ────────────────────
@@ -226,5 +307,77 @@ console.log('\nla interfaz dice de dónde salió el trío');
   e3.whoClasses = ['SHD','MAG','DRU']; e3.classSourceAt = 'manual';
   ok(e3.classSource === 'tabla', 'lo declarado se declara declarado', e3.classSource);
 }
+/**
+ * BORRAR UNA FILA DE LA TABLA DE TRÍOS BORRA LA QUE TOCA.
+ *
+ * LA INSERCIÓN EN MEDIO ES LA PRUEBA, no un adorno. Con un trío añadido AL
+ * FINAL esto pasa con la implementación rota y con la buena: los índices sólo
+ * se descolocan cuando el nuevo cae ANTES que alguno de los que ya estaban, y
+ * `normalizeTrios` ordena por fecha. Por eso nadie lo vio en año y medio — y
+ * por eso una prueba que añada al final no vale para nada aquí.
+ *
+ * Lo que se reproduce es el caso medido: tabla real de cinco renglones, se
+ * añade uno fechado ANTES que cuatro de ellos, y se borra uno de los viejos.
+ * Con el borrado por posición desaparecía otro; con el borrado por `at`, el
+ * que se pidió.
+ */
+console.log('\nborrar un trío borra el que se señala');
+{
+  // La tabla tal cual estaba en una configuración real.
+  const tuyos = [
+    { at: null, classes: ['SHD', 'DRU', 'MAG'], level: 50, note: 'antes del cambio al chamán' },
+    { at: Date.parse('2026-08-05T00:52:00'), classes: ['SHD', 'SHM', 'MAG'], level: 24, note: 'chaman a 24' },
+    { at: Date.parse('2026-08-05T12:31:00'), classes: ['SHD', 'DRU', 'MAG'], level: 50, note: 'vuelta al druida' },
+    { at: Date.parse('2026-08-05T23:51:47'), classes: ['SHD', 'SHM', 'MAG'], level: 27, note: '/who de las 23:51:47' },
+    { at: Date.parse('2026-08-06T11:21:59'), classes: ['SHD', 'DRU', 'MAG'], level: null, note: 'null -> cl.null' },
+  ];
+  // Y el añadido, fechado el 1 de agosto: cae SEGUNDO, detrás del «desde
+  // siempre», y empuja a los otros cuatro.
+  const conNuevo = normalizeTrios([...tuyos, { at: Date.parse('2026-08-01T10:00:00'), classes: ['SHD', 'ENC', 'MAG'], level: 42 }]);
+  ok(conNuevo.length === 6, 'la tabla tiene seis renglones', conNuevo.length);
+  ok(conNuevo[1].classes.join('/') === 'SHD/ENC/MAG',
+    'y el nuevo cae EN MEDIO, no al final: por eso descolocaba', conNuevo[1].classes.join('/'));
+
+  // El renglón que se quiere borrar: el del /who de las 23:51:47.
+  const objetivo = conNuevo.find((x) => x.note === '/who de las 23:51:47');
+  const posicion = conNuevo.indexOf(objetivo);
+
+  // LO QUE HACÍA ANTES: filtrar por la posición que tenía cuando se PINTÓ la
+  // tabla, que era la de cinco renglones —ahí estaba el cuarto, índice 3—.
+  const indiceViejo = tuyos.indexOf(tuyos.find((x) => x.note === '/who de las 23:51:47'));
+  const porIndice = conNuevo.filter((_, k) => k !== indiceViejo);
+  ok(porIndice.some((x) => x.note === '/who de las 23:51:47'),
+    'POR ÍNDICE: el que se quería borrar SIGUE ahí', `se pidió ${indiceViejo}, estaba en ${posicion}`);
+  ok(!porIndice.some((x) => x.note === 'vuelta al druida'),
+    'y ha desaparecido OTRO, que es la pérdida de datos');
+
+  // LO QUE HACE AHORA: filtrar por `at`, que no se mueve al insertar.
+  const at = objetivo.at;
+  const porAt = conNuevo.filter((x) => (x.at ?? null) !== at);
+  ok(porAt.length === 5, 'POR `at`: se va exactamente uno', porAt.length);
+  ok(!porAt.some((x) => x.note === '/who de las 23:51:47'), 'y es el que se pidió');
+  for (const nota of ['antes del cambio al chamán', 'chaman a 24', 'vuelta al druida', 'null -> cl.null']) {
+    ok(porAt.some((x) => x.note === nota), `sigue estando: ${nota}`);
+  }
+
+  // El «desde siempre» también se borra por su identidad, y su `at` es `null`:
+  // en el atributo del botón viaja como cadena vacía, no como cero.
+  const sinSiempre = conNuevo.filter((x) => (x.at ?? null) !== null);
+  ok(sinSiempre.length === 5 && !sinSiempre.some((x) => x.at == null),
+    'el renglón «desde siempre» se puede borrar por su `at` nulo', sinSiempre.length);
+
+  // Y la garantía en la que se apoya todo: `at` es único por renglón.
+  const ats = conNuevo.map((x) => x.at ?? 'null');
+  ok(new Set(ats).size === ats.length, '`at` es único: `normalizeTrios` colapsa los que coinciden');
+  const repetido = normalizeTrios([
+    { at: 1000, classes: ['SHD', 'DRU', 'MAG'], level: 1 },
+    { at: 1000, classes: ['SHD', 'SHM', 'MAG'], level: 2 },
+    { at: null, classes: ['SHD', 'ENC', 'MAG'], level: 3 },
+    { at: null, classes: ['SHD', 'WIZ', 'MAG'], level: 4 },
+  ]);
+  ok(repetido.length === 2, 'dos renglones con el mismo instante son uno', repetido.length);
+  ok(repetido.filter((x) => x.at == null).length === 1, 'y «desde siempre» sólo puede haber uno');
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

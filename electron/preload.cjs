@@ -38,6 +38,9 @@ contextBridge.exposeInMainWorld('eql', {
   logContext: (desde, hasta, tope) => ipcRenderer.invoke('log:context', { desde, hasta, tope }),
   // Duración medida de cada hechizo, para la barra de casteo.
   castTimes: (centro, margenMin) => ipcRenderer.invoke('spells:castTimes', { centro, margenMin }),
+  // El botín que se recogió DESPUÉS de cerrarse esa pelea y le pertenece: vive
+  // en el fichero lateral, no dentro de la pelea. Ver `store.lootDe`.
+  lootDe: (at) => ipcRenderer.invoke('loot:de', at),
   foeList: (sinceMs) => ipcRenderer.invoke('history:foes', sinceMs),
   aggregate: (q) => ipcRenderer.invoke('history:aggregate', q),
   storeStats: () => ipcRenderer.invoke('history:stats'),

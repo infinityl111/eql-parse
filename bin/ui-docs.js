@@ -45,6 +45,26 @@ const IDIOMAS = ['es', 'en', 'fr', 'de', 'pt'];
 const CANONICO = 'en';
 
 /**
+ * EL FILTRO DE LA LISTA, IGUAL PARA TODAS LAS VISTAS.
+ *
+ * La lista arranca filtrada a 24 horas y el filtro es estado en memoria: en
+ * cuanto una vista lo cambiaba, las siguientes heredaban el cambio. En la
+ * tanda anterior las vistas de postura lo pusieron en «todo» y a partir de ahí
+ * `combate.png` pasó de 1737 a 2100 píxeles porque la primera pelea de la
+ * lista ya no era la misma. La captura no salió mal; salió DISTINTA, que en
+ * una documentación es igual de malo y más difícil de ver.
+ *
+ * Así que se pone al principio de todas y siempre en el mismo sitio.
+ */
+const TODO_EL_HISTORICO = `(() => {
+  const s = document.getElementById('fltRange');
+  if (!s) return false;
+  s.value = 'all';
+  s.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+})()`;
+
+/**
  * Las vistas, con los mismos identificadores que usa `ui-check.js`: los
  * rótulos están traducidos a cinco idiomas y los `id` no.
  */
@@ -53,6 +73,7 @@ const VISTAS = [
     fichero: 'combate.png',
     llega: [
       "document.getElementById('tabCombat')?.click()",
+      TODO_EL_HISTORICO,
       "document.querySelector('.fight[data-live=\"0\"]')?.click()",
     ],
     espera: 1500,
@@ -61,6 +82,7 @@ const VISTAS = [
     fichero: 'analisis.png',
     llega: [
       "document.getElementById('tabCombat')?.click()",
+      TODO_EL_HISTORICO,
       "document.querySelector('.fight[data-live=\"0\"]')?.click()",
       "document.getElementById('btnAnalyse')?.click()",
     ],
@@ -68,7 +90,7 @@ const VISTAS = [
   },
   {
     fichero: 'enciclopedia.png',
-    llega: ["document.getElementById('tabEnc')?.click()"],
+    llega: [TODO_EL_HISTORICO, "document.getElementById('tabEnc')?.click()"],
     espera: 2000,
   },
   {
@@ -86,12 +108,88 @@ const VISTAS = [
     fichero: 'postura.png',
     llega: [
       "document.getElementById('tabCombat')?.click()",
-      "document.querySelector('.fight[data-live=\"0\"]')?.click()",
+      TODO_EL_HISTORICO,
     ],
     espera: 2000,
     recorte: '#advice',
+    /**
+     * Y LA PELEA TIENE QUE SER UNA DONDE EL CONSEJO ACONSEJE.
+     *
+     * La primera cerrada de la lista daba «ya estabas en Defensive, que es la
+     * que mejor aguanta»: cierto, y no vende nada — enseña un consejo que no
+     * aconseja. El argumento se ve cuando la tabla enseña que había una opción
+     * mejor, con su coste en aguante y maná al lado.
+     *
+     * La tabla se ordena por daño evitado y la postura que llevabas va marcada
+     * en su celda. Que la marca no esté en la primera fila NO basta: la primera
+     * pelea que lo cumplía encabezaba con «la diferencia entre Channeler y
+     * Defensive es menor del 4%: no compensa cambiar» — cierto, honesto, y la
+     * misma clase de no-consejo con otras palabras.
+     *
+     * Así que se exige margen: que la mejor evite AL MENOS UN 15% MÁS que la
+     * que llevabas. Ahí la tabla enseña de verdad que había otra opción, y con
+     * su coste al lado.
+     */
+    elige: `(() => {
+      const tbl = document.querySelector('#advice .tbl');
+      if (!tbl) return false;
+      const cols = tbl.querySelectorAll('.th').length;
+      const tds = [...tbl.querySelectorAll('.td')];
+      if (cols < 2 || tds.length < cols * 2) return false;   // menos de dos posturas
+      const num = (c) => Number(String(c?.textContent ?? '').replace(/[^0-9]/g, '')) || 0;
+      const filas = [];
+      for (let i = 0; i + cols <= tds.length; i += cols) {
+        filas.push({ activa: !!tds[i].querySelector('span'), evita: num(tds[i + 1]) });
+      }
+      if (filas.length < 2 || filas[0].activa) return false;
+      const activa = filas.find((f) => f.activa);
+      if (!activa || !activa.evita) return false;
+      return (filas[0].evita - activa.evita) / activa.evita >= 0.15;
+    })()`,
+  },
+  {
+    /**
+     * LA OTRA CARA: el consejo que dice que no hagas nada.
+     *
+     * Misma tabla, criterio inverso — hay una postura por delante de la tuya
+     * pero la diferencia no llega al 15%, y el titular dice que no compensa
+     * cambiar. En la cabecera desconcertaría, debajo de un subtítulo que
+     * promete decirte qué cambiar. Más abajo es la prueba más fuerte de que el
+     * consejo no está vendiendo nada: calcula la diferencia y te dice que te
+     * quedes como estás.
+     */
+    fichero: 'postura-nocambiar.png',
+    llega: [
+      "document.getElementById('tabCombat')?.click()",
+      TODO_EL_HISTORICO,
+    ],
+    espera: 2000,
+    recorte: '#advice',
+    elige: `(() => {
+      const tbl = document.querySelector('#advice .tbl');
+      if (!tbl) return false;
+      const cols = tbl.querySelectorAll('.th').length;
+      const tds = [...tbl.querySelectorAll('.td')];
+      if (cols < 2 || tds.length < cols * 2) return false;
+      const num = (c) => Number(String(c?.textContent ?? '').replace(/[^0-9]/g, '')) || 0;
+      const filas = [];
+      for (let i = 0; i + cols <= tds.length; i += cols) {
+        filas.push({ activa: !!tds[i].querySelector('span'), evita: num(tds[i + 1]) });
+      }
+      if (filas.length < 2 || filas[0].activa) return false;
+      const activa = filas.find((f) => f.activa);
+      if (!activa || !activa.evita) return false;
+      const margen = (filas[0].evita - activa.evita) / activa.evita;
+      return margen > 0 && margen < 0.15;
+    })()`,
   },
 ];
+
+/** `npm run ui:docs -- --solo postura` rehace sólo esa, sin las otras tres. */
+const SOLO = (() => {
+  const i = process.argv.indexOf('--solo');
+  return i >= 0 ? process.argv[i + 1] : null;
+})();
 
 /**
  * AJUSTA LA VENTANA HASTA QUE EL PANEL NO TENGA NADA POR DEBAJO.
@@ -201,7 +299,16 @@ try {
   await manda('Emulation.setDeviceMetricsOverride', {
     width: ANCHO, height: ALTO_MIN, deviceScaleFactor: 1, mobile: false,
   });
-  await espera(3000);
+  /**
+   * MÁS MARGEN DE ARRANQUE DEL QUE PARECE HACER FALTA.
+   *
+   * Los cuelgues de captura se concentraban en los PRIMEROS idiomas y
+   * desaparecían a partir del tercero, que es la firma de algo que todavía se
+   * está asentando y no de un fallo aleatorio: con 409 peleas el índice tarda
+   * más en cargar que cuando esto se escribió, y las primeras capturas caían
+   * encima de una ventana que aún estaba repintando.
+   */
+  await espera(8000);
 
   temaPrevio = await fijarTema(evalua, TEMA);
   // El idioma se lee del selector y NO de `document.documentElement.lang`:
@@ -212,47 +319,108 @@ try {
   if (!idiomaPrevio) throw new Error('no se pudo leer el idioma actual del selector');
   console.log(`\ncapturas de docs/ en tema ${TEMA} (estaba en ${temaPrevio}/${idiomaPrevio})\n`);
 
+  /**
+   * DOS PASADAS: la segunda rehace lo que falló en la primera.
+   *
+   * `Page.captureScreenshot` se cuelga tres o cuatro veces de cada veinticinco,
+   * y ya reintenta la orden tres veces dentro. Cuando ni con esas responde, lo
+   * que sí funciona es volver a esa vista más tarde: la primera teoría —que
+   * era la ventana asentándose, porque fallaban los primeros idiomas— la tumbó
+   * la tanda siguiente, donde fallaron los últimos. Es intermitente y no tiene
+   * sitio fijo.
+   *
+   * Con una tanda de veinticinco, dejarlo así significa que `docs/` acaba
+   * mezclando capturas de dos ejecuciones distintas — que es peor que un
+   * hueco, porque no se ve. Así que lo que falla se apunta y se repite al
+   * final, y sólo cuenta como fallo si vuelve a fallar.
+   */
+  const fallos = [];
+  let pendientes = null;
+  for (let pasada = 1; pasada <= 2; pasada++) {
+    if (pasada === 2) {
+      pendientes = fallos.splice(0);
+      if (!pendientes.length) break;
+      console.log(`\n  segunda pasada: ${pendientes.length} que fallaron\n`);
+    }
+    const toca = (lang, fichero) => !pendientes
+      || pendientes.some((f) => f.lang === lang && (!fichero || f.fichero === fichero));
+
   for (const lang of IDIOMAS) {
+    if (!toca(lang)) continue;
     await ponIdioma(lang);
     const dir = path.join(DOCS, 'i18n', lang);
     fs.mkdirSync(dir, { recursive: true });
     console.log(`  ${lang}`);
 
+    /** Apunta el fallo. En la primera pasada no cuenta: se reintenta al final. */
+    const falla = (fichero, msg) => {
+      if (pendientes) { mal++; console.error(`    MAL  ${fichero}: ${msg}`); }
+      else { fallos.push({ lang, fichero }); console.error(`    --   ${fichero}: ${msg} (se repite al final)`); }
+    };
+
     for (const v of VISTAS) {
+      if (SOLO && !v.fichero.startsWith(SOLO)) continue;
+      if (!toca(lang, v.fichero)) continue;
       for (const paso of v.llega) { await evalua(paso); await espera(1400); }
-      if (v.espera) await espera(v.espera);
+
+      /**
+       * Las vistas con criterio recorren peleas hasta que una lo cumple.
+       *
+       * Se prueban por orden y se para en la primera que vale. Si ninguna lo
+       * cumple, NO se captura la que haya: se avisa y se sigue. Una imagen que
+       * no enseña lo que dice enseñar es peor que un hueco.
+       */
+      if (v.elige) {
+        const cuantas = await evalua('document.querySelectorAll(\'.fight[data-live="0"]\').length');
+        // Sin tope artificial: con el histórico entero delante, cortar en 25 es
+        // volver a contestar sobre una muestra que nadie eligió.
+        const TOPE = 120;
+        let vale = false;
+        for (let i = 0; i < Math.min(cuantas, TOPE) && !vale; i++) {
+          await evalua(`document.querySelectorAll('.fight[data-live="0"]')[${i}]?.click()`);
+          await espera(v.espera ?? 1200);
+          vale = await evalua(v.elige);
+        }
+        if (!vale) {
+          falla(v.fichero, `ninguna de las ${Math.min(cuantas, TOPE)} primeras peleas cumple el criterio (de ${cuantas} en la lista)`);
+          continue;
+        }
+      } else if (v.espera) await espera(v.espera);
 
       // El tema, en cada vista. Repintar puede releer la configuración, y una
       // sola captura clara en la fila delata el truco.
       const puesto = await evalua('document.documentElement.dataset.theme');
       if (puesto !== TEMA) {
-        mal++;
-        console.error(`    MAL  ${v.fichero}: la vista quedó en tema «${puesto}»`);
+        falla(v.fichero, `la vista quedó en tema «${puesto}»`);
         continue;
       }
 
       const enc = await ajustaAlto(manda, evalua);
       if (enc.error) {
-        mal++;
-        console.error(`    MAL  ${v.fichero}: ${enc.error}`);
+        falla(v.fichero, enc.error);
         continue;
       }
       if (enc.sobra > 0) {
-        mal++;
-        console.error(`    MAL  ${v.fichero}: «${enc.quien}» se corta por abajo, sobran`
-          + ` ${enc.sobra}px con la ventana ya en el tope de ${ALTO_MAX}.`
-          + ' Sube ALTO_MAX o acorta la vista.');
+        falla(v.fichero, `«${enc.quien}» se corta por abajo, sobran ${enc.sobra}px con la ventana ya en el tope de ${ALTO_MAX}`);
         continue;
       }
 
+      /**
+       * UNA VISTA QUE FALLA NO SE LLEVA LAS DEMÁS.
+       *
+       * La primera tanda murió entera en la cuarta captura del primer idioma:
+       * el fallo subió hasta el `catch` de fuera y los cuatro idiomas que
+       * faltaban no llegaron a intentarse. Doce capturas buenas perdidas por
+       * una mala. Se cuenta como fallo, se dice cuál, y se sigue.
+       */
       let png; let medida;
+      try {
       if (v.recorte) {
         // Por `capturaComprobada`, que vuelve a medir el elemento justo antes
         // de disparar: la misma puerta que todo lo demás.
         const caja = await medirCaja(evalua, v.recorte);
         if (!caja || caja.height < 40) {
-          mal++;
-          console.error(`    MAL  ${v.fichero}: «${v.recorte}» no está o está vacío en esta pelea`);
+          falla(v.fichero, `«${v.recorte}» no está o está vacío en esta pelea`);
           continue;
         }
         png = await capturaComprobada({ manda, evalua }, v.recorte, caja);
@@ -261,12 +429,17 @@ try {
         ({ png } = await capturaPagina({ manda, evalua }, ANCHO, ALTO_MAX, enc.alto));
         medida = `${ANCHO}×${enc.alto}`;
       }
+      } catch (e) {
+        falla(v.fichero, e.message);
+        continue;
+      }
       fs.writeFileSync(path.join(dir, v.fichero), png);
       if (lang === CANONICO) fs.writeFileSync(path.join(DOCS, v.fichero), png);
       console.log(`    ok   ${v.fichero.padEnd(20)} ${medida.padEnd(11)} `
         + `${(png.length / 1024).toFixed(0)} KB${lang === CANONICO ? '  (y a docs/ para los README)' : ''}`);
     }
   }
+  }   // fin de la pasada
 
   console.log('\n  docs/overlay.png se queda como está: es el overlay encima del');
   console.log('  juego, y eso hay que capturarlo con EverQuest abierto.\n');

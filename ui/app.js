@@ -6,6 +6,7 @@ import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { copiarAlPortapapeles } from './clip.js';
+import { pedirDatos } from './dialogo.js';
 import { initTriggers, renderTriggers } from './triggers.js';
 import { plate, DIBUJADAS } from './plates.js';
 import { grafica, STANCE_COLOR, W, H, BAND } from './grafica.js';
@@ -1810,12 +1811,12 @@ async function renderNarrate(host) {
     <div class="sec-title eyebrow" style="margin-top:16px">${esc(t('trio.title'))}</div>
     <div class="hint">${esc(t('trio.note'))}</div>
     <div class="trio-tbl" id="trioTbl">${(state.cfg.trios ?? []).length
-      ? (state.cfg.trios ?? []).map((r, i) => `<div class="trio-row">
+      ? (state.cfg.trios ?? []).map((r) => `<div class="trio-row">
           <span class="trio-from">${r.at == null ? esc(t('trio.always'))
             : esc(new Date(r.at).toLocaleString())}</span>
           <span class="trio-cls"><b>${r.classes.map((c) => esc(t(`cl.${c}`))).join(' · ')}</b></span>
           <span class="trio-lvl">${r.level == null ? esc(t('trio.fromLog')) : esc(t('trio.level', { n: r.level }))}</span>
-          <button class="petbtn" data-trio-del="${i}">${esc(t('trio.del'))}</button>
+          <button class="petbtn" data-trio-at="${r.at ?? ''}">${esc(t('trio.del'))}</button>
         </div>`).join('')
       : `<span class="hint">${esc(t('trio.empty'))}</span>`}</div>
     <button class="petbtn" id="trioAdd" style="margin-top:8px">${esc(t('trio.add'))}</button>
@@ -1924,31 +1925,94 @@ async function renderNarrate(host) {
     state.needsRebuild = r.needsRebuild;
     showTrioRebuild();
     renderApp();
-    pintarConflictos();
+    // Y SE REPINTA ESTE PANEL, que `renderApp` no toca: sólo lo construye si no
+    // existe (`if (!$('narrateBox'))`), así que la tabla se quedaba enseñando
+    // los renglones de antes de guardar. Con el borrado por `at` eso ya no
+    // borra nada equivocado, pero una tabla que no refleja lo guardado hace
+    // dudar de si se guardó — y encima el trío recién añadido no aparecía.
+    // No hace falta `pintarConflictos()` detrás: repintar el panel ya lo llama.
+    await renderNarrate(host);
   };
   host.querySelector('#trioAdd')?.addEventListener('click', async () => {
-    const cls = prompt(t('trio.askClasses'), 'SHD/MAG/DRU');
-    if (!cls) return;
-    const classes = cls.toUpperCase().split(/[^A-Z]+/).filter(Boolean);
-    if (classes.length !== 3) { alert(t('trio.needThree')); return; }
-    const fecha = prompt(t('trio.askFrom'), new Date().toISOString().slice(0, 16).replace('T', ' '));
-    if (fecha === null) return;
+    // Los tres datos a la vez y validados dentro. Antes eran tres `prompt`
+    // encadenados que en Electron NO SE ABREN: el botón no hacía nada desde la
+    // 1.1.0. Ver `ui/dialogo.js`.
+    const r = await pedirDatos({
+      titulo: t('trio.addTitle'),
+      aceptar: t('trio.addOk'),
+      cancelar: t('cancel'),
+      campos: [
+        { id: 'clases', etiqueta: t('trio.askClasses'), valor: '', marcador: 'SHD/MAG/DRU' },
+        { id: 'desde', etiqueta: t('trio.askFrom'), valor: '', marcador: 'AAAA-MM-DD HH:MM',
+          ayuda: t('trio.fromHint') },
+        { id: 'nivel', etiqueta: t('trio.askLevel'), valor: '', ayuda: t('trio.levelHint') },
+      ],
+      validar: (v) => {
+        const classes = v.clases.toUpperCase().split(/[^A-Z]+/).filter(Boolean);
+        if (classes.length !== 3) return { campo: 'clases', mensaje: t('trio.needThree') };
+        if (v.desde.trim() && !Number.isFinite(new Date(v.desde.trim().replace(' ', 'T')).getTime())) {
+          return { campo: 'desde', mensaje: t('trio.badDate') };
+        }
+        const lvl = v.nivel.trim() ? Number(v.nivel.trim()) : null;
+        if (lvl !== null && !(lvl > 0 && lvl < 200)) return { campo: 'nivel', mensaje: t('trio.badLevel') };
+        return null;
+      },
+    });
+    if (!r) return;
+    const classes = r.clases.toUpperCase().split(/[^A-Z]+/).filter(Boolean);
     // Vacío quiere decir «desde siempre»: cubre las peleas anteriores a tu
     // primer /who, que si no se quedan sin nivel para siempre.
-    let at = null;
-    if (fecha.trim()) {
-      at = new Date(fecha.trim().replace(' ', 'T')).getTime();
-      if (!Number.isFinite(at)) { alert(t('trio.badDate')); return; }
-    }
-    const nivel = prompt(t('trio.askLevel'), '');
-    if (nivel === null) return;
-    const lvl = nivel.trim() ? Number(nivel.trim()) : null;
-    if (lvl !== null && !(lvl > 0 && lvl < 200)) { alert(t('trio.badLevel')); return; }
+    const at = r.desde.trim() ? new Date(r.desde.trim().replace(' ', 'T')).getTime() : null;
+    const lvl = r.nivel.trim() ? Number(r.nivel.trim()) : null;
     await guardarTrios([...(state.cfg.trios ?? []), { at, classes, level: lvl }]);
   });
-  host.querySelectorAll('[data-trio-del]').forEach((el) => el.addEventListener('click', async () => {
-    const i = Number(el.dataset.trioDel);
-    await guardarTrios((state.cfg.trios ?? []).filter((_, k) => k !== i));
+  /**
+   * SE BORRA POR `at`, NO POR POSICIÓN. Y esto no es una preferencia de estilo:
+   * es un fallo de pérdida de datos que ya ocurrió, con su fila borrada.
+   *
+   * QUÉ PASÓ. El botón llevaba `data-trio-del="${i}"`, la posición en el array,
+   * y el borrado filtraba por esa misma posición. Parece correcto y lo es —
+   * mientras el array no se mueva. Pero `normalizeTrios` ORDENA POR FECHA, así
+   * que añadir un trío que caiga en medio recoloca todos los de detrás: los
+   * índices pintados dejan de señalar a lo que señalaban, y el siguiente
+   * borrado se lleva otra fila. Medido en la 1.12.0 sobre una tabla real:
+   * añadido un trío fechado antes que los demás, pulsar «borrar» en una fila
+   * hizo desaparecer una distinta, sin aviso.
+   *
+   * POR QUÉ `at` CIERRA EL CASO Y REPINTAR SÓLO LO TAPA. Repintar arregla ESTA
+   * secuencia; la identidad por posición sigue rota para cualquier otra que
+   * mueva el array entre el pintado y el clic. `at` no se mueve nunca: es la
+   * hora del tramo, es lo que ordena la tabla, y `normalizeTrios` GARANTIZA que
+   * es única —colapsa los renglones que comparten instante, incluido el `null`
+   * de «desde siempre», que por eso puede ser sólo uno—. Se repinta igual,
+   * porque una tabla que no refleja lo guardado despista aunque no borre nada.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * Y ES LA CUARTA VEZ ESTA SEMANA CON LA MISMA RAÍZ: IDENTIFICAR ALGO POR UN
+   * DATO QUE NO ES ESTABLE. Tres funciones distintas, tres fallos distintos:
+   *
+   *   el encanto   identificaba cadáveres POR NOMBRE, y los nombres se repiten:
+   *                dos «a hardened skeleton» a la vez, uno tuyo y otro no.
+   *                Se cerró midiendo al otro extremo del golpe, y lo que sigue
+   *                sin poder decidirse se aparta y se cuenta (`charmAmbiguo`).
+   *   el botín     se colgaba de la VENTANA abierta, y las ventanas se mueven:
+   *                el mismo objeto caía en una pelea o en otra según qué reloj
+   *                cerrara la anterior. Se cerró colgándolo del cadáver del que
+   *                salió (ver `VENTANA_CADAVER` en `src/encounter.js`).
+   *   los tríos    se borraban por ÍNDICE, y los índices se recolocan al
+   *                insertar. Esto.
+   *
+   * La pregunta que había que hacerse las tres veces es la misma: «¿esto que
+   * uso como identidad sigue valiendo lo mismo dentro de un segundo?». Nombre,
+   * posición y ventana contestan que no. Antes de identificar nada por un dato,
+   * hazte esa pregunta — porque va a volver a pasar.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
+    // El atributo vacío es el `null` de «desde siempre», no un cero.
+    const crudo = el.dataset.trioAt;
+    const at = crudo === '' ? null : Number(crudo);
+    await guardarTrios((state.cfg.trios ?? []).filter((x) => (x.at ?? null) !== at));
   }));
   host.querySelectorAll('[data-restore]').forEach((el) => el.addEventListener('click', async () => {
     const r = await window.eql.setExcluded(el.dataset.restore, false);
@@ -2320,13 +2384,27 @@ function renderAdvice(snap) {
   // Declarar el trío es justo lo que hace falta cuando aún no se sabe cuál es.
   const engancharTrio = () => host.querySelector('#trioNow')?.addEventListener('click', async () => {
     const classes = [...host.querySelectorAll('.cls')].map((x) => x.value).filter(Boolean);
-    if (classes.length !== 3) { alert(t('trio.needThree')); return; }
     // El nivel es opcional a propósito: si lo dejas vacío manda lo que diga el
     // log dentro del tramo, que es lo correcto mientras estés subiendo.
-    const nivel = prompt(t('trio.askLevel'), String(state.snap?.level ?? ''));
-    if (nivel === null) return;
-    const lvl = nivel.trim() ? Number(nivel.trim()) : null;
-    if (lvl !== null && !(lvl > 0 && lvl < 200)) { alert(t('trio.badLevel')); return; }
+    //
+    // Las clases salen de tres desplegables, así que «no son tres» sólo puede
+    // pasar si alguno está vacío. Se valida dentro del cuadro, como todo lo
+    // demás, en vez de con un aviso nativo antes de abrirlo.
+    const d = await pedirDatos({
+      titulo: t('trio.nowTitle'),
+      texto: classes.length === 3 ? classes.map((c) => t(`cl.${c}`)).join(' · ') : '',
+      aceptar: t('trio.addOk'),
+      cancelar: t('cancel'),
+      campos: [{ id: 'nivel', etiqueta: t('trio.askLevel'), valor: String(state.snap?.level ?? ''), ayuda: t('trio.levelHint') }],
+      validar: (v) => {
+        if (classes.length !== 3) return { campo: 'nivel', mensaje: t('trio.needThree') };
+        const n = v.nivel.trim() ? Number(v.nivel.trim()) : null;
+        if (n !== null && !(n > 0 && n < 200)) return { campo: 'nivel', mensaje: t('trio.badLevel') };
+        return null;
+      },
+    });
+    if (!d) return;
+    const lvl = d.nivel.trim() ? Number(d.nivel.trim()) : null;
     const r = await window.eql.setTrios([...(state.cfg.trios ?? []), { at: Date.now(), classes, level: lvl }]);
     state.cfg.trios = r.trios;
     state.needsRebuild = r.needsRebuild;
@@ -2657,8 +2735,14 @@ async function renderReplay(snap) {
   let casteos = {};
   try { casteos = (await window.eql.castTimes?.(desde)) ?? {}; } catch { /* sin tabla */ }
   if (host.dataset.sig !== sig) return;
+  // El botín que se recogió con la pelea ya cerrada. Vive en el fichero lateral
+  // y no dentro de la pelea —`fights.ndjson` sólo crece por el final—, así que
+  // hay que pedirlo aparte o la ficha enseñaría una lista incompleta sin saberlo.
+  let tardio = null;
+  try { tardio = (await window.eql.lootDe?.(f.at ?? Math.round((f.start ?? 0) * 1000))) ?? null; } catch { /* sin lateral */ }
+  if (host.dataset.sig !== sig) return;
   repro = montarReproduccion(zona, {
-    f, self: snap.self, lineas: r.lineas, retratos: retratoCache, casteos,
+    f, self: snap.self, lineas: r.lineas, retratos: retratoCache, casteos, tardio,
     // La ficha del objeto es la misma que en la lista de botín: vive aquí con
     // su caché de la wiki, y la reproducción la pide en vez de traérsela.
     onObjeto: showItemTip, onObjetoFuera: hideItemTip,
@@ -5030,6 +5114,11 @@ async function showMigration() {
       pintar(`<div class="mig-h">${esc(t('mig.doneTitle'))}</div>
         <p>${esc(t('mig.done', { fights: n0(r.peleasDespues), kills: n0(r.abatidos),
           lines: n0(r.lineas), secs: r.segundos.toFixed(1), backup: (r.copias ?? []).join(', ') }))}</p>
+        ${/* Lo borrado se dice aquí también, y no sólo en la consola: quien
+             reconstruye desde el cartel no ve la consola nunca. */ ''}
+        ${r.podadas?.length ? `<p class="hint">${esc(t('mig.podadas', {
+    n: r.podadas.length, tandas: (r.tandasConservadas ?? []).join(', '),
+  }))}</p>` : ''}
         <div class="mig-btns"><button id="migOk">${esc(t('mig.later'))}</button></div>`);
       $('migOk').addEventListener('click', cerrar);
       // El histórico es otro: se descarta lo que la interfaz tuviera en memoria.

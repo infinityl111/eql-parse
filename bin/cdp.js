@@ -136,6 +136,36 @@ export async function medirCaja(evalua, selector) {
   })()`);
 }
 
+/**
+ * Reintenta una captura que se queda sin respuesta, y LO DICE.
+ *
+ * `Page.captureScreenshot` se cuelga de vez en cuando: con la misma caja y la
+ * misma página responde en 410 ms, y una vez de cada muchas no responde nunca.
+ * No es un error de uso —se probó la caja exacta, dentro y fuera del alto de la
+ * ventana, y las dos van— sino el compositor atascado después de mucho
+ * redimensionar.
+ *
+ * Contra eso, reintentar es lo correcto; callarlo, no. Si un fotograma necesitó
+ * dos intentos, eso se imprime: una tanda que reintenta la mitad de las veces
+ * está diciendo que algo va mal aunque acabe en verde.
+ */
+async function conReintento(quien, fn, veces = 3) {
+  let ultimo = null;
+  for (let i = 1; i <= veces; i++) {
+    try {
+      const r = await fn();
+      if (i > 1) console.log(`       (${quien} salió al intento ${i} de ${veces})`);
+      return r;
+    } catch (e) {
+      ultimo = e;
+      if (!/no respondió en/.test(e.message)) throw e;   // sólo los cuelgues
+      console.log(`       (${quien}: intento ${i} sin respuesta, reintentando)`);
+      await espera(1000);
+    }
+  }
+  throw ultimo;
+}
+
 export async function capturaComprobada({ manda, evalua }, selector, ref, escala = 1, tol = 8) {
   const ahora = await medirCaja(evalua, selector);
   if (!ahora) throw new Error(`no existe «${selector}» al capturar`);
@@ -144,9 +174,9 @@ export async function capturaComprobada({ manda, evalua }, selector, ref, escala
     throw new Error(`el encuadre se ha movido: ${ref.width}×${ref.height} en (${ref.x},${ref.y})`
       + ` → ${ahora.width}×${ahora.height} en (${ahora.x},${ahora.y})`);
   }
-  const r = await manda('Page.captureScreenshot', {
+  const r = await conReintento(`recorte de ${selector}`, () => manda('Page.captureScreenshot', {
     format: 'png', clip: { x: ref.x, y: ref.y, width: ref.width, height: ref.height, scale: escala },
-  });
+  }));
   return Buffer.from(r.data, 'base64');
 }
 
@@ -169,7 +199,8 @@ export async function capturaPagina({ manda, evalua }, ancho = 1500, maxAlto = 3
   });
   await espera(500);
   const despues = await evalua('document.body.scrollHeight');
-  const shot = await manda('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
+  const shot = await conReintento('captura de página', () => manda('Page.captureScreenshot',
+    { format: 'png', captureBeyondViewport: true }));
   await manda('Emulation.clearDeviceMetricsOverride');
   return {
     png: Buffer.from(shot.data, 'base64'),

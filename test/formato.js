@@ -124,10 +124,15 @@ function estable(x) {
  *                         daño partido por postura, la serie de dos cubos a
  *                         tres, el campo `modelo`— y lo que faltaba era
  *                         numerarlo. Ésta es la anotación que salda esa deuda.
+ *   953dbd521cbe0dcc  v8  la 1.12.0. Cada pelea guarda ahora `coins` —la moneda
+ *                         de los cadáveres, que se reconocía y se tiraba— y cada
+ *                         objeto lleva de dónde salió: `via`, `amb` y `dt`, el
+ *                         hueco medido entre la muerte de su cadáver y la
+ *                         recogida.
  */
 const ANOTADO = {
-  version: 7,
-  huella: '17f6d0ffda79de90',
+  version: 8,
+  huella: '953dbd521cbe0dcc',
 };
 
 console.log('\nel formato de lo guardado');
@@ -165,8 +170,20 @@ ok((f.rows ?? []).length >= 2, 'y con más de un combatiente', (f.rows ?? []).le
 // -- Las dos preguntas, separadas y comprobadas ------------------------------
 //
 // Que existan dos constantes no sirve de nada si el cartel sigue colgado de la
-// equivocada. Estas comprobaciones son el contrato de la 1.11.0: el formato
-// sube, y aun asi NADIE ve el cartel de reconstruir por esta actualizacion.
+// equivocada.
+//
+// OJO AL LEER ESTO: lo que se comprueba NO es «el cartel nunca sale». Eso era el
+// contrato de la 1.11.0, donde la correccion se hacia al leer y por eso nadie
+// tenia que releer su registro. La 1.12.0 es el caso contrario y a proposito:
+// donde esta colgado cada objeto se decidio AL ESCRIBIRLO, y ningun lector lo
+// puede recomponer. Asi que aqui `RECONSTRUIR_DESDE` sube hasta `FORMATO_VERSION`
+// y el cartel SI sale.
+//
+// Lo que se comprueba es que las dos preguntas siguen siendo dos: que la de
+// reconstruir nunca va POR DELANTE de la del formato —pedir releer para llegar a
+// una generacion que todavia no se escribe seria pedir un imposible— y que el
+// que ya esta al dia no ve nada. Que coincidan es una respuesta valida; que se
+// crucen, no.
 const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'eqlver-'));
 const conPeleas = (dir, n = 3) => {
   const st = new FightStore(dir, 'Campeon');
@@ -179,24 +196,24 @@ const conPeleas = (dir, n = 3) => {
 };
 
 console.log(`
-el formato sube y el cartel de reconstruir no sale`);
+las dos preguntas siguen siendo dos`);
 {
-  ok(FORMATO_VERSION > RECONSTRUIR_DESDE,
-    'el formato va por delante de la condicion de reconstruir',
+  ok(FORMATO_VERSION >= RECONSTRUIR_DESDE,
+    'reconstruir nunca va por delante del formato',
     `formato ${FORMATO_VERSION} / reconstruir por debajo de ${RECONSTRUIR_DESDE}`);
 
   const alDia = conPeleas(tmpDir());
   alDia.stamp(RECONSTRUIR_DESDE);
   alDia.load();
   ok(alDia.migration().needed === false,
-    'con el almacen sellado en 6, esta actualizacion NO pide reconstruir',
+    'quien ya esta en la generacion de hoy NO ve el cartel',
     `sellado ${alDia.meta()?.version}`);
 
   const atrasado = conPeleas(tmpDir());
   atrasado.stamp(RECONSTRUIR_DESDE - 1);
   atrasado.load();
   ok(atrasado.migration().needed === true,
-    'y quien no reconstruyo con la 1.10.0 lo sigue viendo');
+    'y quien se quedo una generacion atras SI lo ve');
 
   const vacio = new FightStore(tmpDir(), 'Campeon');
   vacio.load();
@@ -206,12 +223,15 @@ el formato sube y el cartel de reconstruir no sale`);
 console.log(`
 el aviso de que las cifras cambian solas`);
 {
+  // Una generacion por debajo de la de hoy, sea cual sea: si se sella con
+  // `RECONSTRUIR_DESDE` y las dos constantes coinciden, este almacen estaria al
+  // dia y la prueba pasaria por no tener nada que avisar.
   const viejo = conPeleas(tmpDir());
-  viejo.stamp(RECONSTRUIR_DESDE);
+  viejo.stamp(FORMATO_VERSION - 1);
   viejo.load();
   const a = viejo.avisoModelo();
   ok(a.needed === true, 'con peleas por debajo del formato de hoy, se avisa', `${a.fights} peleas`);
-  ok(a.fights === 3 && a.desde === RECONSTRUIR_DESDE,
+  ok(a.fights === 3 && a.desde === FORMATO_VERSION - 1,
     'y se dice cuantas y desde que generacion');
 
   const nuevo = new FightStore(tmpDir(), 'Campeon');

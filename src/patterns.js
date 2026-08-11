@@ -60,6 +60,24 @@ const SUF = '(?:\\s*\\(([A-Za-z][A-Za-z \'-]{1,28})\\))?';
  */
 const QTY = '(?:an?|(\\d+))\\s+';
 
+/**
+ * «2 platinum, 5 gold, 7 silver and 2 copper» -> 2572 cobres.
+ *
+ * Una sola cifra y no cuatro, porque cuatro no se pueden sumar entre peleas ni
+ * ordenar: 1 platino y 900 cobres es más que 2 platinos... no, es menos, y esa
+ * duda es justo la que no debe llegar a la ficha. El cobre es la unidad y la
+ * conversión es fija: 1 platino = 10 oro = 100 plata = 1.000 cobre.
+ *
+ * Se guarda TAMBIÉN la frase original: si algún día aparece una quinta moneda,
+ * la suma se quedaría corta en silencio y el texto es lo que permite verlo.
+ */
+export function enCobre(frase) {
+  const P = { platinum: 1000, gold: 100, silver: 10, copper: 1 };
+  let cp = 0;
+  for (const [, n, m] of String(frase ?? '').matchAll(/(\d+)\s+(platinum|gold|silver|copper)/g)) cp += +n * P[m];
+  return cp;
+}
+
 const rules = [
   // ═══ DAÑO DE HECHIZO / HABILIDAD (atribuido y tipado) ═══
   {
@@ -349,6 +367,16 @@ const rules = [
   { kind: 'loot', hint: 'have looted',
     re: new RegExp(`^--You have looted ${QTY}(.+?) from (.+?)'s corpse\\.--$`),
     map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3] }) },
+  // La misma red que abajo, para la forma entre guiones — y aquí hace falta
+  // MÁS, no menos. La regla que viene después casa cualquier cosa que acabe en
+  // `.--`, así que un final nuevo no se perdería: se metería ENTERO dentro del
+  // nombre del objeto. Saldría un «Bone Chips from a skeleton's corpse and lo
+  // que sea» en la enciclopedia, contado como un objeto distinto cada vez, y
+  // nadie lo leería como un fallo del analizador. Es exactamente el caso que
+  // este fichero llama peor que no casar la línea.
+  { kind: 'loot', hint: 'have looted',
+    re: new RegExp(`^--You have looted ${QTY}(.+?) from (.+?)'s corpse ([a-z].*)\\.--$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], cola: m[4] }) },
   { kind: 'loot', hint: 'have looted',
     re: new RegExp(`^--You have looted ${QTY}(.+?)\\.--$`),
     map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2] }) },
@@ -361,7 +389,45 @@ const rules = [
   { kind: 'loot', hint: 'You looted',
     re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse and stored it in your currency\\.?$`),
     map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], stored: true }) },
-  { kind: 'coin', hint: 'from the corpse', re: /^You receive (.+?) from the corpse\.$/, map: (m) => ({ coin: m[1] }) },
+  // El quinto final, y el que enseña que no hay «todos los que hay».
+  //
+  // «and stored it in your tradeskill depot» apareció el 11 de agosto de 2026 a
+  // las 18:59, una sola vez en 55 MB, y se llevó un `Essence of Rathe` entero:
+  // la contabilidad cerraba al objeto —1.866 líneas de botín en el registro,
+  // 1.865 en el almacén— y la que faltaba era ésa. Ojo, como la del monedero,
+  // al final SIN PUNTO.
+  { kind: 'loot', hint: 'You looted',
+    re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse and stored it in your tradeskill depot\\.?$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], depot: true }) },
+  // ── Y LA RED, que es lo que de verdad arregla el fallo ────────────────────
+  //
+  // Cuatro finales bastaron durante meses; el quinto costó un objeto y NADIE LO
+  // VIO. La teoría era que una línea que no casa cae en el contador de no
+  // reconocidas y allí se nota — pero en un registro real ese contador tiene
+  // 39.027 líneas, así que una sola de botín no se distingue de nada.
+  //
+  // Así que el sexto final, cuando llegue, no se pierde: `'s corpse ` es un
+  // anclaje lo bastante firme para sacar el objeto y el cadáver de cualquier
+  // línea de recogida, venga como venga. La cola desconocida VIAJA en `cola`,
+  // literal y sin interpretar, hasta la ficha: es la diferencia entre no saber
+  // qué pasó con un objeto y no saber que existe.
+  //
+  // Va LA ÚLTIMA de las cinco a propósito. Dentro de una misma pista las reglas
+  // se prueban en orden, así que los cuatro finales conocidos casan antes y esta
+  // no les quita ninguno: sólo recoge lo que ninguno reconoció.
+  { kind: 'loot', hint: 'You looted',
+    re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse ([a-z].*)$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], cola: m[4] }) },
+  // ═══ MONEDA ═══
+  //
+  // Es botín, y hasta la 1.12.0 se reconocía y se tiraba: 1.392 líneas en un
+  // registro real que no llegaban a ningún contador. Sin ella, una ficha
+  // titulada «lo que recogiste» miente por omisión en la mitad de las peleas.
+  //
+  // NO DICE DE QUÉ CADÁVER SALE, y eso decide cómo se puede colgar de una pelea:
+  // el objeto se resuelve por su cadáver, la moneda sólo por la ventana. Son dos
+  // reglas distintas y la ficha las etiqueta distinto.
+  { kind: 'coin', hint: 'from the corpse', re: /^You receive (.+?) from the corpse\.$/, map: (m) => ({ coin: m[1], cp: enCobre(m[1]) }) },
   { kind: 'con', hint: ' -- ', re: /^(.+?) (?:scowls at you|glares at you|glowers at you|regards you|looks at you|considers you|judges you|kindly considers you|ponders your|looks upon you)[^-]*-- (.+?)(?: \(Lvl: (\d+)\))?$/, map: (m) => ({ mob: m[1], con: m[2], level: m[3] ? +m[3] : null }) },
   { kind: 'logging', hint: 'Logging to', re: /^Logging to '(.+?)' is now \*(ON|OFF)\*\.$/, map: (m) => ({ file: m[1], on: m[2] === 'ON' }) },
   // ── El encanto del encantador ────────────────────────────────────────────
@@ -430,6 +496,17 @@ const rules = [
     map: (m) => ({ from: m[1], channel: 'shout', text: m[2] }),
   },
   { kind: 'chat', hint: 'You tell', re: /^You tell (.+?), '([\s\S]*)'$/, map: (m) => ({ from: 'You', channel: 'outgoing', text: m[2] }) },
+  // «You say to your guild» iba a no reconocidas: 703 líneas en un registro
+  // real, contra las 96 de `You say` a secas — lo que faltaba era la forma
+  // NORMAL de hablar, no un caso raro. La regla de abajo no las coge porque
+  // exige que la coma vaya pegada al verbo.
+  //
+  // Va ANTES que `You say` porque su `,?` haría que la otra casara «to your
+  // guild» como parte del texto. Dentro de una misma pista mandan por orden.
+  //
+  // `You tell your party` NO necesita regla propia: la de `You tell X` de arriba
+  // ya la coge, y le pone el mismo canal `outgoing` que a cualquier susurro.
+  { kind: 'chat', hint: 'You say', re: /^You say to (.+?), '([\s\S]*)'$/, map: (m) => ({ from: 'You', channel: m[1], text: m[2] }) },
   { kind: 'chat', hint: 'You say', re: /^You say,? '([\s\S]*)'$/, map: (m) => ({ from: 'You', channel: 'outgoing', text: m[1] }) },
 
   // ═══ RUIDO (reconocido para que no ensucie la calibración) ═══
