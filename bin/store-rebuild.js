@@ -122,3 +122,16 @@ console.log(`  tiempo: ${r.segundos.toFixed(1)} s · almacén marcado como ${r.v
 const dif = r.peleasDespues - r.peleasAntes;
 if (dif !== 0) console.log(`  ${dif > 0 ? '+' : ''}${dif} peleas respecto al almacén anterior.`);
 if (r.copias.length) console.log(`  Si algo no cuadra, lo de antes está en: ${r.copias.join(', ')}\n`);
+
+// LO BORRADO SE DICE, CON LOS NOMBRES. Una poda silenciosa no se distingue de
+// una pérdida de datos, y quien mira esta salida es justamente quien va a
+// querer saber qué copias le quedan.
+if (r.podadas?.length) {
+  console.log(`  Se han borrado ${n(r.podadas.length)} ficheros de copias antiguas`
+    + ` (se conservan las 3 últimas tandas: ${r.tandasConservadas.join(', ')}):`);
+  for (const f of r.podadas) console.log(`    ${f}`);
+  console.log('');
+}
+if (r.podaFallida?.length) {
+  console.log(`  No he podido borrar ${n(r.podaFallida.length)}: ${r.podaFallida.join(', ')}\n`);
+}

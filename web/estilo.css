@@ -25,7 +25,7 @@
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--fondo); color: var(--texto);
-  font: 16px/1.65 'Segoe UI', system-ui, sans-serif;
+  font: 17px/1.7 'Segoe UI', system-ui, sans-serif;
 }
 a { color: var(--cold); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -52,16 +52,50 @@ a:hover { text-decoration: underline; }
 .idiomas a.on { color: var(--cold); border-color: var(--cold); }
 
 /* ── Cuerpo ───────────────────────────────────────────── */
-main { max-width: 980px; margin: 0 auto; padding: 0 24px 64px; }
+/*
+ * EL CONTENEDOR ENSANCHA; EL TEXTO NO.
+ *
+ * Son dos cosas distintas y antes iban atadas al mismo número. A las imágenes
+ * —la tabla del consejo, las capturas, la rejilla de ocho— el ancho de más les
+ * sienta bien: es detalle que se lee. Al texto corrido no: una línea de noventa
+ * caracteres se lee peor que una de setenta, porque el ojo pierde el renglón al
+ * volver. Así que el contenedor sube a 1280 y cada párrafo conserva su tope en
+ * `ch`, que es la unidad que mide caracteres y no píxeles.
+ */
+main { max-width: 1280px; margin: 0 auto; padding: 0 28px 64px; }
 section { margin: 48px 0; }
 h1 { font-family: var(--display); font-size: 40px; line-height: 1.15; margin: 0 0 12px; letter-spacing: .01em; }
-h2 { font-family: var(--display); font-size: 24px; margin: 0 0 10px; letter-spacing: .02em; }
+h2 { font-family: var(--display); font-size: 24px; margin: 0 0 10px; letter-spacing: .02em; text-align: center; }
 h3 { font-family: var(--display); font-size: 16px; margin: 0 0 6px; letter-spacing: .03em; }
-.ancho { max-width: 68ch; color: var(--tenue); }
+/*
+ * EL TEXTO, JUSTIFICADO Y CON PARTICIÓN DE PALABRAS.
+ *
+ * El bloque sigue centrado —el tope en `ch` lo anclaba al borde izquierdo y en
+ * una pantalla ancha quedaba una columna arrimada a un lado— pero el texto se
+ * justifica en vez de centrarse: centrado, cada renglón empieza en un sitio
+ * distinto y el ojo se pierde al volver.
+ *
+ * Y JUSTIFICAR SIN PARTIR PALABRAS ES PEOR QUE NO JUSTIFICAR: para cuadrar el
+ * margen derecho el navegador estira los espacios, y en una columna estrecha
+ * con palabras largas —«reconstrucción», «Wiedergabe»— salen ríos blancos que
+ * cruzan el párrafo. `hyphens: auto` los evita partiendo por sílabas, y sabe
+ * cómo hacerlo porque cada página declara su idioma en `<html lang>`.
+ */
+.ancho, .hero .sub, .hero .alcance, .pieMuestra, .tarjeta p, .notas p, .aviso {
+  text-align: justify; hyphens: auto; -webkit-hyphens: auto;
+}
 
-.hero { margin: 64px 0 40px; }
-.hero .sub { font-size: 19px; color: var(--tenue); max-width: 60ch; margin: 0 0 24px; }
-.gratis { font-size: 13px; color: var(--bone-faint); margin-top: 12px; }
+.ancho { max-width: 72ch; color: var(--tenue); margin-inline: auto; font-size: 17px; }
+
+/* Los titulares sí van centrados: una línea suelta no se justifica. */
+.hero { margin: 64px 0 32px; }
+.hero h1 { text-align: center; }
+.hero .sub { font-size: 21px; line-height: 1.55; color: var(--tenue); max-width: 64ch; margin: 0 auto 16px; }
+.hero .alcance { font-size: 17px; line-height: 1.75; color: var(--tenue); max-width: 76ch; margin: 0 auto 28px; }
+.gratis { font-size: 13px; color: var(--bone-faint); margin-top: 12px; text-align: center; }
+
+/* La descarga y el café, en fila y sin competir. */
+.botones { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: center; }
 
 .boton {
   display: inline-block; background: var(--cold); color: var(--slate-900);
@@ -70,15 +104,131 @@ h3 { font-family: var(--display); font-size: 16px; margin: 0 0 6px; letter-spaci
 }
 .boton:hover { filter: brightness(1.1); text-decoration: none; }
 .boton .mb { font-family: var(--mono); font-size: 12px; opacity: .75; text-transform: none; }
+/*
+ * EL CAFÉ: invita, no cobra.
+ *
+ * Mismo molde que la descarga y sin relleno, porque al lado del único botón que
+ * importa una chapa naranja de PayPal se lleva la mirada y hace que una
+ * descarga gratuita parezca de pago. Pero sin relleno no quiere decir apagado:
+ * lleva su taza dibujada y dice el método —«PayPal», en la misma letra
+ * monoespaciada que los «75 MB» del otro— para que nadie tenga que pulsar para
+ * enterarse de a dónde va.
+ *
+ * El calor va en el icono y aparece al acercarse: en reposo es un botón más;
+ * al pasar el ratón, la taza y el borde se encienden en el naranja de la
+ * paleta —el mismo `--fire` de la aplicación— y sube un pelo. Un guiño, no una
+ * llamada.
+ */
+.boton.cafe {
+  background: transparent; color: var(--tenue); border: 1px solid var(--linea);
+  font-weight: 400; display: inline-flex; align-items: center; gap: 9px;
+  transition: color .18s, border-color .18s, background .18s, transform .18s;
+}
+.boton.cafe .taza { color: var(--bone-faint); transition: color .18s, transform .18s; }
+.boton.cafe .mb { letter-spacing: .04em; }
+.boton.cafe:hover {
+  color: var(--texto); border-color: var(--fire);
+  background: color-mix(in srgb, var(--fire) 8%, transparent);
+  filter: none; transform: translateY(-1px);
+}
+.boton.cafe:hover .taza { color: var(--fire); transform: translateY(-1px); }
+/* Si el navegador no entiende `color-mix`, se queda sin el tinte y ya está. */
 
-.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+/*
+ * Dos columnas para «qué NO hace» y «requisitos».
+ *
+ * Son las dos preguntas que se hace quien está a punto de bajarse un ejecutable
+ * sin firmar de un desconocido: qué toca de mi máquina, y qué necesito. Estaban
+ * sólo en la página de instalación, que es donde llega quien YA ha decidido.
+ * Puestas una al lado de otra ocupan una fila y no alargan la página.
+ */
+/*
+ * El cierre: la última cosa que se lee antes del pie.
+ *
+ * Va en su recuadro para que se lea como un aparte y no como una sección más
+ * de producto, y el botón repite abajo lo que ya está arriba — quien ha bajado
+ * hasta aquí ha leído la página entera y es justo a quien tiene sentido
+ * preguntarle. Con el mismo dibujo discreto: si el café gritara más que la
+ * descarga, la página entera cambiaría de tono en su última línea.
+ */
+.cierre {
+  background: var(--panel); border: 1px solid var(--linea); border-radius: 3px;
+  padding: 30px 32px 34px; margin-top: 56px;
+}
+.cierre .ancho { margin-bottom: 22px; }
+
+.dos h3 { font-size: 17px; margin-bottom: 8px; color: var(--texto); }
+.dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 20px 40px; }
+.dos .ancho { max-width: none; }
+
+.rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 16px; }
 .tarjeta { background: var(--panel); border: 1px solid var(--linea); border-left: 2px solid var(--cold);
   border-radius: 3px; padding: 16px 18px; }
-.tarjeta p { margin: 0; color: var(--tenue); font-size: 14px; }
+.tarjeta p { margin: 0; color: var(--tenue); font-size: 14.5px; line-height: 1.6; }
 
-.capturas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+/*
+ * Dos columnas en ancho, y no tres. Con cuatro capturas, `minmax(300px)` daba
+ * 3 + 1 —el overlay solo en su fila— y cada una a 380 px, donde no se lee un
+ * rótulo. A 420 caben dos, salen a unos 600 y sí se leen. Menos y más grandes.
+ */
+/*
+ * El `min(...)` no es adorno: `minmax(420px, 1fr)` impone 420 aunque la
+ * pantalla tenga 375, y entonces la rejilla empuja el cuerpo entero de lado.
+ * Con `min(420px, 100%)` el mínimo cede cuando no cabe.
+ */
+.capturas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 20px; }
 figure { margin: 0; }
 figure img { width: 100%; border: 1px solid var(--linea); border-radius: 3px; display: block; }
+
+/*
+ * EL ZOOM VA DENTRO DEL MARCO, no en el marco.
+ *
+ * Agrandar el `<figure>` entero mueve el borde, empuja el pie de foto y hace
+ * saltar la fila de al lado en una rejilla. Lo que se agranda es la imagen
+ * DENTRO de un recuadro que no se mueve y que recorta lo que sobra: el borde
+ * se queda quieto, se enciende, y la foto se acerca. Por eso el borde pasa del
+ * `<img>` al `<a>` — si se queda en la imagen, el zoom se lo lleva fuera del
+ * recorte y desaparece.
+ */
+.capturas figure a {
+  display: block; overflow: hidden; border-radius: 3px;
+  border: 1px solid var(--linea);
+  transition: border-color .2s ease, box-shadow .25s ease;
+}
+.capturas figure a img { border: 0; border-radius: 0; transition: transform .4s ease; }
+.capturas figure a:hover {
+  border-color: var(--cold);
+  box-shadow: 0 0 0 1px var(--cold), 0 10px 30px -8px color-mix(in srgb, var(--cold) 45%, transparent);
+}
+.capturas figure a:hover img { transform: scale(1.045); }
+.capturas figure a:hover + figcaption, .capturas figure a:focus-visible + figcaption { color: var(--tenue); }
+
+/*
+ * Las sueltas —las dos del consejo y la muestra— NO se agrandan: ya ocupan casi
+ * todo el ancho, y crecer ahí sólo sirve para recortarles los bordes. Se
+ * encienden y se levantan un píxel, que es lo que dice «esto es una pieza» sin
+ * mover la página.
+ */
+.prueba img, .contra img, .muestra {
+  transition: border-color .2s ease, box-shadow .25s ease, transform .2s ease;
+}
+.prueba img:hover, .contra img:hover, .muestra:hover {
+  border-color: var(--cold); transform: translateY(-2px);
+  box-shadow: 0 12px 34px -10px color-mix(in srgb, var(--cold) 40%, transparent);
+}
+
+/*
+ * Y nada de esto se mueve para quien ha pedido que no se mueva nada. El brillo
+ * se queda —es información: dice que se puede pulsar—; el movimiento se va.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .capturas figure a img, .prueba img, .contra img, .muestra, .boton.cafe, .boton.cafe .taza {
+    transition: none;
+  }
+  .capturas figure a:hover img { transform: none; }
+  .prueba img:hover, .contra img:hover, .muestra:hover { transform: none; }
+  .boton.cafe:hover, .boton.cafe:hover .taza { transform: none; }
+}
 /*
  * Todas a la misma forma. Sin esto la rejilla la manda la más alta —el combate
  * mide 1500×1749— y su celda estira la fila entera dejando un hueco enorme al
@@ -86,29 +236,32 @@ figure img { width: 100%; border: 1px solid var(--linea); border-radius: 3px; di
  * está arriba.
  */
 .capturas figure img { aspect-ratio: 16 / 10; object-fit: cover; object-position: top center; }
-.capturas figure a { display: block; }
-.capturas figure a:hover img { border-color: var(--cold); }
-figcaption { font-size: 13px; color: var(--bone-faint); margin-top: 6px; }
-.muestra { width: 100%; max-width: 900px; border: 1px solid var(--linea); border-radius: 3px; }
+figcaption { font-size: 13.5px; color: var(--bone-faint); margin-top: 6px; }
+.muestra { width: 100%; max-width: 1189px; display: block; margin-inline: auto; border: 1px solid var(--linea); border-radius: 3px; }
+/* La otra cara del consejo, debajo de la galería y a su mismo ancho. */
+.contra { margin-top: 20px; }
+.contra img { width: 100%; max-width: 1189px; display: block; margin-inline: auto;
+  border: 1px solid var(--linea); border-radius: 3px; }
+
 /*
  * La prueba de la cabecera. Va pegada al titular —margen de arriba corto— para
  * que entre en la primera pantalla: si hay que bajar para verla, no prueba nada.
  */
 .prueba { margin: 24px 0 40px; }
-.prueba img { width: 100%; max-width: 900px; display: block;
+.prueba img { width: 100%; max-width: 1189px; display: block; margin-inline: auto;
   border: 1px solid var(--linea); border-left: 2px solid var(--cold); border-radius: 3px; }
 /* Los umbrales de la muestra: iban dentro del PNG y ahora son texto. */
-.pieMuestra { max-width: 900px; margin: 8px 0 0; font-size: 13px;
-  line-height: 1.55; color: var(--bone-faint); }
+.pieMuestra { max-width: 78ch; margin: 10px auto 0; font-size: 13.5px;
+  line-height: 1.6; color: var(--bone-faint); }
 
-.pasos { max-width: 68ch; color: var(--tenue); padding-left: 20px; }
+.pasos { max-width: 72ch; font-size: 17px; color: var(--tenue); padding-left: 20px; margin-inline: auto; }
 .pasos li { margin-bottom: 12px; }
-.aviso { max-width: 68ch; background: var(--panel); border-left: 2px solid var(--fire);
+.aviso { max-width: 68ch; margin-inline: auto; background: var(--panel); border-left: 2px solid var(--fire);
   padding: 12px 16px; color: var(--tenue); }
 
 .version { border-top: 1px solid var(--linea); padding-top: 24px; margin-top: 32px; }
 .version .fecha { font-family: var(--mono); font-size: 12px; color: var(--bone-faint); margin-bottom: 10px; }
-.notas { max-width: 72ch; color: var(--tenue); }
+.notas { max-width: 76ch; color: var(--tenue); margin-inline: auto; }
 .notas code { font-family: var(--mono); font-size: 13px; background: var(--panel);
   padding: 1px 5px; border-radius: 2px; }
 .notas strong { color: var(--texto); }
@@ -119,11 +272,84 @@ figcaption { font-size: 13px; color: var(--bone-faint); margin-top: 6px; }
 footer {
   border-top: 1px solid var(--linea); padding: 24px; display: flex; gap: 18px;
   flex-wrap: wrap; align-items: center; color: var(--bone-faint); font-size: 13px;
-  max-width: 980px; margin: 0 auto;
+  max-width: 1280px; margin: 0 auto;
 }
 footer .ver { margin-left: auto; font-family: var(--mono); }
+
+/*
+ * EN PANTALLA ESTRECHA, LA TABLA SE DESPLAZA EN VEZ DE ENCOGERSE.
+ *
+ * Las dos imágenes del consejo son tablas de 1189 px. Reducidas a 390 no se
+ * lee ni una cifra, y justamente lo que las hace valer —vigor y maná al lado
+ * de cada opción— es lo primero que desaparece. Antes que una imagen que no
+ * dice nada, una que se arrastra con el dedo.
+ *
+ * El desplazamiento vive DENTRO de su caja: el cuerpo de la página no se mueve
+ * de lado, que es lo que convierte una tabla ancha en una web rota.
+ */
+@media (max-width: 820px) {
+  .prueba, .contra { overflow-x: auto; }
+  .prueba img, .contra img { min-width: 820px; max-width: none; }
+}
 
 @media (max-width: 620px) {
   h1 { font-size: 30px; }
   .idiomas { margin-left: 0; width: 100%; }
+  /* Los dos botones a lo ancho: en 390 px, uno al lado del otro se parte mal. */
+  .botones { flex-direction: column; align-items: stretch; }
+  .boton { text-align: center; }
 }
+
+/* ── El aviso del otro proyecto ────────────────────────── */
+/*
+ * Al final de la portada, debajo del café. Pequeño y sin marco fuerte: es un
+ * aviso de al lado, no una segunda portada. La versión anterior era un recuadro
+ * fijo en la esquina, y un cartel que te sigue por la pantalla es exactamente
+ * lo que molesta en las webs de los demás.
+ */
+.otro { margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--linea); }
+.otro-in { display: block; text-align: center; margin-top: 14px; }
+.otro-in:hover { text-decoration: none; }
+
+/*
+ * LA FILA: dos capturas, el ogro, dos capturas. Todo a la misma altura.
+ *
+ * Se alinean por ABAJO y no por el centro: el ogro es una figura recortada con
+ * los pies en su borde inferior, y centrarlo con unas capturas rectangulares lo
+ * deja flotando medio palmo por encima de ellas.
+ */
+.otro-fila { display: flex; gap: 10px; align-items: flex-end; justify-content: center; flex-wrap: wrap; }
+.otro-fila a { display: block; line-height: 0; }
+.otro-fila a:hover { text-decoration: none; }
+.otro-lado { display: flex; gap: 10px; align-items: flex-end; }
+.otro-lado img {
+  height: 112px; width: auto; display: block;
+  border: 1px solid var(--linea); border-radius: 3px;
+  transition: border-color .2s ease, transform .2s ease;
+}
+.otro-lado img:hover { border-color: var(--fire); transform: translateY(-2px); }
+.otro-v {
+  width: 84px; height: 112px; object-fit: contain; flex: none;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, .5));
+}
+
+.otro-t { display: inline-flex; flex-direction: column; gap: 2px; max-width: 52ch; text-align: center; }
+.otro-t .eyebrow { font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--bone-faint); font-weight: 400; }
+.otro-n { font-family: var(--display); font-size: 18px; color: var(--texto);
+  letter-spacing: .03em; display: flex; align-items: center; gap: 8px; justify-content: center; }
+/* «En alfa» no es adorno: promete lo que hay, no lo que habrá. */
+.otro-a { font-style: normal; font-family: var(--mono); font-size: 9.5px;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--fire);
+  border: 1px solid var(--fire); border-radius: 2px; padding: 1px 5px; }
+.otro-t span { font-size: 13.5px; line-height: 1.5; color: var(--tenue); }
+.otro-t .otro-l { font-size: 14.5px; color: var(--texto); margin-top: 2px; }
+.otro-u { font-family: var(--mono); font-size: 11.5px; color: var(--cold); margin-top: 4px; }
+.otro-in:hover .otro-u { text-decoration: underline; }
+
+/* En estrecho, las cuatro se apilan en dos filas y encogen con la pantalla. */
+@media (max-width: 760px) {
+  .otro-lado img { height: 76px; }
+  .otro-v { width: 62px; height: 84px; }
+}
+@media (prefers-reduced-motion: reduce) { .otro-lado img:hover { transform: none; } }

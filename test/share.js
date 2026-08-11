@@ -2,17 +2,25 @@
  * El texto para pegar en el chat del juego.
  *
  * Todo lo que se comprueba aquí sale de medir el chat de un registro real
- * —6.163 mensajes de 451 jugadores— y no de suponer cómo es EQ:
+ * —9.934 mensajes de chat, 8.098 de canal humano, 568 emisores— y no de suponer
+ * cómo es EQ:
  *
- *   · El límite NO son 250. El mensaje más largo escrito por una persona son
- *     491 caracteres y la cola de longitudes es suave, sin ningún número
- *     repetido en el máximo, que es como se delata un corte del cliente. La
- *     wiki de EQL lista los canales y no documenta ningún máximo. 240 es un
- *     presupuesto cómodo, no el techo.
+ *   · El límite NO son 250. El texto más largo escrito por una persona son 423
+ *     caracteres, hay UNO solo de esa longitud y la cola es suave; un cliente
+ *     que corta se delata con una pila de mensajes clavados en el mismo número,
+ *     y el más repetido pasando de 100 son 26 mensajes de 102. La wiki de EQL
+ *     lista los canales y describe la ventana de chat sin dar ningún máximo.
+ *     240 es un presupuesto cómodo, no el techo. (Antes ponía 491: eso era la
+ *     línea entera del registro, con marca de tiempo y cabecera de canal.)
  *
  *   · El chat es ASCII. El único carácter no-ASCII en todo el chat es U+FFFD
- *     ocho veces —el rombo de «no sé pintar esto»— y en 359 mensajes propios
- *     en español no hay ni una tilde.
+ *     once veces —el rombo de «no sé pintar esto»— y en los mensajes propios
+ *     en español no hay ni una tilde. Por eso el recorte dice «+3 mas».
+ *
+ *   · El «|» llega. Siete líneas del registro lo llevan: tres son de otras
+ *     personas escribiendo en un canal, una es la ayuda del juego y DOS son
+ *     este mismo texto, pegado en el chat de gremio y devuelto por el registro
+ *     con las barras intactas. El viaje completo no se come el carácter.
  *
  *   · «%» SÍ llega, y la medida que decía lo contrario era una trampa. Sale
  *     216 veces en el registro y cero en un mensaje de chat, todas escritas por
@@ -47,6 +55,8 @@ console.log('\nsólo ASCII, porque el chat no pinta otra cosa');
   ok(!/[^\x20-\x7e\n]/.test(texto), 'no queda un solo carácter fuera del ASCII imprimible');
   ok(texto.includes('Munoz'), 'una tilde se degrada a su letra y se sigue leyendo');
   ok(texto.includes('%'), 'el «%» pasa: comprobado dentro del juego, no deducido');
+  // El separador no es una suposición: está en el registro de ida y vuelta.
+  ok(texto.includes(' | '), 'y el «|» sobrevive al saneador, que es donde moriría');
 }
 
 // ── 2. El presupuesto se respeta recortando por el final ───────────────────
@@ -56,8 +66,22 @@ console.log('\nel presupuesto por línea');
   const f = pelea([...muchos, enemigo('a fetid fiend', 200, 1500, 40)]);
   const r = fightToChat(f);
   ok(r.lineas[0].length <= LIMITE, 'la línea cabe en el presupuesto', r.lineas[0].length);
-  ok(r.fuera > 0 && /\| \+\d+$/.test(r.lineas[0]), 'y se dice cuántos se quedaron fuera',
-    r.lineas[0].slice(-8));
+  ok(r.fuera > 0 && /\| \+\d+ mas$/.test(r.lineas[0]), 'y se dice cuántos se quedaron fuera',
+    r.lineas[0].slice(-12));
+  // Cortar en silencio no omite: afirma que el grupo era más pequeño. El número
+  // del rótulo tiene que ser el de verdad, no «alguno más».
+  ok(Number(/\+(\d+) mas$/.exec(r.lineas[0])[1]) === r.fuera,
+    'y el número que dice es el que falta de verdad', `dice +${r.fuera}`);
+  // Lo que NUNCA se recorta: la cabecera, el total y el «vs».
+  ok(r.lineas[0].includes('TOTAL GRUPO'), 'el total sobrevive al recorte');
+  ok(r.lineas[1].startsWith('vs '), 'y la línea de enemigos entera');
+  // Caen de menor a mayor daño: el primero de la lista es el que más pegó y no
+  // puede faltar; el último de los que quedan tiene que pegar más que el que se
+  // fue justo detrás.
+  ok(r.lineas[0].includes('Jugadorconnombrelargo0 5000'),
+    'el que más pegó nunca es el que cae');
+  ok(!r.lineas[0].includes(`Jugadorconnombrelargo${12 - r.fuera}`),
+    'y los que caen son los de menos daño, por el final');
   // Un nombre a medias parece un nombre. Nunca se corta por la mitad.
   ok(!/Jugadorconnombrelarg\b/.test(r.lineas[0].replace(/Jugadorconnombrelargo\d+/g, '')),
     'nunca se parte un nombre por la mitad');
@@ -113,12 +137,69 @@ console.log('\nlas mascotas enemigas se pliegan');
   ok(!r.lineas[1].includes('pet'), 'y la mascota no sale en la línea de enemigos');
 }
 
-// ── 6. El plural, que es lo que delata un texto generado ───────────────────
-console.log('\nplurales');
+// ── 6. Un enemigo solo se llama por su nombre ──────────────────────────────
+//
+// Agregar tiene sentido con muchos, porque sus nombres en montón no dicen nada.
+// Con uno no hay nada que agregar y «1 normal» tapaba justo el dato que se
+// busca al preguntar qué te mató.
+console.log('\nun enemigo solo tiene nombre');
 {
   const uno = fightToChat(pelea([aliado('Campeon', 100), enemigo('a rat', 10, 90, 5)]));
-  ok(uno.lineas[1].includes('1 normal ') && !uno.lineas[1].includes('1 normales'),
-    '«1 normal», no «1 normales»', uno.lineas[1]);
+  ok(uno.lineas[1].includes('a rat - 10'), 'con un normal, sale su nombre', uno.lineas[1]);
+  ok(!/\d normal/.test(uno.lineas[1]), 'y no «1 normal», que no nombraba a nadie');
+
+  // Con varios sí se agregan, y entonces el recuento va en plural siempre: al
+  // rótulo nunca le llega un 1.
+  const muchos = fightToChat(pelea([
+    aliado('Campeon', 100),
+    enemigo('a rat', 10, 90, 5), enemigo('a bat', 8, 80, 4), enemigo('a cat', 6, 70, 3),
+  ]));
+  ok(muchos.lineas[1].includes('3 normales'), 'con tres, se agregan', muchos.lineas[1]);
+}
+
+// ── 6b. En la segunda mención, el nombre va corto ──────────────────────────
+console.log('\nel título se dice una vez');
+{
+  const f = pelea([
+    aliado('Campeon', 61585), aliado('Kabaner', 23263),
+    enemigo('Innoruuk, the Prince of Hate', 45200, 84848, 820),
+  ], 258);
+  const r = fightToChat(f);
+  ok(r.lineas[0].startsWith('Innoruuk, the Prince of Hate 4m18s'),
+    'la cabecera lo nombra entero, una vez', r.lineas[0].slice(0, 40));
+  ok(r.lineas[1] === 'vs Innoruuk - 45200 (175dps, max 820)',
+    'y la segunda línea lo llama por el nombre corto', r.lineas[1]);
+  ok(r.lineas[0] === 'Innoruuk, the Prince of Hate 4m18s | TOTAL GRUPO 84848 (329dps)'
+    + ' | Campeon 61585 (239dps 73%) | Kabaner 23263 (90dps 27%)',
+    'y la línea entera es la acordada', r.lineas[0]);
+
+  // Sin título no hay nada que cortar: los nombres normales pasan enteros.
+  const g = fightToChat(pelea([aliado('Campeon', 50000), enemigo('Lord Nagafen', 20000, 50000, 711)], 100));
+  ok(g.lineas[1].includes('vs Lord Nagafen - 20000'), 'un nombre sin coma no se toca', g.lineas[1]);
+}
+
+// ── 6c. Los números, todos con la misma forma ──────────────────────────────
+//
+// Convivían «84.8k» y «61585» en la misma línea por casualidad, no por criterio.
+// Abreviar no ahorraba un solo carácter —«.», el decimal y la «k» sustituyen
+// exactamente a los tres dígitos que se tiran—, así que costaba precisión y no
+// compraba sitio.
+console.log('\nlos números');
+{
+  const f = pelea([
+    aliado('Campeon', 61585), aliado('Kabaner', 23263),
+    enemigo('a big thing', 45200, 84848, 820),
+  ], 258);
+  const r = fightToChat(f);
+  ok(!/\d\.\dk/.test(r.texto), 'no queda una sola cifra abreviada', r.texto);
+  ok(r.lineas[0].includes('TOTAL GRUPO 84848'), 'el total va exacto y se puede sumar');
+  ok(r.lineas[1].includes('- 45200 '), 'y el del enemigo también');
+
+  // El umbral de 10.000 era lo peor de las dos formas: dos formatos en la misma
+  // columna, según de qué lado del número cayera cada uno.
+  const cruce = fightToChat(pelea([aliado('Aa', 10200), aliado('Bb', 9800)], 100));
+  ok(/Aa 10200 /.test(cruce.lineas[0]) && /Bb 9800 /.test(cruce.lineas[0]),
+    '9800 y 10200 se escriben igual, que antes no', cruce.lineas[0]);
 }
 
 // ── 7. El prefijo, configurable y vacío por defecto ────────────────────────

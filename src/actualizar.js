@@ -82,6 +82,33 @@ export async function consultar(repo, versionActual) {
   return {
     version: tag.replace(/^v/, ''),
     url: j.html_url,
+    /**
+     * PENDIENTE PARA LA 1.12.0: ESTO ESTÁ EN ESPAÑOL PARA TODO EL MUNDO.
+     * Decidido, no implementado.
+     *
+     * El cuerpo de una release es UNO SOLO —la API de GitHub no devuelve cinco—
+     * y está en español. Desde la 1.11.0 el cartel de actualización SÍ lo enseña
+     * (antes se traía y no lo pintaba nadie), así que a un alemán le sale un
+     * muro de texto en español justo cuando tiene que decidir si instala. La
+     * web ya se arregló: lee `web/notas/<versión>.<idioma>.md` y cae al cuerpo
+     * de la release si no hay fichero. Aquí falta lo mismo.
+     *
+     * CÓMO, sin inventar infraestructura: esos ficheros se suben como ADJUNTOS
+     * de la release, junto al `.exe` y al `latest.yml`. Entonces esto los coge
+     * igual que ya coge el `latest.yml` —buscando por nombre en `j.assets`— y no
+     * hace falta ni otro servidor ni otra petición a un sitio distinto:
+     *
+     *     const nota = (j.assets ?? []).find((a) => a.name === `${version}.${lang}.md`);
+     *
+     * Y EL RESPALDO ES LA MITAD DEL TRABAJO, como en la web: las veinte
+     * versiones anteriores no tienen fichero de nadie y tienen que seguir
+     * saliendo con `j.body`. Que falte el adjunto no puede dejar el cartel sin
+     * notas.
+     *
+     * Va después de la sustitución de rótulos (ver `notasDe()` en
+     * `web/build.mjs`): lo que se suba como adjunto tiene que ser el `.md` YA
+     * SUSTITUIDO, nunca el fuente con las llaves dentro.
+     */
     notas: (j.body ?? '').slice(0, 4000),
     // Lo que decide si se puede instalar desde aquí o sólo enlazar.
     descargable: !!(exe && sha512),

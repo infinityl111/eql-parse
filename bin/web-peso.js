@@ -110,12 +110,22 @@ try {
     await manda('Page.navigate', { url: `http://127.0.0.1:${PUERTO_WEB}/${idioma}/index.html` });
 
     let pintado = null, primerFotograma = null, entera = null;
-    // Se sondea la página, que es quien sabe: `naturalWidth` deja de ser 0 en
-    // cuanto la cabecera del PNG ha llegado —ahí ya hay algo que enseñar— y
-    // `complete` no se pone hasta que ha bajado el fichero entero.
+    /**
+     * LA IMAGEN QUE SE MIDE ES LA DE ARRIBA, no la muestra animada.
+     *
+     * Al bajar la reproducción al final y devolverle la carga diferida, la
+     * muestra ya NO se descarga al llegar. Buscarla aquí dejaba al medidor
+     * esperando dos minutos una imagen que nadie había pedido, y lo contaba
+     * como que la página no cargaba: un fallo inventado por el instrumento.
+     * Lo que hay que medir es lo que ve quien llega — la prueba de la cabecera.
+     *
+     * Se sondea la página, que es quien sabe: `naturalWidth` deja de ser 0 en
+     * cuanto la cabecera de la imagen ha llegado —ahí ya hay algo que
+     * enseñar— y `complete` no se pone hasta que ha bajado entera.
+     */
     for (let i = 0; i < 1200 && !entera; i++) {
       const s = await evalua(`(() => {
-        const im = document.querySelector('.muestra');
+        const im = document.querySelector('.prueba img') || document.querySelector('.muestra');
         return {
           pintado: performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null,
           hay: !!im, ancho: im?.naturalWidth ?? 0, lista: !!im?.complete,

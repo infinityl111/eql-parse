@@ -86,6 +86,18 @@ function paraWeb(fichero, lang) {
  */
 const PRUEBA = 'postura.png';
 
+/**
+ * Y LA OTRA CARA, más abajo: el mismo bloque en una pelea donde el consejo dice
+ * que NO cambies.
+ *
+ * Debajo del subtítulo «te dice qué cambiar», una tabla que dice que no cambies
+ * desconcierta. Junto a las capturas es otra cosa: la prueba más fuerte de que
+ * el consejo no está vendiendo nada, porque calcula la diferencia y te dice que
+ * te quedes como estás. Una mejora la enseña cualquiera; decir «aquí no hace
+ * falta» sólo lo dice quien ha medido.
+ */
+const CONTRAPRUEBA = 'postura-nocambiar.png';
+
 /** Las capturas que se enseñan, con la clave de su pie en el diccionario. */
 const CAPTURAS = [
   { fichero: 'combate.png', clave: 'tab.combat' },
@@ -225,10 +237,152 @@ ${alternos}
 </html>`;
 }
 
+const PAYPAL = 'https://paypal.me/eqcampeon';
+const OTRO = 'https://mmorpgexperience.com';
+
+/**
+ * El aviso del otro proyecto, al final de la portada.
+ *
+ * Va DESPUÉS del cierre del café, que es el último sitio donde tiene sentido
+ * hablar de otra cosa: quien ha llegado hasta ahí ya ha decidido sobre ésta.
+ * Discreto y pequeño — es un aviso de al lado, no una segunda portada.
+ *
+ * El vídeo va MUDO y con póster: sin `muted` ningún navegador lo reproduce
+ * solo, y sin póster hay un hueco hasta que llega el primer fotograma.
+ *
+ * LAS IMÁGENES SE RECOGEN SOLAS. Todo lo que haya en `web/promo/` que no sea el
+ * vídeo ni su póster entra en la tira de abajo, por orden de nombre. Así se
+ * añaden dejando ficheros en la carpeta, sin tocar esto.
+ */
+function avisoOtro(tt) {
+  const dir = path.join(RAIZ, 'promo');
+  if (!fs.existsSync(dir)) return '';
+  /**
+   * Las miniaturas, y NO sus versiones grandes: `-grande` no se lista, se
+   * enlaza. Si entrara en la lista saldría ocho veces la misma tira.
+   */
+  const sueltas = fs.readdirSync(dir)
+    .filter((f) => /\.(png|jpe?g|webp|gif)$/i.test(f)
+      && f !== 'apenao_poster.webp' && !/-grande\./i.test(f))
+    .sort();
+  /**
+   * MITAD A CADA LADO DEL OGRO, y el reparto se calcula en vez de escribirse.
+   *
+   * Con cuatro son dos y dos. Con tres serían dos y una, y con cinco tres y
+   * dos: el día que se añada o se quite una imagen no hay que tocar nada, que
+   * es justo lo que se olvida.
+   */
+  const mitad = Math.ceil(sueltas.length / 2);
+  /**
+   * CADA CAPTURA ENLAZA A SU VERSIÓN GRANDE, no al sitio del juego.
+   *
+   * Estaban dentro del enlace a mmorpgexperience.com, así que pinchar una
+   * captura te sacaba de la página en vez de enseñártela. Quien pincha una
+   * imagen pequeña quiere verla; el que quiera ir al juego tiene el nombre y
+   * la dirección justo debajo.
+   *
+   * Y enlaza a la GRANDE de verdad —1500 px— y no a la miniatura: la miniatura
+   * está guardada a 232 de alto y se enseña a 112, así que abrirla sería verla
+   * el doble, o sea nada.
+   */
+  const grandeDe = (f) => {
+    const g = f.replace(/\.(webp|png|jpe?g|gif)$/i, '-grande.webp');
+    return fs.existsSync(path.join(dir, g)) ? g : f;
+  };
+  const lado = (fs2) => (fs2.length ? `<span class="otro-lado">${fs2.map((f) =>
+    `<a href="../promo/${esc(grandeDe(f))}" target="_blank" rel="noopener"
+      ><img src="../promo/${esc(f)}" alt="" loading="lazy"></a>`).join('')}</span>` : '');
+
+  return `<section class="otro">
+    <div class="otro-fila">
+      ${lado(sueltas.slice(0, mitad))}
+      <a href="${OTRO}" rel="noopener" aria-label="Aetheria — ${esc(tt.otroLema)}"
+        ><video class="otro-v" src="../promo/apenao_idle.webm" poster="../promo/apenao_poster.webp"
+        width="84" height="112" autoplay muted playsinline preload="none" aria-hidden="true"></video></a>
+      ${lado(sueltas.slice(mitad))}
+    </div>
+    <a class="otro-in" href="${OTRO}" rel="noopener">
+      <span class="otro-t">
+        <b class="eyebrow">${esc(tt.otroT)}</b>
+        <b class="otro-n">Aetheria <i class="otro-a">${esc(tt.otroAlfa)}</i></b>
+        <span class="otro-l">${esc(tt.otroLema)}</span>
+        <span>${esc(tt.otroP)}</span>
+        <span class="otro-u">mmorpgexperience.com</span>
+      </span>
+    </a>
+  </section>
+${GUION_ANIMACION}`;
+}
+
+/**
+ * LA ÚNICA LÍNEA DE JAVASCRIPT DE TODA LA WEB, y por qué existe.
+ *
+ * El resto de la página no lleva ni una: los idiomas son enlaces, el aviso se
+ * quitó de la esquina para no necesitar un botón de cerrar, y las novedades van
+ * horneadas en el HTML. Pero un vídeo en bucle no se puede pausar desde CSS, y
+ * un ogro moviéndose sin parar en la esquina de la vista se convierte en lo
+ * único que se mira. Así que se mueve, se para, y vuelve a moverse cada diez o
+ * veinte segundos — al azar, para que no se le vea el compás.
+ *
+ * Va aquí dentro y no en un fichero aparte: son ocho líneas, y un `<script src>`
+ * sería una petición más para eso.
+ *
+ * SI NO HAY JAVASCRIPT, se reproduce una vez y se queda quieto. Sin `loop` en
+ * la etiqueta, esa es la degradación natural y es la correcta: mejor quieto que
+ * en bucle eterno.
+ *
+ * Y SI SE HA PEDIDO NO VER MOVIMIENTO, no se mueve nada: se queda en su póster.
+ * `prefers-reduced-motion` no es una preferencia estética.
+ */
+const GUION_ANIMACION = `<script>
+(function () {
+  var v = document.querySelector('.otro-v');
+  if (!v) return;
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    v.removeAttribute('autoplay'); v.pause(); v.currentTime = 0; return;
+  }
+  var luego = function () { setTimeout(mueve, 10000 + Math.random() * 10000); };
+  var mueve = function () {
+    v.currentTime = 0;
+    var p = v.play();
+    if (p && p.catch) p.catch(luego);   // si el navegador lo rechaza, se reintenta
+  };
+  v.loop = false;
+  v.addEventListener('ended', luego);
+  mueve();
+})();
+</script>`;
+
+/**
+ * La taza, dibujada aquí y no traída de fuera.
+ *
+ * Un icono de una fuente o de un CDN es una petición a otro servidor por un
+ * dibujo de quince píxeles, y de paso le cuenta a ese servidor quién visita la
+ * página. Son cuatro trazos: se dibujan. Hereda el color con `currentColor`,
+ * así que cambia con el tema y con el estado del botón sin una regla más.
+ */
+const TAZA = `<svg class="taza" viewBox="0 0 20 20" width="15" height="15" aria-hidden="true"
+  fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 8h11v4.2a3.5 3.5 0 0 1-3.5 3.5H7a3.5 3.5 0 0 1-3.5-3.5V8Z"/>
+  <path d="M14.5 9.2h1.1a1.9 1.9 0 0 1 0 3.8h-1.1"/>
+  <path d="M6.6 5.4V3.7M9.6 5.4V3.2M12.6 5.4V3.7"/>
+</svg>`;
+
+/**
+ * La descarga, sola.
+ *
+ * El café estuvo aquí al lado y se quitó: en la cabecera, el único trabajo es
+ * que se descargue. Dos botones juntos son dos decisiones donde debería haber
+ * una, y la segunda ni siquiera es la que interesa. Sigue estando al final de
+ * la página, después de haber leído lo que hay — que es cuando preguntar tiene
+ * sentido.
+ */
 const botonDescarga = (tt, rel) => {
   const mb = rel?.bytes ? ` <span class="mb">${(rel.bytes / 1024 / 1024).toFixed(0)} MB</span>` : '';
-  return `<a class="boton" href="${esc(rel?.descarga ?? `https://github.com/${REPO}/releases/latest`)}">
-    ${esc(tt.descargar)}${mb}</a>`;
+  return `<div class="botones">
+    <a class="boton" href="${esc(rel?.descarga ?? `https://github.com/${REPO}/releases/latest`)}">
+      ${esc(tt.descargar)}${mb}</a>
+  </div>`;
 };
 
 /**
@@ -311,6 +465,7 @@ function portada(lang, rels) {
     }).join('');
   const hayMuestra = fs.existsSync(path.join(DIST, 'img', 'reproduccion.png'));
   const hayPrueba = fs.existsSync(path.join(PROY, 'docs', paraWeb(PRUEBA, lang)));
+  const hayContra = fs.existsSync(path.join(PROY, 'docs', paraWeb(CONTRAPRUEBA, lang)));
 
   /**
    * LA REPRODUCCIÓN, LA ÚLTIMA — y estuvo la primera, que fue un error mío.
@@ -342,6 +497,7 @@ function portada(lang, rels) {
   return `<section class="hero">
     <h1>${esc(tt.tagline)}</h1>
     <p class="sub">${esc(tt.sub)}</p>
+    <p class="alcance">${esc(tt.subMas)}</p>
     ${botonDescarga(tt, rel)}
     <p class="gratis">${esc(tt.gratis)}${rel ? ` · v${esc(rel.tag.replace(/^v/, ''))}` : ''}</p>
   </section>
@@ -357,10 +513,32 @@ function portada(lang, rels) {
     <div class="rejilla">${funciones}</div>
   </section>
   <section>
+    <h2>${esc(tt.masT)}</h2>
+    <div class="dos">
+      <div><h3>${esc(tt.masVozT)}</h3><p class="ancho">${esc(tt.masVoz)}</p></div>
+      <div><h3>${esc(tt.masEncT)}</h3><p class="ancho">${esc(tt.masEnc)}</p></div>
+    </div>
+  </section>
+  <section class="dos">
+    <div><h2>${esc(tt.privacidad)}</h2><p class="ancho">${esc(tt.privacidadP)}</p></div>
+    <div><h2>${esc(tt.requisitos)}</h2><p class="ancho">${esc(tt.requisitosP)}</p></div>
+  </section>
+  <section>
     <h2>${esc(tt.capturas)}</h2>
     <div class="capturas">${capturas}</div>
+    ${hayContra ? `<figure class="contra">
+      <img src="../img/${paraWeb(CONTRAPRUEBA, lang)}" alt="${esc(tt.pies[CONTRAPRUEBA])}" loading="lazy">
+      <figcaption>${esc(tt.pies[CONTRAPRUEBA])}</figcaption>
+    </figure>` : ''}
   </section>
-  ${muestra}`;
+  ${muestra}
+  <section class="cierre">
+    <h2>${esc(tt.cierreT)}</h2>
+    <p class="ancho">${esc(tt.cierreP)}</p>
+    <div class="botones"><a class="boton cafe" href="${PAYPAL}" rel="noopener">${TAZA}
+      ${esc(tt.cafe)} <span class="mb">PayPal</span></a></div>
+  </section>
+  ${avisoOtro(tt)}`;
 }
 
 function instalacion(lang, rels) {
@@ -376,6 +554,82 @@ function instalacion(lang, rels) {
   <section><h2>${esc(tt.privacidad)}</h2><p class="ancho">${esc(tt.privacidadP)}</p></section>`;
 }
 
+/**
+ * Las notas de una versión en el idioma de la página, si las hay.
+ *
+ * EL CUERPO DE LA RELEASE ES UNO SOLO Y ESTÁ EN ESPAÑOL. Hasta ahora la página
+ * alemana enseñaba las novedades en español, porque es lo único que devuelve la
+ * API de GitHub: una release tiene un cuerpo, no cinco.
+ *
+ * Así que se buscan aquí, en `web/notas/<versión>.<idioma>.md`, y viven
+ * versionadas en el repositorio a propósito. `notas/` está en el `.gitignore`
+ * —por eso las de las veinte versiones anteriores sólo existen en un disco— y
+ * repetir esa decisión habría sido perder también éstas en cuanto cambiara la
+ * máquina.
+ *
+ * EL RESPALDO NO ES UN DETALLE: las veinte versiones anteriores no tienen
+ * fichero de nadie, y tienen que seguir saliendo exactamente como salían. Si no
+ * hay fichero para ese idioma, se usa el cuerpo de la release. No es una
+ * regresión: hoy ya se ven en español en los cinco idiomas.
+ */
+/**
+ * PENDIENTE PARA LA 1.12.0: LOS RÓTULOS CITADOS SE SUSTITUYEN, NO SE ESCRIBEN.
+ * Decidido, no implementado.
+ *
+ * Estas notas citan a propósito rótulos que la aplicación enseña —«Postura
+ * equivocada por tramos», «Pelea guardada antes de que el daño se partiera por
+ * postura»— para que el lector RECONOZCA lo que tiene delante en su programa.
+ * Escritos a mano, se desvían: en la 1.11.0 el rótulo del consejo se tradujo
+ * mal en tres idiomas a la vez —`découpés`, `aufgeteilt`, `dividido`, cuando
+ * i18n dice `répartis`, `getrennt`, `separado`— y el del análisis se citó en
+ * los cinco con un nombre que la aplicación NUNCA ha enseñado. Se cazó a mano
+ * antes de publicar; la segunda vez no habrá quien lo cace.
+ *
+ * LA FORMA: en el `.md` va la clave y aquí se pone el texto.
+ *
+ *     El aviso de {{an.stance}} del análisis se mueve
+ *     verás {{adv.notSegmented}} en tus peleas antiguas
+ *
+ * Las comillas retóricas —«¿ha cambiado lo que se guarda?»— se escriben como
+ * siempre y nadie las mira. Eso resuelve el problema que hundiría a una prueba
+ * que cotejara TODO lo entrecomillado: en francés y en portugués las comillas
+ * angulares son la puntuación normal, así que no sirven de señal.
+ *
+ * POR QUÉ SUSTITUIR Y NO COTEJAR, que es la alternativa que se consideró y se
+ * descartó (declarar al pie las claves citadas y comprobarlas):
+ *
+ *   · La sustitución QUITA el modo de fallo; la declaración lo DETECTA sólo si
+ *     el autor se acuerda de declarar. Una enumeración que depende de que quien
+ *     escribe la mantenga ya ha fallado dos veces en este proyecto — el escáner
+ *     que sólo veía `function` y no `async function`, y el bucle sobre
+ *     `SIN_MITIGACION` que probaba menos al encoger la lista.
+ *   · Y su fallo es RUIDOSO. Si alguien pega el `.md` en crudo, el cuerpo de la
+ *     release enseña `{{adv.notSegmented}}` con las llaves a la vista y se ve al
+ *     instante. Citar sin declarar no rompe nada y nadie se entera. Entre dos
+ *     soluciones imperfectas, la que grita.
+ *
+ * DECISIÓN QUE ALGUIEN VA A QUERER «ARREGLAR» DENTRO DE UN AÑO, y no hay que
+ * arreglarla: cuando un rótulo se reescriba en una versión futura, las notas
+ * ANTIGUAS pasarán a renderizar el texto NUEVO — un rótulo que el usuario de la
+ * 1.11.0 nunca vio. Es deliberado. Estas citas están para que el lector
+ * reconozca lo que tiene delante en SU programa, no para dejar constancia de lo
+ * que decía la versión de entonces. Si algún día se quiere lo segundo, es otra
+ * cosa y necesita otro mecanismo.
+ *
+ * LO QUE FALTA POR HACER:
+ *   · sustituir aquí, con el `t()` del idioma de la página
+ *   · que `web:build` escriba además los `.md` YA SUSTITUIDOS, y que
+ *     `gh release edit --notes-file` tome el español de ahí y NUNCA del fuente
+ *   · una prueba de una línea: toda `{{clave}}` de `web/notas/*.md` existe en
+ *     `i18n.js`. Sin falsos positivos, porque sólo mira lo marcado.
+ */
+function notasDe(tag, lang) {
+  const version = String(tag ?? '').replace(/^v/, '');
+  if (!version) return null;
+  const p = path.join(RAIZ, 'notas', `${version}.${lang}.md`);
+  try { return fs.readFileSync(p, 'utf8'); } catch { return null; }
+}
+
 function novedades(lang, rels) {
   const tt = T[lang];
   const fecha = (s) => (s ? new Date(s).toLocaleDateString(lang, { year: 'numeric', month: 'long', day: 'numeric' }) : '');
@@ -383,7 +637,7 @@ function novedades(lang, rels) {
   ${rels.map((r) => `<article class="version">
       <h2>${esc(r.nombre)}</h2>
       <div class="fecha">${esc(fecha(r.fecha))}</div>
-      <div class="notas">${md(r.cuerpo)}</div>
+      <div class="notas">${md(notasDe(r.tag, lang) ?? r.cuerpo)}</div>
     </article>`).join('')}
   <p><a href="https://github.com/${REPO}/releases">${esc(tt.verTodas)}</a></p>`;
 }
@@ -414,6 +668,12 @@ function queMide(lang) {
       'El registro de EQL no escribe la vida de nadie. Así que no hay barras de presión, ni «casi mueres», ni porcentajes que se parezcan a una barra de vida: 3.000 recibidos son una tragedia con 3.100 de vida y un paseo con 12.000, y la aplicación no sabe cuál de las dos.'],
     ['Y el orden es dato, el espaciado no',
       'Dentro de un segundo, las líneas están en el orden en que ocurrieron: se comprobó con una predicción que podía fallar —el golpe que mata tiene que aparecer antes que la línea de muerte— y salió 952 de 952. El espaciado dentro de ese segundo no existe en el registro, así que la reproducción no lo dibuja.'],
+    /**
+     * La cifra que desactiva la sospecha de que el consejo existe para darse la
+     * razón. Y va con el decimal: lo que la hace creíble es que no es redonda.
+     */
+    ['El consejo de postura acierta poco, y eso es lo que hay que decir',
+      'Pasado por el histórico de referencia: en 359 peleas medidas, en el 68,5% ya llevabas la mejor postura. La mediana de lo que habrías ganado cambiando es exactamente cero. En el 14,5% —52 peleas— la mejor habría evitado al menos un 15% más, y en una de ellas un 150%. Un consejo que se diera la razón saldría con otro reparto; éste dice «no toques nada» dos de cada tres veces.'],
   ] : [
     ['Measured, inferred or declared — never mixed',
       'Every figure carries where it came from. "Measured" is what the log counts; "inferred" is what follows from it by a written rule; "declared" is what you told it. A missing datum dressed as a measured one is worse than not having the column.'],
@@ -425,6 +685,8 @@ function queMide(lang) {
       'The EQL log never writes anyone’s health. So there are no pressure bars, no "you nearly died", no percentages that look like a health bar: 3,000 taken is a tragedy with 3,100 health and a stroll with 12,000, and the app does not know which.'],
     ['And order is data, spacing is not',
       'Within a second, lines are in the order they happened: checked with a prediction that could have failed — the killing blow must appear before the death line — and it came out 952 of 952. The spacing inside that second does not exist in the log, so the replay does not draw it.'],
+    ['The stance advice is right about you more often than it corrects you',
+      'Run over the reference history: across 359 measured fights, in 68.5% you were already in the best stance. The median gain from switching is exactly zero. In 14.5% — 52 fights — the best would have prevented at least 15% more, and in one of them 150% more. Advice built to prove itself right would come out with a different spread; this one says "change nothing" two times in three.'],
   ];
   return `<section><h1>${esc(tt.mideT)}</h1><p class="ancho">${esc(tt.mideP)}</p></section>
     ${bloques.map(([h, p]) => `<section class="bloque"><h2>${esc(h)}</h2><p class="ancho">${esc(p)}</p></section>`).join('')}`;
@@ -454,6 +716,7 @@ async function main() {
     ...FUNCIONES.filter((f) => !T[l].desc?.[f.icono]).map((f) => `${l}.desc.${f.icono}`),
     ...CAPTURAS.filter((c) => !T[l].pies?.[c.fichero]).map((c) => `${l}.pies.${c.fichero}`),
     ...(T[l].pies?.[PRUEBA] ? [] : [`${l}.pies.${PRUEBA}`]),
+    ...(T[l].pies?.[CONTRAPRUEBA] ? [] : [`${l}.pies.${CONTRAPRUEBA}`]),
   ]);
   if (huecos.length) throw new Error(`textos sin escribir: ${huecos.join(', ')}`);
 
@@ -463,7 +726,7 @@ async function main() {
   // Una copia por cada ruta distinta que pidan las cinco páginas. Si sólo hay
   // el juego en inglés, las cinco piden la misma y se copia una vez.
   const rutas = new Set(IDIOMAS.flatMap((l) =>
-    [...CAPTURAS.map((c) => c.fichero), PRUEBA].map((f) => paraWeb(f, l))));
+    [...CAPTURAS.map((c) => c.fichero), PRUEBA, CONTRAPRUEBA].map((f) => paraWeb(f, l))));
   let porIdioma = 0;
   for (const rel of rutas) {
     const o = path.join(PROY, 'docs', rel);
@@ -481,6 +744,25 @@ async function main() {
   } else {
     console.log('  (sin muestra del reproductor: lanza `npm run ui:gif` antes)');
   }
+  /**
+   * LA CARPETA DEL AVISO ENTERA, no una lista de nombres.
+   *
+   * Estaban escritos a mano los dos ficheros del ogro, y el HTML se construye
+   * leyendo la carpeta: al añadir las cuatro capturas, el HTML las enlazó y el
+   * copiado no las copió. Cuatro imágenes rotas en el sitio publicado, y la
+   * comprobación de tamaños las midió a 112 px sin pestañear — porque el alto
+   * lo pone el CSS y una imagen rota también lo cumple.
+   *
+   * Dos sitios que tienen que decir lo mismo y sólo uno se actualiza. Aquí se
+   * copia lo que haya, que es lo mismo que lee el HTML.
+   */
+  const promo = path.join(RAIZ, 'promo');
+  if (fs.existsSync(promo)) {
+    const fich = fs.readdirSync(promo).filter((f) => !f.startsWith('.'));
+    for (const f of fich) await copiar(path.join(promo, f), path.join(DIST, 'promo', f));
+    console.log(`  aviso del otro proyecto: ${fich.length} ficheros`);
+  }
+
   if (fs.existsSync(path.join(PROY, 'build', 'icon.png'))) {
     await copiar(path.join(PROY, 'build', 'icon.png'), path.join(DIST, 'icon.png'));
   }

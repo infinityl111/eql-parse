@@ -51,8 +51,16 @@ import { FightStore, FORMATO_VERSION } from './store.js';
 // caía encima el `motivo: frontera-idle-20s` de la versión partida: una pelea
 // impecable rotulada como excepción. Y quedaba una entrada huérfana apuntando a
 // una hora de inicio que ya no existe.
+// `dudas.ndjson` va por el mismo motivo que `tramos.ndjson` —no se regenera, y
+// una reconstrucción deja sin sentido lo que dice— pero con una diferencia que
+// conviene no perder: éste NO DEPENDE de que lo apartemos. Cada duda guarda el
+// importe mal atribuido, y `aplicarDudas` sólo se la cree si la pelea sigue
+// teniendo esas cifras; en cuanto la reconstrucción la cambia, la entrada se
+// descarta sola. Apartarlo es el cinturón; la comprobación por contenido, los
+// tirantes. Van los dos porque el fallo que esta lista evita —un aviso viejo
+// estampado sobre una pelea que ya está bien— es silencioso.
 const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjson',
-  'aa.ndjson', 'spells.ndjson', 'tramos.ndjson'];
+  'aa.ndjson', 'spells.ndjson', 'tramos.ndjson', 'dudas.ndjson'];
 
 /**
  * AVISO QUE VIAJA CON EL RESULTADO, no un comentario que nadie lee.
@@ -121,6 +129,77 @@ export const AVISO_RECONSTRUIR = 'fronteras-dos-relojes';
  * lo que se acaba de verificar. Y es la clase de fallo que no se nota hasta que
  * alguien necesita la copia que ya no está.
  */
+
+/**
+ * LO QUE CUENTA COMO UNA TANDA, y qué se puede tocar.
+ *
+ * Una reconstrucción aparta varios ficheros a la vez con LA MISMA marca de
+ * tiempo: `fights.ndjson.2026-08-11T19-30-47.bak`, `fights.idx.<misma>.bak`,
+ * etcétera. Esa marca ES la tanda, y por eso se poda por marcas y no por
+ * ficheros: media tanda es peor que ninguna —restaurarías un `fights.ndjson`
+ * con el índice de otro momento— y ese razonamiento ya está escrito arriba.
+ *
+ * SÓLO SE MIRA LO QUE ACABA EN `.<marca ISO>.bak`. Cualquier otro `.bak` no se
+ * toca, y esto no es una precaución vaga: en una carpeta real conviven
+ * `config.json.antes-de-trios.bak` y `config.json.antes-del-who.bak`, que no
+ * llevan marca, no pertenecen a ninguna tanda, ocupan dos kilobytes y su valor
+ * es justamente que siguen ahí. Los puso una persona antes de una operación
+ * concreta. Una poda que generalice «los .bak viejos» se los lleva.
+ */
+const MARCA = /\.(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})\.bak$/;
+
+export function tandas(dir) {
+  let nombres = [];
+  try { nombres = fs.readdirSync(dir); } catch { return []; }
+  const por = new Map();
+  for (const n of nombres) {
+    const m = MARCA.exec(n);
+    if (!m) continue;
+    const lista = por.get(m[1]) ?? [];
+    lista.push(n);
+    por.set(m[1], lista);
+  }
+  // De la más nueva a la más vieja. La marca es ISO recortada, así que ordenar
+  // el texto ordena el tiempo: no hay que mirar la fecha del fichero, que es
+  // otra cosa y se mueve al copiar la carpeta.
+  return [...por.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([marca, ficheros]) => ({ marca, ficheros: ficheros.sort() }));
+}
+
+/**
+ * Deja las `conservar` tandas más recientes y borra las demás.
+ *
+ * POR POSICIÓN Y NO POR ANTIGÜEDAD, decidido y medido: en cuatro días hubo
+ * cinco generaciones de `fights.ndjson` en esta carpeta, y con un criterio de
+ * días quien reconstruye cada dos meses —que es exactamente quien más la
+ * necesita— se queda sin ninguna. La posición en la pila sí dice algo; la edad
+ * no dice nada del valor de una copia.
+ *
+ * SE LLAMA DESPUÉS DE UNA RECONSTRUCCIÓN CON ÉXITO, jamás al arrancar. Borrar
+ * es destructivo y el único instante en que consta que lo nuevo está bien es
+ * cuando acaba de salir bien.
+ *
+ * Devuelve los nombres borrados para que quien la llame PUEDA DECIRLOS. Una
+ * poda silenciosa es indistinguible de una pérdida de datos.
+ */
+export function podar(dir, conservar = 3) {
+  const todas = tandas(dir);
+  const sobran = todas.slice(conservar);
+  const borrados = [];
+  const fallidos = [];
+  for (const t of sobran) {
+    for (const f of t.ficheros) {
+      try { fs.rmSync(path.join(dir, f), { force: true }); borrados.push(f); }
+      catch { fallidos.push(f); }
+    }
+  }
+  return {
+    borrados, fallidos,
+    tandasAntes: todas.length,
+    tandasDespues: Math.min(todas.length, conservar),
+    conservadas: todas.slice(0, conservar).map((t) => t.marca),
+  };
+}
 
 export async function rebuildStore({
   dir, logPath, self = null, idleSec = 20, trios = [], companions = [],
@@ -193,10 +272,23 @@ export async function rebuildStore({
   }
 
   despues.stamp(FORMATO_VERSION);
+  // AQUÍ, Y NO ANTES: la poda va después de que la reconstrucción haya salido
+  // bien Y esté sellada. Todo lo de arriba tiene un camino de vuelta —`deshacer`
+  // restaura lo apartado— y ese camino deja de existir en cuanto se borra algo,
+  // así que borrar es lo último que se hace.
+  //
+  // La tanda que acaba de crearse cuenta como una de las tres, y es lo
+  // correcto: es la copia de lo que había hasta hace un segundo, la más
+  // valiosa de todas.
+  const poda = podar(dir, 3);
   const peleasDespues = despues.index.length;
   const resumenes = despues.filter({});
   return {
     ok: true,
+    // Lo borrado viaja con el resultado, con los nombres. Ver `podar`.
+    podadas: poda.borrados,
+    tandasConservadas: poda.conservadas,
+    podaFallida: poda.fallidos,
     // Viaja con el resultado para que cada interfaz lo enseñe. Ver
     // `AVISO_RECONSTRUIR`.
     aviso: AVISO_RECONSTRUIR,

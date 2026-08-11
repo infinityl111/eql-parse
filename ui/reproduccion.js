@@ -21,6 +21,7 @@
 import { t } from '../src/i18n.js';
 import { guion, agrupar } from '../src/guion.js';
 import { Parser } from '../src/parser.js';
+import { enCobre } from '../src/patterns.js';
 import { grafica, W, H, BAND } from './grafica.js';
 import { barra as barraCasteo } from '../src/casteos.js';
 import { mostrarRotulo, ocultarRotulo, visible as rotuloVisible } from './rotulo.js';
@@ -42,6 +43,149 @@ const claseTipo = (x) => (TIPOS.includes(x) ? x : 'other');
  * segundos y 43. La más larga del histórico, 15m45, se queda en 3m09.
  */
 const VELOCIDADES = [1, 2, 5];
+
+const relojDe = (seg) => `${Math.floor(seg / 60)}:${String(Math.max(0, Math.round(seg % 60))).padStart(2, '0')}`;
+
+/**
+ * «2.572 cobres» no se lee. «2p 5o 7pl 2c» sí, y es la misma cifra.
+ *
+ * El precio de venta pasa por aquí igual que el total, y no se deja en crudo:
+ * el registro lo escribe en inglés y con todas las letras —«71 platinum, 4 gold,
+ * 2 silver and 9 copper»—, así que dejarlo tal cual pondría dos formatos de la
+ * misma cosa en la misma ficha. La frase original se conserva en el `title`: lo
+ * que se cambia es cómo se lee, no lo que dijo el registro.
+ *
+ * Se enseñan sólo las denominaciones que tienen algo: un «0 oro» en medio hace
+ * leer un cero que no aporta. Y nunca se redondea a platino — 3 platinos y
+ * medio no es una moneda que exista, y la mitad perdida es dinero.
+ */
+function monedaCorta(cp) {
+  const P = [['p', 1000], ['o', 100], ['pl', 10], ['c', 1]];
+  const partes = [];
+  let resto = Math.round(cp || 0);
+  for (const [sufijo, valor] of P) {
+    const n = Math.floor(resto / valor);
+    if (n > 0) { partes.push(`${n.toLocaleString('es-ES')}${sufijo}`); resto -= n * valor; }
+  }
+  return partes.length ? partes.join(' ') : '0c';
+}
+
+/**
+ * Lo que la venta dio, dicho como lo dijo el registro cuando no son monedas.
+ *
+ * MEDIDO: de 1.101 ventas automáticas de un histórico real, 108 son `free.` —
+ * objetos que el autovendedor se lleva sin pagar—. Pasarlas por el conversor da
+ * cero, que es CIERTO, pero enseñar «vendido por 0c» es una cifra donde el
+ * registro puso una palabra. Con monedas se formatea; sin ellas se enseña lo
+ * que decía, y así una forma que no sepamos leer se ve en vez de convertirse en
+ * un cero silencioso.
+ */
+const precio = (sold) => {
+  const cp = enCobre(sold);
+  return cp > 0 ? monedaCorta(cp) : String(sold).replace(/\.$/, '');
+};
+
+/**
+ * LA FICHA DEL FINAL: lo que recogiste en esta pelea.
+ *
+ * TRES DECISIONES QUE NO SON DE ESTILO.
+ *
+ * 1. EL TÍTULO. No es «lo que cayó» ni «lo que soltó el bicho», porque el
+ *    registro no ve ninguna de las dos cosas: no anota el botín de tus
+ *    compañeros —cero líneas en 677.675—, ni lo que saquea otro de un cadáver
+ *    lejano, ni lo que se quedó en el suelo. Ve lo que cogiste tú. Por eso
+ *    tampoco hay columna de QUIÉN: sólo hay un recolector posible y sería una
+ *    columna con el mismo valor en todas las filas.
+ *
+ * 2. EL ORDEN ES EL INSTANTE DE RECOGIDA, EN CRUDO. Es el único dato medido que
+ *    tiene cada objeto por separado. Agrupar por cadáver se lee mejor pero es
+ *    una deducción —el cadáver se empareja por nombre— y además se rompe en
+ *    cuanto saqueas dos cuerpos intercalados, que es lo normal. El cadáver sale
+ *    en cada fila; el que manda es el reloj.
+ *
+ * 3. NO ESTÁ ACOTADA POR `duration`, Y ÉSTE ES EL ARREGLO. El reproductor
+ *    recorre de 0 a la duración de la pelea, así que un objeto recogido después
+ *    del último golpe NO SE PINTA NUNCA: 273 entradas en 159 peleas de un
+ *    histórico real —el 14,8% del botín, un tercio de las peleas con botín—
+ *    eran invisibles. Aquí salen todas, con su hora y dichas como lo que son:
+ *    recogidas con la pelea ya cerrada. Se saquea después de matar.
+ */
+export function fichaBotin(f, tardio) {
+  const inicio = f?.at ? Math.round(f.at / 1000) : Math.round(f?.start ?? 0);
+  const dur = Math.max(0, Math.round(f?.duration ?? 0));
+  // Dentro de la pelea el instante es relativo; el tardío vive en el fichero
+  // lateral y lo trae absoluto. Se llevan los dos al mismo eje —segundos desde
+  // el inicio de la pelea— o no se pueden ordenar juntos.
+  const dentro = (f?.loot ?? []).filter((l) => l?.item).map((l) => ({ ...l, s: Math.round(l.t ?? 0) }));
+  const fuera = (tardio?.loot ?? []).filter((l) => l?.item)
+    .map((l) => ({ ...l, s: Math.round((l.t ?? 0) - inicio) }));
+  const objetos = [...dentro, ...fuera].sort((a, b) => a.s - b.s);
+
+  const monedas = [...(f?.coins ?? []).map((c) => ({ ...c, s: Math.round(c.t ?? 0) })),
+    ...(tardio?.coins ?? []).map((c) => ({ ...c, s: Math.round((c.t ?? 0) - inicio) }))]
+    .sort((a, b) => a.s - b.s);
+  const cp = monedas.reduce((a, c) => a + (c.cp ?? 0), 0);
+
+  const cabecera = `<div class="rpb-head">
+      <div class="sec-title eyebrow">${esc(t('rp.botin.title'))}</div>
+      <div class="hint">${esc(t('rp.botin.sub'))}</div>
+    </div>`;
+
+  // ── Los tres vacíos ────────────────────────────────────────────────────
+  //
+  // «No consta botín» y «no cayó nada» son cosas distintas, y una pelea donde
+  // no cayó nadie es una tercera. El registro las escribe igual —no escribe
+  // nada— así que la diferencia hay que sacarla de lo que SÍ consta: cuántos
+  // enemigos cayeron. Un panel vacío las diría las tres a la vez, que es
+  // mentir en dos.
+  if (!objetos.length && !monedas.length) {
+    const caidos = (f?.kills ?? []).length;
+    const [titulo, sub] = caidos
+      ? [t('rp.botin.nadaConMuertos'), t('rp.botin.nadaConMuertosSub', { n: caidos })]
+      : [t('rp.botin.nadaSinMuertos'), t('rp.botin.nadaSinMuertosSub')];
+    return `<div class="rp-fichabotin vacia">${cabecera}
+      <div class="rpb-nada">${esc(titulo)}</div>
+      <div class="hint">${esc(sub)}</div>
+    </div>`;
+  }
+
+  const fila = (l) => {
+    const tarde = l.s > dur;
+    // Lo MEDIDO de cada objeto: cuándo lo cogiste y cuánto después de caer su
+    // cadáver. El emparejamiento con el cadáver es deducido y se dice arriba;
+    // esta cifra no lo es.
+    const desfase = Number.isFinite(l.dt)
+      ? (l.dt > 0 ? t('rp.botin.dt', { s: l.dt }) : t('rp.botin.dt_0'))
+      : null;
+    return `<div class="rpb-fila${tarde ? ' tarde' : ''}${l.amb ? ' amb' : ''}">
+      <span class="rpb-reloj num">${esc(relojDe(l.s))}</span>
+      <button class="rp-obj rpb-item" data-obj="${esc(l.item)}">${esc(l.item)}${(l.qty ?? 1) > 1 ? ` ×${l.qty}` : ''}</button>
+      <span class="rpb-de dim">${esc(t('rp.botin.deQuien'))} ${esc(l.from ?? '—')}</span>
+      ${desfase ? `<span class="rpb-dt dim">${esc(desfase)}</span>` : ''}
+      ${l.sold ? `<span class="rpb-tag" title="${esc(String(l.sold).replace(/\.$/, ''))}">${esc(t('loot.sold'))} ${esc(precio(l.sold))}</span>` : ''}
+      ${l.upgraded ? `<span class="rpb-tag up">${esc(t('loot.upgraded'))} ${esc(l.upgraded)}</span>` : ''}
+      ${l.stored ? `<span class="rpb-tag">${esc(t('rp.botin.monedero'))}</span>` : ''}
+      ${l.depot ? `<span class="rpb-tag">${esc(t('rp.botin.depot'))}</span>` : ''}
+      ${l.cola ? `<span class="rpb-tag ojo" title="${esc(t('rp.botin.cola', { cola: l.cola }))}">${esc(t('rp.botin.cola', { cola: l.cola }))}</span>` : ''}
+      ${tarde ? `<span class="rpb-tag tarde">${esc(t('rp.botin.tras'))}</span>` : ''}
+      ${l.amb ? `<span class="rpb-tag duda" title="${esc(t('rp.botin.amb'))}">?</span>` : ''}
+    </div>`;
+  };
+
+  // El contador de las monedas es «cuántas veces», no «cuántos objetos»: pasarlo
+  // por `loot.count` diría «3 objetos» de tres recogidas de monedas, que no son
+  // objetos ni son tres cosas.
+  return `<div class="rp-fichabotin">${cabecera}
+    ${objetos.length ? `<div class="rpb-lista">${objetos.map(fila).join('')}</div>
+      <div class="hint rpb-nota">${esc(t('rp.botin.cadaverNota'))}</div>` : ''}
+    ${monedas.length ? `<div class="rpb-moneda">
+      <span class="eyebrow">${esc(t('rp.botin.moneda'))}</span>
+      <b class="num">${esc(monedaCorta(cp))}</b>
+      <span class="dim">${monedas.length > 1 ? `×${monedas.length}` : ''}</span>
+    </div>
+    <div class="hint">${esc(t('rp.botin.monedaNota'))}</div>` : ''}
+  </div>`;
+}
 
 /**
  * Cuánto vive un flotante, y por qué depende de la velocidad.
@@ -133,7 +277,7 @@ function destacable(x, s, reg, totalSegundo) {
  * @returns {{destruir: Function}}
  */
 export function montarReproduccion(host, { f, self, lineas, retratos = new Map(), casteos = {},
-  onObjeto = null, onObjetoFuera = null }) {
+  tardio = null, onObjeto = null, onObjetoFuera = null }) {
   const g = guion(f, lineas, Parser, self);
   const reg = reglas(f);
 
@@ -261,6 +405,7 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
       ${columna(sinBando, 'sinbando')}
     </div>` : ''}
     <div class="rp-texto" id="rpTexto"></div>
+    ${fichaBotin(f, tardio)}
     <div class="hint" id="rpReglas"></div>
   </div>`;
 

@@ -5,4 +5,10 @@ config.json
 *.log
 *.bak
 *.exe
-notas/
+# Las notas sueltas de la raíz, que son de trabajo. ANCLADA A LA RAÍZ con la
+# barra de delante, y esto no es cosmético: sin ella la regla casa CUALQUIER
+# carpeta llamada `notas`, y se estaba llevando `web/notas/` — las notas de
+# versión que `web:build` publica y que `build.mjs` dice tener versionadas «a
+# propósito» para no perderlas al cambiar de máquina. No lo estaban: las cinco
+# de la 1.11.0 existían sólo en este disco.
+/notas/

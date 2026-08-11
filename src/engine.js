@@ -308,10 +308,21 @@ export class Engine extends EventEmitter {
         for (const l of f.loot ?? []) {
           if (!l?.item) continue;
           this.store?.appendLoot({
-            ...l, t: (f.start ?? 0) + (l.t ?? 0),
+            ...l, via: 'suelto', porQue: 'pelea-sin-dano', de: null,
+            t: (f.start ?? 0) + (l.t ?? 0),
             at: Math.round(((f.start ?? Date.now() / 1000) + (l.t ?? 0)) * 1000),
             zone: f.zone ?? null, zoneBase: f.zoneBase ?? null,
             diff: f.diff ?? null, diffTag: f.diffTag ?? null,
+          });
+          this.storeSeq++;
+        }
+        // Y la moneda de esa pelea que no llegó a existir, por lo mismo: es
+        // dinero que tienes. Sin esto volvería a pasar lo del `Rusty Long
+        // Sword`, sólo que en platino y sin nadie mirando.
+        for (const c of f.coins ?? []) {
+          this.store?.appendCoin({
+            cp: c.cp ?? 0, raw: c.raw ?? null, de: null,
+            t: (f.start ?? 0) + (c.t ?? 0), zone: f.zone ?? null,
           });
           this.storeSeq++;
         }
@@ -329,9 +340,38 @@ export class Engine extends EventEmitter {
       if (this.backfilling) { /* precargado: igual entra, es un hecho del registro */ }
       const z = e.zone ? parseZone(e.zone) : null;
       this.store?.appendLoot({
+        ...e, de: null, at: Math.round((e.t ?? Date.now() / 1000) * 1000),
+        zoneBase: z?.base ?? null, diff: z?.diff ?? null, diffTag: z?.tag ?? null,
+      });
+      this.storeSeq++;
+    });
+    /**
+     * BOTÍN TARDÍO: el cadáver murió en una pelea que ya está cerrada.
+     *
+     * Va al MISMO fichero que el suelto y con la misma forma, más un campo `de`
+     * con la hora de su pelea. Dos ficheros para dos clases de lo mismo sólo
+     * darían dos sitios donde buscar el mismo objeto.
+     *
+     * Y NO se mete dentro de la pelea guardada, aunque ahora se sepa cuál es:
+     * `fights.ndjson` sólo crece por el final y `uid` ES el byte de inicio, así
+     * que reescribir una línea correría todas las siguientes y dejaría el índice
+     * —y el `lastUid` de la enciclopedia— apuntando a sitios equivocados. Es la
+     * misma regla que ya siguen `tramos.ndjson` y `dudas.ndjson`: lo que llega
+     * después de guardar una pelea vive al lado, indexado por su hora.
+     */
+    this.tracker.on('lateLoot', (e) => {
+      const z = e.zone ? parseZone(e.zone) : null;
+      this.store?.appendLoot({
         ...e, at: Math.round((e.t ?? Date.now() / 1000) * 1000),
         zoneBase: z?.base ?? null, diff: z?.diff ?? null, diffTag: z?.tag ?? null,
       });
+      this.storeSeq++;
+    });
+    // Moneda recogida sin ninguna pelea abierta. No se le puede buscar cadáver
+    // —la línea no lo nombra— así que aquí no hay nada que deducir: se guarda
+    // como lo que es, dinero tuyo sin pelea, y la ficha no lo cuenta en ninguna.
+    this.tracker.on('orphanCoin', (e) => {
+      this.store?.appendCoin({ ...e, de: null });
       this.storeSeq++;
     });
     // Acumulador de sesión: mismos eventos, pero no se cierra nunca. Es la
@@ -1057,6 +1097,11 @@ export class Engine extends EventEmitter {
       // Daño real que no se puede adjudicar a nadie. Fuera de los totales.
       unattributed: enc.unattributed ?? 0,
       loot: (enc.loot ?? []).slice(0, 200),
+      // La moneda de esta pelea, con su instante. Va aparte del botín y no
+      // fundida en un total porque la ficha la enseña en su sitio de la línea
+      // de tiempo, igual que los objetos — y porque un total sin instantes no
+      // se puede colocar después si alguien lo necesita.
+      coins: (enc.coins ?? []).slice(0, 200),
       spellVsFoe: [...(enc.spellVsFoe ?? new Map()).values()],
       // Abatido = uno del bando enemigo. Antes bastaba con «no eres tú ni tu
       // mascota», y en cuanto empezaron a contarse las muertes de los

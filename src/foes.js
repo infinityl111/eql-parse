@@ -112,6 +112,35 @@ export class FoeLedger {
    *
    * @param {object} f  pelea completa, con `side` en cada fila
    */
+  /**
+   * UN OBJETO QUE LLEGÓ TARDE a la ficha de su enemigo.
+   *
+   * Su cadáver murió en una pelea tuya, pero lo recogiste después de que esa
+   * pelea se cerrara, así que no viaja dentro de ella —`fights.ndjson` sólo
+   * crece por el final— sino en `loot.ndjson` con la hora de su pelea. Sin esta
+   * puerta, mover el saqueo tardío fuera de la pelea vaciaría en silencio la
+   * tabla de caídas justo de lo que más importa: en un histórico real, el botín
+   * tardío es el de los jefes, porque un jefe tiene diez objetos y vaciarle el
+   * cadáver lleva más que los 20 segundos que tarda la pelea en cerrarse.
+   *
+   * SÓLO SUMA EL NUMERADOR, y esto es lo que no se puede tocar: cuántas veces lo
+   * has tumbado ya se contó al plegar su pelea. Volver a subir `kills` aquí
+   * diría que cayó dos veces y estropearía el «2 en 9 caídas» de la ficha, que
+   * es dos cifras medidas por caminos distintos.
+   *
+   * Al enemigo que no exista todavía no se le inventa una ficha: sin su pelea
+   * plegada no hay denominador, y un numerador solo es peor que nada.
+   */
+  foldLootTardio(l, kd) {
+    const e = l?.from ? this.porNombre.get(l.from) : null;
+    if (!e || !l.item) return false;
+    const q = l.qty ?? 1;
+    suma(e.loot, l.item, q);
+    const pd = e.porDif.get(kd);
+    if (pd) suma(pd.loot, l.item, q);
+    return true;
+  }
+
   fold(f) {
     if (!f?.rows?.length) return;
     // La zona se vuelve a leer del nombre completo cuando lo hay, en vez de

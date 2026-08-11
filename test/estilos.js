@@ -40,6 +40,7 @@
  * los dos nombres sin enterarse.
  */
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -80,22 +81,27 @@ ok(/class="tramo-h"/.test(app) && /\.tramo-h\s*\{/.test(css),
  * funcionó en la aplicación empaquetada. Por eso está aquí y no en las notas:
  * un fallo que nadie ve porque nadie usa el camino roto sobrevive años.
  *
- * ESTA PRUEBA NO PROHÍBE LOS QUE HAY, LOS CONGELA. Sustituir la interfaz de
- * tríos por un diálogo propio va en la 1.12.0, no en la 1.11.0: no es una
- * regresión y no se toca la interfaz después de haber probado el instalador.
- * Hasta entonces, lo que esta prueba impide es que aparezca uno NUEVO — que es
- * como se llegó a nueve sin que nadie lo notara.
+ * YA NO CONGELA: PROHÍBE. La 1.12.0 se llevó los nueve —cuatro `prompt` y cinco
+ * `alert`, todos de la tabla de tríos— a `ui/dialogo.js`, que pide los tres
+ * datos a la vez y valida dentro. Los tres contadores están en cero, así que
+ * esto pasó de «que no aparezca uno nuevo» a «que no aparezca ninguno», que es
+ * lo que su propio comentario decía que tocaba hacer al quitarlos.
  *
- * Cuando la 1.12.0 los quite, estos dos números bajan a cero y la prueba pasa a
- * ser una prohibición a secas.
+ * Y NO SE VUELVE A SUBIR NINGUNO «temporalmente»: `prompt` no se abre en
+ * Electron, así que un camino que lo llame no está a medias, está muerto, y no
+ * se nota — quien lo pulsa supone que no sabe usarlo. Año y medio duró el
+ * anterior.
  */
 {
-  const CONGELADOS = { prompt: 4, alert: 5, confirm: 0 };
-  const fuentes = ['app.js', 'overlay.js', 'triggers.js', 'plates.js', 'grafica.js',
-    'reproduccion.js', 'alerts.js', 'clip.js', 'fallo.js', 'rotulo.js']
+  const PROHIBIDOS = { prompt: 0, alert: 0, confirm: 0 };
+  // La lista se saca de la carpeta y no se escribe a mano: `dialogo.js` es de
+  // esta misma tanda, y una enumeración a mano habría dejado fuera justo al
+  // fichero nuevo — que es donde más falta hace mirar.
+  const fuentes = fs.readdirSync(new URL('../ui/', import.meta.url))
+    .filter((f) => f.endsWith('.js')).sort()
     .map((f) => [f, fs.readFileSync(new URL(`../ui/${f}`, import.meta.url), 'utf8')]);
 
-  for (const cual of Object.keys(CONGELADOS)) {
+  for (const cual of Object.keys(PROHIBIDOS)) {
     // Sin punto delante, para no cazar `foo.alert(...)`, y sin `//` para no
     // contar los que sólo se nombran en un comentario.
     const re = new RegExp('(^|[^.A-Za-z0-9_])' + cual + '\\s*\\(');
@@ -106,19 +112,38 @@ ok(/class="tramo-h"/.test(app) && /\.tramo-h\s*\{/.test(css),
         if (re.test(linea)) encontrados.push(`${nombre}:${n + 1}`);
       });
     }
-    ok(encontrados.length === CONGELADOS[cual],
-      `${cual}() sigue en ${CONGELADOS[cual]} sitios y ni uno más`,
+    ok(encontrados.length === PROHIBIDOS[cual],
+      `${cual}() no se usa en ninguna parte de la interfaz`,
       encontrados.length ? encontrados.join(' ') : 'ninguno');
-    // Y los que quedan viven TODOS en la tabla de tríos. Uno que aparezca en
-    // otra pantalla cambia la cuenta, pero si alguien mueve uno de sitio la
-    // cuenta no se entera: esto sí.
-    const fuera = encontrados.filter((sitio) => {
-      const [f, n] = sitio.split(':');
-      const linea = fuentes.find(([x]) => x === f)[1].split(String.fromCharCode(10))[Number(n) - 1];
-      return !linea.includes('trio.');
-    });
-    ok(fuera.length === 0, `y los ${cual}() que quedan son todos de la tabla de tríos`,
-      fuera.length ? `fuera: ${fuera.join(' ')}` : '');
+  }
+}
+
+/**
+ * QUE CADA MÓDULO DE LA INTERFAZ SE PUEDA LEER. Nada más, y hacía falta.
+ *
+ * EL FALLO que la trajo: un comentario HTML dentro de una plantilla de texto,
+ * con una clave entre comillas invertidas. Las comillas cerraban la plantilla
+ * en medio, y `ui/reproduccion.js` dejaba de compilar entero. La aplicación no
+ * arranca a medias con eso: `app.js` lo importa, así que la ventana se queda en
+ * blanco — y NINGUNA prueba se enteraba, porque ninguna importa la interfaz.
+ * Las 34 pruebas seguían en verde con la aplicación rota.
+ *
+ * Es la comprobación más barata que existe —¿esto es JavaScript?— y cubre la
+ * clase entera de fallo, no el caso. `ui:check` la habría cazado también, pero
+ * necesita pantalla y un histórico, así que no está en `npm test`; ésta sí.
+ */
+console.log('\ncada módulo de la interfaz compila');
+{
+  const dir = new URL('../ui/', import.meta.url);
+  const modulos = fs.readdirSync(dir).filter((f) => f.endsWith('.js')).sort();
+  ok(modulos.length > 0, 'hay módulos que comprobar', modulos.length);
+  for (const m of modulos) {
+    const ruta = new URL(m, dir);
+    const r = spawnSync(process.execPath, ['--input-type=module', '--check'],
+      { input: fs.readFileSync(ruta, 'utf8'), encoding: 'utf8' });
+    const err = (r.stderr ?? '').split(String.fromCharCode(10))
+      .find((l) => l.includes('Error')) ?? '';
+    ok(r.status === 0, `ui/${m}`, r.status === 0 ? '' : err.trim());
   }
 }
 
