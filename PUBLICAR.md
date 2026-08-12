@@ -213,11 +213,39 @@ dijera que todo fue bien. Y con el número de versión no basta si el navegador 
 el borde te sirven algo cacheado: recarga forzada, o pide la página con un
 parámetro cualquiera.
 
-> **PENDIENTE MENOR:** falta confirmar si el proyecto `eqlparse` tiene `main`
-> como rama de producción. El registro de wrangler prueba que detecta `main`,
-> pero la respuesta de la API con `production_branch` no queda guardada. Si
-> resulta que no coinciden, este paso necesita `--branch` y hay que escribirlo
-> aquí **y** en el script.
+**Confirmado, y el comando no necesita `--branch`.** El registro de wrangler
+prueba que detecta `main`, pero no guarda la respuesta de la API con
+`production_branch`, así que eso hubo que mirarlo donde sí se ve:
+
+> **Panel de Cloudflare → Workers & Pages → `eqlparse` → Deployments.** El de
+> arriba tiene que decir **Production**, con la rama `main`, y colgando de él
+> `eqlparse.com` y `eqlparse.pages.dev`.
+
+Ésa es la comprobación de la próxima vez, y la que responde a la única pregunta
+que ni la consola ni los registros contestan: si esto ha llegado al sitio real o
+se ha quedado en una vista previa.
+
+#### Lánzalo desde un commit que nombre la versión
+
+Cloudflare **etiqueta cada despliegue con el asunto del commit desde el que se
+lanzó**, y ésa es la única etiqueta que tiene: en la lista de Deployments se leen
+«1.12.0 — …» y «1.11.0 — …» sin abrir nada, porque esos despliegues salieron del
+commit de su versión.
+
+Y se ve lo que pasa cuando no: el despliegue de la 1.13.0 salió de un commit
+llamado «la alarma muerta, junto a la salida muerta». Cierto, útil, y **no dice
+qué versión hay ahí arriba**. Un renglón menos legible en una lista que se
+consulta justo cuando algo va mal.
+
+Así que antes del despliegue final, mira en qué commit estás. Si el último de la
+tanda es un arreglo o un documento, el asunto que va a quedar en Cloudflare es
+ése. Lo barato es que **el commit que nombra la versión sea el último antes de
+desplegar** — y si la tanda ya se cerró con otra cosa, un commit de cierre corto
+que la nombre.
+
+No cambia nada de lo que se publica. Cambia que dentro de tres meses la lista de
+Cloudflare se pueda leer sin abrir cada entrada, que es exactamente el mismo
+criterio con el que se eligen los rótulos de la aplicación.
 
 **Dónde mirar cuando algo salga mal:** wrangler deja un registro por invocación
 en `%APPDATA%\xdg.config\.wrangler\logs\`, con la rama detectada, el commit y
