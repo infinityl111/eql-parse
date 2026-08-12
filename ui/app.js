@@ -2275,6 +2275,37 @@ async function renderNarrate(host) {
    * barrido que salió de aquí aparecieron más: `charm.soltado`, `unattributed`,
    * `lootAmbiguo`, y los tres con un comentario al lado prometiendo que se
    * enseñan.
+   *
+   * ─── Y TIENE UNA SEGUNDA CARA, QUE ES LA MISMA FORMA: LA ALARMA MUERTA ───
+   *
+   * Si una salida muerta es algo que se calcula bien y no llega a nadie, una
+   * alarma muerta es algo que AVISA bien y no la oye nadie. No son dos
+   * problemas: son el mismo con el trabajo hecho en el otro extremo.
+   *
+   * El caso que la destapó, al publicar la 1.13.0: `sustituirRotulos` deja la
+   * clave intacta cuando no existe, a propósito, «para que el fallo sea
+   * ruidoso» — y eso estaba bien pensado. Pero ruidoso sólo funciona si hay
+   * alguien delante. Las notas se construyen, se suben y las lee un usuario
+   * dentro de un cartel de actualización, y en ese camino no mira nadie: el
+   * aviso se habría publicado con las llaves a la vista.
+   *
+   * La misma forma en otros sitios de esta casa:
+   *
+   *   el cajón de las    34.207 líneas que no sabemos leer, el 4,8% del
+   *   no reconocidas     registro, contadas y sin que nadie las mire. Está
+   *                      escrito en `patterns.js` con esas palabras.
+   *   el aviso impreso   `web/build.mjs` imprimía el comando bueno por consola,
+   *                      y el comando se dictó de memoria igual.
+   *
+   * LO QUE SEPARA UNA ALARMA VIVA DE UNA MUERTA: que PARE algo. Un `throw` para;
+   * un `console.log` informa a quien mire. Por eso la construcción de la web ya
+   * no escribe el fichero cuando una clave no resuelve — antes avisaba, ahora
+   * impide. La misma cura que necesita cualquiera de las de arriba.
+   *
+   * Y la prueba de que las dos caras son una: la guarda de la salida muerta
+   * —`test/muertos.js`— si se la deja pasar por lista vacía cuando su marca del
+   * fuente deja de casar, se convierte ella misma en una alarma muerta. Por eso
+   * una lista vacía allí es un fallo y no un aprobado.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {

@@ -83,6 +83,48 @@ const BLOQUES = [
     '  return {\n    phases: ph,', '\n}'],
 ];
 
+/**
+ * ═══ LO QUE ESTA GUARDA TODAVÍA NO MIRA, MEDIDO Y CON NOMBRES ═══
+ *
+ * FALTA `snapshot()`, que es lo que el motor le pasa a la interfaz cuatro veces
+ * por segundo — o sea el sitio donde más se produce. Se probó a añadirlo y
+ * cayeron tres campos con CERO lectores:
+ *
+ *   `advice`        el consejo en vivo. Y no es que no se lea: es que se dejó
+ *                   de leer. El comentario de `renderAdvice` en `ui/app.js` lo
+ *                   dice — «antes venía del motor»— porque ahora se calcula
+ *                   sobre la pelea SELECCIONADA. El motor lo sigue calculando
+ *                   cuatro veces por segundo para nadie.
+ *   `currentPet`    la mascota de ahora, que ya viaja en `pets` y `allPets`
+ *   `autoFullRead`  una marca de si la relectura completa fue automática
+ *
+ * NO SE AÑADE TODAVÍA, Y EL MOTIVO NO ES LA PRISA: al añadirlo salieron también
+ * `allies` del índice y `allies`/`enemies` del análisis, y ésos SÍ tienen lector
+ * — los lee `src/store.js` al filtrar por compañero, que en esta guarda está en
+ * el lado de los productores. O sea que la guarda tiene un fallo de diseño: un
+ * fichero puede producir una cosa y consumir otra, y aquí se clasifican ficheros
+ * enteros. Con eso, ampliar ahora sólo añadiría tres hallazgos buenos y dos
+ * falsos, y una guarda que se equivoca dos de cada cinco se desactiva a la
+ * tercera.
+ *
+ * Y HAY UN FALSO NEGATIVO CONOCIDO, del mismo tamaño y en el otro sentido: el
+ * comparador busca `.campo`, y una clave de diccionario como `'lvl.unknown'`
+ * lleva un punto y un nombre dentro de unas comillas. Con eso, un campo que se
+ * llame como el final de una clave de i18n parece leído sin serlo. Se probó a
+ * quitar las claves entrecomilladas antes de buscar y aparecieron los mismos
+ * dos falsos positivos de arriba: la mejora es correcta y no se puede aplicar
+ * hasta que el problema de fondo esté resuelto.
+ *
+ * QUÉ HAY QUE HACER, para que no se quede en una nota: separar productor de
+ * consumidor POR LITERAL y no por fichero — «quién lee este campo aparte del
+ * objeto donde nace»— y entonces meter `snapshot()` y quitar las claves de
+ * i18n. Los tres de arriba caen solos ese día, y el falso negativo también.
+ *
+ * Se escribe aquí y no en un cuaderno porque es exactamente lo que este fichero
+ * persigue: un hallazgo que existe sólo en la memoria de una sesión ya no
+ * existe.
+ */
+
 /** Las claves de un objeto literal, del fuente, sin comentarios. */
 function claves(txt, desde, hasta) {
   const i = txt.indexOf(desde);
