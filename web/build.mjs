@@ -828,6 +828,26 @@ async function main() {
     const fuente = path.join(RAIZ, 'notas', `${versionHoy}.${lang}.md`);
     if (!fs.existsSync(fuente)) continue;
     const texto = sustituirRotulos(fs.readFileSync(fuente, 'utf8'), lang);
+    /**
+     * Y SI UNA CLAVE NO RESUELVE, SE PARA AQUÍ.
+     *
+     * `sustituirRotulos` deja intacta la clave que no existe —a propósito, para
+     * que el fallo sea ruidoso— pero «ruidoso» sólo funciona si alguien mira. El
+     * sitio donde se mira es éste: quien construye la web está delante, y lo que
+     * sale de aquí es literalmente lo que va a leer el cartel de actualización
+     * de todo el mundo.
+     *
+     * `test/notas.js` ya comprueba que toda clave citada existe en el
+     * diccionario. Esto comprueba la otra mitad, que no es la misma: que la
+     * sustitución de VERDAD ocurrió sobre el fichero que se va a publicar. Entre
+     * las dos hay un camino —el de la construcción— y es donde se coló el fallo
+     * que motivó esta guarda.
+     */
+    const sinResolver = [...texto.matchAll(/\{\{([\w.]+)\}\}/g)].map((m) => m[1]);
+    if (sinResolver.length) {
+      throw new Error(`notas ${versionHoy}.${lang}: claves sin resolver -> ${sinResolver.join(', ')}`
+        + '. No se publica así: saldrían las llaves a la vista en el cartel.');
+    }
     await fsp.writeFile(path.join(DIST, 'notas', `${versionHoy}.${lang}.md`), texto);
     notasListas++;
   }
@@ -848,6 +868,11 @@ async function main() {
     console.log('\n  AL PUBLICAR, súbelos como adjuntos de la release o el cartel');
     console.log('  de actualización saldrá en español para todo el mundo:');
     console.log(`    gh release upload v${versionHoy} web/dist/notas/*.md\n`);
+    // Y el ritual entero, porque este paso tiene dependencias con los de antes
+    // y con los de después: ver `PUBLICAR.md`. El comando de arriba SE COPIA de
+    // aquí y no se escribe de memoria — es exactamente así como se subieron una
+    // vez las fuentes en vez de estos ficheros.
+    console.log('  El orden completo, con sus porqués, está en PUBLICAR.md\n');
   } else {
     console.log(`  notas de la ${versionHoy}: NO HAY FICHERO en web/notas/ — el cartel caerá al cuerpo de la release`);
   }
