@@ -11,6 +11,11 @@ de una sesión. Por eso cada paso lleva **su motivo al lado**: un orden sin moti
 se reordena solo en cuanto alguien tenga prisa, y aquí el orden es justamente lo
 que evita el fallo.
 
+Y la cuarta se destapó escribiendo esto: el comando de despliegue a Cloudflare no
+estaba en ninguna parte del árbol y hubo que recuperarlo ejecutándolo. Ya es
+`npm run web:deploy`. Si al leer esto encuentras otro paso que no puedas copiar
+de algún sitio, ése es el siguiente.
+
 ---
 
 ## La regla que resume todo lo demás
@@ -147,14 +152,76 @@ Ahora la release existe, así que ésta sí trae la página de la versión nueva
 
 ### 10. Despliega la web
 
-> **PENDIENTE: el comando de despliegue a Cloudflare (proyecto `eqlparse`) no
-> está escrito en ninguna parte del repositorio.** Se buscó al escribir este
-> documento y no hay ni script en `package.json`, ni `wrangler.toml`, ni una
-> mención en el código. Vive en la memoria de quien despliega, que es
-> exactamente el fallo que este fichero existe para cerrar.
->
-> Quien lo sepa: escríbelo aquí, y mejor aún como script en `package.json` para
-> que se copie en vez de recordarse.
+```
+npm run web:deploy
+```
+
+que es `npx wrangler pages deploy web/dist --project-name=eqlparse`.
+
+**Por qué es un script y no una línea en este documento.** Fue la última pieza
+del ritual que sólo vivía en la memoria de una sesión — y la sesión se acabó.
+Al escribir este fichero se buscó por todo el árbol y no había nada: ni script,
+ni `wrangler.toml`, ni una mención en el código. Hubo que recuperarlo
+ejecutándolo. Nos pasó **mientras escribíamos el documento que cierra
+exactamente ese fallo**, que es la mejor prueba de que hacía falta.
+
+Como script se copia; en un documento se relee, y releer es lo que no se hace
+con prisa.
+
+**Lo único que había en el árbol era el rastro, no el comando:** una carpeta
+`.wrangler/tmp/pages-*` —que sólo crea `wrangler pages deploy`— y el
+`_redirects` que `web/build.mjs` escribe en `web/dist`, que es un fichero de
+Cloudflare Pages. Suficiente para saber **qué** se hacía y no **cómo**.
+
+#### Vista previa y producción no son lo mismo
+
+Cloudflare Pages decide entre las dos **por la rama**, y ahí hay un fallo
+silencioso esperando: un despliegue que sólo llega a la vista previa **parece un
+éxito completo en la consola** mientras el sitio real no cambia.
+
+Wrangler saca la rama del propio git, sin que se la digas. Del registro de un
+despliegue real:
+
+```
+pages deploy: Detected branch: "main"
+pages deploy: Git information summary - branch: main, commitHash: 9dd243ae…, commitDirty: false
+```
+
+Así que **el despliegue va a producción si lo lanzas desde el repositorio y
+estás en la rama de producción del proyecto**. Si estás en otra rama, o si lo
+lanzas desde una carpeta que no es un git, la rama detectada cambia y el
+despliegue se va a una vista previa. `--branch` es la manera de forzarla.
+
+Wrangler imprime la rama que ha detectado: **mírala**. Es el aviso temprano, y
+llega antes que cualquier comprobación.
+
+#### Cómo se comprueba, que es lo que de verdad cierra el paso
+
+No vale la consola. La consola dice que subió algo, no que lo subido sea lo que
+la gente ve — es la misma distinción que el paso 7 hace con los adjuntos:
+comprobar el artefacto donde lo ve el usuario, no donde lo produjiste.
+
+Comprueba contra **el dominio de producción**, y busca algo que sólo tenga la
+versión nueva:
+
+```
+curl -s https://eqlparse.com/es/ | findstr /C:"1.13.0"
+```
+
+Si no aparece, el despliegue se quedó en la vista previa aunque la consola
+dijera que todo fue bien. Y con el número de versión no basta si el navegador o
+el borde te sirven algo cacheado: recarga forzada, o pide la página con un
+parámetro cualquiera.
+
+> **PENDIENTE MENOR:** falta confirmar si el proyecto `eqlparse` tiene `main`
+> como rama de producción. El registro de wrangler prueba que detecta `main`,
+> pero la respuesta de la API con `production_branch` no queda guardada. Si
+> resulta que no coinciden, este paso necesita `--branch` y hay que escribirlo
+> aquí **y** en el script.
+
+**Dónde mirar cuando algo salga mal:** wrangler deja un registro por invocación
+en `%APPDATA%\xdg.config\.wrangler\logs\`, con la rama detectada, el commit y
+todas las llamadas a la API. Es de donde salieron las dos líneas de arriba.
 
 ### 11. Mira los cinco idiomas en la web desplegada
 
