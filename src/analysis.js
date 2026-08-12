@@ -177,10 +177,26 @@ export function analyse(f, ctx = {}) {
   //
   // Las peleas viejas no traen la cadencia. No se aproxima con lo anterior: se
   // callan, que es lo que se sabe de ellas hasta reconstruir.
+  /**
+   * Y NO SE TE COBRA EL TIEMPO QUE NO MANEJABAS EL PERSONAJE.
+   *
+   * Con miedo no puedes actuar y con encanto no decides: los dos son
+   * involuntarios y ninguno de los dos puede contar ni a favor ni en contra.
+   * `huecoReal` ya no incluye esos segundos —se descuentan al medirlo— y aquí
+   * hay que sacarlos TAMBIÉN del denominador, o el porcentaje sube por el otro
+   * lado: cero segundos parados sobre una pelea que en un tercio no era tuya
+   * seguiría describiendo mal lo que hiciste.
+   *
+   * Medido en el registro de referencia: 464 segundos en 31 tramos de 12
+   * peleas, con uno de 38 s. La duración tampoco es un dato sobre ti — no la
+   * decides — así que se va entera del reparto.
+   */
+  const sinMando = mine?.sinMandoSec ?? f.sinMandoSec ?? 0;
+  const duracionTuya = Math.max(1, f.duration - sinMando);
   if (mine && f.duration >= 20 && mine.cadencia && mine.huecoReal !== null
       && mine.huecoReal !== undefined) {
     const idle = mine.huecoReal;
-    const share = idle / f.duration;
+    const share = idle / duracionTuya;
     // Diez segundos de parón real, o un quinto de la pelea. Con la vara buena
     // el umbral puede ser más exigente: ya no acusa a nadie por su arma.
     if (share > 0.20 && idle >= 10) {
@@ -203,7 +219,31 @@ export function analyse(f, ctx = {}) {
   if (classes.length) {
     let wasted = 0;
     const bad = [];
-    for (const p of ph) {
+    /**
+     * EL VEREDICTO DE POSTURA NO MIRA LOS SEGUNDOS SIN MANDO.
+     *
+     * La postura no se puede cambiar mientras te tienen: acusar a alguien de
+     * llevar la equivocada durante un miedo es acusarle de una decisión que no
+     * pudo tomar. Así que el daño recibido en esos segundos sale del cómputo,
+     * y con él la comparación entera de ese tramo.
+     *
+     * Se recalculan los dos cubos de la fase saltándose esos segundos, en vez de
+     * recortar la fase: una fase puede tener un tramo dentro y el resto bueno, y
+     * tirarla entera perdería lo que sí se puede juzgar.
+     */
+    const fuera = new Set();
+    for (const x of f.sinControl ?? []) {
+      for (let s2 = x.desde; s2 <= x.hasta; s2++) fuera.add(s2);
+    }
+    const crudos = (p) => {
+      if (!fuera.size) return { melee: p.rawMelee, spell: p.rawSpell };
+      const win = series.filter((q) => q.s >= p.from && q.s < p.to && !fuera.has(q.s));
+      return { melee: sum(win, (q) => q.tMelee), spell: sum(win, (q) => q.tSpell) };
+    };
+    for (const p0 of ph) {
+      const c = crudos(p0);
+      const p = { ...p0, rawMelee: c.melee, rawSpell: c.spell,
+        meleeShare: (c.melee + c.spell) ? c.melee / (c.melee + c.spell) : null };
       if (p.meleeShare === null || (p.rawMelee + p.rawSpell) < 200) continue;
       const best = bestStanceFor(p.rawMelee, p.rawSpell, classes,
         (f.stanceSpans ?? []).map((x) => x.stance));

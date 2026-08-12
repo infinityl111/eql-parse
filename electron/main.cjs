@@ -80,7 +80,9 @@ const REPO = 'infinityl111/eql-parse';
 async function checkUpdate() {
   try {
     const { consultar } = await import('../src/actualizar.js');
-    const info = await consultar(REPO, app.getVersion());
+    // El idioma configurado viaja con la consulta: las notas del cartel se
+    // piden en él y sólo caen al español si esa versión no trae adjunto.
+    const info = await consultar(REPO, app.getVersion(), cfg.lang ?? 'es');
     latest = info;
     if (info && cfg.skipVersion !== info.version) mainWin?.webContents.send('update', info);
   } catch { /* sin red: se reintenta en la próxima comprobación */ }

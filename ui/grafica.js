@@ -19,6 +19,33 @@
  * hecho en la mediana, y en ninguna lo supera.
  */
 
+import { posEnTiempo } from './tiempo.js';
+
+/**
+ * EL PRÓXIMO QUE CAMBIE ESTE DIBUJO PAGA SU PRUEBA DE DIBUJO.
+ *
+ * No es una tarea suelta que nadie hará: es el peaje de tocar esto, y se cobra
+ * cuando hay una razón para tocarlo.
+ *
+ * POR QUÉ. En una semana, seis fallos pasaron con la batería en verde, y la
+ * línea que ninguno cruzaba era la misma: EL CÁLCULO ESTABA PROBADO Y EL DIBUJO
+ * NO. El último fue un `import` que faltaba —un `ReferenceError` en tiempo de
+ * ejecución, no un error de sintaxis— que dejaba una pista entera vacía; se vio
+ * abriendo la aplicación y contando cero marcas. Las guardas que hay
+ * —«todo ui/*.js compila» y «nadie hace nada al importarse»— son de CARGA, no
+ * de función: compilar no es funcionar.
+ *
+ * CÓMO SE PAGA, que es barato porque esto devuelve cadenas: se construye una
+ * pelea de fixture, se llama a `grafica()`, y se cuenta lo que sale —puntos,
+ * hitos, franjas—. Si sale cero, cae. Ver `test/loot.js`, donde la pista de
+ * estados ya lo hace, y `test/tiempo.js`, que compara esta gráfica contra la
+ * función de posición compartida.
+ *
+ * Y LA GUARDA NUEVA SE ESTRENA ROMPIÉNDOLA contra el fallo que la motivó, con
+ * el error que sale escrito en el informe. Una prueba que nunca se ha visto
+ * fallar no protege de nada.
+ */
+
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
   (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -49,7 +76,9 @@ export function grafica(f, { marcas = false } = {}) {
   const pts = [];
   for (let i = 0; i <= dur; i++) pts.push(byS.get(i) ?? { s: i, dmg: 0, taken: 0, heal: 0 });
   const peak = Math.max(1, ...pts.map((p) => p.dmg));
-  const x = (i) => (i / dur) * W;
+  // La posición en el tiempo sale de `posEnTiempo`, compartida con los hitos y
+  // con la pista de estados: aquí sólo se multiplica por el ancho del viewBox.
+  const x = (i) => posEnTiempo(i, dur) * W;
   const y = (v) => H - (v / peak) * (H - 6);
 
   const area = `M0,${H} ` + pts.map((p, i) => `L${x(i).toFixed(1)},${y(p.dmg).toFixed(1)}`).join(' ') + ` L${W},${H} Z`;

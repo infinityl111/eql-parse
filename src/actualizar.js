@@ -58,7 +58,7 @@ export function masNuevaQue(a, b) {
  * datos limitados o mala conexión tiene que poder decir que no con el número
  * delante. Sale de la propia release, no de una estimación.
  */
-export async function consultar(repo, versionActual) {
+export async function consultar(repo, versionActual, lang = 'es') {
   const r = await fetch(`https://api.github.com/repos/${repo}/releases/latest`,
     { headers: CABECERAS });
   if (!r.ok) return null;
@@ -79,37 +79,51 @@ export async function consultar(repo, versionActual) {
     } catch { /* sin yml: se queda en enlace manual */ }
   }
 
+  const version = tag.replace(/^v/, '');
+
+  /**
+   * LAS NOTAS, EN EL IDIOMA DE QUIEN LAS VA A LEER.
+   *
+   * El cuerpo de una release es UNO SOLO —la API de GitHub no devuelve cinco— y
+   * está en español. Desde la 1.11.0 el cartel SÍ lo enseña, así que a un alemán
+   * le salía un muro en español justo cuando tiene que decidir si instala. Y
+   * desde la 1.12.0 eso pasó de incomodidad a deuda: fue la primera versión que
+   * pide algo DESTRUCTIVO —reconstruir, que mueve fronteras de pelea— y el
+   * texto que lo explicaba era el único sin traducir.
+   *
+   * SIN INFRAESTRUCTURA NUEVA: los cinco `.md` se suben como adjuntos de la
+   * release, junto al `.exe` y al `latest.yml`, y se cogen igual que el yml —por
+   * nombre, de `j.assets`—. Ni otro servidor ni otra petición a un sitio
+   * distinto. Los escribe `web:build` YA SUSTITUIDOS (ver `sustituirRotulos`):
+   * lo que se sube nunca es el fuente con las llaves dentro.
+   *
+   * EL RESPALDO ES LA MITAD DEL TRABAJO. Las veinte versiones anteriores no
+   * tienen adjunto de nadie y tienen que seguir saliendo con `j.body`; una
+   * publicación futura en la que se olvide subirlos, también. Que falte el
+   * adjunto no puede dejar el cartel sin notas, y por eso hay dos respaldos:
+   * el idioma pedido, y si no, el cuerpo de siempre.
+   *
+   * Y NO SE DESCARGA SI NO HACE FALTA: el `.md` sólo se pide cuando hay una
+   * versión nueva que ofrecer, que es este mismo camino.
+   */
+  let notas = null;
+  const adjunto = (j.assets ?? []).find((a) => a.name === `${version}.${lang}.md`);
+  if (adjunto) {
+    try {
+      const texto = await (await fetch(adjunto.browser_download_url, { headers: CABECERAS })).text();
+      // Una respuesta vacía o un error de GitHub disfrazado de texto no valen
+      // como notas: mejor el cuerpo en español que un cartel en blanco.
+      if (texto && texto.trim().length > 40) notas = texto.slice(0, 4000);
+    } catch { /* sin adjunto legible: se cae al cuerpo */ }
+  }
+
   return {
-    version: tag.replace(/^v/, ''),
+    version,
     url: j.html_url,
-    /**
-     * PENDIENTE PARA LA 1.12.0: ESTO ESTÁ EN ESPAÑOL PARA TODO EL MUNDO.
-     * Decidido, no implementado.
-     *
-     * El cuerpo de una release es UNO SOLO —la API de GitHub no devuelve cinco—
-     * y está en español. Desde la 1.11.0 el cartel de actualización SÍ lo enseña
-     * (antes se traía y no lo pintaba nadie), así que a un alemán le sale un
-     * muro de texto en español justo cuando tiene que decidir si instala. La
-     * web ya se arregló: lee `web/notas/<versión>.<idioma>.md` y cae al cuerpo
-     * de la release si no hay fichero. Aquí falta lo mismo.
-     *
-     * CÓMO, sin inventar infraestructura: esos ficheros se suben como ADJUNTOS
-     * de la release, junto al `.exe` y al `latest.yml`. Entonces esto los coge
-     * igual que ya coge el `latest.yml` —buscando por nombre en `j.assets`— y no
-     * hace falta ni otro servidor ni otra petición a un sitio distinto:
-     *
-     *     const nota = (j.assets ?? []).find((a) => a.name === `${version}.${lang}.md`);
-     *
-     * Y EL RESPALDO ES LA MITAD DEL TRABAJO, como en la web: las veinte
-     * versiones anteriores no tienen fichero de nadie y tienen que seguir
-     * saliendo con `j.body`. Que falte el adjunto no puede dejar el cartel sin
-     * notas.
-     *
-     * Va después de la sustitución de rótulos (ver `notasDe()` en
-     * `web/build.mjs`): lo que se suba como adjunto tiene que ser el `.md` YA
-     * SUSTITUIDO, nunca el fuente con las llaves dentro.
-     */
-    notas: (j.body ?? '').slice(0, 4000),
+    notas: notas ?? (j.body ?? '').slice(0, 4000),
+    // De dónde salieron, para que la interfaz pueda decirlo si algún día quiere
+    // y para que una prueba pueda distinguir los dos caminos sin adivinar.
+    notasIdioma: notas ? lang : null,
     // Lo que decide si se puede instalar desde aquí o sólo enlazar.
     descargable: !!(exe && sha512),
     exeUrl: exe?.browser_download_url ?? null,

@@ -406,5 +406,89 @@ console.log('\ncompañeros de grupo declarados');
     'ni se pregunta si es tu mascota', preguntados.join(', ') || 'no se pregunta nada');
 }
 
+/**
+ * LOS DOS RELOJES CONVERGEN: en directo y al releer sale lo mismo.
+ *
+ * EL FALLO. `feed` decide con la marca del registro y `tick` con el reloj de
+ * pared, que va por delante porque la cabecera del log no tiene decimales —una
+ * línea escrita en el .9 se lee como .0— más el sondeo del lector. Con un hueco
+ * de exactamente `idleSec` el reloj de pared llegaba antes y partía la pelea;
+ * al releer no se partía. Siete peleas de un histórico real.
+ *
+ * LO QUE SE PRUEBA es la convergencia, no el número: mismos sucesos por los dos
+ * caminos, y las mismas peleas al final. El desfase que se le mete a `tick` es
+ * el MÁXIMO MEDIDO (1,077 s de lectura + 0,25 s de ritmo de `tick`), no uno
+ * inventado: si alguien baja `MARGEN_TICK` por debajo de eso, esto se pone
+ * rojo.
+ */
+console.log('\nel reloj de pared no parte lo que el registro no parte');
+{
+  const { MARGEN_TICK } = await import('../src/encounter.js');
+  const DESFASE = 1.077 + 0.25;          // el peor caso medido, de punta a punta
+
+  // Un guion con el hueco EXACTO que rompía: 20 s con `idleSec` = 20.
+  const guion = (hueco) => [
+    [0, 'You slash a gorgon for 100 points of damage.'],
+    [4, 'You slash a gorgon for 100 points of damage.'],
+    [4 + hueco, 'You slash a gorgon for 100 points of damage.'],
+    [8 + hueco, 'You have slain a gorgon!'],
+  ];
+
+  const correr = (hueco, conReloj) => {
+    const p = new Parser({ self: 'Campeon' });
+    const tr = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+    const cerradas = [];
+    tr.on('close', (e) => cerradas.push(Math.round(e.end - e.start)));
+    for (const [s, cuerpo] of guion(hueco)) {
+      const hh = String(12 + Math.floor(s / 3600)).padStart(2, '0');
+      const mm = String(Math.floor(s / 60) % 60).padStart(2, '0');
+      const ss = String(s % 60).padStart(2, '0');
+      const ev = p.parse(`[Tue Aug 11 ${hh}:${mm}:${ss} 2026] ${cuerpo}`);
+      if (!ev) continue;
+      // EN DIRECTO el reloj de pared va por delante y `tick` corre ANTES de que
+      // llegue la línea: es justo el instante en que se decidía mal.
+      if (conReloj) tr.tick(ev.t + DESFASE);
+      tr.feed(ev);
+    }
+    tr.tick(Number.MAX_SAFE_INTEGER);
+    return cerradas;
+  };
+
+  ok(MARGEN_TICK > DESFASE,
+    'el margen cubre el peor desfase medido', `${MARGEN_TICK} s > ${DESFASE.toFixed(2)} s`);
+
+  for (const hueco of [19, 20, 21, 22]) {
+    const frio = correr(hueco, false);
+    const vivo = correr(hueco, true);
+    ok(JSON.stringify(frio) === JSON.stringify(vivo),
+      `hueco de ${hueco} s: los dos caminos dan lo mismo`,
+      `frío ${JSON.stringify(frio)} · directo ${JSON.stringify(vivo)}`);
+  }
+
+  // Y un hueco de verdad grande SÍ parte, por los dos caminos: el margen no
+  // puede convertirse en «no partir nunca».
+  const frioLargo = correr(120, false);
+  const vivoLargo = correr(120, true);
+  ok(frioLargo.length === 2 && vivoLargo.length === 2,
+    'con un hueco de 120 s se parte igual por los dos caminos',
+    `${frioLargo.length} y ${vivoLargo.length}`);
+
+  // Si el registro se acaba —cierras el juego— `tick` cierra igual y sella con
+  // la marca de la ÚLTIMA LÍNEA, no con «ahora». Sin esto, una pelea
+  // interrumpida se quedaría abierta para siempre.
+  const p = new Parser({ self: 'Campeon' });
+  const tr = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+  let cerrada = null;
+  tr.on('close', (e) => { cerrada = e; });
+  for (const [s, cuerpo] of [[0, 'You slash a gorgon for 100 points of damage.'],
+    [6, 'You slash a gorgon for 100 points of damage.']]) {
+    tr.feed(p.parse(`[Tue Aug 11 12:00:0${s} 2026] ${cuerpo}`));
+  }
+  tr.tick(Date.parse('2026-08-11T12:00:06') / 1000 + 9999);
+  ok(cerrada !== null, 'el juego se cierra y la pelea NO se queda abierta');
+  ok(Math.round(cerrada.end - cerrada.start) === 6,
+    'y se sella con la última línea, no con «ahora»', Math.round(cerrada.end - cerrada.start));
+}
+
 console.log(failed ? `\n${failed} comprobaciones MAL\n` : '\ntodo correcto\n');
 process.exit(failed ? 1 : 0);

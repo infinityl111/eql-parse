@@ -65,16 +65,31 @@ const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjs
 /**
  * AVISO QUE VIAJA CON EL RESULTADO, no un comentario que nadie lee.
  *
- * Mientras el cierre de pelea se decida con dos relojes distintos —el de pared
- * en directo y la marca del registro al reconstruir— esta operación NO reproduce
- * el histórico: con un hueco de exactamente `idleSec` cada camino parte la pelea
- * de una manera. Medido el 9 de agosto de 2026 sobre 441 peleas: una se funde en
- * otra, y las cifras de las dos cambian.
+ * ESTA OPERACIÓN NO REPRODUCE EL HISTÓRICO. Sigue sin hacerlo en la 1.13.0, y
+ * el motivo cambió: hay que corregir lo que se dijo antes.
+ *
+ * LO QUE ERA. El cierre se decidía con dos relojes —el de pared en directo, la
+ * marca del registro al reconstruir— y con un hueco de exactamente `idleSec`
+ * cada camino partía la pelea de una manera.
+ *
+ * LO QUE SE ARREGLÓ EN LA 1.13.0. `tick` cierra ahora con un margen medido
+ * sobre el desfase real entre los dos relojes (ver `MARGEN_TICK` en
+ * `src/encounter.js`), y con eso los dos caminos convergen.
+ *
+ * LO QUE QUEDA, Y POR ESO ESTE AVISO NO SE VA. Durante una semana la tarea de
+ * los relojes se vendió como «lo que desbloquea reconstruir con garantías». NO
+ * ERA ESO. Medido sobre un histórico real, de las 10 peleas que existían en
+ * directo y no al releer, el margen arregla 7 —las de huecos de 19 y 20 s— y
+ * las otras 3 tienen huecos de 12, 9 y 2 segundos: son ARRANQUES DE LA
+ * APLICACIÓN a mitad del registro, donde un rastreador nuevo empieza pelea
+ * nueva pase lo que pase. Ninguna regla de reloj las toca.
+ *
+ * Así que reconstruir sigue moviendo fronteras, sólo que muchas menos. El aviso
+ * avisa de menos, no de nada, y quitarlo requeriría resolver los arranques —que
+ * es otra tarea y ni siquiera está claro que tenga arreglo—.
  *
  * Se devuelve como dato y no se escribe aquí para que cada sitio lo enseñe a su
- * manera —la consola con texto, la aplicación con su cartel— y para que el día
- * que se arregle la tarea baste con quitar esta constante y ver qué se rompe.
- * Ver el comentario de `tick()` en `src/encounter.js`.
+ * manera: la consola con texto, la aplicación con su cartel.
  */
 export const AVISO_RECONSTRUIR = 'fronteras-dos-relojes';
 

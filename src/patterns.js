@@ -209,8 +209,52 @@ const rules = [
   { kind: 'noise', hint: 'feels much better', re: /^(.+?) feels much better\.$/, map: (m) => ({ who: m[1] }) },
 
   // ═══ CASTEO ═══
+  /**
+   * EMPEZAR A LANZAR NO ES ACTUAR. Es una intención, y a veces una denegada.
+   *
+   * LA REGLA, y generaliza más allá del sitio donde se descubrió: un «begin
+   * casting» SIN DESENLACE no es actividad, es un intento que el juego rechazó.
+   * Un lanzamiento de verdad acaba en algo —impacto, resistencia, interrupción,
+   * «you can't use that command right now»— y el registro lo escribe.
+   *
+   * DE DÓNDE SALE, medido: dentro de los 31 tramos de miedo del registro de
+   * referencia hay 24 líneas de «You begin casting Ensnare.» repartidas por 10
+   * de ellos, y NINGUNA tiene desenlace. Ese mismo Ensnare, fuera de los tramos,
+   * sale interrumpido 6 veces y resistido 9. O sea que dentro del miedo la línea
+   * es la tecla aporreada, no un acto del personaje.
+   *
+   * DÓNDE IMPORTA, comprobado uno por uno: `cadencia()` y `swingSeconds` sólo se
+   * alimentan de golpes y fallos, `activeSeconds` de golpes, fallos, daño
+   * recibido y curaciones — ninguna suma casteos, así que ninguna medida de
+   * actividad estaba contando intención como trabajo. Lo que sí los cuenta es la
+   * LÍNEA DE TIEMPO de lanzamientos y el número de la pestaña, y ahí es
+   * correcto: la pregunta es «¿qué intentaste y cuándo?».
+   *
+   * Si algún día alguien mide actividad con `casts`, esto es lo que hay que
+   * leer antes.
+   */
   { kind: 'cast', hint: 'begin casting', re: /^You begin casting (.+?)\.$/, map: (m) => ({ source: 'You', ability: m[1] }) },
   { kind: 'cast', hint: 'begins casting', re: /^(.+?) begins casting (.+?)\.$/, map: (m) => ({ source: m[1], ability: m[2] }) },
+  /**
+   * CANTAR ES LANZAR, y llevaba 355 líneas sin serlo.
+   *
+   * Un bardo no «castea», canta, y el registro lo escribe con otro verbo. Sin
+   * esta regla la línea entera se iba al cajón de las no reconocidas: medido
+   * sobre el registro de referencia, 355 cánticos invisibles, y de ellos 253 de
+   * un compañero bardo del grupo y 52 del jefe del Plano del Miedo.
+   *
+   * LO QUE COSTABA NO ERA EL RECUENTO. Entre esas líneas están las 53 de
+   * `Solon's Bewitching Bravura`, que es la canción de ENCANTO del jefe: la
+   * única señal escrita que existe de por qué un compañero se puso a pegarle al
+   * grupo. La línea no dice a quién encantó —eso sigue sin saberse— pero decir
+   * «el jefe cantó un encanto ocho veces en esta pelea» es un hecho medido, y
+   * hasta ahora ni siquiera eso se podía decir.
+   *
+   * Va con el mismo `kind` que el casteo y no con uno propio: para todo lo que
+   * viene detrás —la línea de tiempo, el consejo, el aviso hablado— es el mismo
+   * suceso. Que uno se cante y otro se recite es del sabor, no de la cuenta.
+   */
+  { kind: 'cast', hint: 'begins singing', re: /^(.+?) begins singing (.+?)\.$/, map: (m) => ({ source: m[1], ability: m[2] }) },
   { kind: 'cast', hint: 'begins to cast', re: /^(.+?) begins to cast a spell\.$/, map: (m) => ({ source: m[1], ability: null }) },
   { kind: 'cast_recover', hint: 'concentration', re: /^You regain your concentration/, map: () => ({}) },
   { kind: 'cast_recover', hint: 'concentration', re: /^(.+?) regains concentration and continues casting\.$/, map: (m) => ({ source: m[1] }) },
@@ -279,11 +323,134 @@ const rules = [
   // ═══ ESTADOS, PROCS, MASCOTA ═══
   { kind: 'stun', hint: 'stunned', re: /^You are stunned!$/, map: () => ({ target: 'You', on: true }) },
   { kind: 'stun', hint: 'stunned', re: /^You are no longer stunned\.$/, map: () => ({ target: 'You', on: false }) },
+  /**
+   * CUANDO EL PERSONAJE DEJA DE SER TUYO. Los dos extremos, y los dos escritos.
+   *
+   *   You lose control of yourself!          31 veces en el registro de
+   *   You have control of yourself again.    referencia, y 31 cierres. Ni uno
+   *                                          suelto.
+   *
+   * Duración medida: mínimo 2 s, mediana 9 s, máximo 37 s. Treinta y siete
+   * segundos de una pelea en los que lo que hace tu personaje no lo decides tú,
+   * y hasta ahora la aplicación no los distinguía de estar mirando el inventario.
+   *
+   * QUÉ NO DICE ESTA LÍNEA, Y HAY QUE NO DECIRLO TAMPOCO: no dice si te
+   * encantaron o si te dieron miedo. Es el aviso genérico de que perdiste el
+   * mando. Medido sobre los 31 episodios, el último lanzamiento enemigo en los 8
+   * segundos anteriores fue `Dragon Fear` 14 veces y `Solon's Bewitching
+   * Bravura` 4, así que ni siquiera correlaciona limpio con una sola causa.
+   *
+   * LO QUE SÍ LOS SEPARA ES LA CONDUCTA, y ésa se mide: encantado le pegas a los
+   * tuyos, asustado corres. En estos 31 episodios TÚ no le pegaste a un
+   * compañero ni una sola vez, así que los 31 fueron miedo — y llamarlos
+   * «encantado» habría sido falso 31 veces de 31. Ver `sinControl` en
+   * `src/encounter.js`, que es donde se califica el tramo con lo que pasó dentro.
+   */
+  { kind: 'control', hint: 'control of yourself', re: /^You lose control of yourself!$/, map: () => ({ target: 'You', on: true }) },
+  { kind: 'control', hint: 'control of yourself', re: /^You have control of yourself again\.$/, map: () => ({ target: 'You', on: false }) },
   { kind: 'stagger', hint: 'staggers', re: /^(.+?) staggers\.$/, map: (m) => ({ target: m[1] }) },
   { kind: 'proc', hint: 'feels alive', re: /^Your (.+?)(?: \((.+?)\))? feels alive with power\.$/, map: (m) => ({ item: m[1], effect: m[2] ?? null }) },
   { kind: 'pet_frenzy', hint: 'accelerated frenzy', re: /^(.+?) enters an accelerated frenzy\.$/, map: (m) => ({ pet: m[1] }) },
   { kind: 'buff_fade', hint: 'has worn off', re: /^(?:Your pet's |Your )?(.+?) spell has worn off\.$/, map: (m) => ({ ability: m[1] }) },
-  { kind: 'debuff', hint: 'been diseased', re: /^(.+?) (?:have|has) been diseased\.$/, map: (m) => ({ target: m[1], ability: 'diseased' }) },
+  /**
+   * LO QUE TE ENTRA CON NOMBRE DE EFECTO, NO DE HECHIZO.
+   *
+   * Había una sola regla, `been diseased`, y a su lado 1.204 líneas de la MISMA
+   * forma que nadie reconocía: 576 `poisoned`, 114 `ensnared`, 83 `mesmerized`,
+   * 76 `struck down by wrath`, 73 `struck by the force of Ykesha`, 52
+   * `lacerated`. Le pasan a alguien, dicen QUÉ le pasa, y se iban al cajón de
+   * las no reconocidas — que tiene 34.207 líneas y no lo mira nadie.
+   *
+   * ═══ QUÉ HAY EN ESE CAJÓN, MEDIDO Y NO SUPUESTO ═══
+   *
+   * 34.207 líneas de 708.240, el 4,8%. Y no son un solo montón: son TRES, con
+   * tres destinos distintos, y confundirlos es lo que hacía que nadie lo mirara.
+   *
+   *   1. ADORNO DE UN EFECTO QUE YA ESTÁ CONTADO. Es el montón grande.
+   *      «Your feet move faster» (3.049), «Your mind begins to clear» (2.884),
+   *      «Your wounds begin to heal» (1.952), «X's body combusts as the lava
+   *      hits them» (284). El lanzamiento y la caída de esos hechizos SÍ tienen
+   *      línea y sí se guardan; esto es la frase bonita del mismo suceso, y
+   *      encima muchas no nombran al sujeto. Reconocerlas no añadiría una cifra.
+   *      DESTINO: quedarse fuera, y que esté escrito por qué.
+   *
+   *   2. NO ES COMBATE. «Your faction standing with X has been adjusted by N»
+   *      (2.104 entre sus cuatro formas), «Your target is out of range» (389),
+   *      «You already have your target's attention» (288), «Your will is not
+   *      sufficient to command this weapon» (424). Son facción, avisos de la
+   *      interfaz y comandos. DESTINO: fuera, y no es una deuda.
+   *
+   *   3. SÍ ES COMBATE Y NO TIENE REGLA. Es el montón que importa y el único
+   *      que hay que mirar:
+   *
+   *        1.251  «X tries to cast a spell on you, but you are protected.»
+   *                 Es una inmunidad, o sea un hechizo enemigo que NO entró. Va
+   *                 justo al lado de `resist_by_you` y hoy no se cuenta.
+   *        1.777  «X rages.»            un estado del enemigo
+   *          395  «You overcome the stun!»
+   *          246  «X activates X.»      habilidades con nombre
+   *          196  «You go berserk.»
+   *
+   *      Lo de «overcome the stun» se comprobó por si era un TERCER final del
+   *      aturdimiento, que habría dejado barras abiertas en el reproductor: no
+   *      lo es. Hay 1.447 «You are stunned!» y 1.456 «You are no longer
+   *      stunned.», así que los pares cierran solos y sobran nueve cierres —los
+   *      que empezaron antes de que arrancara el registro, que es exactamente el
+   *      extremo abierto que la barra dibuja.
+   *
+   * LA REGLA AL AÑADIR ALGO AQUÍ: se enumera, no se generaliza, y se dice a cuál
+   * de los tres montones pertenece lo que se deja fuera. Un cajón con tres cosas
+   * dentro y un solo nombre es un cajón que nadie abre.
+   *
+   * SE ENUMERA LO MEDIDO Y NO SE GENERALIZA, y aquí eso no es prudencia
+   * abstracta: `^(.+?) (?:have|has) been (.+?)\.$` se traga cosas que NO son
+   * estados, y se ha comprobado sobre el registro entero —
+   *
+   *     1.426  «... has been adjusted by 5»      un ajuste de la interfaz
+   *       167  «... been stunned too recently»   un aviso de inmunidad
+   *       109  «... been set to on»              una opción
+   *        43  «... has been charmed»            que es del encanto, y tiene su
+   *                                              propia regla más abajo. Ésta
+   *                                              va ANTES en el fichero, así
+   *                                              que se la habría llevado y con
+   *                                              ella el bando de un bicho.
+   *
+   * El precio de enumerar es que el día que aparezca un efecto nuevo se pierde.
+   * El precio de generalizar era romper el encanto. No es un empate.
+   *
+   * `ability` lleva el EFECTO, no un hechizo: el registro no dice cuál fue.
+   *
+   * DOS COSAS QUE ESTUVIERON EN ESTA LISTA Y SE CAYERON AL COMPROBARLA:
+   *
+   *   `blinded`, `silenced`   los puse de memoria, por sonar a estado. En el
+   *                           registro salen CERO veces. Una alternativa que no
+   *                           se ha medido no es una regla, es una corazonada
+   *                           que va a envejecer sin que nadie la revise.
+   *   `struck down by wrath`  49 líneas, y YA tenían dueño: están en el bloque
+   *                           de adorno reconocido como `noise`. Rescatar lo
+   *                           que nadie reconoce es una cosa; reclasificar lo
+   *                           que otro clasificó a propósito es otra, y no se
+   *                           hace de pasada. La comprobación de que no se
+   *                           roban líneas lo cazó.
+   */
+  { kind: 'debuff', hint: 'been ', map: (m) => ({ target: m[1], ability: m[2] }),
+    re: /^(.+?) (?:have|has) been (poisoned|diseased|ensnared|mesmerized|lacerated|struck by the force of [A-Za-z']+)\.$/ },
+  /**
+   * NO HAY REGLA PARA «X has been awakened by Y», Y ESTUVO ESCRITA UN RATO.
+   *
+   * Se añadió como `survival`/`feign` dando por hecho que era romper el
+   * fingimiento de muerte. La comprobación de que no se robaban líneas a otras
+   * reglas la cazó —49 se las quitaba a `noise`— y al mirar de quién eran, la
+   * lectura no se sostenía: de las 54 del registro, sólo 6 son de Campeon y 3
+   * de un compañero. Las otras 45 son BICHOS: «A greater ice bones has been
+   * awakened», «A shin ghoul knight has been awakened» ×11. Un bicho que
+   * despierta no está fingiendo muerte — le han roto el mez.
+   *
+   * Es un dato bueno y su sitio no es éste: dice a QUIÉN se le rompió el
+   * control y POR QUIÉN, que es una pregunta de la pista de estados. Queda sin
+   * regla a propósito, para no etiquetarlo mal mientras tanto. Las 49 vuelven a
+   * `noise`, que es donde estaban y donde no afirman nada.
+   */
   { kind: 'stance', hint: 'stance', re: /^You assume an? (.+?) stance\.$/, map: (m) => ({ stance: m[1] }) },
   { kind: 'stance', hint: 'stance', re: /^You begin to change your stance\.$/, map: () => ({ changing: true }) },
   { kind: 'invocation', hint: 'invocation', re: /^You begin reciting the (.+?) invocation\.$/, map: (m) => ({ invocation: m[1] }) },
@@ -526,13 +693,66 @@ const rules = [
   { kind: 'noise', hint: 'legs feel weak', re: /^Your legs feel weak\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'returns to your legs', re: /^Strength returns to your legs\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'mind clouds', re: /^Your mind clouds\.$/, map: () => ({}) },
-  { kind: 'noise', hint: 'feet come free', re: /^Your feet come free\.$/, map: () => ({}) },
+  /**
+   * LA RAÍZ, QUE ESTABA CLASIFICADA COMO ADORNO Y ES UN ESTADO CON DURACIÓN.
+   *
+   * Estaba en el montón de ruido —y por duplicado, en dos reglas distintas—
+   * porque nadie la había medido. Medida:
+   *
+   *     entran   680   `adhere to the ground` 502 · `sink into the ground` 120
+   *                    · `become entwined` 58. TRES formas, no una: mirar sólo
+   *                    la primera daba 502 y una pareja falsa.
+   *     salen    632   `come free`
+   *     cierran  583   el 86% de las entradas · duración mediana 5 s, p90 23 s
+   *
+   * Es exactamente la forma de un estado con duración medible, y es lo contrario
+   * de las cuatro frases que se descartaron el mismo día: aquéllas repetían cada
+   * 6 segundos clavados —un latido, no una entrada— y ésta tiene 41 s de
+   * mediana entre entradas y una salida que casa.
+   *
+   * `leave the ground` NO entra: es levitación, otra cosa, y sigue en el ruido.
+   */
+  { kind: 'root', hint: 'Your feet',
+    re: /^Your feet (?:adhere to the ground|sink into the ground|become entwined)\.$/,
+    map: () => ({ target: 'You', on: true }) },
+  { kind: 'root', hint: 'Your feet', re: /^Your feet come free\.$/, map: () => ({ target: 'You', on: false }) },
   { kind: 'noise', hint: 'life force drain', re: /^You feel your life force drain away\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'enveloped by lava', re: /^You are enveloped by lava\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'Zone Safe Point', re: /^Returning to Zone Safe Point/, map: () => ({}) },
   { kind: 'noise', hint: 'spirit of wolf', re: /^You feel the spirit of wolf enter you\.$/, map: () => ({}) },
   { kind: 'knockdown', hint: 'fallen to the ground', re: /^(.+?) has fallen to the ground\.$/, map: (m) => ({ who: m[1] }) },
   { kind: 'buff_land', hint: 'feel', re: /^You feel (?:much better|resistant to .+|protected from .+|your strength return|a heal efflorescing within you)\.$/, map: () => ({}) },
+  /**
+   * Y EL RESTO DE «You feel …», que es lo que quedaba fuera por enumerar.
+   *
+   * La regla de arriba nombraba cinco frases; el registro tiene muchas más y
+   * suman miles: 866 `an aura of protection engulf you`, 507 `your soul being
+   * consumed`, 199 `your skin freeze`, 151 `a bit dispelled`, 148 `dazed`…
+   *
+   * AQUÍ SÍ SE GENERALIZA, y la diferencia con `been …` de arriba es medible:
+   * «You feel» sólo lo escribe el juego cuando algo te entra. No hay ajustes
+   * de interfaz ni opciones con esa forma, y las frases que ya tienen dueño
+   * —las cinco de arriba, y las que otras reglas clasifican como ruido— casan
+   * ANTES, porque dentro de una misma pista mandan por orden.
+   *
+   * LO QUE SE GUARDA ES LA FRASE, NO UN HECHIZO, y va en `flavor` a propósito:
+   * el registro NO dice qué te entró. Poner ese texto en `ability` lo haría
+   * pasar por el nombre de un hechizo y acabaría emparejándose con un
+   * lanzamiento en la línea de tiempo. Se sabe que algo entró y se sabe cómo lo
+   * describe el juego; nada más.
+   */
+  { kind: 'buff_land', hint: 'feel', re: /^You feel (.+)\.$/, map: (m) => ({ who: 'You', flavor: m[1] }) },
+  /**
+   * Y lo que se CAE sin decir de qué era: 723 líneas, de `Your aura fades` (173)
+   * a `Your strength fades` (9).
+   *
+   * NO LLEVA `ability`, Y ESO ES LA REGLA ENTERA. `enc.fades` empareja la caída
+   * con el lanzamiento por el NOMBRE para medir cuánto estuvo puesto algo, y
+   * `encounter.js` sólo anota las que traen nombre. Una caída anónima con un
+   * `ability` inventado —«aura»— se emparejaría con nada o, peor, con algo. Va
+   * en `flavor`, se ve que cayó algo, y no se finge saber qué.
+   */
+  { kind: 'buff_fade', hint: ' fades', re: /^Your (.+?) fades\.$/, map: (m) => ({ who: 'You', flavor: m[1] }) },
   { kind: 'buff_land', hint: 'is resistant', re: /^(.+?) is (?:resistant to|protected from) (.+?)\.$/, map: (m) => ({ who: m[1], what: m[2] }) },
   { kind: 'buff_land', hint: 'skin shimmers', re: /^(?:Your|(.+?)'s) skin shimmers with divine power\.$/, map: (m) => ({ who: m[1] ?? 'You' }) },
   { kind: 'noise', hint: 'Spell set', re: /^Spell set (.+?) loaded\.$/, map: (m) => ({ set: m[1] }) },
@@ -551,7 +771,8 @@ const rules = [
   { kind: 'noise', hint: 'stunned too recently', re: /^Your target has been stunned too recently/, map: () => ({}) },
   { kind: 'noise', hint: 'no longer diseased', re: /^(?:You are|.+? is) no longer (?:diseased|poisoned)\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'winces', re: /^(.+?) (?:winces|goes berserk|writhes in the grip of agony|floats into the air)\.$/, map: (m) => ({ who: m[1] }) },
-  { kind: 'noise', hint: 'feet', re: /^Your feet (?:adhere to the ground|leave the ground|come free)\.$/, map: () => ({}) },
+  // Sólo la levitación: la raíz salió de aquí y tiene su propio tipo, arriba.
+  { kind: 'noise', hint: 'feet', re: /^Your feet leave the ground\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'flames die', re: /^The flames die down\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'entombed', re: /^You are entombed in elemental ice\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'effloresces', re: /^The heal within you effloresces\.$/, map: () => ({}) },

@@ -114,6 +114,31 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  *                   `Essence of Rathe` que no llegó a ningún contador) y la
  *                   moneda, 1.392 líneas reconocidas y tiradas desde siempre.
  *
+ *   9               UN GOLPE CONVERTÍA A UN COMPAÑERO DECLARADO EN ENEMIGO PARA
+ *                   TODA LA PELEA. En el Plano del Miedo encantan, y con la
+ *                   regla de bandos a secas —enemigo es quien te pega— bastaba
+ *                   una línea para que uno de tu grupo cambiara de lado con
+ *                   todo su daño detrás. Medido sobre 709 peleas: 3 con un
+ *                   compañero en el bando enemigo, y en ellas 11.862 de 24.499
+ *                   de «daño enemigo» —el 48%— eran del propio grupo; en la
+ *                   peor, el 55%. Cinco peleas en total cambian de cifras.
+ *
+ *                   Ahora la identidad declarada gana, el daño que os hacéis
+ *                   entre vosotros se aparta en `entreTuyos` —fuera de la
+ *                   producción y fuera del daño enemigo— y se guardan también
+ *                   los tramos `sinControl`, que el registro escribía y nadie
+ *                   leía.
+ *
+ *                   LAS PELEAS VIEJAS NO SE RECONSTRUYEN, y por eso esto no sube
+ *                   `RECONSTRUIR_DESDE`: el fallo se DETECTA leyendo lo guardado
+ *                   —«hay un compañero declarado en el bando enemigo» está en el
+ *                   fichero— y se marca con el mecanismo de dudas. Corregirlas
+ *                   exige releer el registro; avisar de que están mal, no.
+ *
+ *                   Y LAS TRES DE 700 SON UNA FOTO, no una constante: el Plano
+ *                   del Miedo encanta, y si se raidea más allí el número sube.
+ *                   El día que suba, esta decisión hay que volver a tomarla.
+ *
  * ESTE NÚMERO ERAN DOS PREGUNTAS EN UNA, Y HASTA LA 1.11.0 NUNCA SE SEPARARON
  * PORQUE SIEMPRE HABÍAN COINCIDIDO.
  *
@@ -140,7 +165,7 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  * Sube SIEMPRE que cambie lo que se escribe a disco. Sin excepciones y sin
  * ramas de escape: `test/formato.js` no deja publicar sin subirlo.
  */
-export const FORMATO_VERSION = 8;
+export const FORMATO_VERSION = 9;
 
 /**
  * Por debajo de esta generación, lo guardado NO se puede arreglar leyéndolo
@@ -165,8 +190,81 @@ export const FORMATO_VERSION = 8;
  * Al subirlo, repasa `mig.body` — el cartel explica los motivos de ESA
  * migración, y un texto puesto por un motivo que ya no aplica sobrevive porque
  * nadie lo relee.
+ *
+ * ═══ DEUDA APUNTADA, PARA QUE LA PAGUE LA PRÓXIMA RECONSTRUCCIÓN ═══
+ *
+ * SUBE A 9 EN LA 1.13.0, Y ESO ES UNA DECISIÓN QUE SE TOMÓ AL REVÉS PRIMERO.
+ *
+ * La deuda empezó siendo UN punto y detectable, y con eso la respuesta correcta
+ * era no forzar: corregir cuesta reconstruir y detectar es gratis, así que se
+ * marca y ya. Al terminar el trabajo la deuda eran TRES, y dos de las tres no se
+ * pueden detectar leyendo. Eso cambia la respuesta: una pelea que enseña cifras
+ * falsas y NI SIQUIERA PUEDE MARCARSE está mintiendo en silencio, que es lo
+ * único que este programa no hace.
+ *
+ * LAS TRES, Y CUÁL SE PODÍA DETECTAR:
+ *
+ *   1. EL COMPAÑERO EN EL BANDO ENEMIGO. 3 peleas de 714, con 11.862 de sus
+ *      24.499 de «daño enemigo» —el 48%, y el 55% en la peor— hecho por el
+ *      propio grupo, y el veredicto de postura calculado encima.
+ *      DETECTABLE: sí, ver `dudaCompa`. Era la que sostenía el «no fuerces».
+ *
+ *   2. LOS TRAMOS SIN MANDO, COBRADOS COMO TIEMPO PARADO. 31 tramos en 12
+ *      peleas, 464 segundos, el más largo de 38 s. Con miedo no puedes actuar,
+ *      así que ese parón no lo eligió nadie — y `huecoReal` se calculó al
+ *      escribir con esos segundos dentro. Medido: 485 s cobrados que pasan a
+ *      234, y una pelea que iba de 172 s a 91 s.
+ *      DETECTABLE: NO. Una pelea guardada no tiene forma de saber que perdiste
+ *      el mando: el campo no existía y las líneas están en el registro.
+ *
+ *   3. LAS PELEAS PARTIDAS POR UN MIEDO. 8 de los 31 tramos pasan de `idleSec`,
+ *      y durante ellos no hay ni una línea tuya —no porque dejaras de combatir,
+ *      sino porque no podías—. El corte se decidió al escribir. Al arreglarlo,
+ *      714 peleas pasan a 710: cinco se funden con su vecina y una mueve su
+ *      frontera.
+ *      DETECTABLE: NO, y encima es la peor de las tres: no es una cifra torcida
+ *      dentro de una pelea, son dos peleas donde había una.
+ *
+ * LO QUE SE PAGA DE PASO, y por eso conviene reconstruir aunque no fuera
+ * obligatorio: `entreTuyos`, `sinControl`, `sinMandoSec`, `duracionMando` y
+ * `resistsByFoe` son campos nuevos, así que el histórico viejo no los tiene y
+ * las pantallas que los usan salen vacías hasta releer.
+ *
+ * Y LAS CIFRAS SON UNA FOTO DE UN PASADO CONCRETO, no una constante: las cinco
+ * peleas con fuego amigo y los 31 tramos están TODOS en el Plano del Miedo y
+ * alrededores, que es donde encantan y dan miedo. Si se raidea más allí, los
+ * números suben.
+ *
+ * ═══ Y `dudaCompa` SE QUEDA DORMIDA A PARTIR DE AQUÍ ═══
+ *
+ * NO ES CÓDIGO MUERTO Y NO HAY QUE BORRARLA, aunque a partir de esta versión no
+ * marque nunca nada. Con la reconstrucción forzada, todo el mundo llega con el
+ * histórico rehecho por la regla nueva —donde un compañero declarado no puede
+ * acabar en el bando enemigo— así que no queda ni una pelea que casar.
+ *
+ * Sigue siendo la guarda que avisa si la regla se rompe otra vez: el día que
+ * alguien toque `#sides` y un compañero vuelva a cambiarse de bando, esto lo
+ * dice en la ficha en vez de dejarlo pasar. Y su prueba lo comprueba con una
+ * pelea fabricada, que no depende de que exista ninguna real.
+ *
+ * Queda escrito porque una función que no se dispara nunca parece inútil, y en
+ * dos versiones alguien la borrará por eso. Es la séptima familia de la lista de
+ * `ui/app.js` —salida muerta— vista venir en vez de descubierta tarde: la
+ * diferencia entre una guarda dormida y una salida muerta es que la primera
+ * tiene un caso que la despierta y está escrito cuál.
+ *
+ * NO SE FUERZA, Y EL MOTIVO NO ES EL PORCENTAJE. Es que corregir y detectar no
+ * cuestan lo mismo: «hay un compañero declarado en el bando enemigo» se
+ * comprueba leyendo la pelea guardada, sin tocar un byte y sin que nadie pulse
+ * nada (ver `dudaCompa`). Así que esas tres salen marcadas como sospechosas y
+ * ninguna miente en silencio, que era lo único inaceptable.
+ *
+ * QUÉ HACER CUANDO ALGO OBLIGUE A SUBIR ESTE NÚMERO POR OTRO MOTIVO: no hay nada
+ * que hacer, y por eso conviene saberlo. La reconstrucción arregla estas tres de
+ * paso y las dudas se invalidan solas al dejar de casar. Esta nota está aquí
+ * para que, cuando llegue ese día, nadie se pregunte si faltaba algo.
  */
-export const RECONSTRUIR_DESDE = 8;
+export const RECONSTRUIR_DESDE = 9;
 
 const META = 'store.json';
 
@@ -394,6 +492,10 @@ function aplicarDudas(f, at, dudas) {
     motivo: e.motivo,
     filas: filas.map((r) => r.name),
     daño, recibido,
+    // Sobre qué cifra hay que leer `daño`. Aquí es el total de TU bando, del que
+    // esa parte no era. Ver `dudaCompa`, que apunta al otro. Sin este campo las
+    // dos dudas se leerían con la misma frase y una de las dos mentiría.
+    sobre: 'total',
     // La cifra viaja con la duda para que la ficha pueda decirla en vez de
     // soltar un aviso genérico: «de los 5.015 de tu bando, 2.026 son de un
     // enemigo» se entiende; «esta pelea puede estar mal» no dice nada.
@@ -401,6 +503,58 @@ function aplicarDudas(f, at, dudas) {
     // Qué queda invalidado y qué NO. El daño personal está bien —lo tuyo es
     // tuyo, el fallo es de quién más entra en el bando— así que se tacha el
     // total del bando y su DPS, y nada más.
+    invalida: ['total', 'raidDps', 'enemyTotal', 'enemyDps'],
+    arregla: 'reconstruir',
+  };
+  return f;
+}
+
+/**
+ * UN COMPAÑERO DECLARADO EN EL BANDO ENEMIGO. Se detecta al leer, y es gratis.
+ *
+ * QUÉ ESTÁ MAL EN ESAS PELEAS. Se guardaron con la regla de bandos a secas
+ * —enemigo es quien te pega— así que bastó un golpe de un compañero encantado
+ * para que apareciera del otro lado con todo su daño detrás. Medido sobre un
+ * histórico real de 709 peleas: 3 afectadas, y en ellas 11.862 de 24.499 de
+ * «daño enemigo» —el 48%— era del propio grupo. Sobre esa cifra falsa está
+ * calculado además el veredicto de postura y el reparto que enseña el análisis,
+ * y el análisis coge de ahí quién es enemigo: las curas de tu propio sanador
+ * podían salir como «el enemigo se curó».
+ *
+ * POR QUÉ ESTO NO NECESITA UN FICHERO NI UNA RECONSTRUCCIÓN. La otra duda
+ * —`aplicarDudas`— vive en `dudas.ndjson` porque hay que ir a buscarla: alguien
+ * midió el fallo fuera y escribió el resultado. Ésta no hace falta escribirla en
+ * ninguna parte, porque la prueba está DENTRO de la pelea guardada: el bando de
+ * cada fila está en el fichero y la lista de compañeros la tienes declarada. La
+ * pregunta se contesta leyendo, en el momento, sin tocar un byte.
+ *
+ * Y SE INVALIDA SOLA POR CONSTRUCCIÓN, que era lo importante en la otra y aquí
+ * sale de balde: en cuanto se reconstruya, la pelea nueva ya no tendrá a nadie
+ * declarado en el bando enemigo —la regla lo impide— y la marca no vuelve a
+ * salir. No hay entrada que se quede huérfana apuntando a una pelea que ya no
+ * es la que era.
+ *
+ * SÓLO MARCA LO QUE HOY SABEMOS. Si declaras un compañero mañana, las peleas de
+ * ayer donde salga como enemigo se marcarán mañana. Es correcto: la afirmación
+ * es «hay alguien que tú das por tuyo contado como enemigo aquí», y eso es
+ * verdad desde que lo declaras, no desde que se guardó.
+ *
+ * La duda de fichero manda sobre ésta si las dos hablan de la misma pelea: la
+ * escribió alguien mirando, y esto es una regla.
+ */
+function dudaCompa(f, mates) {
+  if (!f || f.duda || !mates?.size) return f;
+  const filas = (f.rows ?? []).filter((r) => r.side === 'enemy' && mates.has(r.name));
+  if (!filas.length) return f;
+  f.duda = {
+    motivo: 'compa-en-bando-enemigo',
+    filas: filas.map((r) => r.name),
+    daño: filas.reduce((a, r) => a + (r.damage ?? 0), 0),
+    recibido: filas.reduce((a, r) => a + (r.taken ?? 0), 0),
+    // Aquí `daño` se lee sobre el total ENEMIGO, no sobre el tuyo: lo que está
+    // inflado es el otro lado. Ver `sobre` en `aplicarDudas`.
+    sobre: 'enemyTotal',
+    total: f.enemyTotal ?? null,
     invalida: ['total', 'raidDps', 'enemyTotal', 'enemyDps'],
     arregla: 'reconstruir',
   };
@@ -481,6 +635,16 @@ export class FightStore {
     // que una reconstrucción la invalida sola.
     this.dudasPath = path.join(dir, 'dudas.ndjson');
     this.dudas = new Map();    // hora de la pelea -> {motivo, filas, daño, recibido}
+    /**
+     * Los compañeros que has declarado, para poder detectar al leer las peleas
+     * donde alguno quedó en el bando enemigo. Ver `dudaCompa`.
+     *
+     * Vive aquí y no se guarda: la lista es de la configuración, no del
+     * almacén. El motor la empuja cuando cambia, y al cambiarla se vacía la
+     * caché — si no, las peleas ya leídas se quedarían sin marcar hasta
+     * reiniciar, que es la peor versión de las dos.
+     */
+    this.companions = new Set();
     // El libro de hechizos: los que CONSTA que tienes, y de qué línea consta.
     // Fichero aparte por lo mismo que los puntos: escribir o comprar un hechizo
     // pasa fuera de cualquier pelea.
@@ -492,6 +656,20 @@ export class FightStore {
     this.byUid = new Map();
     this.seen = new Map();  // identidad lógica -> resumen, para no duplicar
     this.dropped = 0;       // duplicados descartados al cargar
+  }
+
+  /**
+   * Los compañeros declarados. Los empuja el motor, y sólo se usan para leer.
+   *
+   * Vaciar la caché es la mitad del trabajo: `get` marca la pelea al leerla, así
+   * que las que ya estuvieran leídas se quedarían sin marcar —o marcadas de más
+   * si acabas de quitar a alguien— hasta el próximo arranque.
+   */
+  setCompanions(list) {
+    const antes = [...this.companions].sort().join(' ');
+    this.companions = new Set([...(list ?? [])].filter(Boolean));
+    if ([...this.companions].sort().join(' ') !== antes) this.cache.clear();
+    return this.companions.size;
   }
 
   /** Con qué versión se escribió lo que hay guardado. */
@@ -999,9 +1177,9 @@ export class FightStore {
       // La misma cura que en el índice: la pelea entera también lleva su
       // dificultad, y el expediente del enemigo la lee de aquí. Y el modelo de
       // medición, por lo mismo: se arregla al leer porque se puede.
-      const f = aplicarDudas(aplicarTramos(
+      const f = dudaCompa(aplicarDudas(aplicarTramos(
         repararModelo(rehacerDif(JSON.parse(buf.toString('utf8')))), s.at, this.tramos),
-        s.at, this.dudas);
+        s.at, this.dudas), this.companions);
       this.cache.set(uid, f);
       if (this.cache.size > 40) this.cache.delete(this.cache.keys().next().value);
       return f;

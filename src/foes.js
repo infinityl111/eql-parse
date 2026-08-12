@@ -36,6 +36,10 @@ function nuevaFicha(name) {
     name, fights: 0, kills: 0, damageTo: 0, seconds: 0, taken: 0, deaths: 0,
     maxHit: 0, hpSamples: [], zones: new Set(), abil: new Map(), loot: new Map(),
     porDif: new Map(), niveles: new Set(), sinNivel: false, spells: new Map(),
+    // Hechizos SUYOS que TÚ resististe, por hechizo. Es el sentido contrario de
+    // `spells`, y la razón de que exista: `resistsCaused` era un número por
+    // pelea y con eso no se puede decidir nada. Ver `resistsByFoe`.
+    resistidos: new Map(),
   };
 }
 
@@ -308,6 +312,18 @@ export class FoeLedger {
         destino.set(x.spell, c);
       }
     }
+
+    // Y al revés: lo que él te lanzó y tú resististe. Va sólo a la ficha común
+    // y no a la celda por dificultad: son 1.972 sucesos en todo un registro, así
+    // que partirlos por dificultad deja casi todas las celdas con n = 1, y una
+    // proporción de una muestra no es una proporción.
+    for (const x of f.resistsByFoe ?? []) {
+      const e = this.porNombre.get(x.foe);
+      if (!e) continue;
+      const c = e.resistidos.get(x.spell) ?? { spell: x.spell, n: 0 };
+      c.n += x.n;
+      e.resistidos.set(x.spell, c);
+    }
   }
 
   /** Todas las fichas terminadas, de la que más daño te ha hecho a la que menos. */
@@ -433,6 +449,9 @@ function terminar(e) {
     lootList: [...e.loot].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([item, n]) => ({ item, n })),
     hp: vida(e.hpSamples),
+    // Lo que le resististe, de más a menos. Si no le has resistido nada, lista
+    // vacía y la interfaz no enseña el bloque: cero no es un dato que decir.
+    resisted: [...e.resistidos.values()].sort((a, b) => b.n - a.n || a.spell.localeCompare(b.spell)),
     // Una ficha por dificultad, ordenadas. Cuando hay más de una, la de arriba
     // deja de tener sentido y la interfaz enseña éstas.
     dificultades: [...e.porDif.values()]

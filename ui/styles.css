@@ -357,6 +357,43 @@ main { overflow-y: auto; padding: 16px 20px; min-height: 0; }
 .dlg-btns .dlg-si { background: var(--slate-700); color: var(--bone); border-color: var(--slate-600); }
 .dlg-btns button:hover { border-color: var(--t-melee); color: var(--bone); }
 
+/* ── La pista de cambios de estado ─────────────────
+   Va PEGADA bajo la línea de tiempo y con su mismo ancho: comparte el eje, así
+   que una marca cae exactamente bajo el punto de la curva que explica.
+
+   EL PESO SALE DE LA RAREZA, no del gusto. stun y resist_by_you son el 90%
+   de las marcas; absorb y knockdown, el 2%. Con el mismo peso, lo raro
+   desaparece entre lo común. Y resist_by_you es lo más tenue de todo
+   porque es la AUSENCIA de un suceso: explica un hueco de la curva, no
+   lo llena. */
+.rp-pista { position: relative; height: 18px; margin-top: 2px; }
+.rp-marca { position: absolute; top: 3px; width: 4px; height: 12px; border-radius: 1px;
+  transform: translateX(-2px); cursor: pointer; display: block; }
+.rp-marca > b { position: absolute; top: -2px; left: 5px; font-size: 9px;
+  font-family: var(--mono); color: var(--bone-dim); font-weight: 400; }
+/* peso 1 — lo que NO pasó: se insinúa y no compite con nada.
+   LA OPACIDAD ESTÁ MEDIDA EN LOS DOS TEMAS, no elegida a ojo. A 0,38 el
+   contraste contra el fondo de la página era 1,47:1 en oscuro y 1,50:1 en
+   claro — en el filo de lo invisible, y para un trazo de 3×6 px eso es
+   desaparecer. A 0,6 sube a 1,94:1 y 1,96:1: casi idéntico en los dos temas,
+   que es la propiedad que se busca, y sigue muy por debajo del 0,8 del peso 2.
+   Lo que le da su discreción es sobre todo el TAMAÑO —la mitad de alto—, no
+   la transparencia. */
+.rp-marca.p1 { opacity: .6; height: 6px; top: 9px; width: 3px; }
+/* peso 2 — lo frecuente que sí pasó. */
+.rp-marca.p2 { opacity: .8; }
+/* peso 3 — lo raro: alto, opaco y con reborde para que salte. */
+.rp-marca.p3 { opacity: 1; height: 16px; top: 1px; box-shadow: 0 0 0 1px var(--slate-900); }
+.rp-marca.e-stun          { background: var(--t-magic); }
+.rp-marca.e-knockdown     { background: var(--t-fire); }
+.rp-marca.e-survival      { background: var(--t-ds); }
+.rp-marca.e-absorb        { background: var(--t-cold); }
+.rp-marca.e-resist_by_you { background: var(--bone-faint); }
+.rp-marca.e-charm_on      { background: var(--t-poison); }
+.rp-marca.e-charm_off     { background: var(--t-poison); opacity: .55; }
+/* Deducido: la MISMA señal que usa la ficha de botín, no una nueva. */
+.rp-marca.dedu { border-bottom: 2px dotted var(--t-ds); }
+
 /* ── La ficha del botín, al final del reproductor ───────────
    Es un epílogo, no una fila más de la escena: va después del último suceso y
    se lee entera de un vistazo. Cada fila empieza por su reloj porque el orden
@@ -1592,6 +1629,48 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
   background: var(--slate-850); border-left: 2px solid var(--t-magic);
   color: var(--bone-dim); }
 .charm-note b { color: var(--bone); font-family: var(--mono); }
+/* Los bloques de dentro de la nota: el fuego amigo y los tramos sin mando. Van
+   uno debajo de otro y sólo se separan; no llevan caja propia porque son la
+   misma nota y tres cajas anidadas se leen como tres avisos distintos. */
+.charm-note .nota-bloque + .nota-bloque { margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--slate-700); }
+.charm-note .nota-h { font-family: var(--display); font-size: 11px;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--bone); }
+.charm-note .nota-fila { margin-top: 3px; }
+.charm-note .nota-fila .dim { margin-left: 6px; }
+
+/*
+  LA PELEA QUE SE SABE QUE ESTÁ MAL. Va donde se ven sus cifras y con el color
+  de lo que no cuadra, no en gris de nota: si no se distingue de una aclaración,
+  se lee como una aclaración.
+*/
+/*
+  LOS TRAMOS DE LA PISTA. Una barra dice una duración; dos puntos no dicen
+  ninguna. Van por debajo de las marcas sueltas para que un punto que caiga
+  dentro de un tramo se siga viendo.
+*/
+.rp-tramo { position: absolute; top: 50%; transform: translateY(-50%);
+  height: 6px; border-radius: 3px; background: var(--t-magic); opacity: .55; }
+.rp-tramo.p3 { opacity: .8; height: 8px; }
+/*
+  El extremo abierto se dibuja abierto: sin redondeo y desvaneciéndose hacia el
+  borde. Es la diferencia entre «duró hasta aquí» y «hasta aquí es lo que se
+  sabe», y con el mismo dibujo para las dos cosas se afirma la primera.
+*/
+.rp-tramo.abre { border-top-left-radius: 0; border-bottom-left-radius: 0;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14px);
+  mask-image: linear-gradient(to right, transparent, #000 14px); }
+.rp-tramo.cierra { border-top-right-radius: 0; border-bottom-right-radius: 0;
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 14px);
+  mask-image: linear-gradient(to left, transparent, #000 14px); }
+.rp-tramo.e-control { background: var(--t-ds); }
+
+.duda { margin: 10px 0; padding: 9px 12px; border-left: 2px solid var(--t-ds);
+  background: var(--slate-850); font-size: 12px; }
+.duda-h { font-family: var(--display); font-size: 12px; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--t-ds); }
+.duda p { margin: 4px 0 0; color: var(--bone-dim); }
+.duda p.hint { color: var(--bone-faint); }
 
 /* El retrato del enemigo. Donde no hay, no va nada: ni hueco ni silueta. */
 .foeicon { width: 20px; height: 20px; object-fit: cover; vertical-align: -5px;

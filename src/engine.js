@@ -261,7 +261,10 @@ export class Engine extends EventEmitter {
     for (const n of opts.myPets ?? []) this.parser.markPet(n);
     for (const n of opts.notPets ?? []) this.parser.unmarkPet(n);
     // Y los compañeros, por lo mismo: el rastreador es nuevo en cada enganche.
-    if (opts.companions?.length) this.companions = new Set(opts.companions);
+    if (opts.companions?.length) {
+      this.companions = new Set(opts.companions);
+      this.store?.setCompanions(this.companions);
+    }
     this.tracker = new EncounterTracker({
       self: this.self,
       idleSec: opts.idleSec ?? 20,
@@ -970,6 +973,9 @@ export class Engine extends EventEmitter {
       cadencia: r.cadencia ?? null,
       swingSec: r.swingSec ?? 0,
       huecoReal: r.huecoReal ?? null,
+      // Segundos en los que esta fila no manejaba su personaje. Sólo la tuya
+      // los tiene: el registro no dice nada del mando de los demás.
+      sinMandoSec: r.sinMandoSec ?? 0,
       hits: r.hits, meleeHits: r.meleeHits, misses: r.misses,
       crits: r.crits, critDamage: r.critDamage, critRate: r.critRate,
       flurries: r.flurries, ripostes: r.ripostes, healPotential: r.healPotential,
@@ -1009,17 +1015,30 @@ export class Engine extends EventEmitter {
    * Enemigo = te ha pegado a ti o a tu mascota, o tú o tu mascota le habéis
    * pegado. Sin esta separación el "dps del grupo" sumaba los dos bandos y los
    * porcentajes repartían entre atacantes y atacados a la vez.
+   *
+   * CON UNA EXCEPCIÓN, Y ES LA REGLA QUE MANDA: UN COMPAÑERO DECLARADO NUNCA
+   * ACABA EN EL BANDO ENEMIGO. La regla de arriba decide por un golpe, y un
+   * golpe es un dato inestable: en el Plano del Miedo encantan, y con la regla a
+   * secas bastaba UNO para que alguien de tu grupo fuera enemigo el resto de la
+   * pelea, con todo su daño detrás. Declararlo tuyo es una identidad que has
+   * afirmado tú; lo que un golpe suyo puede hacer es apartarse y contarse aparte
+   * —ver `entreTuyos` en `src/encounter.js`—, no cambiarle el bando.
+   *
+   * La guarda va también aquí, y no sólo en el encuentro que ya no le pasa esos
+   * golpes a `byTarget`: esto es la regla, aquello es su consecuencia, y las
+   * peleas que llegan por otros caminos tienen que obedecer la misma.
    */
-  #sides(rows, me, petSet) {
+  #sides(rows, me, petSet, mates = new Set()) {
     const foes = new Set();
     const ours = new Set([me, ...petSet]);
+    const declarado = (n) => ours.has(n) || mates.has(n);
     for (const r of rows) {
       const hitsUs = (r.byTarget ?? []).some(([n]) => ours.has(n));
-      if (hitsUs && !ours.has(r.name)) foes.add(r.name);
+      if (hitsUs && !declarado(r.name)) foes.add(r.name);
     }
     for (const r of rows) {
       if (!ours.has(r.name)) continue;
-      for (const [n] of r.byTarget ?? []) if (!ours.has(n)) foes.add(n);
+      for (const [n] of r.byTarget ?? []) if (!declarado(n)) foes.add(n);
     }
 
     // Quien CURA a un enemigo es enemigo.
@@ -1035,7 +1054,7 @@ export class Engine extends EventEmitter {
     for (let vuelta = 0; vuelta < 4; vuelta++) {
       let nuevos = 0;
       for (const r of rows) {
-        if (foes.has(r.name) || ours.has(r.name)) continue;
+        if (foes.has(r.name) || declarado(r.name)) continue;
         if ((r.healByTarget ?? []).some(([n]) => foes.has(n))) { foes.add(r.name); nuevos++; }
       }
       if (!nuevos) break;
@@ -1058,7 +1077,7 @@ export class Engine extends EventEmitter {
     // en que aporta algo que no sepamos ya.
     const deAhora = new Set(this.parser?.pets.keys() ?? []);
     const petSet = deAhora.size ? deAhora : new Set(this.knownPets);
-    const foeSet = this.#sides(t.rows, me, petSet);
+    const foeSet = this.#sides(t.rows, me, petSet, this.companions);
     // El bando se decide por NOMBRE, y un encantado comparte nombre con el
     // salvaje del mismo tipo: sin esta excepción los dos caían en enemigos y
     // el que peleaba para ti aparecía en el bando contrario.
@@ -1071,11 +1090,71 @@ export class Engine extends EventEmitter {
     // verdad lo que es un enemigo, así que tiene que ser un campo de la pelea y
     // no un trozo de texto dentro del nombre.
     const z = parseZone(enc.zone);
+    /**
+     * EL ÚLTIMO LANZAMIENTO ENEMIGO ANTES DE ESTE SEGUNDO. Por episodio, y sea
+     * el que sea.
+     *
+     * QUÉ ESTABA MAL Y ESTO ARREGLA. La primera versión ponía al lado de estos
+     * tramos un agregado —«el jefe cantó un encanto 8 veces en esta pelea»— y
+     * eso es escoger el candidato bonito. La vecindad se lee antes que el
+     * descargo: una canción de encanto pegada a un tramo «sin control» se lee
+     * como «te encantaron» por mucho que debajo ponga que no se sabe.
+     *
+     * Y CONTRADECÍA LA PROPIA MEDICIÓN. De los 31 tramos sin control del
+     * registro de referencia, el lanzamiento inmediatamente anterior fue:
+     *
+     *   15  Dragon Fear (a dracoliche)          18 de miedo
+     *    2  Fear (Terror)                       ────────────
+     *    1  Panic (a turmoil toad)              10 de encanto
+     *   10  Solon's Bewitching Bravura           3 de otra cosa
+     *    1  Root · 1 Paralyzing Earth · 1 Greater Healing
+     *
+     * O sea que el encanto era el segundo, y aun así era el que se enseñaba
+     * porque es el que explica la historia bonita. Ahora se enseña el de cada
+     * episodio, con su distancia, y en el episodio donde lo último fue una
+     * curación del enemigo se enseña esa curación — que es exactamente lo que
+     * impide leer causa donde sólo hay vecindad.
+     *
+     * LA VENTANA SALE DE LA MEDIDA Y NO HACE FALTA AFINARLA, porque los datos no
+     * tienen término medio: en los 31 tramos el hueco es de 0 a 3 s (mediana 0),
+     * y en los 13 tramos de fuego amigo, o hay uno a 8 s o menos, o no hay
+     * ninguno en toda la pelea. Se toma el doble del peor caso observado —la
+     * misma regla que `CHARM_MAX_SEC` y `MARGEN_TICK`— y sobra sitio.
+     *
+     * `dt` viaja siempre, como el hueco del botín: enseñar la distancia es lo
+     * que permite no pedir que se confíe en la regla.
+     */
+    const VECINO_MAX = 16;
+    const previoDe = (seg) => {
+      let mejor = null;
+      for (const c of enc.casts ?? []) {
+        if (!c.ability || !foeSet.has(c.source)) continue;
+        if (c.t > seg || seg - c.t > VECINO_MAX) continue;
+        if (!mejor || c.t >= mejor.t) mejor = c;
+      }
+      return mejor ? { ability: mejor.ability, source: mejor.source, dt: seg - mejor.t } : null;
+    };
     return {
       id: enc.id,
-      // Con qué reglas están calculadas estas cifras. Va en la pelea y no en el
-      // almacén: en cuanto una parte del histórico se corrige y otra no, una
-      // marca global deja de describir lo que hay dentro. Ver `MODELO_MEDICION`.
+      /**
+       * Con qué reglas están calculadas estas cifras. Va en la pelea y no en el
+       * almacén: en cuanto una parte del histórico se corrige y otra no, una
+       * marca global deja de describir lo que hay dentro. Ver `MODELO_MEDICION`.
+       *
+       * GUARDA DORMIDA, y así la cazó `test/muertos.js`. Su único lector es
+       * `repararModelo` en `store.js`, que decide con él si una pelea vieja hay
+       * que subirla al leerla; ninguna pantalla lo enseña.
+       *
+       * CUÁNDO DESPIERTA, que es lo que hace que no sea salida muerta: cuando
+       * exista una pelea guardada por debajo de `MODELO_MEDICION`. Hoy no puede
+       * haberla —la 1.13.0 fuerza la reconstrucción y todo el histórico nace al
+       * día— pero la habrá la próxima vez que el modelo suba SIN reconstruir,
+       * que es justo lo que pasó en la 1.11.0 y para lo que se inventó este
+       * campo. El día que eso ocurra, `repararModelo` lo lee y decide con él.
+       *
+       * Si algún día se decide que además hay que ENSEÑARLO, el sitio es la
+       * ficha de la pelea, al lado de las cifras que ese modelo calculó.
+       */
       modelo: MODELO_MEDICION,
       // La misma identidad que llevan las cerradas: es lo que permite al
       // overlay saber que el bloque de arriba y el que acaba de llegar por el
@@ -1147,6 +1226,37 @@ export class Engine extends EventEmitter {
       // Lo que no se pudo atribuir del encanto, para poder rotularlo. Nulo
       // cuando no hubo ninguno, que es casi siempre.
       charm: t.charm ?? null,
+      // Dos de los tuyos pegándose entre ellos: quién, cuánto y cuántos
+      // segundos. Está fuera de `total` y fuera de `enemyTotal` a propósito —no
+      // es producción y no es daño enemigo— así que si no viaja en su propio
+      // campo, no queda constancia de que ocurrió. Nulo casi siempre.
+      //
+      // Cada tramo lleva pegado el último lanzamiento enemigo que hubo antes de
+      // que empezara — el suyo, no el más llamativo de la pelea. Ver `previoDe`.
+      entreTuyos: t.entreTuyos
+        ? { ...t.entreTuyos, quien: t.entreTuyos.quien.map((q) => ({ ...q, previo: previoDe(q.desde) })) }
+        : null,
+      // Los segundos en que tu personaje no era tuyo, con sus dos extremos
+      // escritos en el registro. Nulo cuando no perdiste el mando.
+      sinControl: t.sinControl
+        ? t.sinControl.map((x) => ({ ...x, previo: previoDe(x.desde) }))
+        : null,
+      /**
+       * SEGUNDOS QUE NO CUENTAN CONTRA TI, Y LA DURACIÓN QUE QUEDA.
+       *
+       * Con miedo no puedes actuar y con encanto no decides. Los dos son
+       * involuntarios, así que ese tiempo no puede entrar en ningún denominador
+       * de actividad: veinte segundos encantado hunden tu dps por un rato en el
+       * que no manejabas nada, y encima la duración no la eliges tú.
+       *
+       * `duration` SE QUEDA COMO ESTÁ y esto viaja al lado, que es deliberado:
+       * `duration` es la convención comparable con GamParse y ACT, y cambiarla
+       * en silencio haría que tus cifras dejaran de compararse con las de nadie.
+       * Lo que se hace es dar la otra al lado y usarla donde se te juzga — ver
+       * `huecoReal` y el hallazgo de tiempo muerto en `analysis.js`.
+       */
+      sinMandoSec: t.sinMandoSec ?? 0,
+      duracionMando: Math.max(1, t.duration - (t.sinMandoSec ?? 0)),
       label: (() => {
         // Nombre de la pelea: el enemigo abatido, nunca los tuyos.
         const foesDown = enc.kills.filter((k) => foeSet.has(k.victim));
@@ -1177,6 +1287,11 @@ export class Engine extends EventEmitter {
       fades: (enc.fades ?? []).slice(0, 400),
       castsCut: Math.max(0, (enc.casts ?? []).length - 1200),
       resistsCaused: enc.resistsCaused,
+      // De quién y de qué. `resistsCaused` a secas es un número que no se puede
+      // usar para nada; esto va a la ficha del enemigo, que es donde una
+      // proporción dice algo. Es el sitio al que se muda `resist_by_you` al
+      // salir de la pista del reproductor.
+      resistsByFoe: [...(enc.resistedByYou ?? new Map()).values()],
       interrupts: enc.interrupts,
       closed: enc.closed,
       start: enc.start,
@@ -1330,6 +1445,10 @@ export class Engine extends EventEmitter {
   /** Dónde se guardan las peleas. Lo fija el proceso principal. */
   setStorePath(dir) {
     this.store = new FightStore(dir);
+    // El almacén es nuevo y la lista de compañeros no: sin esto, cambiar de
+    // carpeta de datos dejaba de marcar las peleas afectadas hasta que volvieras
+    // a tocar la lista. Es la misma cura que la del rastreador en `attach`.
+    this.store.setCompanions(this.companions);
     // Las mascotas cambian de nombre en cada invocación y el parser sólo
     // recuerda las de esta sesión. Sin una lista acumulada, el histórico de
     // ayer no puede reconocer a las de ayer.
@@ -1644,6 +1763,9 @@ export class Engine extends EventEmitter {
     // Y al rastreador, que los necesita para saber si abrir una pelea en la que
     // no llegaste a pegar. Sin esta línea la lista existía sólo para pintar.
     this.tracker?.setCompanions(this.companions);
+    // Y al almacén, que con ella puede marcar al leer las peleas viejas donde
+    // uno de ellos quedó en el bando enemigo. Ver `dudaCompa` en `store.js`.
+    this.store?.setCompanions(this.companions);
     return [...this.companions];
   }
 

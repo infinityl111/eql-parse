@@ -22,7 +22,13 @@ export const CATEGORIES = Object.fromEntries(CAT_KEYS.map((k) => [k, {
 const KEYS = {
   heal: ['heal', 'healing', 'remedy', 'renewal', 'mend', 'salve', 'cure wounds',
          'celestial', 'restor', 'regenerat', 'rejuven'],
-  charm: ['charm', 'beguile', 'dominate', 'dominion', 'allure', 'cajol', 'command of'],
+  // `bewitch` entra por lo medido: `Solon's Bewitching Bravura` sale 53 veces en
+  // el registro de referencia, la canta el jefe del Plano del Miedo, y es la
+  // única señal escrita que hay cerca de los tramos en que un compañero se puso
+  // a pegarle al grupo. Sin ella el encanto cantado no era ninguna categoría.
+  // Las demás canciones de bardo se quedan sin clasificar a propósito: sabría
+  // ponerles nombre de memoria y en el registro no hay con qué comprobarlo.
+  charm: ['charm', 'beguile', 'bewitch', 'dominate', 'dominion', 'allure', 'cajol', 'command of'],
   mez: ['mesmeriz', 'mez', 'enthrall', 'entrance', 'lull', 'sleep', 'dazzle', 'blanket of forgetful'],
   fear: ['fear', 'panic', 'terror', 'horrify', 'invoke fear', 'scream of'],
   root: ['root', 'ensnare', 'snare', 'immobiliz', 'paraly', 'engulfing dark',

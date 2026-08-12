@@ -129,10 +129,33 @@ function estable(x) {
  *                         objeto lleva de dónde salió: `via`, `amb` y `dt`, el
  *                         hueco medido entre la muerte de su cadáver y la
  *                         recogida.
+ *   8b5e345e669f162b  v9  la 1.13.0. Dos campos nuevos y los dos son cosas que
+ *                         pasaban y no se guardaban: `entreTuyos` —dos de los
+ *                         tuyos pegándose entre ellos, con quién y cuántos
+ *                         segundos— y `sinControl`, los tramos en que el
+ *                         registro dice que tu personaje dejó de ser tuyo.
+ *   fd0777ef4da59c0d  v9  y la última de la misma versión sin publicar: `resistsByFoe`,
+ *                         que es a donde se muda `resist_by_you` al salir de la
+ *                         pista del reproductor — de quién y de qué, en vez de
+ *                         un número por pelea que no se podía usar para nada.
+ *   ecef0b9883deca6b  v9  antes de eso, en la misma versión: los tramos sin
+ *                         mando pasan a descontarse de los denominadores, así
+ *                         que la pelea guarda además `sinMandoSec` y
+ *                         `duracionMando`, y `huecoReal` ya no cobra esos
+ *                         segundos. La huella cambia sin que el número suba
+ *                         porque el 9 no ha salido de aquí.
+ *
+ *                         Y ESTA SUBIDA NO PIDE RECONSTRUIR. `RECONSTRUIR_DESDE`
+ *                         se queda en 8 a propósito: lo que las peleas viejas
+ *                         tienen mal —un compañero encantado contado como
+ *                         enemigo— se DETECTA leyéndolas, y se marca con el
+ *                         mecanismo de dudas. Arreglarlo exigiría releer el
+ *                         registro; detectarlo es gratis. Ver `dudaCompa` en
+ *                         `src/store.js`.
  */
 const ANOTADO = {
-  version: 8,
-  huella: '953dbd521cbe0dcc',
+  version: 9,
+  huella: 'fd0777ef4da59c0d',
 };
 
 console.log('\nel formato de lo guardado');

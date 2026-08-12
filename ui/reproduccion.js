@@ -23,6 +23,7 @@ import { guion, agrupar } from '../src/guion.js';
 import { Parser } from '../src/parser.js';
 import { enCobre } from '../src/patterns.js';
 import { grafica, W, H, BAND } from './grafica.js';
+import { posEnTiempo, cuboDe } from './tiempo.js';
 import { barra as barraCasteo } from '../src/casteos.js';
 import { mostrarRotulo, ocultarRotulo, visible as rotuloVisible } from './rotulo.js';
 
@@ -68,6 +69,286 @@ function monedaCorta(cp) {
     if (n > 0) { partes.push(`${n.toLocaleString('es-ES')}${sufijo}`); resto -= n * valor; }
   }
   return partes.length ? partes.join(' ') : '0c';
+}
+
+/**
+ * LA PISTA DE CAMBIOS DE ESTADO: qué entra, y con qué peso se dibuja.
+ *
+ * QUÉ ENTRA, MEDIDO Y NO ELEGIDO. Los números son UNA FOTO —700 peleas de un
+ * histórico real, 12 de agosto de 2026— y se recalculan, no se heredan.
+ *
+ * CADA PAR CUENTA COMO UN ESTADO, y esto costó una re-derivación entera: un
+ * aturdimiento son DOS líneas, «You are stunned!» y «You are no longer
+ * stunned.», así que los 2.853 sucesos `stun` de la primera medición eran 1.439
+ * aturdimientos contados dos veces. Sobre esos 2.853 se había sacado el salto
+ * que decide dónde empieza «lo raro», o sea que el corte estaba puesto sobre
+ * una cuenta inflada.
+ *
+ *     resist_by_you   1.972
+ *     stun            1.439   ×1,37
+ *     root              703   ×2,05
+ *     survival          603   ×1,17
+ *     absorb             91   ×6,63   <- EL SALTO
+ *     charm              43   ×2,12
+ *     knockdown          36   ×1,19
+ *
+ * El mayor salto está entre `survival` y `absorb`, así que lo raro empieza ahí.
+ * `survival` estuvo en peso 3 con la cuenta vieja y vuelve a 2 con la buena: la
+ * corrección era correcta para los números que había, y los números estaban mal.
+ *
+ * Y QUÉ NO ENTRA: `stagger` (19 por pelea de mediana, y le pasa al ENEMIGO) y
+ * `proc` (10 por pelea). No es que no signifiquen nada: son el fondo, y una
+ * pista donde todo está marcado no marca nada.
+ *
+ * EL PESO SALE DE LA RAREZA. Dibujadas con el mismo peso, las tres de abajo
+ * —absorb, charm, knockdown, que juntas son el 3%— desaparecerían entre las dos
+ * de arriba, que son el 70%. La rareza mide la información.
+ *
+ * Y HAY UNA ASIMETRÍA DE FONDO EN `resist_by_you`: un aturdimiento es algo que
+ * te PASÓ; un resistido es algo que NO te pasó. Es la explicación de un hueco en
+ * la curva, no un suceso que la llene. Por eso es la marca más tenue de todas,
+ * por debajo incluso de lo que le tocaría por frecuencia — y es la única
+ * exención a la regla, enumerada con su motivo en `test/loot.js`.
+ *
+ *   peso 1  tenue     lo que NO pasó (sólo `resist_by_you`)
+ *   peso 2  normal    lo común que sí pasó
+ *   peso 3  marcado   lo raro: lo que cae después del salto
+ */
+/**
+ * QUÉ SE CAYÓ DE LA PISTA EN LA 1.13.0, Y NO ES UN RECORTE DE ESPACIO.
+ *
+ *   `root`            703 apariciones. Una raíz no explica la curva: te deja
+ *                     donde estás y sigues pegando si tienes objetivo delante.
+ *                     Estaba aquí por frecuencia, no por poder explicativo, y en
+ *                     una pista donde todo está marcado no se marca nada. LA
+ *                     REGLA DE `patterns.js` NO SE TOCA: se sigue reconociendo,
+ *                     se sigue guardando y el consejo la sigue usando; lo único
+ *                     que cambia es que no se dibuja.
+ *   `resist_by_you`   1.972, la más frecuente de todas. Y es la que peor encaja:
+ *                     un resistido es algo que NO te pasó, así que llenaba de
+ *                     marcas la pista para explicar huecos. Su sitio es una
+ *                     estadística POR ENEMIGO —«a este bicho le resistes 4 de
+ *                     cada 5»— que es lo que se ha hecho con ella: ver
+ *                     `resistsByFoe`. El coste está dicho donde toca: es un
+ *                     campo nuevo por pelea, así que sólo lo tienen las peleas
+ *                     escritas desde la 1.13.0 y las viejas lo tendrán al
+ *                     reconstruir.
+ */
+export const PISTA = new Map([
+  ['stun', { peso: 2, clave: 'rp.est.stun', par: true }],
+  ['survival', { peso: 2, clave: 'rp.est.survival' }],
+  ['absorb', { peso: 3, clave: 'rp.est.absorb' }],
+  ['charm_on', { peso: 3, clave: 'rp.est.charmOn', deducido: true }],
+  ['charm_off', { peso: 3, clave: 'rp.est.charmOff', deducido: true }],
+  ['knockdown', { peso: 3, clave: 'rp.est.knockdown' }],
+  // Perder el mando del personaje. Peso 3 y no 2: son 31 tramos en un registro
+  // de 55 MB frente a 1.429 aturdimientos, y sobre todo son la única marca que
+  // explica por qué durante nueve segundos no hiciste nada — que es justo el
+  // hueco que el análisis te estaba cobrando como tiempo parado.
+  ['control', { peso: 3, clave: 'rp.est.control', par: true }],
+]);
+
+/**
+ * LO QUE DURA UN ESTADO SE DIBUJA COMO UNA BARRA, NO COMO DOS PUNTOS.
+ *
+ * `par: true` llevaba versiones declarado y SIN LEER —una bandera muerta, la
+ * misma familia que `f.duda`—. El registro escribe los dos extremos de un
+ * aturdimiento y de una pérdida de mando, así que la duración está medida y se
+ * estaba tirando: seis marcas donde hay tres estados, y ninguna dice cuánto
+ * duró. Medido: 2.853 sucesos `stun` son 1.429 aturdimientos, con 2 s de
+ * mediana.
+ *
+ * LOS EXTREMOS ABIERTOS SON LA MITAD DEL TRABAJO. Un estado puede empezar antes
+ * de la pelea o no cerrarse dentro de ella —te aturden en el último segundo, o
+ * la reproducción arranca contigo ya aturdido—, y ahí sólo se conoce un lado. Se
+ * dibuja hasta el borde y se marca abierto, que es distinto de decir que duró
+ * hasta el final.
+ *
+ * Y LA REGLA DEL CUBO: si la barra no llega a medir un cubo de dibujo, se pinta
+ * el punto de siempre. Una barra de dos píxeles no informa de una duración —no
+ * se distingue de un punto— y encima pierde el número cuando hay varios
+ * apilados. Con la mediana de 2 s sobre una pelea de dos minutos, la mayoría de
+ * los aturdimientos caen de ese lado, y está bien: lo que la barra tiene que
+ * enseñar es el estado LARGO, que es el que explica un hueco de la curva.
+ */
+export function tramosDePista(sucesos, duracion) {
+  const fuera = [];
+  const tramos = [];
+  const abiertos = new Map();          // clase -> suceso de apertura
+  for (const x of sucesos ?? []) {
+    if (!PISTA.get(x.clase)?.par) { fuera.push(x); continue; }
+    if (x.on === true) {
+      // Dos aperturas seguidas sin cierre: la segunda manda y la primera se
+      // cierra donde empieza la segunda, que es lo único que se sabe.
+      const previo = abiertos.get(x.clase);
+      if (previo) tramos.push({ clase: x.clase, desde: previo.s, hasta: x.s, abre: false, cierra: true, quien: previo.quien });
+      abiertos.set(x.clase, x);
+    } else {
+      const ini = abiertos.get(x.clase);
+      abiertos.delete(x.clase);
+      tramos.push({
+        clase: x.clase,
+        desde: ini ? ini.s : 0,
+        hasta: x.s,
+        // Sin apertura, el estado venía de antes de la pelea.
+        abre: !ini,
+        cierra: false,
+        quien: (ini ?? x).quien,
+      });
+    }
+  }
+  // Lo que se quedó abierto llega al final de la pelea, y se dice.
+  for (const [clase, ini] of abiertos) {
+    tramos.push({ clase, desde: ini.s, hasta: duracion, abre: false, cierra: true, quien: ini.quien });
+  }
+  return { tramos: tramos.sort((a, b) => a.desde - b.desde), sueltos: fuera };
+}
+
+/** Píxeles de un cubo de dibujo, y cuántos se perdonan al pinchar. */
+const PX_CUBO = 4;
+const PX_CLIC = 10;
+
+/**
+ * Los sucesos de la pista, del guion.
+ *
+ * EL EJE NO ES «lo que me pasó a mí» SINO «lo que explica esta curva desde tu
+ * sitio», y la diferencia la destapó el encanto: `charm_on` lleva de destino al
+ * BICHO y de origen a ti, así que un filtro por destino se quedaba mudo justo
+ * en las sesiones de encantador — y `charm_off` aparecería o no según quién lo
+ * causara, o sea incoherente consigo mismo. Medido: incluir el origen añade 61
+ * marcas en 15 peleas y no mueve ninguna mediana.
+ *
+ * ESOS 61 SE MIDIERON SOBRE UN CORPUS ANTERIOR a las sesiones de encantador, así
+ * que el número VA A SUBIR. No cambia la decisión: lo que protege la pista de
+ * saturarse es el colapso por cubo y por clase, no que las marcas sean pocas.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * DIVERGENCIA CONOCIDA, ANOTADA PARA QUE NO SORPRENDA: en las 18 peleas
+ * afectadas por el fallo del encanto, ESTA PISTA DIRÁ LO CORRECTO Y LA PELEA
+ * GUARDADA SEGUIRÁ DICIENDO LO VIEJO.
+ *
+ * No es un fallo nuevo ni de la pista: pasa desde la 1.11.0, porque la
+ * reproducción RELEE el registro con el código de hoy mientras la pelea se
+ * escribió con el de entonces. Lo que cambia es que hasta ahora no se veía y
+ * ahora se va a ver — un encanto marcado en la pista de una pelea cuyo reparto
+ * de daño se calculó sin saber que ese bicho era tuyo.
+ *
+ * Se deja así a propósito: preferimos que se vea. Arreglarlo es reconstruir, y
+ * reconstruir cuesta fronteras movidas (ver `AVISO_RECONSTRUIR`).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export function sucesosDePista(g, self) {
+  const out = [];
+  (g.segundos ?? []).forEach((lista, s) => {
+    for (const x of lista ?? []) {
+      if (x?.tipo !== 'estado' || !PISTA.has(x.clase)) continue;
+      // `self` PUEDE SER NULO —pasa mientras el nombre no se ha deducido del
+      // registro— y sin esta guarda `x.origen === self` casaba null con null y
+      // se colaba TODO lo que no tuviera origen. Sin nombre no se puede decir
+      // qué es tuyo, así que sólo pasa el encanto, que se sabe por otra vía.
+      const mio = !!self && (x.destino === self || x.origen === self);
+      const esEncanto = x.clase === 'charm_on' || x.clase === 'charm_off';
+      if (!mio && !esEncanto) continue;
+      // `on` viaja porque es lo que permite emparejar los dos extremos de un
+      // estado y dibujar una barra en vez de dos puntos. Sin él, la duración
+      // que el registro sí da se perdía aquí. Ver `tramosDePista`.
+      out.push({ s, clase: x.clase, on: x.on ?? null,
+        quien: x.destino ?? x.origen ?? null, habilidad: x.habilidad ?? null });
+    }
+  });
+  return out;
+}
+
+/**
+ * LAS MARCAS YA COLAPSADAS, A PARTIR DE LOS SUCESOS Y DEL ANCHO REAL.
+ *
+ * VIVE FUERA DEL MONTAJE Y DEVUELVE DATOS, y ésa es la razón de que exista como
+ * función suelta: LO QUE FALLÓ FUE EL DIBUJO, NO EL CÁLCULO. `sucesosDePista`
+ * tenía prueba y esto no, así que un `cuboDe` sin importar —un `ReferenceError`
+ * en tiempo de ejecución, no un error de sintaxis— dejaba la pista vacía con la
+ * batería entera en verde y la guarda de «todo ui/*.js compila» sin poder verlo:
+ * compilar no es funcionar. Se descubrió abriendo la aplicación y contando cero
+ * marcas, y la próxima vez nadie la va a abrir.
+ *
+ * Partido así, una prueba puede pintar una pelea y contar lo que sale.
+ */
+export function marcasDePista(sucesos, duracion, anchoPx, pxCubo = PX_CUBO) {
+  if (!sucesos?.length || !(anchoPx > 0)) return [];
+  // Un cubo por cada `pxCubo` píxeles, Y UNA MARCA POR CLASE DENTRO DE ÉL.
+  // Fundir clases distintas en un «×3» daría un número que no dice nada: un
+  // aturdimiento, un absorbido y un resistido en el mismo hueco no son tres
+  // veces lo mismo, son tres cosas.
+  const cubos = new Map();
+  for (const x of sucesos) {
+    const c = cuboDe(x.s, duracion, anchoPx, pxCubo);
+    const k = `${c}|${x.clase}`;
+    const e = cubos.get(k) ?? { cubo: c, clase: x.clase, n: 0, s: x.s, quienes: new Set() };
+    e.n++;
+    if (x.quien) e.quienes.add(x.quien);
+    cubos.set(k, e);
+  }
+  return [...cubos.values()].map((e) => {
+    const info = PISTA.get(e.clase);
+    return {
+      ...e,
+      peso: info?.peso ?? 2,
+      deducido: !!info?.deducido,
+      px: Math.round(posEnTiempo(e.s, duracion) * anchoPx),
+    };
+  }).sort((a, b) => a.px - b.px);
+}
+
+/**
+ * Los tramos, en píxeles, con la regla del cubo aplicada.
+ *
+ * Devuelve dos cosas: los que dan para barra y los que no, y estos últimos
+ * vuelven a la cola de puntos con la forma que espera `marcasDePista`. Así la
+ * decisión se toma UNA vez y en un sitio que se puede probar sin navegador.
+ */
+export function barrasDePista(tramos, duracion, anchoPx, pxCubo = PX_CUBO) {
+  const barras = [];
+  const aPunto = [];
+  for (const tr of tramos ?? []) {
+    const x1 = Math.round(posEnTiempo(tr.desde, duracion) * anchoPx);
+    const x2 = Math.round(posEnTiempo(tr.hasta, duracion) * anchoPx);
+    if (x2 - x1 < pxCubo) {
+      // No llega al cubo: punto, y con el instante en que empezó.
+      aPunto.push({ s: tr.desde, clase: tr.clase, quien: tr.quien, habilidad: null });
+      continue;
+    }
+    barras.push({ ...tr, px: x1, ancho: x2 - x1, peso: PISTA.get(tr.clase)?.peso ?? 2 });
+  }
+  return { barras, aPunto };
+}
+
+/** Las barras, en HTML. Los extremos abiertos llevan su marca y su explicación. */
+export function pintaBarras(barras, reloj) {
+  return (barras ?? []).map((b) => {
+    const info = PISTA.get(b.clase);
+    const nombre = info ? t(info.clave) : b.clase;
+    const dur = Math.max(0, b.hasta - b.desde);
+    const abierto = b.abre || b.cierra;
+    const titulo = `${reloj(b.desde)} → ${reloj(b.hasta)} · ${nombre} · ${dur} s`
+      + (b.quien ? ` — ${b.quien}` : '')
+      + (abierto ? ` · ${t(b.abre ? 'rp.pista.abreAntes' : 'rp.pista.cierraDespues')}` : '');
+    return `<i class="rp-tramo e-${esc(b.clase)} p${b.peso}${b.abre ? ' abre' : ''}${b.cierra ? ' cierra' : ''}"
+      style="left:${b.px}px;width:${b.ancho}px" data-s="${b.desde}" title="${esc(titulo)}"></i>`;
+  }).join('');
+}
+
+/** Las marcas, en HTML. Separado del cálculo para poder mirarlo sin navegador. */
+export function pintaMarcas(marcas, reloj) {
+  return (marcas ?? []).map((m) => {
+    const info = PISTA.get(m.clase);
+    const nombre = info ? t(info.clave) : m.clase;
+    const quien = m.quienes?.size === 1 ? [...m.quienes][0] : null;
+    const titulo = `${reloj(m.s)} · ${nombre}${m.n > 1 ? ` ×${m.n}` : ''}`
+      + (quien ? ` — ${quien}` : '')
+      + (m.deducido ? ` · ${t('rp.pista.deducido')}` : '');
+    return `<i class="rp-marca e-${esc(m.clase)} p${m.peso}${m.deducido ? ' dedu' : ''}"
+      style="left:${m.px}px" data-s="${m.s}" title="${esc(titulo)}"
+      >${m.n > 1 ? `<b>${m.n}</b>` : ''}</i>`;
+  }).join('');
 }
 
 /**
@@ -389,11 +670,12 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
       ${gr ? `${gr.band ? `<svg class="rp-band" viewBox="0 0 ${W} ${BAND}" preserveAspectRatio="none">${gr.band}</svg>` : ''}
         <svg class="rp-graf" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${gr.svg}</svg>
         <div class="rp-hitos">${gr.hitos.map((h) => `<i class="rp-hito ${h.clase}"
-          style="left:${(h.s / g.duracion * 100).toFixed(3)}%" title="${esc(h.texto)}"></i>`).join('')}</div>`
+          style="left:${(posEnTiempo(h.s, g.duracion) * 100).toFixed(3)}%" title="${esc(h.texto)}"></i>`).join('')}</div>`
     : `<div class="rp-lisa"></div>`}
       <div class="rp-cursor" id="rpCursor"></div>
       <button class="rp-punto" id="rpPunto" aria-label="${esc(t('rp.seekHint'))}"></button>
     </div>
+    <div class="rp-pista" id="rpPista" role="group" aria-label="${esc(t('rp.pista.title'))}"></div>
     <div class="rp-escena">
       ${columna(aliados, 'aliado')}
       <div class="rp-medio"><div class="rp-vs eyebrow">${esc(t('rp.vs'))}</div></div>
@@ -411,6 +693,49 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
 
   const $ = (id) => host.querySelector(`#${id}`);
   const elReloj = $('rpReloj'), elCursor = $('rpCursor'), elTexto = $('rpTexto');
+
+  // ── La pista de cambios de estado ──────────────────────────────────────
+  //
+  // Se dibuja aparte de la plantilla porque NECESITA EL ANCHO REAL: el colapso
+  // no se puede definir en segundos —una pelea de 1.434 s y otra de 84 caben en
+  // el mismo ancho, así que en la larga dos segundos comparten píxel y en la
+  // corta un segundo son diez— y ese ancho no existe hasta que el elemento está
+  // en la página. Y se repinta al cambiar de tamaño, que es cuando el cubo deja
+  // de valer.
+  const elPista = $('rpPista');
+  const sucesosPista = sucesosDePista(g, self);
+  let marcasPista = [];             // {px, s, clase, n} ya colapsadas
+
+  function pintarPista() {
+    if (!elPista) return;
+    const ancho = Math.round(elPista.getBoundingClientRect().width);
+    if (!ancho) return;
+    // Primero los estados con dos extremos, que son barras; lo que no dé para
+    // barra vuelve a la cola de puntos. Ver `tramosDePista` y `barrasDePista`.
+    const { tramos, sueltos } = tramosDePista(sucesosPista, g.duracion);
+    const { barras, aPunto } = barrasDePista(tramos, g.duracion, ancho);
+    marcasPista = marcasDePista([...sueltos, ...aPunto], g.duracion, ancho);
+    elPista.innerHTML = pintaBarras(barras, reloj) + pintaMarcas(marcasPista, reloj);
+  }
+
+  /**
+   * EL CUBO ES LA UNIDAD DE DIBUJO, NO LA DE PINCHAR.
+   *
+   * Cuatro píxeles se ven; acertarlos con el ratón, no. El objetivo es la marca
+   * MÁS CERCANA dentro de `PX_CLIC`, no el cubo en el que caes. Una marca
+   * visible que no se deja abrir es peor que no haberla dibujado.
+   */
+  function marcaCercana(clientX) {
+    if (!marcasPista.length) return null;
+    const caja = elPista.getBoundingClientRect();
+    const x = clientX - caja.left;
+    let mejor = null;
+    for (const m of marcasPista) {
+      const d = Math.abs(m.px - x);
+      if (d <= PX_CLIC && (!mejor || d < mejor.d)) mejor = { m, d };
+    }
+    return mejor?.m ?? null;
+  }
   const elPlay = $('rpPlay'), elNota = $('rpNota'), elPunto = $('rpPunto');
 
   const elReglas = $('rpReglas');
@@ -700,7 +1025,7 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
 
   function pintarReloj() {
     elReloj.textContent = reloj(s);
-    const pct = `${(s / g.duracion * 100).toFixed(3)}%`;
+    const pct = `${(posEnTiempo(s, g.duracion) * 100).toFixed(3)}%`;
     elCursor.style.left = pct;
     elPunto.style.left = pct;    // el punto se mueve solo mientras reproduce
     pintarPresentes();
@@ -849,9 +1174,33 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
   };
   document.addEventListener('keydown', teclas);
 
+  /**
+   * PINCHAR UNA MARCA LLEVA A SU SEGUNDO, que es lo que se quiere hacer al
+   * verla. Y el objetivo se busca por cercanía, no por el cubo: ver `marcaCercana`.
+   */
+  elPista?.addEventListener('click', (e) => {
+    const m = marcaCercana(e.clientX);
+    if (m) irA(m.s);
+  });
+
+  pintarPista();
+  /**
+   * Y SE REPINTA AL CAMBIAR DE TAMAÑO, porque el cubo de colapso sale del ancho
+   * REAL: la misma pelea pasa de 838 px a 2.003 al maximizar, y marcas que
+   * compartían cubo dejan de compartirlo. Sin esto, la pista se quedaría con el
+   * colapso del tamaño que tuviera al abrirse.
+   */
+  const observador = typeof ResizeObserver === 'function' ? new ResizeObserver(() => pintarPista()) : null;
+  if (observador && elPista) observador.observe(elPista);
+
   pintarReloj();
   return {
-    destruir() { parar(); ocultarRotulo(); document.removeEventListener('keydown', teclas); },
+    destruir() {
+      parar();
+      ocultarRotulo();
+      document.removeEventListener('keydown', teclas);
+      observador?.disconnect();
+    },
     guion: g,
   };
 }

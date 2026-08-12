@@ -28,6 +28,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { IDIOMAS, CON_PROSA, NOMBRE_IDIOMA, T, FUNCIONES } from './textos.js';
 import { setLang, t } from '../src/i18n.js';
+import { sustituirRotulos } from './rotulos.mjs';
 
 const RAIZ = path.dirname(fileURLToPath(import.meta.url));
 const PROY = path.join(RAIZ, '..');
@@ -627,7 +628,7 @@ function notasDe(tag, lang) {
   const version = String(tag ?? '').replace(/^v/, '');
   if (!version) return null;
   const p = path.join(RAIZ, 'notas', `${version}.${lang}.md`);
-  try { return fs.readFileSync(p, 'utf8'); } catch { return null; }
+  try { return sustituirRotulos(fs.readFileSync(p, 'utf8'), lang); } catch { return null; }
 }
 
 function novedades(lang, rels) {
@@ -803,6 +804,54 @@ async function main() {
    * A los buscadores esto no les confunde: las cinco versiones se declaran con
    * `hreflang` y cada una tiene su canónica.
    */
+  /**
+   * LAS NOTAS YA SUSTITUIDAS, para subirlas como adjuntos de la release.
+   *
+   * El cartel de actualización de la aplicación las lee de ahí —igual que ya lee
+   * el `latest.yml`— y así un alemán ve en alemán lo que va a instalar. Ver
+   * `consultar()` en `src/actualizar.js`.
+   *
+   * SE ESCRIBEN AQUÍ Y NO SE SUBE EL FUENTE, y ésa es la razón de que esto viva
+   * en el mismo sitio que la sustitución: lo que se publica tiene que ser el
+   * `.md` CON los rótulos puestos. Subir `web/notas/*.md` a pelo pondría
+   * `{{adv.notSegmented}}` con las llaves a la vista en el cartel de todo el
+   * mundo. Y el cuerpo en español de la release sale del mismo sitio, nunca del
+   * fuente.
+   *
+   * Sólo la versión que se está publicando: las veinte anteriores ya tienen su
+   * cuerpo en la API y no se reescriben.
+   */
+  const versionHoy = JSON.parse(fs.readFileSync(path.join(PROY, 'package.json'), 'utf8')).version;
+  let notasListas = 0;
+  await fsp.mkdir(path.join(DIST, 'notas'), { recursive: true });
+  for (const lang of IDIOMAS) {
+    const fuente = path.join(RAIZ, 'notas', `${versionHoy}.${lang}.md`);
+    if (!fs.existsSync(fuente)) continue;
+    const texto = sustituirRotulos(fs.readFileSync(fuente, 'utf8'), lang);
+    await fsp.writeFile(path.join(DIST, 'notas', `${versionHoy}.${lang}.md`), texto);
+    notasListas++;
+  }
+  /**
+   * EL PASO SE IMPRIME AQUÍ, con el comando hecho.
+   *
+   * Subir estos `.md` como adjuntos es un paso NUEVO del ritual de publicar, y
+   * es de los que se olvidan sin consecuencia visible: si faltan, el cartel de
+   * actualización cae al cuerpo en español y funciona — sólo que un alemán lee
+   * en español justo cuando decide si instala algo que le va a mover el
+   * histórico. Un fallo silencioso, que es la clase que este proyecto persigue.
+   *
+   * Por eso no va en un documento aparte sino en la salida de la herramienta
+   * que los produce: quien acaba de construir la web tiene el comando delante.
+   */
+  if (notasListas) {
+    console.log(`  notas de la ${versionHoy}: ${notasListas} idiomas listos en dist/notas/`);
+    console.log('\n  AL PUBLICAR, súbelos como adjuntos de la release o el cartel');
+    console.log('  de actualización saldrá en español para todo el mundo:');
+    console.log(`    gh release upload v${versionHoy} web/dist/notas/*.md\n`);
+  } else {
+    console.log(`  notas de la ${versionHoy}: NO HAY FICHERO en web/notas/ — el cartel caerá al cuerpo de la release`);
+  }
+
   await fsp.writeFile(path.join(DIST, '_redirects'), '/  /en/  302\n');
   // Un mapa para los buscadores, con las cinco versiones de cada página.
   const urls = IDIOMAS.flatMap((l) => paginas.map(([f]) => `${DOMINIO}/${l}/${f}`));

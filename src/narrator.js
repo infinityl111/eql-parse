@@ -17,6 +17,60 @@ import { classifySpell, shortName, CATEGORIES, DEFAULT_CAST_CATEGORIES } from '.
  *  - Nada de leer lo que escribes tú, ni repetir el mismo mensaje seguido.
  */
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * NO HAY AVISO DE ENRAGE, Y NO ES UN OLVIDO: SE MIDIÓ Y NO HAY SEÑAL.
+ *
+ * Esto está escrito aquí —y no en un chat que se pierde— porque «avisar de los
+ * enrages» es una idea que se le ocurre a cualquiera mirando un log, y va a
+ * volver a proponerse. La respuesta tiene que ser un número.
+ *
+ * LA PREGUNTA. ¿Hay frases en el registro que anticipen un subidón de daño del
+ * jefe, y con cuánta antelación?
+ *
+ * EL CONTROL, que es lo que hace que esto signifique algo. Un jefe pega más
+ * según avanza la pelea —fases, adds, a ti se te acaban los recursos— así que
+ * cualquier frase que tienda a salir tarde parece profética sin serlo. Se
+ * midieron instantes repartidos por las mismas peleas con exactamente la misma
+ * regla que las candidatas.
+ *
+ *   CONTROL   23.040 instantes · 576 peleas
+ *             27 dps antes · 26 después · sube en el 46% de los casos
+ *
+ * El suelo es limpio: en ventanas de 10 s el daño NO sube solo. Si una frase
+ * avisara, se vería.
+ *
+ * LAS CANDIDATAS, medidas como INICIOS DE RACHA y no como apariciones —una
+ * línea que se repite cada 6 s durante un enrage sale «periódica», pero el
+ * principio de la racha sigue siendo un suceso, así que se exigió 30 s de
+ * silencio antes de contar un inicio—:
+ *
+ *   accelerated frenzy    449 arranques   sube en el 49%   Δ 0 dps
+ *   <N> rages              13 arranques   sube en el 54%   Δ +5 dps
+ *   goes berserk           23 arranques   sube en el 39%   Δ 0 dps
+ *   begins to move faster  61 arranques   sube en el 36%   Δ −3 dps
+ *   <N>'s voice booms     409 apariciones y CERO dentro de una pelea:
+ *                         es ambiente de zona, no del jefe
+ *
+ * NINGUNA DESPEGA DEL 46% DEL AZAR. La muestra grande —449 arranques— da
+ * exactamente el suelo. `rages` marca +5 dps con 13 arranques, que es muestra
+ * insuficiente y una variación menor que el ruido normal.
+ *
+ * No se llegó a medir la antelación porque no hay subida cuya antelación medir.
+ *
+ * EL LÍMITE DEL INSTRUMENTO, que hay que leer antes de dar esto por cerrado: se
+ * midió DAÑO ENTRANTE AL USUARIO en VENTANAS DE 10 s. Un pico dirigido al
+ * tanque, o más corto que 10 s, no sería visible con esta medición.
+ *
+ * CONSECUENCIAS, y son dos:
+ *   · `voice booms` sale de la lista de candidatas a aviso por las cero
+ *     apariciones dentro de pelea.
+ *   · Ninguna frase de esta familia entra como AVISO DE DAÑO mientras no se
+ *     despegue del 46%. Pueden entrar como etiqueta descriptiva en la pista de
+ *     estado del reproductor, que es otra cosa: describe lo que pasó y no
+ *     promete anticipación.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 export const DEFAULT_NARRATE = {
   chat: {
     tell: true, group: true, guild: true, raid: true,

@@ -417,5 +417,301 @@ console.log('\nla ficha del final del reproductor');
   ok(dudoso.includes('rpb-tag duda'), 'la recogida con dos cadáveres posibles se marca');
 }
 
+/**
+ * LA PISTA DE ESTADOS: qué entra, qué no, y con qué peso.
+ *
+ * No se comprueba que dibuje, sino las tres decisiones que se midieron: que el
+ * fondo se queda fuera, que el eje incluye lo que TÚ provocas —sin eso la pista
+ * enmudece justo en las sesiones de encantador— y que el peso ordena por rareza
+ * y no por frecuencia.
+ */
+console.log('\nla pista de cambios de estado');
+{
+  const { sucesosDePista, PISTA } = await import('../ui/reproduccion.js');
+  const g = {
+    duracion: 100,
+    segundos: [
+      [{ tipo: 'estado', clase: 'stun', destino: 'Campeon' }],
+      [{ tipo: 'estado', clase: 'stagger', destino: 'a gorgon' }],
+      [{ tipo: 'estado', clase: 'proc', destino: 'Campeon' }],
+      [{ tipo: 'estado', clase: 'charm_on', destino: 'a hardened skeleton', origen: 'Campeon' }],
+      [{ tipo: 'estado', clase: 'resist_by_you', destino: 'Campeon' }],
+      [{ tipo: 'estado', clase: 'stun', destino: 'Notarino' }],
+      [{ tipo: 'dano', clase: 'melee', destino: 'Campeon' }],
+    ],
+  };
+  const out = sucesosDePista(g, 'Campeon');
+  const clases = out.map((x) => x.clase);
+  ok(clases.includes('stun'), 'el aturdimiento entra');
+  ok(clases.includes('charm_on'), 'EL ENCANTO TUYO ENTRA aunque su destino sea el bicho');
+  ok(!clases.includes('resist_by_you'),
+    'lo que resististe YA NO entra: 1.972 marcas para explicar lo que no pasó. Su'
+    + ' sitio es la estadística por enemigo, ver resistsByFoe');
+  ok(!clases.includes('stagger'), 'el stagger NO entra: 19 por pelea y le pasa al enemigo');
+  ok(!clases.includes('proc'), 'el proc tampoco: 10 por pelea, es el fondo');
+  ok(!out.some((x) => x.quien === 'Notarino'), 'ni lo que le pasa a un compañero');
+  // Tres de siete: entran el aturdimiento tuyo, el encanto y el resistido. Se
+  // quedan fuera el stagger y el proc —el fondo—, el aturdimiento del compañero
+  // y lo que no es un estado.
+  // Dos de siete: entran el aturdimiento tuyo y el encanto. Se quedan fuera el
+  // stagger y el proc —el fondo—, el aturdimiento del compañero, lo que no es un
+  // estado y, desde la 1.13.0, el resistido.
+  ok(out.length === 2, 'dos sucesos de siete', out.length);
+
+  // El peso ordena por RAREZA y no por frecuencia. Si alguien los iguala «para
+  // que se vea todo igual», esto se pone rojo y explica por qué no.
+  ok(!PISTA.has('resist_by_you') && !PISTA.has('root'),
+    'el resistido y la raíz están fuera de la pista, y sus reglas siguen enteras');
+  ok(PISTA.get('absorb').peso > PISTA.get('stun').peso
+    && PISTA.get('knockdown').peso > PISTA.get('stun').peso,
+  'lo raro —absorb 91, knockdown 36— pesa más que lo común —stun 1.439—');
+  ok(PISTA.get('charm_on').deducido === true,
+    'el encanto va marcado como deducido: la línea no dice quién encantó');
+
+  // LOS SIETE PESOS, no cuatro. `survival` estuvo en 2 por descuido y el
+  // criterio lo pone en 3: el salto de la distribución está entre 1.817 y 370.
+  const esperados = {
+    stun: 2, survival: 2,
+    absorb: 3, charm_on: 3, charm_off: 3, knockdown: 3,
+    // `control` entra en la 1.13.0 y es la más rara de las nueve: 31 tramos en
+    // el registro entero, contados como el aturdimiento —por pares, no por
+    // líneas— porque el registro escribe los dos extremos y son un estado.
+    control: 3,
+  };
+  ok(PISTA.size === 7, 'la pista tiene siete clases y no más', PISTA.size);
+  for (const [clase, peso] of Object.entries(esperados)) {
+    ok(PISTA.get(clase)?.peso === peso, `${clase} pesa ${peso}`, PISTA.get(clase)?.peso);
+  }
+  /**
+   * LA REGLA, Y POR QUÉ YA NO NECESITA EXCEPCIÓN.
+   *
+   * La regla es «lo más raro no pesa menos que lo más común». Con la primera
+   * medición había que eximir a `resist_by_you`: parecía más raro que `stun`
+   * —1.817 contra 2.853— y pesaba menos, así que la incumplía, y lo eximía la
+   * ASIMETRÍA: un resistido es algo que NO te pasó, la explicación de un hueco
+   * en la curva y no un suceso que la llene.
+   *
+   * PERO LOS 2.853 ERAN 1.439. Cada aturdimiento son dos líneas y se contaban
+   * dos veces. Con la cuenta buena `resist_by_you` (1.972) es LA MÁS FRECUENTE
+   * de las ocho, así que darle el peso más tenue no incumple nada: lo cumple.
+   *
+   * La asimetría sigue siendo el MOTIVO de que pese 1 —no está ahí por ser
+   * frecuente— pero ha dejado de ser una excepción a la regla. Se quita, que es
+   * lo que decía la propia prueba que había que hacer si algún día pasaba esto.
+   * Y lo detectó ella: al corregir los números se puso roja porque la exención
+   * ya no eximía nada.
+   *
+   * Y LA FRECUENCIA TIENE QUE ESTAR MEDIDA PARA TODAS. Si alguien añade una
+   * clase mañana sin contarla, esto cae — que es justo lo que se quiere, porque
+   * el peso no se puede decidir sin saber cuántas veces pasa.
+   */
+  const FREC = {
+    stun: 1439, survival: 603,
+    absorb: 91, charm_on: 43, charm_off: 43, knockdown: 36,
+    // 31 pares en el registro de referencia —«You lose control of yourself!» y
+    // su cierre—, sin ninguno suelto. Es la clase más rara de la pista, y la
+    // única que explica por qué durante hasta 37 segundos seguidos no hiciste
+    // nada: hasta ahora ese hueco se cobraba como tiempo parado.
+    control: 31,
+  };
+
+  ok([...PISTA.keys()].every((k) => FREC[k] !== undefined)
+    && Object.keys(FREC).length === PISTA.size,
+  'toda clase de la pista tiene su frecuencia medida: sin eso no se puede pesar',
+  `${Object.keys(FREC).length} de ${PISTA.size}`);
+
+  const rompen = [];
+  for (const a of PISTA.keys()) {
+    for (const b of PISTA.keys()) {
+      if (a === b) continue;
+      // `a` es más raro que `b`, así que no puede pesar menos.
+      if (FREC[a] < FREC[b] && PISTA.get(a).peso < PISTA.get(b).peso) rompen.push(`${a} < ${b}`);
+    }
+  }
+  ok(rompen.length === 0,
+    'lo más raro nunca pesa menos que lo más común, SIN excepciones',
+    rompen.length ? rompen.join(' · ') : 'ninguna pareja');
+
+  /**
+   * Y LA EXCEPCIÓN HA DEJADO DE EXISTIR PORQUE LA CLASE HA DEJADO DE ESTAR.
+   *
+   * Aquí se comprobaba que `resist_by_you` seguía siendo la más frecuente, que
+   * era lo que hacía que su peso 1 cumpliera la regla en vez de romperla. En la
+   * 1.13.0 sale de la pista entera —1.972 marcas para explicar lo que NO pasó—
+   * así que no hay nada que eximir: lo que queda cumple la regla a secas, y eso
+   * ya lo comprueba `rompen` de arriba sin ninguna salvedad.
+   *
+   * Lo que sí sigue haciendo falta es que nadie vuelva a meterla sin volver a
+   * pensarlo, y de eso se encarga el recuento de clases.
+   */
+  ok(!Object.keys(FREC).includes('resist_by_you'),
+    'la excepción se fue con su clase: ya no hay ninguna que eximir');
+}
+
+/**
+ * SEIS MARCAS DONDE HAY TRES ESTADOS. La barra, y la regla del cubo.
+ *
+ * ESTA PRUEBA SE ESTRENA EN ROJO, y contra qué es lo que importa: con tres
+ * aturdimientos el registro escribe SEIS líneas —«You are stunned!» y «You are
+ * no longer stunned.»— y la pista dibujaba las seis. Seis puntos donde hay tres
+ * estados, y ninguno dice cuánto duró, con la duración medida y tirada. Medido:
+ * 2.853 sucesos `stun` en el registro de referencia son 1.429 aturdimientos.
+ *
+ * `par: true` llevaba versiones declarado y sin leer —bandera muerta— y es lo
+ * que esto pone a trabajar.
+ *
+ * Y LAS TRES DECISIONES QUE SE FIJAN AQUÍ:
+ *
+ *   emparejar        dos líneas son UN estado, con su duración
+ *   extremos abiertos un estado puede empezar antes de la pelea o no cerrarse
+ *                    dentro: se dibuja hasta el borde y se marca abierto, que
+ *                    es distinto de afirmar que duró hasta el final
+ *   la regla del cubo si la barra no mide un cubo de dibujo, punto y no barra.
+ *                    Una barra de dos píxeles no informa de una duración y
+ *                    encima pierde el número cuando hay varias apiladas
+ */
+console.log('\nla barra de los estados con dos extremos');
+{
+  const { tramosDePista, barrasDePista, pintaBarras } = await import('../ui/reproduccion.js');
+  // Tres aturdimientos, seis líneas. Y uno de ellos, largo.
+  const sucesos = [
+    { s: 10, clase: 'stun', on: true, quien: 'Campeon' },
+    { s: 12, clase: 'stun', on: false, quien: 'Campeon' },
+    { s: 30, clase: 'stun', on: true, quien: 'Campeon' },
+    { s: 70, clase: 'stun', on: false, quien: 'Campeon' },
+    { s: 80, clase: 'stun', on: true, quien: 'Campeon' },
+    { s: 82, clase: 'stun', on: false, quien: 'Campeon' },
+    { s: 50, clase: 'absorb', on: null, quien: 'Campeon' },
+  ];
+  const { tramos, sueltos } = tramosDePista(sucesos, 100);
+  ok(tramos.length === 3, 'seis líneas son TRES estados, no seis marcas', tramos.length);
+  ok(sueltos.length === 1 && sueltos[0].clase === 'absorb',
+    'y lo que no viene emparejado sigue su camino de siempre');
+  ok(tramos[1].hasta - tramos[1].desde === 40, 'con la duración que el registro sí da',
+    tramos[1].hasta - tramos[1].desde);
+
+  // La regla del cubo, con un ancho donde 2 s no llegan al cubo y 40 s sí: a
+  // 150 px de ancho, 2 s son 3 px y el cubo mide 4.
+  const { barras, aPunto } = barrasDePista(tramos, 100, 150);
+  ok(barras.length === 1 && barras[0].ancho === 60,
+    'sólo el largo da para barra', `${barras.length} barra(s) de ${barras[0]?.ancho} px`);
+  ok(aPunto.length === 2, 'los cortos vuelven a ser puntos: una barra de 8 px no dice nada',
+    aPunto.length);
+  ok(aPunto[0].s === 10, 'y el punto se coloca donde EMPEZÓ el estado', aPunto[0].s);
+
+  // Extremos abiertos. Un cierre sin apertura viene de antes de la pelea; una
+  // apertura sin cierre seguía puesta al acabar.
+  const abre = tramosDePista([{ s: 5, clase: 'stun', on: false, quien: 'Campeon' }], 100).tramos[0];
+  ok(abre.abre === true && abre.desde === 0,
+    'sin apertura, el estado venía de antes y se dibuja abierto por la izquierda');
+  const cierra = tramosDePista([{ s: 90, clase: 'stun', on: true, quien: 'Campeon' }], 100).tramos[0];
+  ok(cierra.cierra === true && cierra.hasta === 100,
+    'sin cierre, llega al final de la pelea y se dibuja abierto por la derecha');
+
+  const html = pintaBarras(barrasDePista(tramosDePista(sucesos, 100).tramos, 100, 150).barras,
+    (s2) => `${s2}s`);
+  ok(html.includes('rp-tramo'), 'y el dibujo sale: compilar no es funcionar');
+  ok(html.includes('40 s'), 'con la duración en el título, que es para lo que se emparejan');
+  const htmlAbierto = pintaBarras(
+    barrasDePista(tramosDePista([{ s: 90, clase: 'stun', on: true }], 100).tramos, 100, 150).barras,
+    (s2) => `${s2}s`);
+  ok(htmlAbierto.includes('cierra'), 'y el extremo abierto va marcado en el dibujo');
+}
+
+/**
+ * QUE LA PISTA PINTE, Y QUE SI PINTA CERO LA PRUEBA CAIGA.
+ *
+ * ESTA ES LA PRUEBA QUE FALTABA. `sucesosDePista` tenía la suya y el dibujo no,
+ * y el fallo estaba en el dibujo: un `cuboDe` sin importar dejaba la pista vacía
+ * con la batería entera en verde. No era un error de sintaxis —compilar no es
+ * funcionar— así que la guarda de «todo ui/*.js compila» no podía verlo. Se
+ * descubrió abriendo la aplicación y contando cero marcas, y la próxima vez
+ * nadie la va a abrir.
+ *
+ * Se pinta sin navegador porque el dibujo devuelve una cadena.
+ */
+console.log('\nla pista pinta, y se cuenta lo que pinta');
+{
+  const { sucesosDePista, marcasDePista, pintaMarcas } = await import('../ui/reproduccion.js');
+  const reloj = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  // Una pelea de verdad, con la forma de la de Innoruuk: 131 s, un absorbido y
+  // seis aturdimientos, en los segundos en que ocurrieron.
+  const g = { duracion: 131, segundos: [] };
+  const mete = (s, clase, destino = 'Campeon') => {
+    g.segundos[s] = g.segundos[s] ?? [];
+    g.segundos[s].push({ tipo: 'estado', clase, destino, origen: null });
+  };
+  mete(10, 'absorb');
+  for (const s of [21, 23, 90, 91, 118, 119]) mete(s, 'stun');
+  for (let s = 0; s <= 131; s++) g.segundos[s] = g.segundos[s] ?? [];
+
+  const sucesos = sucesosDePista(g, 'Campeon');
+  ok(sucesos.length === 7, 'siete sucesos entran en la pista', sucesos.length);
+
+  const marcas = marcasDePista(sucesos, g.duracion, 838);
+  ok(marcas.length > 0, 'LA PISTA PINTA ALGO: si esto es cero, está rota', marcas.length);
+  ok(marcas.length === 7, 'a 838 px no se solapa ninguna', marcas.length);
+
+  const html = pintaMarcas(marcas, reloj);
+  const dibujadas = (html.match(/class="rp-marca/g) ?? []).length;
+  ok(dibujadas === marcas.length, 'y el HTML lleva una por marca', dibujadas);
+  ok(/e-absorb p3/.test(html) && /e-stun p2/.test(html),
+    'con su clase y su peso puestos en el HTML');
+  ok(/left:64px/.test(html), 'el absorbido del segundo 10 cae en su píxel', html.match(/left:\d+px/)?.[0]);
+
+  // EL COLAPSO, comprobado por sus dos lados. Estrecho: los del 90 y 91 caen en
+  // el mismo cubo. Ancho: se separan. Si alguien fija el cubo en segundos, esto
+  // deja de moverse y cae.
+  const estrecha = marcasDePista(sucesos, g.duracion, 120);
+  const ancha = marcasDePista(sucesos, g.duracion, 2003);
+  ok(estrecha.length < marcas.length, 'en una ventana estrecha se funden', estrecha.length);
+  ok(ancha.length === 7, 'y maximizada vuelven a separarse', ancha.length);
+  const fundida = estrecha.find((m) => m.n > 1);
+  ok(!!fundida && /×|<b>/.test(pintaMarcas([fundida], reloj)),
+    'la fundida lleva su cuenta', fundida?.n);
+
+  // Sin sucesos no se inventa nada, y sin ancho tampoco: es el estado en que
+  // está el elemento antes de entrar en la página.
+  ok(marcasDePista([], 131, 838).length === 0, 'sin sucesos, ninguna marca');
+  ok(marcasDePista(sucesos, 131, 0).length === 0, 'sin ancho medido, ninguna marca');
+  ok(pintaMarcas([], reloj) === '', 'y el HTML vacío es vacío');
+}
+
+/**
+ * SIN NOMBRE, SÓLO PASA EL ENCANTO. Y esto se clava porque el arreglo es
+ * deliberado y su síntoma al deshacerse es «salen marcas de más», que no mira
+ * nadie.
+ *
+ * `x.origen === self` casaba `null` con `null` cuando el nombre aún no se había
+ * deducido del registro, y colaba TODO lo que no tuviera origen. Es la familia
+ * de siempre —¿lo que uso como identidad sigue valiendo?— con una variante: el
+ * problema no es que la identidad cambie, es que NO EXISTA.
+ */
+console.log('\ncon el nombre sin deducir, sólo pasa el encanto');
+{
+  const { sucesosDePista } = await import('../ui/reproduccion.js');
+  const g = {
+    duracion: 60,
+    segundos: [
+      [{ tipo: 'estado', clase: 'stun', destino: 'Campeon', origen: null }],
+      [{ tipo: 'estado', clase: 'absorb', destino: 'Campeon', origen: null }],
+      [{ tipo: 'estado', clase: 'resist_by_you', destino: 'Campeon', origen: null }],
+      [{ tipo: 'estado', clase: 'charm_on', destino: 'a hardened skeleton', origen: null }],
+      [{ tipo: 'estado', clase: 'stun', destino: 'Notarino', origen: null }],
+    ],
+  };
+  for (const sinNombre of [null, undefined, '']) {
+    const out = sucesosDePista(g, sinNombre);
+    ok(out.length === 1 && out[0].clase === 'charm_on',
+      `con self = ${JSON.stringify(sinNombre)} sólo pasa el encanto`,
+      `${out.length}: ${out.map((x) => x.clase).join(', ')}`);
+  }
+  // Y con nombre, lo normal: no se ha roto el camino bueno para arreglar el malo.
+  const conNombre = sucesosDePista(g, 'Campeon');
+  // Tres desde la 1.13.0: el resistido salió de la pista y se cuenta por enemigo.
+  ok(conNombre.length === 3, 'con nombre pasan los tres tuyos', conNombre.length);
+}
+
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');
 process.exit(failed ? 1 : 0);

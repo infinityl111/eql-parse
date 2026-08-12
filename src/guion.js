@@ -30,8 +30,29 @@
 
 /** Lo que se dibuja. Todo lo demás del registro no llega aquí. */
 const DAÑO = new Set(['melee', 'spell', 'dot', 'ds']);
+/**
+ * Lo que se emite como cambio de estado al guion del reproductor.
+ *
+ * ESTO SÓLO DECIDE QUÉ SE EMITE. No toca la máquina del encanto —`charmed`,
+ * `everCharmed`, `#deQuien`, `charmAmbiguo`, que viven en `parser.js` y
+ * `encounter.js`— ni el bando de nadie: ningún otro fichero lee este conjunto.
+ * Comprobado antes de tocarlo, y por eso el encanto puede entrar aquí sin que
+ * cambie una sola atribución de daño.
+ *
+ * `charm_on` y `charm_off` entran en la 1.13.0 para la pista de estados. Un
+ * encanto tuyo explica la curva más que ningún otro suceso —es de dónde sale la
+ * mitad del daño— y con el filtro anterior no habría aparecido ninguno: la
+ * línea lleva el bicho de destino y no a ti.
+ */
 const ESTADOS = new Set(['stun', 'stagger', 'interrupt', 'knockdown', 'proc',
-  'resist', 'resist_by_you', 'absorb']);
+  'resist', 'resist_by_you', 'absorb', 'charm_on', 'charm_off', 'survival', 'root',
+  // `control` entra por lo mismo que el encanto: son los segundos en los que tu
+  // personaje no era tuyo, y explican la curva mejor que casi nada. El registro
+  // los escribe por los dos extremos —«You lose control of yourself!» y «You
+  // have control of yourself again.»— así que llega emparejado como el
+  // aturdimiento, con su `on`, y la pista puede pintar el tramo entero en vez
+  // de dos marcas sueltas. Ver `sinControl` en `src/encounter.js`.
+  'control']);
 
 /**
  * @param {object} f      la pelea guardada: de ahí salen los actores y su bando
@@ -148,9 +169,29 @@ export function guion(f, lineas, Parser, self = null) {
       cierraCast(ev.source, ev.ability, s, 'interrumpido');
       mete(s, { tipo: 'estado', clase: 'interrupt', destino: ev.source, origen: ev.source, habilidad: ev.ability });
     } else if (ESTADOS.has(ev.kind)) {
+      /**
+       * DOS COSAS QUE SE PERDÍAN AQUÍ, Y LAS DOS SON LA MISMA FAMILIA.
+       *
+       * `on` — un aturdimiento son DOS líneas, «You are stunned!» y «You are no
+       * longer stunned.», y las dos salían de aquí idénticas. Quien las dibuje
+       * pinta dos marcas donde hay un estado, y encima tira la duración que el
+       * registro sí da: emparejan al 100% con 2 s de mediana. Medido: 2.853
+       * sucesos `stun` son 1.429 aturdimientos.
+       *
+       * EL SUJETO CUANDO LA LÍNEA NO LO NOMBRA. «You appear.» o «You are no
+       * longer feigning death» no traen `target` ni `source`, así que `destino`
+       * salía indefinido y cualquier filtro por «¿es mío?» los descartaba —
+       * `survival` no se dibujaba nunca pese a estar en la lista—. La línea SÍ
+       * lo dice, con la primera palabra, y es lo que se mira. Es la misma
+       * trampa de siempre con otro traje: identificar por algo que puede NO
+       * ESTAR.
+       */
+      const tuyoPorLaFrase = /^(?:You|Your)\b/.test(l.texto ?? '') ? self : null;
       mete(s, {
         tipo: 'estado', clase: ev.kind,
-        destino: ev.target ?? ev.source, origen: ev.source ?? null,
+        destino: ev.target ?? ev.source ?? tuyoPorLaFrase,
+        origen: ev.source ?? null,
+        on: ev.on ?? null,
         cantidad: ev.amount ?? 0, habilidad: ev.ability ?? null,
       });
     }

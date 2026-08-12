@@ -64,6 +64,60 @@ export const VENTANA_CADAVER = 600;
 export const AMBIGUO_SEG = 30;
 
 /**
+ * CUÁNTO MARGEN NECESITA EL RELOJ DE PARED PARA NO PARTIR LO QUE EL REGISTRO NO
+ * PARTIRÍA. 3 segundos, y salen de medir el desfase, no de elegir un número
+ * cómodo.
+ *
+ * EL PROBLEMA. `feed` decide con la marca del registro —`ev.t - end`— y `tick`
+ * con `Date.now()`. El reloj de pared va POR DELANTE del registro, así que
+ * `tick` parte peleas que al releer no se parten. Medido sobre un histórico
+ * real: de 10 peleas que existían en directo y no en frío, SIETE tenían un
+ * hueco de 19–20 segundos con `idleSec` = 20. El reloj adelantaba menos de un
+ * segundo y bastaba.
+ *
+ * DE QUÉ SE COMPONE EL DESFASE, medido con el lector de verdad sobre un fichero
+ * que se está escribiendo (1.456 sucesos en 40 s):
+ *
+ *     mediana 0,574 s · p90 0,948 s · p99 1,067 s · MÁXIMO 1,077 s
+ *
+ *   truncado al segundo   la cabecera del log no tiene decimales, así que una
+ *                         línea escrita en el .9 se lee como .0. Es el sumando
+ *                         grande y es irreducible: reparte uniforme en [0, 1).
+ *   sondeo del lector     `pollMs: 100`
+ *   ritmo de `tick`       cada 250 ms desde `main.cjs`, que se suma al decidir
+ *
+ * Peor caso medido de punta a punta: 1,077 + 0,25 = 1,33 s.
+ *
+ * SE TOMA EL DOBLE, que es la misma regla que ya se usó para la caducidad del
+ * encanto: cuando pasarse de largo cuesta una decisión equivocada, se dobla el
+ * peor caso observado en vez de ajustar al percentil. 2 × 1,33 = 2,7 -> 3.
+ *
+ * LO QUE NO SE PUEDE MEDIR AQUÍ es cuánto tarda EQ en volcar su buffer al
+ * fichero: eso necesita el juego delante. Pero la observación lo acota, y por
+ * eso conviene tenerla escrita: si el juego retuviera segundos, las peleas mal
+ * partidas habrían salido con huecos de 15 o 16 s, no de 19 y 20.
+ *
+ * Y LO QUE CUESTA: una pelea tarda 3 segundos más en darse por terminada en
+ * directo. Con 10 costaba cinco veces eso para no comprar nada más.
+ */
+export const MARGEN_TICK = 3;
+
+/**
+ * CUÁNTO SE ESPERA A QUE ALGUIEN RECUPERE EL MANDO ANTES DE DARLO POR PERDIDO.
+ *
+ * 76 s = 2 × los 38 s del tramo más largo medido en el registro de referencia
+ * —31 tramos, mediana 9 s—, con la misma regla que `CHARM_MAX_SEC` y
+ * `MARGEN_TICK`: cuando pasarse de largo cuesta una decisión equivocada, se
+ * dobla el peor caso observado en vez de ajustar al percentil.
+ *
+ * QUÉ DECIDE. Sólo si el reloj de pared puede cerrar la pelea mientras el
+ * personaje está secuestrado. No recorta ningún tramo ni toca ninguna cifra: si
+ * un miedo durase más que esto, el tramo seguiría entero y lo único que pasaría
+ * es que la pelea podría partirse, como se partía antes de la 1.13.0.
+ */
+export const SIN_MANDO_MAX = 76;
+
+/**
  * El nombre de un cadáver, para poder emparejarlo con su muerte.
  *
  * Dos cosas y ninguna más, porque cada normalización de más es un
@@ -350,13 +404,25 @@ class Combatant {
    * Es una propiedad de tu equipo, no de cómo jugaste, y por eso sirve de vara:
    * medir contra cero acusaba al arma; medir contra esto acusa a los parones.
    */
-  cadencia() {
+  cadencia(sinMando = []) {
     const segs = [...this.swingSeconds].sort((a, b) => a - b);
     if (segs.length < 5) return null;          // sin muestra no se afirma un ritmo
     const huecos = [];
     for (let i = 1; i < segs.length; i++) {
       const d = segs[i] - segs[i - 1];
-      if (d <= 12) huecos.push(d);             // un hueco de dos minutos no es el arma
+      if (d > 12) continue;                    // un hueco de dos minutos no es el arma
+      /**
+       * Y UN HUECO QUE CAE DENTRO DE UN TRAMO SIN MANDO TAMPOCO ES EL ARMA.
+       *
+       * Éste iba A FAVOR y por eso costaba verlo: un miedo corto mete un hueco
+       * de diez segundos en la muestra, sube tu p90, y con una cadencia más
+       * lenta el «tiempo muerto» te perdona más de lo que debería. Sigue siendo
+       * un dato que no dice nada de tu equipo, que es lo que esto mide, y la
+       * regla es que esos segundos no cuenten NI a favor ni en contra.
+       */
+      const a = segs[i - 1], b = segs[i];
+      if (sinMando.some((s) => (s.hasta ?? Infinity) >= a && s.desde <= b)) continue;
+      huecos.push(d);
     }
     if (huecos.length < 4) return null;
     huecos.sort((a, b) => a - b);
@@ -370,8 +436,12 @@ class Combatant {
    * Lo que de verdad estuviste parado: la suma de lo que cada hueco pasa de tu
    * cadencia. Un hueco de tu tamaño no es un parón, es el arma.
    */
-  huecoReal(desde, hasta) {
-    const cad = this.cadencia();
+  /**
+   * @param {Array<{desde:number,hasta:number}>} sinMando  tramos, en segundos
+   *   absolutos, en los que NO manejabas el personaje. No se te cobran.
+   */
+  huecoReal(desde, hasta, sinMando = []) {
+    const cad = this.cadencia(sinMando);
     if (cad === null) return null;
     const segs = [...this.swingSeconds].sort((a, b) => a - b);
     let muerto = 0;
@@ -379,7 +449,29 @@ class Combatant {
     // dejaste antes de acabar, eso también fue tiempo sin atacar.
     const puntos = [desde - cad, ...segs, hasta + 1];
     for (let i = 1; i < puntos.length; i++) {
-      muerto += Math.max(0, puntos[i] - puntos[i - 1] - cad);
+      const a = puntos[i - 1] + cad;
+      const b = puntos[i];
+      if (b <= a) continue;
+      let trozo = b - a;
+      /**
+       * LO QUE PASÓ SIN MANDO NO ES UN PARÓN TUYO, Y NO ES UN MATIZ.
+       *
+       * Con miedo no puedes actuar en absoluto, y con encanto tampoco decides
+       * —pegas a los tuyos, pero no lo eliges—. Los dos son involuntarios por
+       * igual, así que ni la inactividad ni su duración dicen nada de cómo
+       * jugaste. Cobrárselo a alguien es acusarle de algo que el juego le hizo.
+       *
+       * Medido en el registro de referencia: 464 segundos repartidos en 31
+       * tramos de 12 peleas, con el más largo en 38 s. Todo eso entraba entero
+       * en el «tiempo muerto» y salía como daño perdido en el hallazgo que más
+       * se lee de la ficha.
+       */
+      for (const s of sinMando) {
+        const ini = Math.max(a, s.desde);
+        const fin = Math.min(b, (s.hasta ?? hasta) + 1);
+        if (fin > ini) trozo -= fin - ini;
+      }
+      muerto += Math.max(0, trozo);
     }
     return Math.round(muerto);
   }
@@ -525,6 +617,10 @@ export class Encounter {
     // Si no se sabe, se queda en null y se dice. No se hereda hacia atrás: las
     // peleas anteriores al primer /who no tienen nivel conocido, y fingir que
     // sí sería justo lo que este programa no hace.
+    // Quién eres, y sólo para una cosa: los tramos sin mando son TUYOS, así que
+    // el descuento de tiempo muerto sólo se le aplica a tu fila. Descontárselo a
+    // todo el mundo regalaría segundos a compañeros que sí estaban jugando.
+    this.self = ctx.self ?? null;
     this.level = ctx.level ?? null;
     this.classes = ctx.classes ?? null;
     this.start = startT;
@@ -538,6 +634,64 @@ export class Encounter {
     // que este montón no tiene una sola línea que lo respalde y no puede
     // enseñarse junto a lo medido sin decirlo.
     this.charmSoltado = { golpes: 0, daño: 0 };
+    /**
+     * DOS DE LOS TUYOS PEGÁNDOSE ENTRE ELLOS. Medido, apartado y con su nombre.
+     *
+     * LO QUE PASÓ. Un compañero declarado apareció pegando al grupo en el Plano
+     * del Miedo. La explicación casi segura es que lo encantaron a él, pero eso
+     * NO ESTÁ ESCRITO en ninguna parte: el registro no dice quién encantó a
+     * quién, y «a Kalforgelp lo encantaron» sería una deducción disfrazada de
+     * medida. Lo que sí está escrito, línea a línea, es que dos miembros
+     * declarados del grupo se pegaron durante N segundos. Eso es lo que se
+     * cuenta aquí y lo único que la ficha afirma. La causa se calla.
+     *
+     * Y NO ES PRODUCCIÓN. Pegar a uno de los tuyos no le quita vida a ningún
+     * enemigo, así que no suma en el daño del bando — exactamente por la misma
+     * razón por la que `selfInflicted` no suma: «recibido sí, hecho no». Lo
+     * recibido sigue contando en quien lo recibe, que es vida que perdió de
+     * verdad.
+     *
+     * Tampoco es daño enemigo, y ahí estaba el fallo que esto cierra: bastaba UN
+     * golpe para que la regla de bandos —enemigo es quien te pega— ascendiera a
+     * un compañero declarado a enemigo PARA TODA LA PELEA, y su daño entero
+     * aterrizaba en `enemyTotal`.
+     *
+     * MEDIDO SOBRE EL REGISTRO ENTERO, 709 peleas reconstruidas con cinco
+     * compañeros declarados:
+     *
+     *   5 peleas con fuego amigo   5.977 de daño y 205 golpes, TODAS en el Plano
+     *                              del Miedo, que es donde encantan.
+     *   3 de esas 5                además tenían al compañero en el bando
+     *                              enemigo: 11.862 de sus 24.499 de «daño
+     *                              enemigo» —el 48%— eran del propio grupo, y en
+     *                              la peor de las tres, el 55%.
+     *
+     * La más clara es la de las 23:01: `Kalforgelp` peleando contra el grupo 23
+     * segundos, 865 puntos, y 480 más de vuelta tuya en 9 segundos.
+     */
+    this.entreTuyos = new Map();   // nombre -> {golpes, daño, desde, hasta, contra}
+    /**
+     * LOS SEGUNDOS EN QUE TU PERSONAJE NO ERA TUYO.
+     *
+     * El registro escribe los dos extremos y los escribe siempre:
+     *
+     *   You lose control of yourself!          31 veces en el registro de
+     *   You have control of yourself again.    referencia, 31 cierres, ninguno
+     *                                          suelto. Duración medida: mínimo
+     *                                          2 s, mediana 9 s, máximo 37 s.
+     *
+     * Hasta ahora esos 37 segundos eran indistinguibles de estar mirando el
+     * inventario: el hueco entraba en el «tiempo muerto» y se te acusaba de él.
+     *
+     * NO SE LLAMA «ENCANTADO» PORQUE LA LÍNEA NO LO DICE. Es el aviso genérico
+     * de perder el mando, y lo mismo lo produce el miedo. Lo que sí distingue
+     * los dos casos es lo que HACES dentro del tramo —encantado le pegas a los
+     * tuyos, asustado corres— y eso está medido: por eso cada tramo lleva
+     * cuántos golpes le diste a los tuyos mientras duraba. En los 31 episodios
+     * del registro de referencia esa cuenta es cero en los 31, así que los 31
+     * fueron miedo y ninguno se rotula como encanto.
+     */
+    this.sinControl = [];          // [{desde, hasta, golpes, daño, cierre}]
     this.kills = [];
     this.closed = false;
     this.series = new Map();        // segundo -> {dmg, taken, heal} para la gráfica
@@ -585,6 +739,9 @@ export class Encounter {
     // a caída.
     this.fades = [];           // {t, ability}
     this.resistsCaused = 0;    // hechizos enemigos que TÚ resististe
+    // Y de quién y de qué, que es lo único que se puede usar para algo. Ver
+    // dónde se llena, en `feed`.
+    this.resistedByYou = new Map();   // 'enemigo hechizo' -> {foe, spell, n}
     this.interrupts = 0;
     this.stancesSeen = new Set();
     this.invocationsSeen = new Set();
@@ -601,6 +758,86 @@ export class Encounter {
     if (!b) b = { s: k, dmg: 0, taken: 0, heal: 0, tMelee: 0, tSpell: 0, tUnmit: 0, mine: 0 };
     this.series.set(k, b);
     b[field] += amount;
+  }
+
+  /**
+   * Un golpe de uno de los tuyos a otro de los tuyos.
+   *
+   * Se guarda POR QUIEN PEGA, con sus dos extremos en el tiempo: la pregunta que
+   * contesta la ficha es «¿quién estuvo peleando contra el grupo, y cuánto
+   * rato?», y un total sin instantes no la contesta. Los segundos son la
+   * distancia entre su primer golpe y el último, que es lo medido; no se
+   * redondea a la pelea entera ni se estira hasta el final.
+   */
+  golpeEntreTuyos(ev) {
+    const seg = Math.round(ev.t);
+    let e = this.entreTuyos.get(ev.source);
+    if (!e) {
+      e = { name: ev.source, golpes: 0, daño: 0, desde: seg, hasta: seg, contra: new Set() };
+      this.entreTuyos.set(ev.source, e);
+    }
+    e.golpes++;
+    e.daño += ev.amount || 0;
+    if (seg < e.desde) e.desde = seg;
+    if (seg > e.hasta) e.hasta = seg;
+    if (ev.target) e.contra.add(ev.target);
+  }
+
+  /** Pierdes el mando. Si ya lo habías perdido, no se abre otro tramo. */
+  abrirSinControl(t) {
+    const ult = this.sinControl[this.sinControl.length - 1];
+    if (ult && ult.hasta === null) return;
+    this.sinControl.push({ desde: t, hasta: null, acciones: 0,
+      aTuyos: 0, aEnemigo: 0, aOtros: 0, daño: 0, cierre: null });
+  }
+
+  /**
+   * Lo recuperas. `cierre` dice de dónde sale el final, que es la misma
+   * distinción de siempre: aquí está escrito en el registro, y el otro cierre
+   * posible —que la pelea acabe con el tramo abierto— es un recorte nuestro.
+   */
+  cerrarSinControl(t) {
+    const ult = this.sinControl[this.sinControl.length - 1];
+    if (!ult || ult.hasta !== null) return;
+    ult.hasta = t;
+    ult.cierre = 'medido';
+  }
+
+  /**
+   * UNA ACCIÓN TUYA DENTRO DEL TRAMO, Y CONTRA QUIÉN. Es el falsador.
+   *
+   * NO ES UNA TENDENCIA, ES UN «NO». Con miedo no puedes actuar —no es que
+   * normalmente no actúes— así que UNA sola acción tuya dentro del tramo
+   * descarta el miedo, sin porcentajes. Y con encanto tampoco decides, pero
+   * pegas a los tuyos. De ahí salen las tres respuestas, y las tres son
+   * categóricas:
+   *
+   *   cero acciones            miedo
+   *   acciones contra los tuyos encanto
+   *   acciones contra el enemigo ninguna de las dos, y se dice que no se sabe
+   *
+   * QUÉ CUENTA COMO ACCIÓN, Y ESTO HAY QUE MEDIRLO O LA REGLA SE CAE. Sólo lo
+   * que tuvo EFECTO: un golpe, un fallo —fallar es atacar—, una curación que
+   * entró. Empezar a lanzar NO cuenta.
+   *
+   * Y no es una sutileza: en los 31 tramos del registro de referencia hay 24
+   * líneas de «You begin casting Ensnare.» repartidas por 10 de ellos, y NINGUNA
+   * tiene desenlace — ni impacto, ni resistencia, ni interrupción, ni «you can't
+   * use that command». En el mismo registro, fuera de los tramos, Ensnare sí
+   * aparece interrumpido 6 veces y resistido 9. O sea que dentro del miedo esa
+   * línea es una tecla que el juego rechaza, no un acto del personaje.
+   *
+   * Contándola como acción, 10 de los 31 tramos habrían dejado de ser miedo por
+   * culpa de un hotkey aporreado. Sin contarla, los 31 tienen cero acciones y el
+   * rótulo se puede escribir con la misma seguridad que una cifra de daño.
+   */
+  accionSinControl(t, contra, amount = 0) {
+    const ult = this.sinControl[this.sinControl.length - 1];
+    if (!ult || ult.hasta !== null || t < ult.desde) return;
+    ult.acciones++;
+    if (contra === 'tuyos') { ult.aTuyos++; ult.daño += amount || 0; }
+    else if (contra === 'enemigo') ult.aEnemigo++;
+    else ult.aOtros++;
   }
 
   markStance(t, stance) {
@@ -696,15 +933,30 @@ export class Encounter {
       damage: c.damage,
       dps: c.damage / inclusive,
       dpsOwn: c.damage / own,
-      dpsActive: c.damage / Math.max(1, c.activeSeconds.size),
+      /**
+       * Y AQUÍ TAMBIÉN SE CAÍAN LOS SEGUNDOS SIN MANDO, por una puerta lateral.
+       *
+       * `activeSeconds` no cuenta sólo lo que HACES: `addTaken` también lo
+       * toca, así que un segundo en el que sólo te pegaron cuenta como activo.
+       * Durante un miedo te siguen pegando, de modo que el denominador crecía
+       * mientras el numerador no podía crecer — te bajaba el dps activo por un
+       * rato en el que no manejabas nada. Es la misma regla que el resto: ese
+       * tiempo no cuenta ni a favor ni en contra.
+       */
+      dpsActive: c.damage / Math.max(1, c.activeSeconds.size - (c.name === this.self ? this.#activosSinMando(c) : 0)),
       // Tu mejor tramo de diez segundos seguidos. Cero cuando la pelea no llega
       // a diez, que no es «no tuviste ráfaga» sino que no cabe la pregunta.
       rafaga10: c.mejorRafaga(10),
       // Tu cadencia de ataque y lo que de verdad estuviste parado, medido
       // contra ella y no contra cero. Ver `cadencia()`.
-      cadencia: c.cadencia(),
+      cadencia: c.cadencia(c.name === this.self ? this.sinControl : []),
       swingSec: c.swingSeconds.size,
-      huecoReal: c.huecoReal(this.start, this.end),
+      huecoReal: c.huecoReal(this.start, this.end,
+        c.name === this.self ? this.sinControl : []),
+      // Segundos de esta fila en los que no manejaba su personaje. Va en la fila
+      // y no sólo en la pelea porque es lo que permite a cualquier consumidor
+      // sacarlos de su denominador sin volver a cruzar nada.
+      sinMandoSec: c.name === this.self ? this.segundosSinMando() : 0,
       hits: c.hits, meleeHits: c.meleeHits, misses: c.misses,
       crits: c.crits, critDamage: c.critDamage, critRate: c.critRate,
       flurries: c.flurries, ripostes: c.ripostes, healPotential: c.healPotential,
@@ -744,6 +996,106 @@ export class Encounter {
     return {
       rows, total, healing, duration: inclusive, raidDps: total / inclusive,
       charm: this.#charm(rows),
+      entreTuyos: this.#entre(),
+      sinControl: this.#sinMando(),
+      // Los segundos que hay que sacar de cualquier denominador de actividad.
+      // Miedo y encanto suman igual: los dos son involuntarios.
+      sinMandoSec: this.segundosSinMando(),
+    };
+  }
+
+  /**
+   * Los tramos sin mando, relativos al inicio de la pelea y ya calificados.
+   *
+   * `encantado` no es una etiqueta que venga del registro: es la respuesta a
+   * «¿le pegaste a los tuyos mientras durabas?», que sí está medida. Cuando la
+   * respuesta es que no, el tramo se queda sin causa y la ficha lo dice así.
+   */
+  #sinMando() {
+    if (!this.sinControl.length) return null;
+    return this.sinControl.map((x) => {
+      const fin = x.hasta ?? this.end;
+      return {
+        desde: Math.max(0, Math.round(x.desde - this.start)),
+        hasta: Math.max(0, Math.round(fin - this.start)),
+        segundos: Math.max(0, Math.round(fin - x.desde)) + 1,
+        acciones: x.acciones,
+        aTuyos: x.aTuyos,
+        aEnemigo: x.aEnemigo,
+        daño: x.daño,
+        // 'medido' cuando el registro escribió el final; 'pelea' cuando la
+        // pelea se acabó con el tramo abierto y el final lo hemos puesto
+        // nosotros. Son dos certezas distintas y no se enseñan igual.
+        cierre: x.cierre ?? 'pelea',
+        // El falsador, aplicado. Ver `accionSinControl`: no es un reparto de
+        // probabilidad, son tres respuestas excluyentes. `null` es «ninguna de
+        // las dos», y sale cuando actuaste CONTRA EL ENEMIGO sin tener el
+        // mando — que no pasa ni una vez en el registro de referencia y que, si
+        // pasa, hay que mirar en vez de rotular.
+        causa: x.acciones === 0 ? 'miedo' : (x.aTuyos > 0 ? 'encanto' : null),
+      };
+    });
+  }
+
+  /**
+   * SEGUNDOS EN LOS QUE NO MANEJABAS TU PERSONAJE. Miedo y encanto suman igual.
+   *
+   * La corrección que ordena esto: los dos son involuntarios, y ninguno de los
+   * dos puede contar ni a favor ni en contra. Lo que los diferencia es sólo el
+   * rastro que dejan en el registro —el miedo ninguno, el encanto golpes contra
+   * los tuyos— y eso vale para etiquetarlos, no para tratarlos distinto en
+   * ningún cálculo. Ni la duración es un dato sobre ti: no la decides tú.
+   *
+   * Los tramos no se solapan por construcción —`abrirSinControl` no abre uno
+   * nuevo si hay otro abierto— así que basta sumar.
+   */
+  /** Cuántos de sus segundos «activos» caen dentro de un tramo sin mando. */
+  #activosSinMando(c) {
+    if (!this.sinControl.length) return 0;
+    let n = 0;
+    for (const s of c.activeSeconds) {
+      if (this.sinControl.some((x) => s >= x.desde && s <= (x.hasta ?? this.end))) n++;
+    }
+    return n;
+  }
+
+  segundosSinMando() {
+    let n = 0;
+    for (const x of this.sinControl) {
+      const fin = x.hasta ?? this.end;
+      n += Math.max(0, Math.round(fin - x.desde)) + 1;
+    }
+    return n;
+  }
+
+  /**
+   * Lo que se pegaron entre ellos los tuyos, listo para rotular.
+   *
+   * Uno por atacante y no un total: «hubo 1.400 de fuego amigo» no se puede
+   * comprobar ni entender, y «Kalforgelp peleó contra el grupo · 23 s» sí. Si
+   * los dos se pegaron —él encantado y tú devolviéndole— salen los dos, con lo
+   * suyo cada uno. Que uno de ellos seas tú no lo esconde: le pegaste a un
+   * compañero declarado, y eso pasó.
+   *
+   * Nulo cuando no hubo ninguno, que es prácticamente siempre.
+   */
+  #entre() {
+    if (!this.entreTuyos.size) return null;
+    const quien = [...this.entreTuyos.values()].map((e) => ({
+      name: e.name,
+      golpes: e.golpes,
+      daño: e.daño,
+      desde: Math.max(0, Math.round(e.desde - this.start)),
+      hasta: Math.max(0, Math.round(e.hasta - this.start)),
+      // Del primer golpe al último, inclusive: la misma convención que la
+      // duración de la pelea, para que las dos cifras se puedan comparar.
+      segundos: Math.max(0, Math.round(e.hasta - e.desde)) + 1,
+      contra: [...e.contra],
+    })).sort((a, b) => b.daño - a.daño);
+    return {
+      golpes: quien.reduce((a, x) => a + x.golpes, 0),
+      daño: quien.reduce((a, x) => a + x.daño, 0),
+      quien,
     };
   }
 
@@ -815,9 +1167,24 @@ export class EncounterTracker extends EventEmitter {
     this.lootSinPelea = 0;
     // Objetos cuyo cadáver murió en una pelea que ya estaba cerrada.
     this.lootTarde = 0;
-    // Y aquéllos cuyo cadáver podía ser de dos peleas distintas. Se cuentan
-    // para poder decir cuánto no se sabe, no para taparlo. Ver `#deQuePelea`.
-    this.lootAmbiguo = 0;
+    /**
+     * AQUÍ VIVÍA `lootAmbiguo`, Y SE HA BORRADO. Queda la nota, no el contador.
+     *
+     * Contaba las recogidas donde dos cadáveres eran candidatos igual de
+     * buenos, con este comentario al lado: «se cuentan para poder decir cuánto
+     * no se sabe, no para taparlo». No lo leía nadie, así que se estaba
+     * tapando: era una promesa escrita que el código incumplía.
+     *
+     * NO SE ARREGLÓ ENSEÑÁNDOLO, porque hay una fuente mejor y ya estaba: cada
+     * objeto viaja con su `amb`, así que la cuenta se saca de la propia pelea y
+     * además se puede señalar CUÁL es el dudoso, que un total no puede. Ver
+     * `incertidumbreHTML` en `ui/app.js`.
+     *
+     * Y SE BORRA EN VEZ DE DEJARLO «POR SI ACASO», por la regla que salió de
+     * esta misma sesión: una guarda dormida tiene un caso que la despierta y
+     * está escrito cuál; una salida muerta no lo tiene. Ésta no tenía ninguno.
+     * Dejarla es exactamente cómo se propaga esa familia.
+     */
     /**
      * LOS CADÁVERES RECIENTES, que es lo que permite colgar el botín de su
      * pelea y no de la que esté abierta. `{clave, t, enc}`, en orden.
@@ -863,7 +1230,34 @@ export class EncounterTracker extends EventEmitter {
           // qué es resistente cada enemigo, medido en tus propias peleas.
           this.#tally(this.current, ev.target, ev.ability, 'resisted', ev.invocation);
         }
-      } else if (ev.kind === 'resist_by_you') this.current.resistsCaused++;
+      } else if (ev.kind === 'resist_by_you') {
+        this.current.resistsCaused++;
+        /**
+         * Y CONTRA QUIÉN, QUE ES LA MITAD QUE FALTABA.
+         *
+         * `resistsCaused` es un número por pelea: «resististe 7». Eso no se
+         * puede usar para nada, porque la pregunta útil es de quién y de qué:
+         * «a este bicho le resistes su miedo casi siempre» sí cambia lo que
+         * haces. Es la misma forma que `spellVsFoe`, que ya guarda el sentido
+         * contrario —tus hechizos contra él—, y por eso comparte estructura.
+         *
+         * De aquí sale además el sitio al que se muda `resist_by_you` cuando
+         * deja la pista del reproductor: allí eran 1.972 marcas para explicar
+         * lo que NO pasó; aquí son una proporción por enemigo.
+         *
+         * SU COSTE, DICHO: es un campo nuevo por pelea. Las peleas guardadas
+         * antes de la 1.13.0 no lo tienen y no se puede deducir de lo guardado
+         * —el lanzador y el hechizo sólo están en el registro—, así que sólo
+         * aparece al reconstruir. Entra en la deuda que la 1.13.0 paga.
+         */
+        if (ev.caster && ev.ability) {
+          const k = `${ev.caster} ${ev.ability}`;
+          const e = this.current.resistedByYou.get(k)
+            ?? { foe: ev.caster, spell: ev.ability, n: 0 };
+          e.n++;
+          this.current.resistedByYou.set(k, e);
+        }
+      }
       else if (ev.kind === 'interrupt') this.current.interrupts++;
       else if (ev.kind === 'buff_fade' && ev.ability) {
         this.current.fades.push({ t: Math.round(ev.t - this.current.start), ability: ev.ability });
@@ -887,6 +1281,33 @@ export class EncounterTracker extends EventEmitter {
           t: Math.round(ev.t - this.current.start),
           source: ev.source, ability: ev.ability, cat: ev.castCat ?? null,
         });
+      }
+      // Perder y recuperar el mando del personaje. Va aquí, con las señales que
+      // no abren pelea: si no hay combate abierto no hay dónde apuntarlo, y una
+      // pérdida de control no es motivo para inventarse un encuentro — el miedo
+      // te pilla corriendo por la zona tanto como peleando.
+      else if (ev.kind === 'control') {
+        if (ev.on) this.current.abrirSinControl(ev.t);
+        else this.current.cerrarSinControl(ev.t);
+        /**
+         * Y EL TRAMO NO PUEDE PARTIR LA PELEA EN DOS.
+         *
+         * El silencio de un miedo no es que dejaras de combatir: es que NO
+         * PODÍAS, y por eso no hay líneas. Cortar ahí por inactividad es
+         * exactamente el error que el resto de este cambio corrige, sólo que
+         * cometido con las fronteras en vez de con las cifras — y sale más
+         * caro, porque parte una pelea en dos trozos con cifras propias.
+         *
+         * Medido: 8 de los 31 tramos pasan de `idleSec`, y los ocho están en el
+         * Plano del Miedo, que es donde están las peleas que importan. El más
+         * largo, 38 s.
+         *
+         * `end` se mueve porque es lo que mira la guarda de inactividad, tanto
+         * en `feed` como en `tick`. No toca ninguna otra cifra: la duración de
+         * la pelea ya sale de `end - start` y el tramo estaba dentro de la pelea
+         * de todos modos. Lo que cambia es que ahora sigue siendo UNA pelea.
+         */
+        this.current.end = Math.max(this.current.end, ev.t);
       }
       else if (ev.kind === 'stance' && ev.stance) this.current.stancesSeen.add(ev.stance);
       else if (ev.kind === 'invocation' && ev.invocation) this.current.invocationsSeen.add(ev.invocation);
@@ -1063,13 +1484,62 @@ export class EncounterTracker extends EventEmitter {
       // —falso, y es lo que la prueba prohíbe—. Vale la primera.
       if (mine.size && !mine.has(ev.source) && !mine.has(ev.target)) return;
       this.current = new Encounter(this.nextId++, ev.t, this.zone,
-        { level: this.level ?? null, classes: this.classes ?? null });
+        { level: this.level ?? null, classes: this.classes ?? null, self: this.self });
       this.emit('open', this.current);
     }
 
+    /**
+     * DAÑO ENTRE DOS DE LOS TUYOS, y la identidad declarada gana.
+     *
+     * Un compañero que has declarado tuyo NO se convierte en enemigo porque te
+     * pegue. Puede que lo hayan encantado, puede que sea un escudo de daño mal
+     * dirigido, puede que sea otra cosa: no lo sabemos. Lo que sí sabemos es
+     * quién es, porque lo dijiste tú, y eso no lo revoca un golpe.
+     *
+     * Ver `Encounter.entreTuyos`. Lo que sigue mira esta marca en cada sitio
+     * donde un golpe cambia de bando a alguien:
+     *
+     *   `foesSeen`      si entrara, el compañero pasaría a ser «a quien estáis
+     *                   pegando» y con eso arrastraría al filtro de relevancia.
+     *   `targetTotals`  la pelea se llama como el que más daño recibió: sin esta
+     *                   guarda, un encuentro contra un golem se titula con el
+     *                   nombre de tu compañero.
+     *   `golpeados`     alimenta el discriminador de la sanguijuela. Un
+     *                   compañero al que has pegado y que luego te cura pasaría
+     *                   por un drenaje tuyo.
+     *   la producción   pegar a uno de los tuyos no es hacer daño: se aparta.
+     */
+    const tuyos = this.#tuyos();
+    const entreTuyos = ev.amount > 0 && ev.source && ev.target
+      && ev.source !== ev.target && ev.selfInflicted !== true
+      && tuyos.has(ev.source) && tuyos.has(ev.target);
+
+    /**
+     * EL FALSADOR, ALIMENTADO. Cualquier acción TUYA con efecto, y contra quién.
+     *
+     * Sólo lo que tuvo efecto: pegar, fallar —fallar es atacar— y curar. Empezar
+     * a lanzar no entra, y el motivo está medido en `accionSinControl`.
+     *
+     * Va aquí y no dentro del reparto de daño porque la pregunta es otra: no es
+     * «de quién es este golpe» sino «¿tu personaje hizo algo?». Un fallo tuyo no
+     * mueve ninguna cifra de daño y sin embargo descarta el miedo él solo.
+     */
+    if (ev.source === this.self && this.current?.sinControl?.length) {
+      const conEfecto = (DAMAGE_KINDS.has(ev.kind) && ev.amount > 0)
+        || ev.kind === 'miss' || (ev.kind === 'heal' && ev.amount > 0);
+      if (conEfecto && ev.selfInflicted !== true) {
+        const obj = ev.target;
+        const contra = !obj || obj === this.self ? 'otro'
+          : tuyos.has(obj) ? 'tuyos' : 'enemigo';
+        this.current.accionSinControl(ev.t, contra, contra === 'tuyos' ? ev.amount : 0);
+      }
+    }
+
     // A quién estáis pegando: define qué es «vuestra» pelea a partir de ahora.
-    if (ev.amount > 0 && ev.target && mine.has(ev.source)) this.current.foesSeen.add(ev.target);
-    if (ev.amount > 0 && ev.source && mine.has(ev.target)) this.current.foesSeen.add(ev.source);
+    if (!entreTuyos) {
+      if (ev.amount > 0 && ev.target && mine.has(ev.source)) this.current.foesSeen.add(ev.target);
+      if (ev.amount > 0 && ev.source && mine.has(ev.target)) this.current.foesSeen.add(ev.source);
+    }
     const enc = this.current;
     enc.end = Math.max(enc.end, ev.t);
 
@@ -1100,12 +1570,16 @@ export class EncounterTracker extends EventEmitter {
       const aTiMismo = ev.selfInflicted === true;
 
       if (huerfano) enc.unattributed += ev.amount;
+      // Entre los tuyos: se aparta con su nombre y no entra en la producción de
+      // nadie. Lo recibido sí se anota, dos líneas más abajo, porque es vida que
+      // se perdió de verdad.
+      else if (entreTuyos) enc.golpeEntreTuyos(ev);
       else if (ev.source && !aTiMismo) this.#deQuien(enc, ev, true).addDamage(ev);
       if (ev.target) this.#deQuien(enc, ev, false).addTaken(ev);
-      if (!huerfano && !aTiMismo) enc.tick(ev.t, 'dmg', ev.amount);
+      if (!huerfano && !aTiMismo && !entreTuyos) enc.tick(ev.t, 'dmg', ev.amount);
       // `mine` es la línea de TU daño en la gráfica: la autolesión tampoco
-      // pinta ahí, por lo mismo.
-      if (ev.source === this.self && !aTiMismo) enc.tick(ev.t, 'mine', ev.amount);
+      // pinta ahí, por lo mismo. Y pegarle a un compañero, tampoco.
+      if (ev.source === this.self && !aTiMismo && !entreTuyos) enc.tick(ev.t, 'mine', ev.amount);
       if (ev.target === this.self) {
         // Bruto y separado por escuela: sin esto no se puede juzgar la
         // postura tramo a tramo, sólo la media de toda la pelea.
@@ -1117,12 +1591,12 @@ export class EncounterTracker extends EventEmitter {
         // cuenta: en cuanto hay dos criterios, discrepan.
         enc.tick(ev.t, cuboRecibido(ev.school), raw);
       }
-      if (ev.target) {
+      if (ev.target && !entreTuyos) {
         const b = enc.targetTotals.get(ev.target) ?? 0;
         enc.targetTotals.set(ev.target, b + ev.amount);
         if (!enc.targetFirst.has(ev.target)) enc.targetFirst.set(ev.target, ev.t);
       }
-      if (ev.target && mine.has(ev.source)) enc.golpeados.add(ev.target);
+      if (ev.target && mine.has(ev.source) && !entreTuyos) enc.golpeados.add(ev.target);
       // Un hechizo vuestro que sí entró, para saber la proporción contra ese
       // enemigo. Va AQUÍ y no en el bloque de señales de arriba porque aquél
       // exige que la pelea ya esté abierta, y el primer hechizo de la pelea es
@@ -1209,40 +1683,62 @@ export class EncounterTracker extends EventEmitter {
   }
 
   /**
-   * PENDIENTE, Y NO ES UN DETALLE: EL ALMACÉN NO ES FUNCIÓN PURA DEL REGISTRO.
+   * EL CIERRE POR RELOJ DE PARED, CON EL MARGEN MEDIDO. Ver `MARGEN_TICK`.
    *
-   * Una pelea se puede cerrar por dos caminos y NO usan el mismo reloj:
+   * Una pelea se cierra por dos caminos y no usan el mismo reloj:
    *
-   *   `feed`, línea 830   `ev.t - this.current.end > this.idleSec`
-   *                       reloj del REGISTRO. Es el que corre al reconstruir.
-   *   `tick`, aquí        `nowSec - this.current.end > this.idleSec`, y quien
-   *                       lo llama es `engine.js:893` con `Date.now()/1000`:
-   *                       reloj de PARED. Sólo corre en directo.
+   *   `feed`   `ev.t - end > idleSec`            la marca del REGISTRO. Es la
+   *            que corre al reconstruir, y la única que decide fronteras.
+   *   `tick`   `nowSec - end > idleSec + MARGEN` el reloj de PARED, y sólo
+   *            corre en directo.
    *
-   * Con un hueco de EXACTAMENTE `idleSec` los dos caminos deciden distinto. El
-   * registro da 20,0 y `20 > 20` es falso, así que en frío la pelea NO se parte;
-   * en directo el reloj de pared sigue corriendo entre líneas, llega a 20,4
-   * antes de que aparezca la siguiente y la pelea SÍ se parte.
+   * LO QUE NO CAMBIA, Y CONVIENE SABERLO ANTES DE TOCAR NADA: la frontera que
+   * se guarda YA sale del registro. `#close()` no mira «ahora» en ningún sitio
+   * y `end` es la marca de la última línea de combate. El reloj de pared nunca
+   * ha fijado un límite: sólo decidía SI se partía.
    *
-   * CASO REAL MEDIDO (9 de agosto de 2026, 428 peleas). Última línea de combate
-   * a las 11:48:33, siguiente a las 11:48:53, `idleSec` = 20. En directo se
-   * guardaron dos peleas (334 s y 210 s); releyendo en frío sale una sola de
-   * 563 s. Es la ÚNICA discrepancia de todo el histórico —las otras 426 peleas
-   * emparejadas coinciden campo por campo— pero basta para que `store:rebuild`
-   * no reproduzca lo que había, y para que dos usuarios con el mismo registro
-   * puedan acabar con historiales distintos.
+   * Por eso basta el margen. Cualquier hueco lo bastante grande para que salte
+   * `tick` es un hueco que `feed` también partirá cuando llegue la línea
+   * siguiente, así que los dos caminos dan lo mismo. Y si el registro se acaba
+   * —cierras el juego— `tick` cierra y sella con `end`, que es exactamente lo
+   * que hace una relectura en frío al llegar al final del fichero.
    *
-   * EL ARREGLO es que el cierre se decida SIEMPRE con la marca del registro.
-   * Y tiene una arista que hay que resolver al hacerlo, no después: si `tick`
-   * deja de poder cerrar, una pelea interrumpida por cerrar el juego se queda
-   * abierta para siempre, porque no va a llegar ninguna línea más. Así que no
-   * vale con borrar esta comprobación: hace falta que cerrar por reloj de pared
-   * no fije la frontera que se guarda, o que lo haga con margen suficiente para
-   * que ninguna línea que el registro pondría dentro llegue después.
+   * ESTO NO ELIMINA LA DIVERGENCIA, LA REDUCE. Y hay que decirlo porque durante
+   * una semana esta tarea se vendió como «lo que desbloquea reconstruir con
+   * garantías», y no es eso. Medido sobre un histórico real, de las 10 peleas
+   * que existían en directo y no al releer:
+   *
+   *   7   huecos de 19–20 s con `idleSec` = 20. Éstas las arregla el margen.
+   *   3   huecos de 12, 9 y 2 segundos. NINGUNA regla de reloj las parte: son
+   *       arranques de la aplicación a mitad del registro, donde un rastreador
+   *       nuevo empieza pelea nueva. El margen no las toca.
+   *
+   * Así que `AVISO_RECONSTRUIR` se queda donde está: reconstruir sigue sin
+   * reproducir el histórico exactamente. Avisa de menos, no de nada.
    */
   tick(nowSec) {
     if (!Number.isFinite(this.idleSec)) return;   // acumulador de sesión: no se cierra
-    if (this.current && nowSec - this.current.end > this.idleSec) this.#close();
+    if (!this.current) return;
+    /**
+     * EN DIRECTO NO BASTA CON MOVER `end` AL RECUPERAR EL MANDO, porque el
+     * aviso de que lo recuperas llega al FINAL del tramo y el reloj de pared no
+     * espera: con 38 segundos de miedo, `tick` cierra en el 23 y la línea de
+     * vuelta se encuentra la pelea ya partida. Al releer no pasa —`feed` sólo
+     * mira la marca del registro— y ésa es justo la clase de divergencia entre
+     * los dos relojes que este fichero lleva documentando desde `MARGEN_TICK`.
+     *
+     * Así que mientras el tramo esté abierto, el reloj de pared no cierra.
+     *
+     * CON UN TOPE, y sale de la medida: el tramo más largo del registro de
+     * referencia dura 38 s y se toma el doble, que es la misma regla que
+     * `CHARM_MAX_SEC` y el propio `MARGEN_TICK`. Sin tope, cerrar el juego a
+     * mitad de un miedo dejaría la pelea abierta para siempre y la última no se
+     * guardaría — y `rebuild.js` cierra llamando a `tick(MAX_SAFE_INTEGER)`,
+     * que con la espera sin límite no cerraría nada.
+     */
+    const ult = this.current.sinControl[this.current.sinControl.length - 1];
+    if (ult && ult.hasta === null && nowSec - ult.desde <= SIN_MANDO_MAX) return;
+    if (nowSec - this.current.end > this.idleSec + MARGEN_TICK) this.#close();
   }
 
   /** Anota si un hechizo tuyo entró o fue resistido contra ese enemigo. */
@@ -1345,8 +1841,9 @@ export class EncounterTracker extends EventEmitter {
       return { enc: null, amb: false, porQue: viejo ? 'cadaver-fuera-de-ventana' : 'sin-muerte-registrada' };
     }
     const ultimo = cand[cand.length - 1];
+    // `amb` viaja CON EL OBJETO y no a un contador del rastreador: así la ficha
+    // puede señalar cuál es el dudoso, que es lo que un total nunca pudo.
     const amb = cand.some((c) => c.enc !== ultimo.enc && ultimo.t - c.t <= AMBIGUO_SEG);
-    if (amb) this.lootAmbiguo++;
     // `dt` es lo único MEDIDO de todo esto: cuánto pasó entre esa muerte y esta
     // recogida. Viaja con el objeto para que la ficha pueda enseñar la distancia
     // en vez de pedir que se confíe en la regla.
@@ -1357,6 +1854,43 @@ export class EncounterTracker extends EventEmitter {
   #mine() {
     const m = new Set(this.petNames ?? []);
     if (this.self) m.add(this.self);
+    return m;
+  }
+
+  /**
+   * LOS TUYOS CON NOMBRE Y APELLIDO: tú y los compañeros que has DECLARADO.
+   *
+   * No es `#mine()` y la diferencia es doble y deliberada.
+   *
+   * POR ARRIBA, entra el compañero. `#mine()` contesta «¿es esto tuyo para abrir
+   * una pelea?», y ahí un compañero no cuenta: su pelea al otro lado de la sala
+   * no es la tuya, y eso lo prohíbe una prueba con su invariante escrita. Esto
+   * contesta otra cosa —«¿son los dos extremos de este golpe gente de tu
+   * bando?»— y para ésa el compañero sí cuenta, porque el bando es exactamente
+   * lo que declaraste.
+   *
+   * POR ABAJO, Y ESTO ES LO QUE COSTÓ VERLO: SE CAE LA MASCOTA. Las mascotas de
+   * EQL se llaman como los bichos —«Ice boned skeleton» es a la vez tu esqueleto
+   * invocado y un bicho de Befallen— así que una mascota es una identidad
+   * DETECTADA por un nombre reciclado, no una declarada. Medido: al incluirlas,
+   * una pelea de Befallen sacaba 110 puntos del daño enemigo y los rotulaba como
+   * fuego amigo porque un `Ice boned skeleton` salvaje —el que grita
+   * «Areeeeewwwww» y te pega— compartía nombre con una mascota tuya de otra
+   * sesión.
+   *
+   * Habría sido el mismo fallo que este cambio arregla, cometido dentro del
+   * arreglo: dejar que un dato inestable mande sobre una identidad. Lo que se
+   * afirma aquí sólo puede apoyarse en nombres que no se reciclan, y los de
+   * jugador no se reciclan.
+   *
+   * EL PRECIO, DICHO: si a tu mascota la encantan y te pega, su daño cuenta como
+   * enemigo en vez de apartarse. Es lo honesto mientras no se pueda distinguir tu
+   * esqueleto del esqueleto de la esquina, que es otro problema y más viejo.
+   */
+  #tuyos() {
+    const m = new Set();
+    if (this.self) m.add(this.self);
+    for (const n of this.companions ?? []) m.add(n);
     return m;
   }
 

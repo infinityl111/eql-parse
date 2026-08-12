@@ -1206,6 +1206,214 @@ function tanqueoHTML(f) {
   </div>`;
 }
 
+/**
+ * EL CORCHETE DEL FUEGO AMIGO. Dice lo que está medido y se calla lo demás.
+ *
+ * Lo que se puede afirmar sin deducir nada es esto: dos miembros declarados de
+ * tu grupo se estuvieron pegando durante N segundos. Eso es exactamente lo que
+ * se ve al jugar —«¿por qué me está pegando mi compañero?»— y es una frase que
+ * el registro respalda línea a línea.
+ *
+ * LO QUE NO DICE, Y LA TENTACIÓN ERA DECIRLO: «te encantaron». La explicación
+ * casi segura es que al compañero lo encantó el jefe, pero el registro no
+ * escribe ni una línea que nombre al encantado — comprobado sobre el episodio
+ * real, donde no hay NADA entre el último golpe suyo al jefe y el primero al
+ * grupo. Poner la causa sería vestir una deducción de medida.
+ *
+ * SÍ SE PUEDE PONER AL LADO UN HECHO VECINO, Y ES EL DE ESE EPISODIO: qué fue
+ * lo último que lanzó el enemigo antes de que empezara, sea lo que sea, con la
+ * distancia en segundos al lado. Ver `previoDe` en `src/engine.js`, donde está
+ * medido por qué NO puede ser un agregado de la pelea entera.
+ */
+// «Hace 0 s» no es una distancia, es el mismo segundo, y decirlo con un cero
+// obliga a traducirlo mentalmente. Son 16 de los 31 tramos medidos, así que no
+// es un caso raro que se pueda despachar con la frase general.
+const vecinoHTML = (p) => (p
+  ? `<div class="hint">${esc(t(p.dt ? 'ally.previo' : 'ally.previoYa',
+    { spell: p.ability, who: p.source, s: p.dt }))}</div>`
+  : '');
+
+function entreTuyosHTML(f) {
+  const e = f?.entreTuyos;
+  if (!e?.quien?.length) return '';
+  return `<div class="nota-bloque">
+    <div class="nota-h">${esc(t('ally.title'))}</div>
+    ${e.quien.map((q) => `<div class="nota-fila">
+      <b>${esc(t('ally.row', { who: q.name, s: q.segundos }))}</b>
+      <span class="dim">${esc(t('ally.rowNote', {
+    n: q.golpes, d: n0(q.daño), contra: q.contra.join(', '), a: q.desde, b: q.hasta }))}</span>
+      ${vecinoHTML(q.previo)}
+    </div>`).join('')}
+    <div class="hint">${esc(t('ally.note'))}</div>
+  </div>`;
+}
+
+/**
+ * LOS SEGUNDOS EN QUE TU PERSONAJE NO ERA TUYO.
+ *
+ * Los dos extremos están escritos en el registro, así que el tramo es medido de
+ * punta a punta. Lo que NO está escrito es la causa: la misma línea la produce
+ * un encanto y un miedo.
+ *
+ * Y por eso el rótulo no dice «encantado» salvo cuando hay con qué: que dentro
+ * del tramo le pegaras a los tuyos. Eso es conducta observada. En el registro
+ * de referencia son 31 tramos y ninguno lo cumple —los 31 fueron miedo—, así
+ * que un rótulo fijo de «encantado» habría mentido 31 veces de 31.
+ *
+ * AL LADO DE CADA TRAMO VA SU PROPIO VECINO, y no el de la pelea. La primera
+ * versión ponía aquí un agregado de la canción de encanto del jefe, y eso era
+ * escoger el candidato bonito contra la propia medición: de los 31 tramos, 18
+ * venían detrás de un miedo y 10 detrás del encanto. Ver `previoDe` en
+ * `src/engine.js`.
+ */
+// El rótulo sale del falsador, y las tres respuestas son excluyentes: sin
+// acciones es miedo, con golpes a los tuyos es encanto, y si actuaste contra el
+// enemigo no es ninguna de las dos y se dice así en vez de elegir.
+const FILA_CTRL = { miedo: 'ctrl.rowMiedo', encanto: 'ctrl.rowCharm' };
+
+function sinControlHTML(f) {
+  const sc = f?.sinControl;
+  if (!sc?.length) return '';
+  const total = sc.reduce((a, x) => a + x.segundos, 0);
+  return `<div class="nota-bloque">
+    <div class="nota-h">${esc(t('ctrl.title', { s: total }))}</div>
+    ${sc.map((x) => `<div class="nota-fila">
+      <b>${esc(t(FILA_CTRL[x.causa] ?? 'ctrl.row', { s: x.segundos, a: x.desde, b: x.hasta }))}</b>
+      ${x.causa === 'encanto'
+    ? `<span class="dim">${esc(t('ctrl.charmed', { n: x.aTuyos, d: n0(x.daño) }))}</span>` : ''}
+      ${x.causa === null
+    ? `<span class="dim">${esc(t('ctrl.rara', { n: x.aEnemigo }))}</span>` : ''}
+      ${x.cierre === 'pelea' ? `<span class="dim">${esc(t('ctrl.open'))}</span>` : ''}
+      ${vecinoHTML(x.previo)}
+    </div>`).join('')}
+    <div class="hint">${esc(t('ctrl.note'))}</div>
+    <div class="hint">${esc(t('ctrl.nocuenta', { s: total }))}</div>
+    ${dpsMandoHTML(f)}
+  </div>`;
+}
+
+/**
+ * TU DPS SOBRE EL TIEMPO QUE SÍ MANEJABAS, al lado del de siempre.
+ *
+ * El denominador es donde más te penaliza un secuestro: veinte segundos
+ * encantado te hunden la cifra por un rato en el que no decidías nada. Y sin
+ * embargo `dps` NO se cambia — es la convención comparable con GamParse y ACT, y
+ * moverla en silencio dejaría tus números sin poder compararse con los de nadie.
+ *
+ * Así que se enseñan los dos, con la resta delante. Es la misma solución que el
+ * resto del programa da cuando hay dos maneras legítimas de contar: las dos, con
+ * su nombre, en vez de elegir una y callarse la otra.
+ *
+ * La fila tuya se reconoce por `sinMandoSec`, que sólo la tuya trae: el registro
+ * no dice nada del mando de los demás.
+ */
+function dpsMandoHTML(f) {
+  const yo = (f?.rows ?? []).find((r) => (r.sinMandoSec ?? 0) > 0);
+  if (!yo || !f.duracionMando || f.duracionMando >= f.duration) return '';
+  return `<div class="nota-fila">${esc(t('ctrl.dps', {
+    a: n1(yo.damage / f.duracionMando), b: n1(yo.dps ?? 0), s: f.duracionMando, d: f.duration }))}</div>`;
+}
+
+/**
+ * LO QUE ESTA PELEA NO SABE. Los contadores de incertidumbre, encendidos.
+ *
+ * ═══ EL FALLO QUE ESTO CIERRA, Y ES EL MÁS GRAVE DE LA SEMANA ═══
+ *
+ * El programa llevaba versiones CALCULANDO SU PROPIA INCERTIDUMBRE Y TIRÁNDOLA.
+ * Tres cifras, las tres correctas, las tres sin un solo lector:
+ *
+ *   `unattributed`     daño real que no se puede adjudicar a nadie —un escudo
+ *                      de daño sin posesivo—. Fuera de todos los totales, con
+ *                      un comentario al lado que dice «se aparta, que es lo que
+ *                      promete el README, y la ficha lo dice». La ficha no lo
+ *                      decía.
+ *   `charm.soltado`    daño contado como enemigo apoyándose en una DEDUCCIÓN
+ *                      —que el encanto se rompió al encadenar otro— y no en una
+ *                      línea. Ni un lector, ni siquiera una prueba.
+ *   botín ambiguo      recogidas donde dos cadáveres eran igual de buenos
+ *                      candidatos, con el comentario «se cuentan para poder
+ *                      decir cuánto no se sabe, NO PARA TAPARLO». Se estaba
+ *                      tapando.
+ *
+ * Los dos últimos comentarios no son documentación: son promesas escritas que
+ * el código incumplía. Eso los separa del resto de la salida muerta, que sólo
+ * estaba sin usar.
+ *
+ * Y LA IRONÍA QUE LO EXPLICA TODO: al diseñar la guarda del botín se decidió no
+ * marcar el 32% de las recogidas porque «marcarlo todo dejaría la ficha llena de
+ * dudas que no lo son», y se afinó hasta el 0,2% que de verdad es dudoso. El
+ * razonamiento era bueno. Lo que nadie comprobó es que ese 0,2% tampoco se
+ * enseñaba: llevábamos versiones marcando el 0%.
+ *
+ * CÓMO SE ENSEÑA. Juntos y no repartidos, porque son la misma pregunta —«¿de
+ * qué parte de esta pelea no me puedo fiar?»— y separados vuelven a ser tres
+ * notas que nadie relaciona. Cada uno con su certeza dicha: lo de `soltado` va
+ * marcado como deducido con la misma señal que el resto del programa, porque no
+ * tiene ni una línea que lo respalde.
+ *
+ * Y NO CUESTA NI UN CAMPO NUEVO NI UNA RECONSTRUCCIÓN: los tres números ya
+ * estaban calculados y guardados. Lo único que faltaba era leerlos.
+ */
+function incertidumbreHTML(f) {
+  if (!f) return '';
+  const filas = [];
+  if (f.unattributed > 0) {
+    filas.push({ txt: t('inc.unattributed', { n: n0(f.unattributed) }), dedu: false });
+  }
+  const sol = f.charm?.soltado;
+  if (sol?.daño > 0) {
+    filas.push({ txt: t('inc.soltado', { n: n0(sol.daño), g: sol.golpes }), dedu: true });
+  }
+  // El botín ambiguo se cuenta de la propia pelea y no de un contador aparte:
+  // la marca por objeto ya viaja en `amb`, así que el número sale de sumarla y
+  // no hace falta guardar nada nuevo.
+  const amb = (f.loot ?? []).filter((l) => l.amb).length;
+  if (amb > 0) filas.push({ txt: t('inc.loot', { n: amb }), dedu: true });
+  if (!filas.length) return '';
+  return `<div class="nota-bloque">
+    <div class="nota-h">${esc(t('inc.title'))}</div>
+    ${filas.map((x) => `<div class="nota-fila">${esc(x.txt)}${
+    x.dedu ? ` <span class="dim">· ${esc(t('inc.dedu'))}</span>` : ''}</div>`).join('')}
+    <div class="hint">${esc(t('inc.note'))}</div>
+  </div>`;
+}
+
+/**
+ * LA PELEA QUE SE SABE QUE ESTÁ MAL, DICHO DONDE SE VEN SUS CIFRAS.
+ *
+ * `f.duda` lleva desde la 1.11.0 calculándose en el almacén —con su fichero, su
+ * comprobación de contenido y su prueba— y NO SE PINTABA EN NINGUNA PARTE. Es el
+ * caso de manual: medirlo no es enseñarlo, y un dato al que hay que ir no es un
+ * dato puesto. Una pelea marcada como incorrecta que enseña sus cifras como si
+ * fueran buenas está exactamente igual de mal que si nadie la hubiera marcado,
+ * con el agravante de que parece resuelto.
+ *
+ * VA ARRIBA Y NO EN UNA NOTA AL PIE, pegado a las tarjetas cuyos números
+ * invalida. Y dice cuáles: el daño personal está bien, y tacharlo todo haría que
+ * la gente dejara de creerse una pelea que en su mayor parte es correcta.
+ */
+function dudaHTML(f) {
+  const d = f?.duda;
+  if (!d) return '';
+  const quien = (d.filas ?? []).join(', ');
+  // El texto se elige por `motivo` —qué pasó— y la cifra se lee sobre el total
+  // que dice `sobre`, que es OTRA cosa: una duda infla el bando enemigo y la
+  // otra el tuyo. Sin mirar `sobre`, la frase sería correcta en un caso y
+  // exactamente al revés en el otro.
+  const cuerpo = t(d.motivo === 'compa-en-bando-enemigo' ? 'duda.compa' : 'duda.charm',
+    { n: n0(d.daño), total: n0(d.total ?? 0), quien,
+      cual: t(d.sobre === 'enemyTotal' ? 'metric.enemyTotal' : 'metric.total') });
+  const CAMPOS = { total: 'metric.total', raidDps: 'metric.raidDps',
+    enemyTotal: 'metric.enemyTotal', enemyDps: 'metric.enemyDps' };
+  const campos = (d.invalida ?? []).map((k) => (CAMPOS[k] ? t(CAMPOS[k]) : k)).join(', ');
+  return `<div class="duda">
+    <div class="duda-h">${esc(t('duda.head'))}</div>
+    <p>${esc(cuerpo)}</p>
+    <p class="hint">${esc(t('duda.invalida', { campos }))}</p>
+    <p class="hint">${esc(t('duda.arregla'))}</p>
+  </div>`;
+}
+
 function renderRows(snap) {
   const f = withPets(fightFor(snap));
   const host = $('rows');
@@ -1222,12 +1430,16 @@ function renderRows(snap) {
   const notaCharm = $('charmNote');
   if (notaCharm) {
     const c = f.charm;
-    notaCharm.style.display = c ? 'block' : 'none';
+    const trozos = [];
     if (c) {
-      notaCharm.innerHTML = `${esc(t('charm.amb', { n: c.golpes, d: n0(c.daño) }))}` +
+      trozos.push(`<div>${esc(t('charm.amb', { n: c.golpes, d: n0(c.daño) }))}` +
         (c.estimadoTuyo !== null
-          ? ` ${esc(t('charm.est', { d: n0(c.estimadoTuyo) }))}` : '');
+          ? ` ${esc(t('charm.est', { d: n0(c.estimadoTuyo) }))}` : '') + '</div>');
     }
+    trozos.push(entreTuyosHTML(f), sinControlHTML(f), incertidumbreHTML(f));
+    const html = trozos.filter(Boolean).join('');
+    notaCharm.style.display = html ? 'block' : 'none';
+    if (html) notaCharm.innerHTML = html;
   }
 
   // Cabecera al pasar de los tuyos a los enemigos: sin ella parecen el mismo
@@ -1988,24 +2200,81 @@ async function renderNarrate(host) {
    * porque una tabla que no refleja lo guardado despista aunque no borre nada.
    *
    * ═══════════════════════════════════════════════════════════════════════════
-   * Y ES LA CUARTA VEZ ESTA SEMANA CON LA MISMA RAÍZ: IDENTIFICAR ALGO POR UN
-   * DATO QUE NO ES ESTABLE. Tres funciones distintas, tres fallos distintos:
+   * Y VAN SEIS CON LA MISMA RAÍZ: DEJAR QUE UN DATO INESTABLE MANDE SOBRE UNA
+   * IDENTIDAD. Seis funciones distintas, seis fallos distintos, y ninguno se
+   * parece a los otros mirándolo de cerca:
    *
-   *   el encanto   identificaba cadáveres POR NOMBRE, y los nombres se repiten:
-   *                dos «a hardened skeleton» a la vez, uno tuyo y otro no.
-   *                Se cerró midiendo al otro extremo del golpe, y lo que sigue
-   *                sin poder decidirse se aparta y se cuenta (`charmAmbiguo`).
-   *   el botín     se colgaba de la VENTANA abierta, y las ventanas se mueven:
-   *                el mismo objeto caía en una pelea o en otra según qué reloj
-   *                cerrara la anterior. Se cerró colgándolo del cadáver del que
-   *                salió (ver `VENTANA_CADAVER` en `src/encounter.js`).
-   *   los tríos    se borraban por ÍNDICE, y los índices se recolocan al
-   *                insertar. Esto.
+   *   el encanto      identificaba cadáveres POR NOMBRE, y los nombres se
+   *                   repiten: dos «a hardened skeleton» a la vez, uno tuyo y
+   *                   otro no. Se cerró midiendo al otro extremo del golpe, y lo
+   *                   que sigue sin poder decidirse se aparta y se cuenta
+   *                   (`charmAmbiguo`).
+   *   el botín        se colgaba de la VENTANA abierta, y las ventanas se mueven:
+   *                   el mismo objeto caía en una pelea o en otra según qué reloj
+   *                   cerrara la anterior. Se cerró colgándolo del cadáver del
+   *                   que salió (ver `VENTANA_CADAVER` en `src/encounter.js`).
+   *   los tramos      `tramos.ndjson` casaba sólo por la HORA de la pelea. La
+   *                   hora no se mueve —ése era el argumento— pero la pelea de
+   *                   debajo sí: sobrevivía a las reconstrucciones y seguía
+   *                   estampando lo suyo sobre otra cosa. Una pelea impecable
+   *                   rotulada como excepción y una entrada huérfana apuntando a
+   *                   un inicio que ya no existía. Se cerró casando también por
+   *                   CONTENIDO (ver `aplicarTramos` y `aplicarDudas`).
+   *   los tríos       se borraban por ÍNDICE, y los índices se recolocan al
+   *                   insertar. Esto.
+   *   el compañero    UN GOLPE convertía a un compañero declarado en enemigo
+   *                   para toda la pelea. En el Plano del Miedo encantan, así
+   *                   que una línea bastaba para mover a alguien de tu grupo al
+   *                   bando contrario con todo su daño detrás: 3 peleas de 709,
+   *                   y en ellas 11.862 de 24.499 de «daño enemigo» —el 48%—
+   *                   era del propio grupo. Se cerró haciendo que la identidad
+   *                   declarada gane, y apartando lo que os pegáis (ver
+   *                   `entreTuyos` y `#sides`).
    *
-   * La pregunta que había que hacerse las tres veces es la misma: «¿esto que
-   * uso como identidad sigue valiendo lo mismo dentro de un segundo?». Nombre,
-   * posición y ventana contestan que no. Antes de identificar nada por un dato,
-   * hazte esa pregunta — porque va a volver a pasar.
+   *   la mascota      «los tuyos» incluía a tus MASCOTAS, y las mascotas de EQL
+   *                   se llaman como los bichos. Un `Ice boned skeleton` salvaje
+   *                   de Befallen —el que grita «Areeeeewwwww» y te pega—
+   *                   compartía nombre con una mascota tuya de otra sesión, y le
+   *                   sacaba 110 puntos al daño enemigo rotulándolos de fuego
+   *                   amigo. Ésta apareció DENTRO del arreglo del compañero, y
+   *                   la cazó una medición, no una lectura. Se cerró dejando en
+   *                   «los tuyos» sólo nombres que no se reciclan.
+   *
+   * LA VARIANTE QUE HACE FALTA VER, porque es la que se escapó cuatro veces
+   * antes: en las tres primeras el dato inestable era el único que había, y el
+   * arreglo fue buscar uno mejor. En las dos siguientes HABÍA UNA IDENTIDAD
+   * DECLARADA AL LADO —tú borraste esa fila, tú dijiste que ése es de tu grupo—
+   * y se dejó que la ganara un dato de un segundo. Eso no es un problema de
+   * medición: es un orden de prioridad puesto al revés. Y la sexta enseña la
+   * otra cara: al arreglar la quinta se metió como «declarado» algo que sólo
+   * estaba DETECTADO. Declarado y detectado no son lo mismo aunque los dos los
+   * sepa el programa.
+   *
+   * La pregunta que había que hacerse las seis veces es la misma: «¿esto que uso
+   * como identidad sigue valiendo lo mismo dentro de un segundo, y hay algo
+   * declarado que debería mandar sobre ello?». Nombre, ventana, hora, posición,
+   * un golpe y un nombre de mascota contestan que no.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * Y LA SÉPTIMA ES DE OTRA FAMILIA, ASÍ QUE VA APARTE: SALIDA MUERTA.
+   *
+   * `f.duda` —la marca de «esta pelea está mal contada»— llevaba desde la 1.11.0
+   * calculándose en el almacén, con su fichero lateral, su comprobación de
+   * contenido y su prueba en verde, y NO SE PINTABA EN NINGUNA PARTE. Dos
+   * versiones. Nadie la vio nunca.
+   *
+   * NO ES UN FALLO Y POR ESO ES PEOR. Nada estaba roto: el cálculo era correcto,
+   * las pruebas pasaban, el fichero se escribía. Es trabajo que se ejecuta y no
+   * llega a nadie, y no hay guarda que lo detecte porque no hay nada que falle.
+   * Una identidad inestable acaba dando un número raro que alguien nota; esto no
+   * da ningún número, y encima deja la sensación de que el problema está
+   * resuelto porque «ya lo marcamos».
+   *
+   * La pregunta que no nos estábamos haciendo: «¿quién LEE esto?». No «¿está
+   * bien calculado?», ni «¿tiene prueba?», que era lo que mirábamos. En el
+   * barrido que salió de aquí aparecieron más: `charm.soltado`, `unattributed`,
+   * `lootAmbiguo`, y los tres con un comentario al lado prometiendo que se
+   * enseñan.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
@@ -2620,6 +2889,11 @@ function renderHead(snap) {
         <button id="btnChat" title="${esc(t('share.tip'))}">${t('share.copy')}</button>
       </div>
     </div>
+    ${/*
+      Lo que se sabe que está mal, ANTES de las cifras que invalida. Debajo de
+      ellas sería una nota al pie de unos números que ya te has creído.
+    */''}
+    ${dudaHTML(f)}
     <div class="metrics">
       ${card(n0(f.raidDps), t('metric.raidDps'), 'lead')}
       ${card(n0(f.total), t('metric.total'))}
@@ -3174,6 +3448,22 @@ function encFoeDif() {
       <div class="hint">${esc(t('enc.resistDiffNote'))}</div>
       <div class="reslist">${d.spells.map((x) => resistCell(x)).join('')}</div>
     </div>` : ''}
+
+    ${/*
+      LO QUE LE RESISTES A ÉL. Es el sentido contrario del bloque de arriba, y
+      hasta la 1.13.0 no existía: se contaban 1.972 resistencias tuyas en todo
+      un registro y se guardaban como UN número por pelea, `resistsCaused`, que
+      no se puede usar para nada. Ahora van con su lanzador y su hechizo, que es
+      lo que convierte «resististe 7» en «a éste le paras el miedo».
+      Vacío no se enseña: cero resistencias puede ser que no te haya lanzado
+      nada, y eso no es un hallazgo.
+    */''}
+    ${(d.resisted ?? []).length ? `<div class="dos-block">
+      <div class="eyebrow">${esc(t('foe.youResist'))}</div>
+      <div class="hint">${esc(t('foe.youResistNote'))}</div>
+      ${d.resisted.map((x) => `<div class="foe-det-l">
+        <span>${esc(x.spell)}</span><b>×${n0(x.n)}</b>
+      </div>`).join('')}</div>` : ''}
 
     ${(d.abilities ?? []).length ? `<div class="dos-block">
       <div class="eyebrow">${esc(t('foe.howHits'))}</div>
