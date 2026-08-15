@@ -1,5 +1,6 @@
 // El suelo de individuos por nombre, compartido con el «×N» del título.
 import { suelosDe } from './suelo.js';
+import { esRelevante } from './relevancia.js';
 /**
  * El guion de una pelea: sus sucesos, segundo a segundo, para reproducirla.
  *
@@ -132,10 +133,52 @@ export function guion(f, lineas, Parser, self = null) {
     porSegundo.get(s).push({ ...suceso, orden: orden++ });
   };
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * QUÉ ES DE ESTA PELEA: SE PREGUNTA, NO SE DECIDE AQUÍ.
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * Estas líneas vienen de releer el registro ENTRE EL INICIO Y EL FIN de la
+   * pelea, así que la ventana trae también lo que pasaba al lado: un
+   * desconocido matando bichos a diez metros sale en los mismos segundos.
+   *
+   * Este fichero ya decía, ciento treinta líneas más arriba, que «el reparto
+   * sale de la pelea, no del registro» y que «dos respuestas distintas para la
+   * misma pregunta es peor que una imperfecta». Y luego daba la segunda
+   * respuesta: metía como actor a cualquiera que apareciera en la ventana.
+   *
+   * MEDIDO ANTES DE ARREGLARLO, sobre las 1.561 peleas con combatientes:
+   *
+   *     con actores AJENOS en la ventana      1.257   (80,5 %)
+   *     ...y en las que esos ajenos SE PEGAN    184   (11,8 %)
+   *
+   * La peor —11 de agosto, 17:34:32— es una pelea de 98 s con TRES
+   * combatientes de verdad, once ajenos y 495 golpes entre ellos dentro. El
+   * reproductor dibujaba catorce figuras donde hubo tres.
+   *
+   * LA REGLA, que es la del componente conexo aplicada al dibujo:
+   *
+   *     QUIEN SÓLO INTERACTÚA CON QUIEN NO ESTÁ EN LA PELEA, NO ESTÁ EN LA PELEA.
+   *
+   * Y SE CONSERVA la categoría «apareció y no hizo ni recibió daño» —un
+   * sanador, alguien que sólo falló—: lo que se le exige no es haber hecho
+   * daño, es haber tocado a ALGÚN MIEMBRO de la pelea.
+   *
+   * El reparto ya está decidido, así que se le pasa entero a la guarda como
+   * respuesta cerrada. El motor le pasa sus conjuntos vivos. Misma pregunta,
+   * la información que cada uno tiene.
+   */
+  const reparto = new Set(actores.keys());
+  const mios = new Set([...actores.values()].filter((a) => a.esTu || a.mascota).map((a) => a.nombre));
+  if (self) mios.add(self);
+  const ctx = { mios, objetivos: reparto, enPelea: reparto, companions: new Set() };
+
   for (const l of lineas ?? []) {
     if (l.t === null || l.t === undefined) continue;
     const ev = p.parseAt(l.t, l.texto, orden);
     if (!ev) continue;
+    // Lo que no es de esta pelea no llega ni a existir en el guion.
+    if (!esRelevante(ev, ctx)) continue;
     const s = Math.round(l.t) - inicio;
 
     if (DAÑO.has(ev.kind) && ev.amount > 0) {
@@ -203,9 +246,13 @@ export function guion(f, lineas, Parser, self = null) {
     }
   }
 
-  // Actores que salen en el registro y no estaban en la pelea guardada: pasa
-  // con quien apareció y no llegó a hacer ni recibir daño. Entran con su bando
-  // sin decidir en vez de desaparecer, y la interfaz los pinta aparte.
+  // Actores que salen en el registro y no estaban en la pelea guardada: quien
+  // apareció y no llegó a hacer ni recibir daño —un sanador, alguien que sólo
+  // falló—. Entran con su bando sin decidir en vez de desaparecer.
+  //
+  // AHORA SÓLO PUEDEN LLEGAR AQUÍ LOS QUE TOCARON A ALGUIEN DE LA PELEA: el
+  // filtro de arriba ya descartó al resto. Antes entraba cualquiera que saliera
+  // en la ventana de tiempo, y eso metía peleas ajenas enteras.
   for (const lista of porSegundo.values()) {
     for (const x of lista) {
       for (const n of [x.origen, x.destino]) {

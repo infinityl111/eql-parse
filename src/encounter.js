@@ -21,6 +21,12 @@ import { CHARM_MAX_SEC } from './parser.js';
 export const cuboRecibido = (school) => (school === 'melee' ? 'tMelee'
   : (SIN_MITIGACION.has(school) ? 'tUnmit' : 'tSpell'));
 
+import { esRelevante } from './relevancia.js';
+
+/** Compartido: la guarda pide conjuntos y una pelea sin abrir no los tiene. Uno
+ *  solo, porque esto corre una vez por cada línea del registro. */
+const VACIO = new Set();
+
 export const DAMAGE_KINDS = new Set(['melee', 'spell', 'dot', 'ds']);
 
 /**
@@ -1919,43 +1925,30 @@ export class EncounterTracker extends EventEmitter {
     // quien los tuyos ya estáis pegando. Con eso los compañeros de grupo
     // entran solos al golpear vuestro objetivo, y el de al lado no.
     const mine = this.#mine();
-    // Sin saber quién eres no hay nada que filtrar: se acepta todo antes que
-    // descartar la pelea entera. Pasa en pruebas y si el personaje aún no se
-    // ha deducido del nombre del fichero.
-    const rel = (n) => n && (mine.has(n) || this.current?.foesSeen?.has(n));
-    // Las muertes no traen `source` ni `target`, sino `victim` y `killer`: hay
-    // que mirar los cuatro. Mirando sólo los dos primeros se descartaban TODAS
-    // las muertes, y con ellas los abatidos, las bajas, el nombre de la pelea y
-    // la vida estimada del enemigo, que se deduce de lo que costó tumbarlo.
-    //
-    // Y en una muerte cuenta también quien ya esté peleando: un compañero de
-    // grupo no es tuyo ni es enemigo, así que sin esto su caída no se contaba
-    // aunque llevara toda la pelea pegando a tu objetivo.
-    const enPelea = (nm) => nm && !!this.current?.combatants?.has(nm);
-    // Un compañero declarado PEGANDO también cuenta, y es lo que permite que la
-    // pelea de tu grupo exista cuando tú no llegaste a tocar al enemigo. Sólo
-    // pegando: un fallo o una curación suya abrirían un encuentro vacío.
-    const compaPega = this.companions.size > 0
-      && DAMAGE_KINDS.has(ev.kind) && ev.amount > 0
-      && (this.companions.has(ev.source) || this.companions.has(ev.target));
-    // `compaPega` ENTRA AQUÍ, que es donde llevaba sin entrar desde que se
-    // escribió. Estaba calculado tres líneas más arriba y no se usaba en
-    // ninguna parte del fichero: una sola aparición, la declaración.
-    //
-    // Lo que costaba, medido sobre un registro real con dos compañeros
-    // declarados: 43.028 de daño suyo descartado —75.688 de uno y 33.543 del
-    // otro, que salen en 67 y 68 de las peleas—. Y 4 peleas partidas de más:
-    // durante unos segundos sólo pegaba el compañero, sus eventos se tiraban,
-    // y el hueco parecía inactividad. Es el mismo fallo que cortaba peleas en
-    // dos con las curaciones reflexivas, con otro disfraz.
-    //
-    // Y NO ABRE LA PUERTA A CUALQUIERA: pide `this.companions.has(…)`, o sea
-    // declarado a mano. El caso que motivó el filtro sigue igual — en ese
-    // mismo registro, `Hartemis` tiene 76.626 de daño descartado y cero peleas
-    // tuyas, y sigue fuera. El escape es para los tuyos, no para quien pase.
-    const relevante = ev.kind === 'death'
-      ? (rel(ev.victim) || rel(ev.killer) || enPelea(ev.victim) || enPelea(ev.killer))
-      : (rel(ev.source) || rel(ev.target) || compaPega);
+    /**
+     * LA GUARDA VIVE EN `src/relevancia.js`, Y AQUÍ SE LLAMA.
+     *
+     * Estaba escrita aquí dentro, y el reproductor contestaba la misma pregunta
+     * por su cuenta con una regla mucho más débil —cualquiera que apareciera en
+     * la ventana de tiempo de la pelea—. Medido antes de arreglarlo: 184 peleas
+     * de 1.561 con combate ajeno DIBUJADO dentro, y la peor con catorce figuras
+     * donde hubo tres.
+     *
+     * El arreglo no fue endurecer aquella regla: fue borrarla y llamar a ésta.
+     * Una pregunta, un sitio.
+     *
+     * Sin saber quién eres no hay nada que filtrar: se acepta todo antes que
+     * descartar la pelea entera. Pasa en pruebas, y si el personaje aún no se ha
+     * deducido del nombre del fichero. Eso es el `mine.size &&` de abajo, y por
+     * eso se queda aquí y no dentro de la guarda: es una condición de ESTE
+     * llamador —el que aún está aprendiendo quién eres—, no de la pregunta.
+     */
+    const relevante = esRelevante(ev, {
+      mios: mine,
+      objetivos: this.current?.foesSeen ?? VACIO,
+      enPelea: this.current?.combatants ?? VACIO,
+      companions: this.companions,
+    });
     if (mine.size && !relevante) return;
 
     // AQUÍ SE DECIDE LA FRONTERA, y ya no la decide un hueco: la deciden las
