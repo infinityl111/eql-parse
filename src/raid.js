@@ -62,10 +62,46 @@ export function clasificaJefe(nombre, { manual = null, wiki = null, vida = null 
  * línea de chat no cabe y tampoco ayuda a quien la lee — vive en la ficha.
  */
 export function jefesDe(rows = [], ctx = {}) {
+  /**
+   * LA VIDA QUE ENTRA AQUÍ VA SIN LO QUE LE CURARON, y antes no.
+   *
+   * `r.taken` es lo que el bicho recibió, y si un sanador se lo repara por el
+   * camino eso NO es vida suya: es daño deshecho. La muestra de vida de una
+   * pelea ya lo descuenta desde hace versiones —`hpSamples` resta `healTotals`,
+   * comprobado sobre el histórico: de 153 enemigos con curación, 151 coinciden
+   * con la cifra NETA y ninguno con la bruta— pero esta función no usaba esa
+   * cifra sino `taken` a pelo, así que la corrección no llegaba al único sitio
+   * donde el número decide algo: quién es un jefe.
+   *
+   * MEDIDO sobre las 2.664 filas enemigas del almacén: 538 recibieron curación,
+   * y en DOS la deducción cambia de lado.
+   *
+   *     Cleric of Innoruuk   recibió 22.633 · le curaron 2.803 · neto 19.830
+   *
+   * Con la cifra bruta cruza `VIDA_JEFE` y sale rotulado como jefe de raid; con
+   * la suya, no llega. Son dos filas de 2.664 y se arregla igual, porque el
+   * error no es de tamaño: es una cifra derivada de una suma que incluye algo
+   * que no debería, que es la familia que este proyecto lleva diez fallos
+   * persiguiendo.
+   *
+   * Y NO TOCA A LOS DEMÁS CAMINOS: lo que dice la wiki y lo que has dicho tú
+   * mandan por encima de la deducción, así que esto sólo mueve a los enemigos
+   * de los que no se sabe nada — que son justo aquellos donde la deducción es
+   * lo único que hay.
+   */
+  const curado = new Map();
+  for (const r of rows) {
+    for (const h of r.healByTarget ?? []) {
+      const n = Array.isArray(h) ? h[0] : h.name;
+      const v = Array.isArray(h) ? (h[1]?.sum ?? 0) : (h.sum ?? 0);
+      if (n) curado.set(n, (curado.get(n) ?? 0) + v);
+    }
+  }
   const out = new Set();
   for (const r of rows) {
     if (r.side !== 'enemy') continue;
-    if (clasificaJefe(r.name, { ...ctx, vida: r.taken ?? 0 }).raid) out.add(r.name);
+    const vida = Math.max(0, (r.taken ?? 0) - (curado.get(r.name) ?? 0));
+    if (clasificaJefe(r.name, { ...ctx, vida }).raid) out.add(r.name);
   }
   return out;
 }
