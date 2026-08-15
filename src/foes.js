@@ -242,16 +242,39 @@ export class FoeLedger {
         acumulaHabilidad(pd.abil, a);
       }
 
-      // Cuántas veces cayó: `kills` trae un nombre por muerte, así que matarlo
-      // tres veces en una pelea son tres. Antes se contaba una.
-      const caidas = (f.kills ?? []).filter((x) => x === r.name).length;
+      /**
+       * Cuántas veces cayó: `kills` trae un nombre por muerte, así que matarlo
+       * tres veces en una pelea son tres. Antes se contaba una.
+       *
+       * Y SE COMPARA SIN LA MAYÚSCULA INICIAL, que no es un remilgo: EQ escribe
+       * «A shin ghoul knight has been slain» al abrir frase y «You slash a shin
+       * ghoul knight» a mitad. La fila del combatiente queda normalizada por
+       * `Encounter.actor`, pero `kills` y `hpSamples` se guardan con el nombre
+       * TAL CUAL venía en la línea de muerte, así que las dos formas conviven en
+       * la misma pelea y esta comparación no casaba.
+       *
+       * LO QUE COSTABA, medido sobre el almacén: de 4.348 abatidos guardados,
+       * 25 no llegaban al bestiario —14 de ellos de `orc legionnaire`— y con
+       * ellos se perdían 39 muestras de vida. No fallaba nada visible: el
+       * enemigo salía con menos muertes de las que tuvo y con la vida estimada
+       * sobre menos muestras, y no había forma de notarlo mirando la ficha.
+       *
+       * SE ARREGLA AL LEER Y NO AL ESCRIBIR a propósito: así queda bien también
+       * el histórico que ya está guardado, sin pedirle a nadie que reconstruya.
+       * Es la misma decisión que la 1.11.0 y por el mismo motivo.
+       */
+      const mismoNombre = (a, b) => a === b
+        || a.charAt(0).toLowerCase() + a.slice(1) === b.charAt(0).toLowerCase() + b.slice(1);
+      const caidas = (f.kills ?? []).filter((x) => mismoNombre(x, r.name)).length;
       if (caidas > 0) {
         e.kills += caidas;
         pd.kills += caidas;
         // Vida estimada: lo que costó tumbarlo. El log no da la vida de nadie,
         // pero el daño hasta su muerte es una cota muy buena. Cada muerte deja
         // su propia muestra, medida en el instante en que cayó.
-        const muestras = f.hpSamples?.[r.name];
+        // Por lo mismo que `caidas`: la clave puede venir capitalizada.
+        const clave = Object.keys(f.hpSamples ?? {}).find((k) => mismoNombre(k, r.name));
+        const muestras = clave ? f.hpSamples[clave] : undefined;
         for (const m of muestras ?? []) if (m > 0) pd.hpSamples.push(Math.round(m));
         if (muestras?.length) {
           for (const m of muestras) if (m > 0) e.hpSamples.push(Math.round(m));

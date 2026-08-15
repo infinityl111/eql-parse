@@ -131,6 +131,16 @@ const KEYS = {
   // Por debajo del listón del stagger —19 por pelea es fondo y no aviso— con
   // holgura. Y el interruptor que las gobierna, «Raíz y ralentizar», no cambia:
   // sigue donde estaba.
+  //
+  // OJO: `instill` ES UN TROZO DE PALABRA, no un nombre entero. Casa con
+  // cualquier hechizo que lo contenga, y el que hay que vigilar es «Instill
+  // Life» —un hechizo de curación en otros servidores— que saldría clasificado
+  // como `root`. HOY NO EXISTE en el registro de referencia: de los 652 nombres
+  // distintos vistos lanzar, el único que empieza por «Instill» es `Instill` a
+  // secas, 472 veces. Se deja escrito aquí para que el día que aparezca no haya
+  // que descubrirlo por un falso positivo: si sale, la clave se alarga a
+  // `instill.` o se enumeran los dos nombres, que es lo que hace el resto de
+  // este fichero — enumerar lo medido y no generalizar.
   root: ['root', 'ensnare', 'snare', 'immobiliz', 'paraly', 'engulfing dark',
          'cripple', 'slow', 'tagar', 'clinging darkness', 'bonds of',
          'languid', 'instill'],

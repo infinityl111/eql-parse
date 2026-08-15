@@ -103,6 +103,37 @@ export class TriggerEngine extends EventEmitter {
     return this.compiled.filter((c) => c.error).map((c) => ({ id: c.id, error: c.error }));
   }
 
+  /**
+   * DE QUÉ REGISTRO HABLA EL CONTADOR. `{ registro, lineas, n }`.
+   *
+   * «Visto 33 veces» sin decir DÓNDE es identidad colgada de algo que se cambia
+   * debajo: hay un botón de «cambiar log», y al pulsarlo la etiqueta seguiría
+   * contando lo del personaje anterior. Es la misma familia que el botín colgado
+   * de la ventana y los tríos borrados por índice, y van once.
+   *
+   * NO SE ARREGLA ACORDÁNDOSE DE REINICIARLO. Se arregla como `aplicarDudas`:
+   * casando por CONTENIDO además de por clave. El contador viaja con el fichero
+   * del que salió, así que al cambiar de registro la clave no casa y la cuenta
+   * empieza de cero **sola** — sin una guarda nueva que alguien tenga que
+   * acordarse de llamar. Y mientras no case, la etiqueta puede decir de qué
+   * registro habla en vez de callarse.
+   *
+   * `lineas` es hasta dónde se contó. Sirve para lo de siempre: un registro que
+   * ha crecido desde la última cuenta no invalida lo contado, sólo dice que hay
+   * más por contar.
+   */
+  registro(ruta, lineas = 0) {
+    this.log = { ruta: ruta ?? null, lineas };
+  }
+
+  #anota(def) {
+    const ruta = this.log?.ruta ?? null;
+    // Otro registro: la cuenta anterior no habla de éste y se empieza de cero.
+    if (!def.vistas || def.vistas.registro !== ruta) def.vistas = { registro: ruta, lineas: 0, n: 0 };
+    def.vistas.n++;
+    def.vistas.lineas = this.log?.lineas ?? def.vistas.lineas;
+  }
+
   /** Comprueba un patrón contra una línea sin tocar el estado. Para el botón de probar. */
   static tryOne(def, line) {
     const c = compile(def);
@@ -139,7 +170,7 @@ export class TriggerEngine extends EventEmitter {
        */
       c.vistas = (c.vistas ?? 0) + 1;
       const def = this.defs.find((d) => d.id === c.id);
-      if (def) { def.vistas = (def.vistas ?? 0) + 1; def.vistaAt = Date.now(); }
+      if (def) this.#anota(def);
 
       const speak = substitute(c.speak, m, line);
       const text = substitute(c.text, m, line);

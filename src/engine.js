@@ -252,6 +252,11 @@ export class Engine extends EventEmitter {
     this.trioIdx = 0;
     this.trioActive = null;
 
+    // El contador de los disparadores viaja con el registro del que sale: hay un
+    // botón de cambiar de log y una etiqueta que dijera «visto 33 veces» sobre
+    // el registro de otro personaje sería identidad colgada de algo que se
+    // cambia debajo. Ver `registro()` en `src/triggers.js`.
+    this.triggers.registro(logPath);
     this.parser = new Parser({ self: this.self });
     this.narrator.setSelf(this.self);
     this.narrator.setPets([]);

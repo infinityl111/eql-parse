@@ -32,7 +32,17 @@
  * Y lo que decide la forma: lo que desborda la línea es la lista de nombres de
  * bichos, no la de los tuyos.
  */
-import { fightToChat, esNamed, LIMITE } from '../src/share.js';
+import { fightToChat as chatCrudo, esNamed, LIMITE } from '../src/share.js';
+import { jefesDe } from '../src/raid.js';
+
+/**
+ * `fightToChat` PIDE `named` y no lo deduce, así que las pruebas lo pasan
+ * igual que lo pasan `ui/app.js` y `ui/overlay.js`: con `jefesDe`, que es
+ * quien mira la wiki, lo que has declarado y —sólo si no hay nada de eso—
+ * deduce, con la vida ya sin lo que le curaron.
+ */
+const fightToChat = (f, o = {}) => chatCrudo(f, { named: jefesDe(f.rows ?? [], {}), ...o });
+
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -297,22 +307,27 @@ console.log('\nlo que no consta de quién es, no se toca');
     'si el dueño no pegó, la mascota sale sola pero con su etiqueta', r.lineas[0]);
 }
 
-// ── 9. La lista de named manda sobre la deducción ──────────────────────────
+// ── 9. `named` es obligatorio: aquí ya no se deduce nada ──────────────────
 //
-// La heurística falla y está medido: `a spite golem` lleva artículo y tiene
-// 49.452 de vida; `King Thex`Ka IV` no lo lleva y tiene 1.417. La wiki
-// categoriza las páginas como «Raid Encounters» y «Named Mobs», y cuando eso
-// esté, se pasa aquí y la deducción no se usa.
-console.log('\nlo declarado manda sobre lo deducido');
+// Esta función tenía su propio respaldo —sin artículo y más de 12.000 de vida—
+// que era una TERCERA copia de la regla de `clasificaJefe`, con otro umbral y
+// sin la corrección de la curación enemiga. Se borró en vez de unificarla: con
+// respaldo hay dos sitios donde escribir la regla y sólo se aplaza la
+// divergencia. Ver `esNamed` en `src/share.js`.
+//
+// Lo que se prueba ahora es que la lista manda y que pedirla es obligatorio.
+console.log('\nlo declarado manda, y no hay deducción de reserva');
 {
-  ok(esNamed('Lord Nagafen', 86000) === true, 'sin lista: sin artículo y grande, se deduce named');
-  ok(esNamed('a fire giant warrior', 11000) === false, 'con artículo, no');
-  ok(esNamed('a spite golem', 49452) === false, 'y aquí la deducción FALLA: es grande y lleva artículo');
-
   const lista = new Set(['a spite golem']);
-  ok(esNamed('a spite golem', 49452, lista) === true, 'con la lista buena, acierta');
-  ok(esNamed('Lord Nagafen', 86000, lista) === false, 'y lo que no está en ella, no lo es');
-  ok(esNamed('Lord Nagafen pet', 86000) === false, 'una mascota nunca es un named');
+  ok(esNamed('a spite golem', lista) === true, 'lo que está en la lista, es named');
+  ok(esNamed('Lord Nagafen', lista) === false, 'y lo que no está, no lo es — por grande que sea');
+  ok(esNamed('a spite golem pet', lista) === false, 'una mascota nunca es un named');
+
+  // Sin lista NO se adivina: se para. Es lo que impide que vuelva a aparecer un
+  // tercer umbral escondido en un camino que nadie recorre.
+  let saltó = false;
+  try { esNamed('Lord Nagafen'); } catch { saltó = true; }
+  ok(saltó, 'sin `named` no deduce: falla, que es lo que se quería');
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

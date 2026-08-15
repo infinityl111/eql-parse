@@ -167,24 +167,36 @@ const corto = (n) => String(n ?? '').split(',')[0].trim() || String(n ?? '');
 const esPet = (n) => / pet$/i.test(String(n ?? ''));
 
 /**
- * ¿Es un enemigo «de los gordos»? DEDUCIDO, y por eso se puede sustituir.
+ * ¿Es un enemigo «de los gordos»? LO DICE `named`, Y NO SE DEDUCE AQUÍ.
  *
- * Dos señales, y ninguna basta sola. Medido sobre 120 enemigos con vida
- * conocida: los que NO llevan artículo tienen de media 26.994 de vida y los que
- * sí, 7.952 — 3,4 veces. Pero falla en los dos sentidos y con casos reales:
- * `a spite golem` lleva artículo y tiene 49.452; `King Thex\`Ka IV` no lo lleva
- * y tiene 1.417. Y `Amygdalan warrior` sale marcado sin serlo.
+ * ═══ AQUÍ HABÍA UNA TERCERA COPIA DE LA REGLA, Y SE HA BORRADO ═══
  *
- * Quien lo sabe de verdad es la wiki, que categoriza las páginas como «Raid
- * Encounters» y «Named Mobs». Mientras eso no esté, esto es una deducción y el
- * que llame puede pasar `named` con la lista buena para no usarla.
+ * Esta función tenía su propio respaldo: sin artículo y más de 12.000 de vida
+ * recibida. La misma regla que `clasificaJefe` en `src/raid.js`, **con otro
+ * umbral** —allí son 20.000— y sin la corrección de la curación enemiga que se
+ * le puso a aquélla.
  *
- * @param {Set<string>|null} named  los que constan como tales. Manda sobre todo.
+ * NO SE UNIFICÓ EL NÚMERO: SE QUITÓ LA COPIA. Unificar deja dos sitios donde
+ * escribir la regla y sólo aplaza la divergencia; el día que alguien afine uno,
+ * el otro se queda atrás en silencio. Sin respaldo no puede haber un tercer
+ * umbral, porque no hay una tercera regla.
+ *
+ * Y ERA UNA MINA, no un problema de hoy: los dos llamadores de la aplicación
+ * —`ui/app.js` y `ui/overlay.js`— pasan siempre `named`, así que el respaldo no
+ * corría nunca. Sólo lo ejercitaban las pruebas. Un camino muerto que contiene
+ * una regla desactualizada es peor que uno vacío: parece que cubre el caso.
+ *
+ * Quien sabe esto de verdad es `jefesDe`, que mira lo que dice la wiki, lo que
+ * has dicho tú y —sólo si no hay nada de eso— deduce, con la vida SIN lo que le
+ * curaron. Ver `src/raid.js`.
+ *
+ * @param {string} nombre
+ * @param {Set<string>} named  los que constan como tales. Obligatorio.
  */
-export function esNamed(nombre, vidaRecibida, named = null) {
+export function esNamed(nombre, named) {
   if (esPet(nombre)) return false;
-  if (named) return named.has(nombre);
-  return !/^(an?|the) /i.test(String(nombre ?? '')) && (vidaRecibida ?? 0) > 12000;
+  if (!named) throw new TypeError('esNamed: falta `named`. La deducción vive en jefesDe (src/raid.js), no aquí.');
+  return named.has(nombre);
 }
 
 /**
@@ -212,7 +224,8 @@ const duenoDe = (r, self) => (r.petOf ? r.petOf : (r.pet && self ? self : null))
  *   - prefijo  lo que va delante, p. ej. «[EQL] ». Vacío por defecto: en un
  *              chat de grupo ya se entiende, y son caracteres que en el borde
  *              cuentan. Configurable porque en un canal lleno sí distingue.
- *   - named    conjunto de nombres que constan como named. Sin él, se deduce.
+ *   - named    conjunto de nombres que constan como named. OBLIGATORIO: la
+ *              deducción vive en  (src/raid.js) y no aquí. Ver .
  *   - enemigos si se genera la segunda línea (sí)
  *   - self     tu nombre. Hace falta para saber de quién son TUS mascotas: la
  *              fila sólo trae la marca `pet`, no el dueño.
@@ -279,8 +292,8 @@ export function fightToChat(f, opts = {}) {
   // Las mascotas enemigas se pliegan: «a turmoil toad pet» no es un enemigo
   // del que se hable, y en la cabecera sólo gasta caracteres.
   const enemigos = rows.filter((r) => r.side === 'enemy' && !esPet(r.name));
-  const gordos = enemigos.filter((r) => esNamed(r.name, r.taken, named));
-  const normales = enemigos.filter((r) => !esNamed(r.name, r.taken, named));
+  const gordos = enemigos.filter((r) => esNamed(r.name, named));
+  const normales = enemigos.filter((r) => !esNamed(r.name, named));
 
   // La cabecera: el named se nombra, los normales se cuentan. Sus nombres uno a
   // uno no le dicen nada a nadie y son justo lo que desborda.

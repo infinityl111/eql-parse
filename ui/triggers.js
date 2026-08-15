@@ -129,14 +129,20 @@ function renderEditor() {
    * muerta que este proyecto persigue, sólo que importada en vez de escrita.
    */
   const esPlantilla = d.origen === 'plantilla';
-  const vistas = d.vistas ?? 0;
+  // El contador viaja con el registro del que salió: si no es el de ahora, la
+  // etiqueta lo DICE en vez de callarse, y si es otro se cuenta de cero sola.
+  // Ver `registro()` en src/triggers.js — es `aplicarDudas` generalizado:
+  // casar por contenido y no sólo por clave.
+  const cuenta = (d.vistas && typeof d.vistas === 'object') ? d.vistas : null;
+  const mismoLog = !cuenta?.registro || cuenta.registro === (cfg.logPath ?? null);
+  const vistas = cuenta ? (cuenta.n ?? 0) : 0;
   const proc = `
     <div class="trig-proc">
       <span class="tag ${esPlantilla ? 'tag-tmpl' : 'tag-mine'}"
             title="${esc(t(esPlantilla ? 'tg.origen.plantillaHint' : 'tg.origen.tuyoHint'))}"
         >${esc(t(esPlantilla ? 'tg.origen.plantilla' : 'tg.origen.tuyo'))}</span>
       <span class="tag ${vistas ? 'tag-viva' : 'tag-neutra'}" title="${esc(t('tg.vistasHint'))}"
-        >${vistas ? esc(t('tg.vistas', { n: vistas })) : esc(t('tg.vistasNunca'))}</span>
+        >${vistas ? esc(t(mismoLog ? 'tg.vistas' : 'tg.vistasOtro', { n: vistas })) : esc(t('tg.vistasNunca'))}</span>
     </div>
     ${d.note ? `<div class="hint trig-note">${esc(t(d.note))}</div>` : ''}`;
 
