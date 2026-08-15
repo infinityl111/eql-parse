@@ -416,6 +416,27 @@ export class Engine extends EventEmitter {
     this.tailer.on('waiting', () => { this.status = 'missing'; });
     this.tailer.on('flush', () => { this.status = 'monitoring'; });
     this.tailer.on('error', (e) => { this.status = 'error'; this.error = e.message; });
+    /**
+     * EL REGISTRO SE HA REINICIADO — y esto lo escucha alguien, que es la mitad
+     * que faltaba.
+     *
+     * `LogTailer` emitía `rotate` desde el primer día y NO lo escuchaba nadie:
+     * se podía comprobar buscándolo en `src/`, `ui/` y `electron/` y salía una
+     * sola línea, la que lo emite. Salida muerta, que es una de las familias
+     * que este proyecto lleva contadas — y la peor versión de ella, porque el
+     * aviso existía y daba la sensación de que el caso estaba atendido.
+     *
+     * Lo que se hace con él es lo único honesto: DECIRLO. Una relectura entera
+     * tarda unos segundos —25,5 s medidos sobre 74,6 MB— y sin este aviso la
+     * aplicación se queda pensando sin explicar por qué. No se toca ningún
+     * contador: quien evita duplicar es la identidad lógica del almacén, no
+     * este manejador.
+     */
+    this.tailer.on('rotate', () => {
+      this.rotations = (this.rotations ?? 0) + 1;
+      this.rotatedAt = Date.now();
+      this.status = 'reading';
+    });
 
     this.status = opts.fromStart ? 'reading' : 'monitoring';
     this.backfilling = true;
@@ -505,6 +526,12 @@ export class Engine extends EventEmitter {
     return {
       path: this.path, self: this.self, server: this.server,
       status: this.status, error: this.error,
+      // Veces que el registro se ha reiniciado bajo nosotros en esta sesión, y
+      // cuándo fue la última. Va aquí para que el aviso de `rotate` tenga a
+      // dónde llegar: sin esto el manejador sería otra salida muerta con un
+      // paso más.
+      rotations: this.rotations ?? 0,
+      rotatedAt: this.rotatedAt ?? null,
       zone: this.parser?.zone ?? null,
       stance: this.parser?.stance ?? null,
       invocation: this.parser?.invocation ?? null,

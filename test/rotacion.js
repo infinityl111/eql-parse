@@ -15,22 +15,27 @@
  * lleva esa marca DESACTIVADA. El invariante no se cumple justo en el camino
  * que lo cita, y a ellos les duplica las muertes.
  *
- * ── LO QUE NUESTRO CÓDIGO HACE HOY, con fichero y línea ───────────────────
+ * ── LOS DOS CAMINOS, Y EL QUE ESTABA MAL ─────────────────────────────────
  *
- * Son DOS caminos distintos y NO hacen lo mismo:
+ * EN MARCHA — `LogTailer.#poll`. Si el tamaño es menor que el desplazamiento, o
+ *   cambia la firma inodo:nacimiento, se pone el desplazamiento a 0 y se emite
+ *   `rotate`: se vuelve a plegar el fichero entero. Correcto, y lo era ya.
  *
- *   EN MARCHA — `LogTailer.#poll`, `src/tailer.js:73-79`. Si el tamaño es menor
- *     que el desplazamiento, o cambia la firma inodo:nacimiento, se pone el
- *     desplazamiento a 0, se tira el resto a medias y se emite `rotate`. O sea:
- *     se vuelve a plegar el fichero entero.
+ * AL ARRANCAR — `LogTailer.start`. Aquí había DOS ramas para TRES situaciones:
+ *   `st.size` contestaba a la vez a «no hay marca» —donde es correcto, es un
+ *   enganche nuevo y se escucha desde el final— y a «la marca se pasa del
+ *   final», donde es exactamente la respuesta contraria a la buena. El mismo
+ *   módulo contestaba lo opuesto a la misma pregunta según por dónde entraras.
  *
- *   AL ARRANCAR — `LogTailer.start`, `src/tailer.js:47-49`. Si el desplazamiento
- *     guardado es MAYOR que el tamaño del fichero, NO se usa: se salta al final
- *     (`st.size`). O sea: no se relee nada, y lo que hubiera en el fichero
- *     nuevo por debajo de esa marca no se lee nunca.
+ *   Lo que costaba: rotar con el juego cerrado, jugar tres horas y abrir la
+ *   aplicación = tres horas que no se leían NUNCA. Sin error, sin hueco, sin
+ *   aviso. Lo fija el bloque 5, drilado en rojo: con el comportamiento viejo se
+ *   leen 0 de 25 líneas.
  *
- * `rotate` no lo escucha NADIE (búsqueda en `src/`, `ui/` y `electron/`), así
- * que el aviso existe y se tira.
+ * Y `rotate` no lo escuchaba NADIE —una sola aparición en todo el árbol, la que
+ * lo emite—, o sea salida muerta, que es una de nuestras familias. Ahora lo
+ * escucha `src/engine.js` y lo cuenta en `describe()`; el bloque 5 exige que el
+ * aviso llegue, para que no vuelva a quedarse sin oyente.
  *
  * ── Y LO QUE SALVA LA SITUACIÓN, que es lo que esta batería fija ──────────
  *
@@ -216,6 +221,83 @@ console.log('\nun fichero nuevo y corto no encoge el almacén');
   ok(despues.peleas === antes.peleas + 1, 'las 20 de antes siguen y se suma la nueva', despues.peleas);
   ok(mismas(antes.identidades, despues.identidades.filter((k) => antes.identidades.includes(k))),
     'las 20 viejas están enteras y sin cambiar');
+}
+
+// ═══ 5. ROTADO CON LA APLICACIÓN CERRADA: lo del fichero nuevo ENTRA ══════
+//
+// Éste es el caso con fecha, y es el que fallaba. `LogTailer.start` tenía DOS
+// ramas para TRES situaciones: `st.size` respondía a la vez a «no hay marca»
+// —donde es correcto: enganche nuevo, se escucha desde el final— y a «la marca
+// se pasa del final» —donde es la respuesta contraria a la buena—.
+//
+// La secuencia de Miguel: rota el log con el juego cerrado, juega tres horas,
+// abre EQL Parse. La marca dice 77.841.561 y el fichero nuevo mide unos megas,
+// así que el lector se plantaba AL FINAL y esas tres horas no se leían nunca.
+// Sin error, sin hueco, sin aviso.
+//
+// Aquí se comprueba lo único que importa: QUE ESE CONTENIDO ENTRA.
+console.log('\nrotado con la aplicación cerrada, lo escrito antes de abrir se lee');
+{
+  const { LogTailer } = await import('../src/tailer.js');
+  const dir = tmp();
+  const log = path.join(dir, 'eqlog_Campeon_erudin.txt');
+
+  // El fichero viejo, grande, y la marca donde se quedó la sesión anterior.
+  const viejo = Array.from({ length: 400 }, (_, i) => `[Tue Aug 11 10:00:00 2026] linea vieja ${i}`).join('\n');
+  fs.writeFileSync(log, `${viejo}\n`);
+  const marca = fs.statSync(log).size;
+
+  // Rotación: el fichero se sustituye por uno nuevo y corto, con contenido YA
+  // escrito — las tres horas que Miguel jugó antes de abrir la aplicación.
+  const nuevas = Array.from({ length: 25 }, (_, i) => `[Wed Aug 12 21:00:00 2026] linea nueva ${i}`);
+  fs.writeFileSync(log, `${nuevas.join('\n')}\n`);
+  ok(fs.statSync(log).size < marca, 'el fichero nuevo es más corto que la marca guardada');
+
+  const leidas = [];
+  let avisos = 0;
+  const t = new LogTailer(log, { pollMs: 10, startOffset: marca });
+  t.on('line', (l) => leidas.push(l));
+  t.on('rotate', () => { avisos++; });
+  await t.start();
+  await new Promise((r) => setTimeout(r, 250));
+  t.stop();
+
+  ok(leidas.length === nuevas.length,
+    'se leen TODAS las líneas del fichero nuevo, no cero',
+    `${leidas.length} de ${nuevas.length}`);
+  ok(leidas[0] === nuevas[0], 'y desde la primera, no desde donde apuntaba la marca vieja');
+  // `rotate` existía desde el primer día y no lo escuchaba nadie: salida muerta.
+  // Que esta línea exija un oyente es lo que impide que vuelva a serlo.
+  ok(avisos === 1, 'y se avisa exactamente una vez de que el registro se reinició', avisos);
+}
+
+// ═══ 6. Y el caso que NO debe cambiar: marca válida, se reanuda ═══════════
+//
+// La guarda de la guarda. Si alguien «arregla» lo de arriba poniendo el
+// desplazamiento a 0 siempre, esta comprobación se pone roja: reanudar es lo
+// normal y releer el registro entero en cada arranque costaría 25,5 s medidos.
+console.log('\ny con una marca válida se sigue reanudando, no releyendo');
+{
+  const { LogTailer } = await import('../src/tailer.js');
+  const dir = tmp();
+  const log = path.join(dir, 'eqlog_Campeon_erudin.txt');
+  const viejas = Array.from({ length: 30 }, (_, i) => `[Tue Aug 11 10:00:00 2026] vieja ${i}`);
+  fs.writeFileSync(log, `${viejas.join('\n')}\n`);
+  const marca = fs.statSync(log).size;
+  const nuevas = Array.from({ length: 5 }, (_, i) => `[Tue Aug 11 10:05:00 2026] nueva ${i}`);
+  fs.appendFileSync(log, `${nuevas.join('\n')}\n`);
+
+  const leidas = [];
+  let avisos = 0;
+  const t = new LogTailer(log, { pollMs: 10, startOffset: marca });
+  t.on('line', (l) => leidas.push(l));
+  t.on('rotate', () => { avisos++; });
+  await t.start();
+  await new Promise((r) => setTimeout(r, 250));
+  t.stop();
+
+  ok(leidas.length === nuevas.length, 'sólo se lee lo escrito después de la marca', `${leidas.length} de ${nuevas.length}`);
+  ok(avisos === 0, 'y no se avisa de ninguna rotación que no ha ocurrido', avisos);
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

@@ -495,7 +495,7 @@ borrar sin conocerlos, así que **cada recuento por forma es un suelo**):
 ```
 líneas                    951.773
 reconocidas               893.941
-sin reconocer              57.814   (6,07 %)
+sin reconocer              57.814   (6,07 % — ver el denominador abajo)
 sin cabecera de hora           18   (ni una cosa ni la otra — abajo)
 formas distintas            6.612
 las 90 formas mayores      33.188   (57,4 % del cajón)
@@ -520,6 +520,53 @@ clasificar. Son 18 en todo el registro, en cinco episodios:
 
 No es un residuo sin nombre: es **una tercera categoría real**, y ahora tiene su
 fila en la cuenta.
+
+**El denominador del 6,07 %.** El fichero tiene **951.773 líneas físicas no
+vacías** y **951.755 registros lógicos** (las 18 de arriba son líneas pero no
+son registros). El porcentaje está calculado sobre **los registros lógicos** —
+57.814 / 951.755 = 6,075 %— porque el cajón mide qué parte de lo CLASIFICABLE no
+sabemos clasificar, y una continuación sin cabecera no es clasificable. Sobre
+las líneas físicas sale 6,074 %: a dos decimales las dos dan 6,07, pero son dos
+preguntas distintas y conviene que la etiqueta diga cuál contesta.
+
+**¿Es una regla o una casualidad?** La cabecera **es una regla, y estricta**:
+`parseHeader` (`src/parser.js:69-77`) exige un `[` en la posición 0, un `]` en la
+25, un nombre de mes conocido en la 5-8 y que día, hora, minuto, segundo y año
+sean números; si algo falla devuelve `null` y `parse` (`src/parser.js:188-190`)
+no llega a clasificar. Una línea sin cabecera **no puede** producir un evento.
+
+**PERO ESO NO NOS PROTEGE DEL CHAT, Y CONVIENE SABERLO.** Una línea de chat sí
+trae cabecera, así que la pregunta de verdad es otra: ¿puede alguien escribir
+una cifra en el chat y que la contemos? **Sí, y la exclusión que hoy lo impide es
+accidental.** Medido:
+
+- Las reglas de daño están ancladas (`^…$`) pero capturan el emisor con `(.+?)`,
+  así que se tragan el prefijo del canal sin protestar.
+- El orden no nos salva: la pista `of damage` se prueba **en la posición 2** de
+  las 123, y ` says` en la 72. **La regla de daño se prueba ANTES que la de chat.**
+- Lo único que hoy impide la confusión es que la regla de daño está anclada al
+  final y **la comilla de cierre del chat rompe la coincidencia**.
+
+De donde: una línea de chat que **no cierre comilla** —la primera línea de un
+mensaje multilínea, que es justo la forma de tres de las 18— cae en la regla de
+daño. Probado sobre nuestro propio parser:
+
+```
+  [hora] You say to your guild, 'Campeon hits a dracoliche for 999999 points of damage.
+     -> melee  amount=999999  source="You say to your guild, 'Campeon"
+
+  [hora] Fulano tells the guild, 'a dracoliche has been slain by Campeon!
+     -> death
+```
+
+**Y ahora la parte tranquilizadora, que también está medida:** en el registro de
+Miguel hay **21.867 líneas con forma de chat**, de las que **9 no cierran
+comilla**, y **ninguna de las 21.867 se clasifica como daño, muerte o curación**.
+El agujero existe y nadie lo ha pisado — los tres desgloses que Miguel pegó en el
+chat de hermandad son resúmenes de dps, que no tienen forma de línea de daño.
+
+Es un vector latente, no una corrupción viva. Queda escrito aquí para que la
+próxima persona que toque el orden de las pistas sepa qué está sosteniendo.
 
 Las familias grandes, y quién las tiene. **Los totales por familia se suman sobre
 las 600 formas mayores**, así que son suelos: la cola de 6.000 formas restantes
@@ -705,8 +752,39 @@ un matiz que ni jmoyers ni nosotros tenemos escrito.
 
 ## 4. Rendimiento
 
-Nosotros tardamos ~31 s en releer 70 MB. Lo que hacen ellos, en orden de lo
-aprovechable:
+### 4.0 Antes de comparar: cuánto tardamos NOSOTROS de verdad
+
+Este apartado decía «~31 s en releer 70 MB», y ese número se ha citado toda la
+semana. **Estaba mal por no decir qué incluía.** Cronometrado el 16 de agosto de
+2026 sobre el registro de Miguel (74,6 MB), por etapas acumulativas y con el
+mismo reloj:
+
+| etapa | tiempo | por MB |
+|---|---:|---:|
+| A. leer los bytes y partir en líneas | 0,5 s | 0,007 s/MB |
+| B. + parsear cada línea | 7,7 s | 0,104 s/MB |
+| C. + segmentar en peleas | 11,9 s | 0,160 s/MB |
+| **D. + construir cada pelea y ESCRIBIRLA** | **25,5 s** | **0,342 s/MB** |
+
+**Las dos cifras que circulaban median cosas distintas.** Los «13,8 s» de la
+medición del crecimiento son la etapa C: leer, parsear y segmentar, **sin tocar
+el disco**. Los «31 s» nombraban la reconstrucción entera, que es la D — y para
+eso eran aproximadamente correctos, aunque hoy sale 25,5 s (la diferencia cabe
+en un disco distinto, una caché fría o una versión anterior; no se ha
+investigado más porque el orden de magnitud es el mismo).
+
+**LA CIFRA COMPARABLE ES 25,5 s, 0,342 s/MB**, porque es la que sufre el usuario
+cuando le sale el cartel de migración. Y trae dentro un dato que cambia el
+apartado: **escribir cuesta 13,6 s de los 25,5, más de la mitad del total**.
+
+Eso ordena la comparación de otra manera. Ellos repliegan en cada arranque y no
+escriben nunca: pagan la etapa C —11,9 s en nuestro registro— cada vez que
+abres. Nosotros pagamos la D una vez y después casi nada, porque reanudamos por
+el byte donde nos quedamos. **Persistir es más barato en régimen; replegar sólo
+gana si reconstruyes a menudo** — que es exactamente lo que nos ha pasado dos
+veces en tres días.
+
+Lo que hacen ellos, en orden de lo aprovechable:
 
 ### 4.1 No releer: marca de byte persistida
 
@@ -770,7 +848,8 @@ answer will eventually recommend»*.
 jmoyers pliega en el proceso principal de Electron y resuelve el bloqueo
 troceando; sowoky lee sincrónicamente por trozos en `main.js:401-406`
 (`fs.readSync` sobre un `Buffer` del tamaño del delta). Es un dato útil: **el
-problema de los 31 s no se ha resuelto en ninguno de los dos con paralelismo.**
+problema de releer el registro entero no se ha resuelto en ninguno de los dos
+con paralelismo** — ni el nuestro de 25,5 s ni el suyo de 43 s.
 
 ### 4.4 Medir el disco por separado del trabajo
 
@@ -864,11 +943,16 @@ empezar otro, y ése es exactamente el día en que las dos posturas se separan.
 
 | | |
 |---|---:|
-| peleas guardadas | 1.474 |
+| peleas guardadas (índice del 15 de agosto, 20:00) | 1.474 |
 | ...reconstruibles leyendo sólo el log de hoy | **1.474 (100 %)** |
 | entradas de botín | 111 |
 | ...reconstruibles | **111 (100 %)** |
 | peleas cuyo fichero de origen ya no existe | **0** |
+
+(El almacén y el registro se mueven: 1.474 es el índice del 15 de agosto a las
+20:00, y una relectura del log ese mismo día da 1.537 peleas cerradas porque
+incluye las que aún no se habían guardado y las que no tienen daño y por eso no
+se guardan nunca. Son dos cuentas de cosas distintas, no una discrepancia.)
 
 Hoy el 100 % es reconstruible **porque el registro no se ha rotado nunca**: la
 pelea más antigua del almacén es del 4 de agosto a las 09:13 y el primer suceso
@@ -881,20 +965,24 @@ almacén, rotar borra el histórico. jmoyers puede permitirse su postura porque 
 registro de referencia es un fichero que nadie ha rotado; no es una propiedad de
 su arquitectura, es una propiedad de su corpus.
 
-**Y el otro lado del precio, también medido.** El pliegue completo en frío del
-registro de hoy —parseo y segmentación, sin escribir en el almacén— tarda **13,8
-s para 74,3 MB**, o sea **0,186 s/MB**. Al ritmo medido de Miguel (6,2 MB y
+**Y el otro lado del precio, con la cifra buena.** Una reconstrucción completa
+—leer, parsear, segmentar, construir cada pelea y escribirla— tarda **25,5 s
+para 74,6 MB**, o sea **0,342 s/MB** (§4.0). Al ritmo medido de Miguel (6,2 MB y
 79.349 líneas por día de juego, 12 días de juego en el fichero):
 
-| plazo | tamaño | líneas | pliegue en frío |
-|---|---:|---:|---:|
-| hoy | 74,3 MB | 952.188 | **13,8 s** |
-| 6 meses | 1,10 GB | 14,5 M | **3,5 min** |
-| 12 meses | 2,21 GB | 29,0 M | **7,0 min** |
+| plazo | tamaño | líneas | pliegue solo (C) | reconstrucción (D) |
+|---|---:|---:|---:|---:|
+| hoy | 74,6 MB | 955.570 | 11,9 s | **25,5 s** |
+| 6 meses | 1,10 GB | 14,5 M | 3,0 min | **6,4 min** |
+| 12 meses | 2,21 GB | 29,0 M | 6,0 min | **12,9 min** |
 
-Siete minutos es lo que costará cada reconstrucción forzada dentro de un año si
-el registro no se rota. **Ése es el precio real de cada cambio de formato que
-decidamos**, y es el argumento tanto para rotar como para dejar de forzar
+(La proyección supone escala lineal y el mismo disco. Leer escala con los bytes
+y escribir con el número de peleas; las dos crecen a la vez, así que la
+aproximación aguanta para decidir, no para prometer.)
+
+**Trece minutos es lo que costará cada reconstrucción forzada dentro de un año**
+si el registro no se rota. Ése es el precio real de cada cambio de formato que
+decidamos, y es el argumento tanto para rotar como para dejar de forzar
 reconstrucciones. Las dos cosas tiran en la misma dirección; lo que no se puede
 es rotar Y no persistir.
 
@@ -1182,7 +1270,8 @@ separar.
 
 **Donde vamos por detrás, y es medible:** el plegado de mayúscula sin prueba (152
 de 164 nombres propios), las 9.965 líneas de facción que son la puerta a detectar
-muertes que el log no escribe, la relectura de 31 s que ellos han resuelto sin
+muertes que el log no escribe, la reconstrucción de 25,5 s —de los que 13,6 son
+de escritura— que ellos han evitado sin
 hilos —troceando y descansando—, y la ausencia de oráculos de equivalencia en las
 pruebas.
 
