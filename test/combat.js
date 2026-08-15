@@ -85,13 +85,25 @@ console.log('\nmuertes');
 // ── 2. Vida estimada: una muestra por muerte, no la suma de todas ─────────
 console.log('\nvida estimada');
 {
-  // Tres gorgonas seguidas, 1.000 de daño cada una.
+  // Tres gorgonas SOLAPADAS, 1.000 de daño cada una.
+  //
+  // Antes iban seguidas y sin nada en medio, y desde la 1.14.0 eso son tres
+  // peleas y no una: la muerte cierra la ventana en el instante, así que en
+  // cuanto cae la primera no queda nadie abierto y la siguiente línea abre otra.
+  // Es el modelo funcionando, no un fallo — pero lo que esta prueba mira es OTRA
+  // cosa: que la vida estimada sea una muestra por muerte y no la suma.
+  //
+  // Así que se le da el caso real en el que tres muertes del mismo nombre caben
+  // en una pelea: que haya OTRO igual dando señales entre medias. Un golpe suyo
+  // después de cada muerte reabre la ventana del nombre, que es exactamente lo
+  // que prueba que había más de uno. Ver `#vista`.
   const guion = [];
   let t = 0;
   for (let i = 0; i < 3; i++) {
     guion.push([t, 'You slash a gorgon for 600 points of damage.']);
     guion.push([t + 1, 'You slash a gorgon for 400 points of damage.']);
     guion.push([t + 2, 'You have slain a gorgon!']);
+    guion.push([t + 3, 'a gorgon hits Campeon for 10 points of damage.']);
     t += 5;
   }
   const f = correr(guion);
@@ -151,10 +163,25 @@ console.log('\nanálisis posterior');
 {
   const { analyse } = await import('../src/analysis.js');
 
-  // Silencio REAL de 15 s: no pasa absolutamente nada en medio, y es más corto
-  // que la inactividad que cierra la pelea (20 s), así que sigue siendo UNA.
+  /**
+   * Silencio REAL de 15 s, Y LA PELEA NO SE PARTE PORQUE HAY UN MEZ PUESTO.
+   *
+   * Antes bastaba con que 15 < `idleSec`. Con el plazo por enemigo en 12 s eso
+   * ya no vale, y el arreglo NO es acortar el parón: es ponerle al silencio la
+   * única explicación que el registro escribe. Un bicho dormido no produce ni
+   * una línea —medido: en el 84,2 % de las ventanas de mez limpias no hay ni un
+   * ataque suyo— así que su ventana no se cierra por callar.
+   *
+   * Y de paso esta prueba pasa a comprobar las dos cosas a la vez, que es lo que
+   * la hace valer más que antes: que la pista de estado sostiene la pelea, y que
+   * sostenerla NO borra el parón — quince segundos sin pegar siguen saliendo
+   * marcados. Sostener la ventana y perdonar el tiempo muerto serían dos
+   * decisiones distintas, y aquí sólo se toma la primera.
+   */
   const guion = [];
   for (let s = 0; s < 20; s++) guion.push([s, 'You slash a gorgon for 100 points of damage.']);
+  guion.push([20, 'a gorgon has been mesmerized.']);
+  guion.push([34, 'Your Mesmerization spell has worn off of a gorgon.']);
   for (let s = 35; s < 70; s++) guion.push([s, 'You slash a gorgon for 100 points of damage.']);
   const f = correr(guion);
   ok(f.duration === 70, 'sigue siendo una sola pelea', `${f.duration}s`);
@@ -207,11 +234,19 @@ console.log('\nanálisis posterior');
   // Un parón de verdad SÍ sale: quince segundos seguidos sin tirar con un arma
   // de un segundo. Eso ya no lo explica el arma.
   //
-  // Quince y no veinte: veinte es justo el corte por inactividad, así que la
+  // Quince y no veinte: veinte era justo el corte por inactividad, así que la
   // pelea se partiría en dos y estaríamos midiendo la segunda mitad en vez del
   // parón. Se vio al escribir la prueba, que daba «uptime» por ese motivo.
+  //
+  // Desde la 1.14.0 el corte lo pone `PLAZO_ENEMIGO`, que son 12, así que quince
+  // segundos de silencio TAMBIÉN partirían — y volvía a dar «uptime» por el
+  // mismo motivo de siempre, sólo que con otro número. El mez es la forma de
+  // tener el parón sin el corte: la ventana del bicho no se cierra porque está
+  // dormido, y tu parón sigue siendo tuyo. Ver la fase de arriba.
   const parado = [];
   for (let s = 0; s < 20; s++) parado.push([s, 'You slash a gorgon for 100 points of damage.']);
+  parado.push([20, 'a gorgon has been mesmerized.']);
+  parado.push([34, 'Your Mesmerization spell has worn off of a gorgon.']);
   for (let s = 35; s < 60; s++) parado.push([s, 'You slash a gorgon for 100 points of damage.']);
   const pa = analyse(correr(parado), { self: 'Campeon', classes: ['WAR'] });
   const dtp = pa.findings.find((x) => x.id === 'downtime' || x.id === 'uptime');

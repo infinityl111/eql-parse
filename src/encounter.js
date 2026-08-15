@@ -1,5 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { SIN_MITIGACION } from './stances.js';
+// El tope del encanto se mide en el analizador —de sus 43 ventanas— y se usa
+// aquí como tope de la pista de estado. Una segunda copia sería un segundo sitio
+// donde discrepar, que es la regla de este fichero.
+import { CHARM_MAX_SEC } from './parser.js';
 
 /**
  * En cuál de los tres cubos cae un golpe que recibes, EN UN SOLO SITIO.
@@ -88,19 +92,196 @@ export const AMBIGUO_SEG = 30;
  *
  * Peor caso medido de punta a punta: 1,077 + 0,25 = 1,33 s.
  *
- * SE TOMA EL DOBLE, que es la misma regla que ya se usó para la caducidad del
- * encanto: cuando pasarse de largo cuesta una decisión equivocada, se dobla el
- * peor caso observado en vez de ajustar al percentil. 2 × 1,33 = 2,7 -> 3.
+ * ── EL 5 TIENE DOS BASES Y NO UNA. No las mezcles. ────────────────────────
+ *
+ * Aquí ponía «se toma el doble» y con 5 eso ES FALSO: 5 / 1,33 = 3,76×. Quien
+ * recalcule la regla de doblado obtendrá 3 y creerá que corrige un error.
+ *
+ *   3 = 2 × el peor caso medido (1,33 s). La regla de doblado —la misma de
+ *       `CHARM_MAX_SEC`, `SIN_MANDO_MAX` y `MEZ_MAX`— llega hasta aquí y NO
+ *       MÁS ALLÁ. Con `idleSec = 20` bastaba, y se comprobó: en once días de
+ *       registro, ninguna de las 13 divergencias entre la partición en vivo y
+ *       la de frío tiene un hueco en la banda del reloj.
+ *
+ *   5 = ELEGIDO, y por otro motivo: `PLAZO_ENEMIGO` bajó a 12. La banda de
+ *       riesgo es `(P + M − desfase, P]`, o sea que P se cancela y su ANCHURA
+ *       no depende del plazo — pero la POBLACIÓN dentro de ella, sí, porque los
+ *       huecos se amontonan en los valores bajos. Medido sobre el histórico,
+ *       huecos de silencio del bando entero por segundo de desborde:
+ *
+ *           plazo 20 s → 17    plazo 15 s → 28    plazo 12 s → 45    plazo 10 s → 60
+ *
+ *       El mismo fallo cuesta 2,6× más caro a 12 que a 20. La holgura sube de
+ *       1,67 s (3 − 1,33) a 3,67 s por 2 segundos de retraso en el aviso.
+ *
+ * SUBIRLO ES SEGURO Y BAJARLO NO, y conviene saber por qué: `tick` sólo puede
+ * cerrar ANTES de tiempo. Si no cierra, cierra `feed` en cuanto llega el
+ * siguiente suceso, y `feed` decide con la marca del registro. Así que el margen
+ * NO PUEDE cambiar la partición en frío: lo único que compra o gasta es cuánto
+ * tarda el overlay en dar una pelea por terminada.
  *
  * LO QUE NO SE PUEDE MEDIR AQUÍ es cuánto tarda EQ en volcar su buffer al
  * fichero: eso necesita el juego delante. Pero la observación lo acota, y por
  * eso conviene tenerla escrita: si el juego retuviera segundos, las peleas mal
  * partidas habrían salido con huecos de 15 o 16 s, no de 19 y 20.
  *
- * Y LO QUE CUESTA: una pelea tarda 3 segundos más en darse por terminada en
- * directo. Con 10 costaba cinco veces eso para no comprar nada más.
+ * Y LO QUE CUESTA: una pelea tarda 5 segundos más en darse por terminada en
+ * directo. Con 10 costaba el doble para no comprar nada más.
  */
-export const MARGEN_TICK = 3;
+export const MARGEN_TICK = 5;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * QUÉ ES UNA PELEA. La definición, y las tres constantes que la sostienen.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Hasta la 1.13.0 esto se contestaba con `idleSec = 20`: «es la misma pelea
+ * mientras el registro no lleve 20 s callado». Esa no es la pregunta. Es OTRA
+ * pregunta —«¿cuánto lleva callado el registro?»— y por eso fallaba en las dos
+ * direcciones a la vez: partía una pelea porque estuviste 25 s limpiando agro, y
+ * juntaba dos porque la siguiente empezó 3 s después de acabar la primera.
+ *
+ * LA DEFINICIÓN, desde la 1.14.0:
+ *
+ *     Una pelea es un grupo de enemigos cuyas ventanas de participación se
+ *     solapan. Un componente conexo, no un hueco de tiempo.
+ *
+ * Cada enemigo tiene UNA ventana: de su primera línea a la última. Mientras
+ * quede una ventana abierta, la pelea sigue; cuando se cierran todas, la
+ * siguiente línea abre una pelea nueva.
+ *
+ * ── POR QUÉ ESTO ES UN REFINAMIENTO Y NO UN SALTO ─────────────────────────
+ *
+ * Es lo que autoriza el cambio, y es un teorema, no una observación:
+ *
+ *     La frontera del modelo viejo se traza cuando `ev.t − end > 20`. Una
+ *     ventana del modelo nuevo se estira como mucho `APERTURA` hacia atrás y
+ *     `PLAZO_ENEMIGO` hacia delante. Luego dos ventanas separadas por una
+ *     frontera vieja sólo pueden tocarse si `APERTURA + PLAZO_ENEMIGO > 20`.
+ *
+ *     Con `APERTURA + PLAZO_ENEMIGO ≤ 20`, la partición nueva es un REFINAMIENTO
+ *     de la vieja: toda pelea nueva está contenida en una de las de antes. El
+ *     modelo sólo puede CORTAR, nunca UNIR.
+ *
+ * Comprobado además sobre el histórico de referencia (845 peleas, 11 días), con
+ * la regla de zona puesta: fusiones 0 con plazo 3, 5, 8, 10, 12, 15, 17 y 18 s;
+ * 2 con 20; 10 con 25; 23 con 30; 65 con 60. La desigualdad no se cumple por
+ * suerte: se cumple SI Y SÓLO SI se respeta. Lo guarda `test/peleas.js`.
+ *
+ * ── EL TEOREMA CUBRE EL PLAZO Y NO CUBRE LA PISTA DE ESTADO ───────────────
+ *
+ * Y ESTO SALIÓ AL ESCRIBIRLO, NO AL DISEÑARLO, así que va con su cuenta.
+ *
+ * La desigualdad acota UN camino para estirar una ventana: el plazo. Hay un
+ * segundo camino —`#tapado`— y ése no está acotado por 20, sino por `MEZ_MAX`
+ * (226 s) y `CHARM_MAX_SEC` (690 s). Un mez o un encanto puede sostener una
+ * ventana por encima del hueco de 20 s con el que se trazó la frontera vieja, y
+ * entonces el modelo nuevo UNE dos peleas de antes.
+ *
+ * MEDIDO SOBRE EL HISTÓRICO ENTERO: pasa 10 veces en 845 peleas (1,2 %). Ni una
+ * sola es del plazo —ése cumple el teorema exactamente— y las diez tienen dentro
+ * un encanto o un mez escrito por el registro. Seis son de Najena y Befallen con
+ * encantos encadenados; el resto, tandas de Old Guk mezadas en bloque.
+ *
+ * POR QUÉ SE DEJA ASÍ. Lo que el teorema protege es que el usuario no encuentre
+ * su histórico revuelto sin motivo. Estas diez tienen motivo, y está escrito en
+ * su registro: durante ese silencio el bicho estaba encantado o dormido, o sea
+ * que seguía en la pelea. Renunciar a ellas para salvar el enunciado sería
+ * tirar la medición para conservar la frase — y la pista de estado es justo la
+ * mitad del modelo que convierte una deducción en una medida.
+ *
+ * LO QUE HAY QUE DECIR, ENTONCES, y no «el modelo sólo corta»:
+ *
+ *     El modelo sólo corta, salvo donde el registro dice con todas las letras
+ *     que el enemigo seguía ahí. Eso son 10 peleas de 845, y cada una se puede
+ *     señalar con la línea que la une.
+ *
+ * ── Y ES UNA PROPIEDAD DE LA MIGRACIÓN, NO UNA LEY ETERNA ─────────────────
+ *
+ * Esto hay que leerlo entero antes de tocar el tope, porque tiene fecha de
+ * caducidad y no se nota mirando el código.
+ *
+ * El tope protege UNA cosa: que el histórico que el usuario ya tiene se pueda
+ * releer y salga partido, no revuelto. En cuanto se reconstruye —y la 1.14.0
+ * fuerza la reconstrucción— la partición vieja DEJA DE EXISTIR, y a partir de
+ * ese momento el tope no protege nada: no hay ninguna frontera anterior con la
+ * que ser coherente.
+ *
+ * Así que se podrá levantar algún día, a propósito y sabiendo qué se pierde: se
+ * pierde la posibilidad de decirle a alguien que sigue con el almacén de la
+ * 1.13.0 que lo suyo sólo se parte. Lo que NO se puede hacer es ninguna de las
+ * dos cosas que pasan cuando esto no está escrito: venerarlo como si fuera una
+ * verdad del dominio, o borrarlo por parecer arbitrario. Es exactamente el par
+ * de errores que ya costaron `FORMATO_VERSION` y `RECONSTRUIR_DESDE`.
+ */
+
+/**
+ * CUÁNTO ANTES SE EMPIEZA A RECOGER. 2 segundos.
+ *
+ * ES RECOLECCIÓN, NO MEDICIÓN, y la distinción es el motivo de que exista.
+ * Abrir la ventana dos segundos antes recoge lo que lanzaste justo al empezar
+ * —el casteo que sale antes del primer golpe— y sirve para unir ventanas.
+ *
+ * EL DPS NO SE CUENTA DESDE AQUÍ. Se cuenta desde la primera línea real, que es
+ * `Encounter.start`; esto es `Encounter.desde`, y son dos campos porque son dos
+ * cosas. Si el dps saliera de `desde`, cada pelea llevaría dos segundos de
+ * denominador que nadie peleó, y las cortas —mediana 59 s— lo notarían.
+ *
+ * Lo que cuesta, medido: 2 fusiones en todo el histórico con el plazo a 20, y
+ * ninguna con el plazo a 12, porque 2 + 12 = 14 ≤ 20. Ver el teorema de arriba.
+ */
+export const APERTURA = 2;
+
+/**
+ * CUÁNTO SILENCIO DE UN ENEMIGO SIGUE SIENDO EL MISMO ENEMIGO. 12 segundos.
+ * Banda medida: 10–15. Tope duro: `APERTURA + PLAZO_ENEMIGO ≤ 20`.
+ *
+ * QUÉ TAPA, y por qué no es un número de comodidad. Censo de los 19.970 huecos
+ * internos de ≥2 s del registro de referencia, repartidos por lo que los explica:
+ *
+ *     estado medido (mez, encanto, tramo sin mando)    489   2,4 %
+ *     homónimo (muere uno y llega otro igual)        2.387  12,0 %
+ *     SIN EXPLICACIÓN                               17.094  85,6 %   ← esto
+ *
+ * Y el montón grande es diminuto: mediana 2 s, p90 4 s, p95 6 s, **p99 12 s**.
+ * No es misterio, es la cadencia de ataque del bicho. El plazo residual compra
+ * cadencia, y por eso cae donde cae:
+ *
+ *      8 s → tapa el 98,6 %      12 s → tapa el 99,1 %      20 s → 99,5 %
+ *
+ * LA CURVA, en peleas resultantes sobre las 845 de hoy (apertura 2, regla de
+ * zona puesta), con la pendiente en % por segundo:
+ *
+ *      3 s  2207        8 s  1283  −4,06     15 s  1125  −1,36     30 s  1019
+ *      5 s  1461 −16,90 10 s  1212  −2,77     18 s  1085  −1,27     60 s   931
+ *
+ * Hay codo y hay techo. El codo está en 8 s: por debajo la pendiente se dispara
+ * y el modelo se deshace en 2.207 peleas. El techo está en 18 s y lo pone el
+ * teorema, no la curva. Entre 10 y 18 la cuenta se mueve un 10,5 % con pendiente
+ * ≤1,6 %/s y monótona, sin escalón, y NINGUNA propiedad cambia: fusiones 0,
+ * duración máxima clavada en 1.609 s —la pelea más larga de hoy—, componentes de
+ * ≥5 min entre 28 y 34.
+ *
+ * Se toma 12: el p99 de la cadencia cabe justo, y deja 6 s de holgura contra el
+ * tope. Cualquier valor entre 10 y 15 da lo mismo salvo la cuenta.
+ */
+export const PLAZO_ENEMIGO = 12;
+
+/**
+ * CUÁNTO PUEDE DURAR UN MEZ DEL QUE NO SE LEE EL FINAL. 226 s.
+ *
+ * De los 217 mez del registro, 202 tienen cierre ESCRITO —«has been awakened
+ * by» o «Your <mez> spell has worn off of»— y no dependen de esto. Los 15 que no
+ * lo tienen necesitan un tope, o una ventana abierta por un mez sin cierre
+ * mantendría viva la pelea para siempre.
+ *
+ * 226 = 2 × 113, y 113 es la más larga de las 198 ventanas medidas que caben en
+ * diez minutos. Las otras 4 de las 202 duran entre 1.693 y 121.842 s: son
+ * emparejamientos falsos —un mez cuyo cierre no llegó, casado con el cierre de
+ * otro bicho del mismo nombre horas después— y por eso no entran en el máximo.
+ * Es la misma regla de doblado que `CHARM_MAX_SEC` y `SIN_MANDO_MAX`.
+ */
+export const MEZ_MAX = 226;
 
 /**
  * CUÁNTO SE ESPERA A QUE ALGUIEN RECUPERE EL MANDO ANTES DE DARLO POR PERDIDO.
@@ -623,7 +804,21 @@ export class Encounter {
     this.self = ctx.self ?? null;
     this.level = ctx.level ?? null;
     this.classes = ctx.classes ?? null;
+    /**
+     * DOS PRINCIPIOS, Y NO ES UNA REDUNDANCIA.
+     *
+     *   start   la PRIMERA LÍNEA REAL. Es de donde sale la duración y, con
+     *           ella, todo dps. Lo que se mide empieza aquí.
+     *   desde   `start - APERTURA`. Es de donde se RECOGE: une ventanas y
+     *           admite lo que lanzaste justo antes del primer golpe.
+     *
+     * Separarlos es la única forma de tener las dos cosas sin mentir en
+     * ninguna. Si el dps saliera de `desde`, cada pelea arrastraría dos segundos
+     * que nadie peleó; si la recolección saliera de `start`, se perdería el
+     * casteo que abre la pelea. Ver `APERTURA`.
+     */
     this.start = startT;
+    this.desde = startT - APERTURA;
     this.end = startT;
     this.combatants = new Map();
     // Lo que no se puede atribuir: golpes entre dos bichos del mismo nombre
@@ -692,6 +887,28 @@ export class Encounter {
      * fueron miedo y ninguno se rotula como encanto.
      */
     this.sinControl = [];          // [{desde, hasta, golpes, daño, cierre}]
+    /**
+     * QUÉ LÍNEA SOSTIENE ESTA PELEA POR ENCIMA DE LO QUE EL PLAZO AGUANTA.
+     *
+     * `{nombre, tipo, desde, hasta, cubre, silencio, en}`, una por silencio
+     * sostenido. Vacío en el 99 % de las peleas: sólo se llena cuando un mez, un
+     * encanto o un tramo sin mando mantiene abierta una ventana por encima de
+     * `PLAZO_ENEMIGO + APERTURA`, que es justo el caso en el que el modelo puede
+     * UNIR dos peleas de las de antes en vez de cortarlas.
+     *
+     * Es la prueba que acompaña a la excepción del teorema: la pelea puede
+     * señalar la línea que la une. Ver `PLAZO_ENEMIGO`.
+     */
+    this.sostenes = [];
+    /**
+     * MUERTES QUE LLEGARON SIN VENTANA. `{name, t, dt}`, y no cuentan como
+     * abatidos. Ver `#vista`: una muerte no abre ventana, la cierra.
+     *
+     * Se anota en vez de tirarse porque es un hecho del registro —ese bicho ha
+     * muerto— y porque el día que esta lista crezca querrá decir que algo del
+     * modelo se ha movido. Hoy tiene un elemento en todo el histórico.
+     */
+    this.muertesHuerfanas = [];
     this.kills = [];
     this.closed = false;
     this.series = new Map();        // segundo -> {dmg, taken, heal} para la gráfica
@@ -1149,8 +1366,64 @@ export class EncounterTracker extends EventEmitter {
     super();
     this.self = opts.self ?? null;
     this.petNames = new Set();
-    this.idleSec = opts.idleSec ?? 20;
+    /**
+     * YA NO ES UN PLAZO: ES EL INTERRUPTOR DE SI ESTE RASTREADOR CIERRA.
+     *
+     * Desde la 1.14.0 la frontera la deciden las ventanas de cada enemigo
+     * (`PLAZO_ENEMIGO`), no un hueco global, así que el VALOR de `idleSec` ya no
+     * se usa para nada. Lo que sigue mandando es si es finito:
+     *
+     *   finito     este rastreador cierra peleas. Es el normal.
+     *   Infinity   NO cierra nunca. Es el acumulador de sesión de `engine.js`,
+     *              que existe justo para no cerrarse.
+     *
+     * SE CONSERVA EL NOMBRE Y NO SE RENOMBRA A `cierra: true`, a propósito: lo
+     * pasan `main.cjs`, `rebuild.js`, `bin/live.js` y treinta pruebas, y un
+     * renombrado callado convertiría cada una de esas llamadas en un
+     * `undefined ?? 20` que volvería a cerrar por hueco global sin que nadie lo
+     * note. Lo que sí se hace es no leer su valor en ninguna parte — buscar
+     * `this.idleSec` en este fichero: sólo aparece dentro de `Number.isFinite`.
+     */
+    this.idleSec = opts.idleSec ?? PLAZO_ENEMIGO;
     this.closeOnDeath = opts.closeOnDeath ?? false;
+    /**
+     * LAS VENTANAS DE PARTICIPACIÓN, que son la pelea. `nombre -> {ultima, muerta}`.
+     *
+     *   ultima   la última línea suya. La ventana sigue abierta mientras
+     *            `ahora - ultima <= PLAZO_ENEMIGO`, o mientras un estado medido
+     *            tape ese silencio.
+     *   muerta   su última línea fue su muerte y no ha vuelto a haber ninguna.
+     *            Entonces la ventana se cierra EN EL INSTANTE, sin plazo: una
+     *            muerte es una medición, no una espera.
+     *
+     * Se vacía al cerrar la pelea. Vive en el rastreador y no en el encuentro
+     * porque la pregunta que contesta —«¿sigue habiendo pelea?»— es anterior a
+     * que exista el encuentro siguiente.
+     */
+    this.ventanas = new Map();
+    /**
+     * La última línea de cada nombre, ATRAVESANDO peleas. Sólo sirve para poder
+     * decir a qué distancia quedó la ventana anterior de una muerte huérfana —
+     * la cifra que acompaña a la anotación, para que quien la lea pueda juzgar
+     * si es «lo remataron ahí al lado» o «esto es otro bicho con el mismo
+     * nombre». No decide nada. Ver `#vista`.
+     */
+    this.ultimaLinea = new Map();
+    /**
+     * LA PISTA DE ESTADO: lo que puede explicar un silencio sin cerrar la
+     * ventana. `nombre -> [{desde, hasta, tipo}]`.
+     *
+     * TRES ENTRADAS, NO CUATRO, y el techo está medido: mez, encanto y tramo sin
+     * mando. LA RAÍZ NO ESTÁ Y NO PUEDE ESTAR — en 850.171 líneas no hay ni una
+     * de aterrizaje de root; lo único con nombre es «X has been ensnared» (120),
+     * que es un ralentizador y no calla a nadie en cuerpo a cuerpo. Añadir la
+     * raíz «por simetría» sería inventarse una entrada que el registro no
+     * escribe. Si algún día aparece la línea, aquí es donde entra.
+     *
+     * El tramo sin mando no vive aquí: es del encuentro (`sinControl`), porque
+     * es tuyo y no de un enemigo. Se consulta aparte, en `#tapado`.
+     */
+    this.estados = new Map();
     this.current = null;
     this.history = [];
     this.nextId = 1;
@@ -1210,9 +1483,250 @@ export class EncounterTracker extends EventEmitter {
    */
   setCompanions(list) { this.companions = new Set([...(list ?? [])].filter(Boolean)); }
 
+  /**
+   * Abre o cierra un estado de esta pista. Ver `this.estados`.
+   *
+   * Un estado que se abre dos veces sobre el mismo nombre no apila ventanas: se
+   * queda con la abierta. El registro nombra al bicho por su nombre y de ésos
+   * hay tres delante, así que dos «has been mesmerized» seguidos pueden ser dos
+   * bichos o el mismo remezado, y no hay forma de saberlo. Una sola ventana por
+   * nombre es lo único que se puede sostener — y es justo lo que el modelo
+   * necesita, porque su unidad también es el nombre.
+   */
+  #estado(nombre, tipo, t, on, tope) {
+    if (!nombre) return;
+    if (!this.estados.has(nombre)) this.estados.set(nombre, []);
+    const v = this.estados.get(nombre);
+    const ultima = v[v.length - 1];
+    if (on) {
+      if (ultima && ultima.hasta === null) return;         // ya abierto: no apila
+      v.push({ desde: t, hasta: null, tipo, tope });
+      if (v.length > 8) v.shift();
+      return;
+    }
+    if (ultima && ultima.hasta === null && ultima.tipo === tipo) ultima.hasta = t;
+  }
+
+  /**
+   * ¿HAY UN ESTADO MEDIDO QUE EXPLIQUE ESTE SILENCIO? De `desde` a `hasta`.
+   *
+   * El criterio es CUBRIR LA MITAD del silencio, no rozarlo. Es el que se midió
+   * —de los 509 huecos de más de 20 s del registro, 77 quedan explicados así— y
+   * el motivo de que no valga «que se toquen» es que un mez de 3 segundos no
+   * explica un silencio de 40: diría que sí y estaría tapando el hueco entero
+   * con la mitad de una prueba.
+   *
+   * Una ventana sin cerrar cuenta sólo hasta su tope, y el tope está medido por
+   * tipo: `MEZ_MAX`, `CHARM_MAX_SEC`. Sin eso, un mez del que no se lee el final
+   * —15 de 217— mantendría la pelea viva para siempre.
+   */
+  #tapado(nombre, desde, hasta) {
+    const largo = hasta - desde;
+    if (largo <= 0) return null;
+    let cubierto = 0;
+    let quien = null;
+    for (const w of this.estados.get(nombre) ?? []) {
+      const fin = Math.min(w.hasta ?? Infinity, w.desde + w.tope);
+      const trozo = Math.max(0, Math.min(hasta, fin) - Math.max(desde, w.desde));
+      if (trozo > 0 && (!quien || trozo > quien.cubre)) {
+        quien = { nombre, tipo: w.tipo, desde: w.desde, hasta: w.hasta, cubre: trozo };
+      }
+      cubierto += trozo;
+    }
+    if (cubierto * 2 >= largo) return quien;
+    // Y el tramo sin mando, que es del encuentro porque es tuyo y no de nadie
+    // más: mientras no manejas tu personaje, que un enemigo calle no dice nada.
+    let mando = 0, tramo = null;
+    for (const s of this.current?.sinControl ?? []) {
+      const fin = s.hasta ?? (s.desde + SIN_MANDO_MAX);
+      const trozo = Math.max(0, Math.min(hasta, fin) - Math.max(desde, s.desde));
+      if (trozo > 0 && (!tramo || trozo > tramo.cubre)) {
+        tramo = { nombre, tipo: 'sin-mando', desde: s.desde, hasta: s.hasta, cubre: trozo };
+      }
+      mando += trozo;
+    }
+    return mando * 2 >= largo ? tramo : null;
+  }
+
+  /**
+   * ¿SIGUE ABIERTA LA PELEA EN ESTE INSTANTE? La respuesta ES la definición.
+   *
+   * Queda abierta mientras quede UNA ventana de enemigo abierta. Cuando se
+   * cierran todas, el componente conexo ha terminado y la línea siguiente abre
+   * una pelea nueva.
+   *
+   * EL RESPALDO —`this.current.end`— no es un resto del modelo viejo: es lo que
+   * pasa cuando todavía no hay ningún enemigo conocido. `foesSeen` sólo se
+   * llena con daño, así que una pelea que arranca fallando no tiene ventanas que
+   * mirar durante unos segundos. Sin el respaldo, esa pelea se cerraría a sí
+   * misma en el primer fallo.
+   */
+  #sigueAbierta(ahora, ev = null) {
+    /**
+     * SE PREGUNTA POR EL PRINCIPIO DE LA VENTANA QUE VIENE, no por su primera
+     * línea. Ver `APERTURA`: la ventana de este suceso empieza dos segundos
+     * antes de él, y lo que decide si hay una pelea o dos es si esa ventana
+     * TOCA alguna de las que ya están abiertas.
+     *
+     * Sin este `- APERTURA` la apertura no unía nada: era un campo que sólo
+     * servía para mover `desde` dos segundos, o sea recolección sin la parte de
+     * unir. Medido sobre el registro, olvidarlo costaba 553 peleas de más —1.716
+     * en vez de 1.163— casi todas en las tandas de bichos que caen de un golpe:
+     * cada bicho suelto que matabas entre dos del montón partía la tanda en tres.
+     */
+    const borde = ahora - APERTURA;
+    let alguna = false;
+    const vistos = this.current?.foesSeen;
+    // Las dos formas, por lo mismo que `#clave`: `foesSeen` guarda el nombre tal
+    // como venía en la línea que lo metió, y la ventana va normalizada.
+    const esFoe = (n) => !!vistos && (vistos.has(n) || vistos.has(n.charAt(0).toUpperCase() + n.slice(1)));
+    for (const [nombre, v] of this.ventanas) {
+      if (!esFoe(nombre)) continue;
+      alguna = true;
+      /**
+       * LA MUERTE CIERRA EN EL INSTANTE, y aquí es donde eso significa algo: la
+       * ventana de un muerto acaba en su muerte, no en su muerte más el plazo.
+       * Lo único que puede tocarla es algo que empiece antes de que se cierre.
+       */
+      if (v.muerta) { if (borde <= v.ultima) return true; continue; }
+      if (borde - v.ultima <= PLAZO_ENEMIGO) return true;
+      const sosten = this.#tapado(nombre, v.ultima, ahora);
+      if (!sosten) continue;
+      /**
+       * SE ANOTA QUÉ LÍNEA SOSTIENE LA PELEA, y sólo cuando el plazo NO habría
+       * bastado. Ver el teorema y su excepción, arriba.
+       *
+       * Es lo que convierte la excepción en propiedad comprobable: una pelea que
+       * abarca un silencio mayor que la frontera vieja tiene que poder señalar la
+       * línea del registro que la une. Sin esto, «diez casos justificados» y
+       * «diez casos tolerados» se escriben igual — y el segundo es una grieta
+       * que se ensancha sola. Lo guarda `test/peleas.js`.
+       */
+      if (ahora - v.ultima > PLAZO_ENEMIGO + APERTURA) {
+        this.current.sostenes.push({
+          ...sosten,
+          silencio: Math.round(ahora - v.ultima),
+          en: Math.round(ahora - this.current.start),
+        });
+        if (this.current.sostenes.length > 64) this.current.sostenes.shift();
+      }
+      return true;
+    }
+    /**
+     * Y EL RELEVO DEL HOMÓNIMO, que es lo único que no se puede decidir mirando
+     * sólo el pasado.
+     *
+     * «La muerte cierra la ventana» y «una línea posterior la reabre» se
+     * contradicen durante un instante: cuando llega esa línea, la ventana consta
+     * cerrada y la pelea se cerraría antes de poder reabrirla. Al releer en frío
+     * no se nota —la ventana del nombre va de su primera línea a su última, y la
+     * muerte sólo decide dónde acaba SI es lo último que hace— pero en vivo hay
+     * que preguntarlo explícitamente: ¿este suceso resucita una ventana muerta?
+     *
+     * Dentro del plazo, sí: es el otro bicho con el mismo nombre. Fuera del
+     * plazo, no, y es correcto que no — la ventana acabó en la muerte y esto es
+     * una pelea nueva, que es justo el corte que el modelo viene a hacer.
+     */
+    for (const bruto of [ev?.source, ev?.target, ev?.victim, ev?.killer]) {
+      const v = bruto && this.ventanas.get(this.#clave(bruto));
+      if (v?.muerta && ahora - v.ultima <= PLAZO_ENEMIGO) return true;
+    }
+    if (alguna) return false;
+    return ahora - this.current.end <= PLAZO_ENEMIGO;
+  }
+
+  /**
+   * LA CLAVE DE UNA VENTANA VA EN MINÚSCULA INICIAL, y no es cosmético.
+   *
+   * EQ capitaliza el nombre cuando abre frase —«A shin ghoul knight has been
+   * slain»— y lo deja en minúscula a mitad —«You slash a shin ghoul knight»—.
+   * `Encounter.actor` ya reconcilia las dos formas para los combatientes; las
+   * ventanas necesitan lo mismo o el nombre tiene dos ventanas según qué línea
+   * lo nombre.
+   *
+   * LO CAZÓ LA GUARDA DE LAS MUERTES HUÉRFANAS, y por poco: de las 39 que
+   * anotaba sobre el histórico, buena parte eran `Orc centurion`, `Dark-boned
+   * skeleton` o `Amygdalan knight pet` — bichos que SÍ habían peleado, como
+   * `orc centurion`, y cuya muerte no encontraba su propia ventana. La guarda
+   * les habría quitado el abatido a peleas correctas. Es la misma familia de
+   * `actor()`, atacando por la puerta nueva.
+   */
+  #clave(nombre) {
+    const s = String(nombre ?? '');
+    return s.charAt(0).toLowerCase() + s.slice(1);
+  }
+
+  /** Anota que este nombre ha dado señales de vida. Ver `this.ventanas`. */
+  #vista(bruto, t, muerta = false) {
+    if (!bruto) return;
+    const nombre = this.#clave(bruto);
+    this.ultimaLinea.set(nombre, t);
+    const v = this.ventanas.get(nombre);
+    /**
+     * UNA MUERTE NO ABRE VENTANA: LA CIERRA.
+     *
+     * Una muerte no es un comienzo, es la prueba de algo que ya estaba pasando.
+     * Si llega la muerte de un nombre que no ha dado ni una línea en esta pelea,
+     * lo que hay debajo no es un enemigo entrando: es uno que ya había salido —
+     * un veneno que acaba solo, o alguien que lo remató. Fundar una ventana con
+     * eso mete en la pelea a un bicho que no estuvo en ella, y el reproductor lo
+     * enseña como lo que parece: un enemigo que se muere en el segundo 1.
+     *
+     * Es el mismo razonamiento del botín: la recogida no dice DÓNDE pasó nada,
+     * dice que hubo un cadáver — y el cadáver es de la pelea en la que ese bicho
+     * estuvo peleando. Ver `VENTANA_CADAVER` y `#deQuePelea`.
+     *
+     * QUÉ CUESTA, MEDIDO, y por eso esto es una guarda y no un arreglo: sobre el
+     * histórico entero, de las 387 muertes que caen en los dos primeros segundos
+     * de una pelea, 386 son de un nombre que SÍ tiene línea propia en ese mismo
+     * segundo o antes — o sea, lo mataste tú de un golpe y la pelea empieza con
+     * eso, que es correcto. Queda UNA en 1.404 peleas. No se escribe porque
+     * duela: se escribe porque la regla es cierta y sin ella el día que duela no
+     * habrá nada que lo pare.
+     *
+     * Y NO SE LE BUSCA PELEA ANTERIOR, aunque la regla candidata lo pedía. Se
+     * midió: la distancia de esas muertes a la última línea de una ventana
+     * anterior del mismo nombre no tiene horizonte —mediana 34 s, p75 105 s, p90
+     * 284 s, máximo 1.076 s, sin ningún corte limpio— al revés que el botín, que
+     * tenía un hueco de 600 s a 12 h sin una sola recogida dentro. Sin cliff no
+     * hay ventana que elegir, y con el homónimo delante «la anterior de ese
+     * nombre» no dice de cuál era. Así que la muerte huérfana se ANOTA y no se
+     * adjudica.
+     */
+    if (!v) {
+      if (muerta) return;
+      this.ventanas.set(nombre, { ultima: t, muerta });
+      return;
+    }
+    v.ultima = t;
+    // Una línea suya DESPUÉS de su muerte reabre la ventana, y eso no es un
+    // apaño: es la prueba de que había al menos dos con ese nombre. Un muerto no
+    // pega. Ver `test/peleas.js` y el suelo de individuos del reproductor.
+    v.muerta = muerta;
+  }
+
   feed(ev) {
     if (!ev) return;
+    /**
+     * EL CAMBIO DE ZONA CIERRA TODO. Regla propia, y es un hecho, no una
+     * heurística: no se puede pelear con algo que está en otra zona.
+     *
+     * Va escrita aparte y no como efecto colateral de ningún plazo, porque no
+     * depende de ninguno. Y conviene saber que HOY NO CORTA NADA: medido sobre
+     * el histórico de referencia, ninguna de las 844 fronteras tiene un hueco de
+     * ≤20 s, o sea que ningún cierre por zona llegó a quedar pegado al siguiente.
+     * Si algún día corta, será por un caso nuevo y no por un ajuste de otra cosa.
+     */
     if (ev.kind === 'zone') { this.zone = ev.zone; this.#close(); return; }
+    /**
+     * LA PISTA DE ESTADO SE ALIMENTA ANTES QUE NADA, y antes del filtro de
+     * relevancia: la línea del mez no nombra a nadie más que al bicho, así que
+     * no pasaría el filtro —que pide que toque a los tuyos— y se perdería justo
+     * cuando hace falta, que es cuando el bicho ha dejado de dar señales.
+     */
+    if (ev.kind === 'mez') { this.#estado(ev.target, 'mez', ev.t, ev.on === true, MEZ_MAX); return; }
+    if (ev.kind === 'charm_on') { this.#estado(ev.target, 'encanto', ev.t, true, CHARM_MAX_SEC); return; }
+    if (ev.kind === 'charm_off') { this.#estado(ev.target, 'encanto', ev.t, false, CHARM_MAX_SEC); return; }
     // Una subárea NO es un cambio de zona: «You have entered an area where
     // levitation effects do not function» pasa dentro del Plano del Cielo y,
     // tratándola como zona, se llevaba por delante la zona real y su
@@ -1444,8 +1958,9 @@ export class EncounterTracker extends EventEmitter {
       : (rel(ev.source) || rel(ev.target) || compaPega);
     if (mine.size && !relevante) return;
 
-    // Y una pelea sólo se abre cuando estáis metidos vosotros.
-    if (Number.isFinite(this.idleSec) && this.current && ev.t - this.current.end > this.idleSec) this.#close();
+    // AQUÍ SE DECIDE LA FRONTERA, y ya no la decide un hueco: la deciden las
+    // ventanas. Ver `#sigueAbierta` y la definición al lado de `PLAZO_ENEMIGO`.
+    if (Number.isFinite(this.idleSec) && this.current && !this.#sigueAbierta(ev.t, ev)) this.#close();
     if (!this.current) {
       // Una muerte suelta no abre pelea: sin golpes previos no hay nada que
       // contar, y la de un desconocido a diez metros no es asunto tuyo.
@@ -1542,6 +2057,22 @@ export class EncounterTracker extends EventEmitter {
     }
     const enc = this.current;
     enc.end = Math.max(enc.end, ev.t);
+    /**
+     * Y AQUÍ SE ANOTAN LAS VENTANAS, con todo lo que toque a un enemigo.
+     *
+     * Cuenta CUALQUIER línea suya, no sólo las que hacen daño: un fallo suyo
+     * dice que sigue ahí igual que un golpe, y una curación que recibe también.
+     * La ventana mide participación, no daño.
+     *
+     * Y se anotan los dos extremos sin preguntar de qué bando son: `#sigueAbierta`
+     * ya filtra por `foesSeen`, que es la aproximación en vivo de `#sides`.
+     * Guardar de más aquí no cuesta nada; filtrar de más costaría perder al
+     * enemigo que entra en la pelea justo cuando otro deja de dar señales.
+     */
+    if (ev.kind !== 'death') {
+      if (ev.source && !mine.has(ev.source)) this.#vista(ev.source, ev.t);
+      if (ev.target && !mine.has(ev.target)) this.#vista(ev.target, ev.t);
+    }
 
     if (DAMAGE_KINDS.has(ev.kind) && ev.amount > 0) {
       // Un escudo de daño sin posesivo no dice de quién es. Adjudicárselo a un
@@ -1642,7 +2173,41 @@ export class EncounterTracker extends EventEmitter {
         enc.healTotals.set(ev.target, (enc.healTotals.get(ev.target) ?? 0) + ev.amount);
       }
     } else if (ev.kind === 'death') {
+      /**
+       * LA MUERTE HUÉRFANA NO ENTRA EN LOS ABATIDOS, Y SE ANOTA. Ver `#vista`.
+       *
+       * Sin ventana de ese nombre en esta pelea, esta muerte no es de aquí: se
+       * contaría como una presa tuya, saldría en el rótulo de la pelea y dejaría
+       * una muestra de vida con el daño de otra. Medido: 1 caso en 1.404 peleas.
+       */
+      if (ev.victim && !mine.has(ev.victim) && !this.ventanas.has(this.#clave(ev.victim))) {
+        const antes = this.ultimaLinea.get(this.#clave(ev.victim));
+        enc.muertesHuerfanas.push({
+          name: ev.victim,
+          t: Math.max(0, Math.round(ev.t - enc.start)),
+          // A qué distancia quedó la última línea suya, o `null` si no consta
+          // ninguna. Es lo único medido de todo esto y viaja con la anotación.
+          dt: antes === undefined ? null : Math.round(ev.t - antes),
+        });
+        this.ultimaLinea.set(ev.victim, ev.t);
+        return;
+      }
       enc.kills.push({ t: ev.t, victim: ev.victim, killer: ev.killer });
+      /**
+       * LA MUERTE CIERRA LA VENTANA EN EL INSTANTE, medida y sin gracia.
+       *
+       * Sólo los enemigos de los que te escapas necesitan plazo; a uno que se
+       * cae lo ha cerrado el registro con todas las letras, y esperar 12
+       * segundos por él sería inventarse una participación que no hubo.
+       *
+       * Y NO CIERRA SI LUEGO SIGUE HABIENDO LÍNEAS SUYAS, que es el caso del
+       * homónimo: `#vista` reabre la ventana en cuanto llega una. Medido, no
+       * supuesto: el 32,3 % de las peleas tiene un nombre con dos o más muertes
+       * y el 6,0 % tiene líneas de un nombre posteriores a su última muerte. En
+       * ese 33,8 % —el 37,8 % de tu daño— «el nombre ha muerto» no significa
+       * que ya no quede nadie con ese nombre.
+       */
+      if (ev.victim && !mine.has(ev.victim)) this.#vista(ev.victim, ev.t, true);
       // Cae un bicho: queda un cadáver, y el cadáver sobrevive a la pelea. Se
       // anota aquí —donde ya se sabe de qué encuentro es— y se poda por la
       // ventana medida, así que la lista se queda en las decenas.
@@ -1738,7 +2303,22 @@ export class EncounterTracker extends EventEmitter {
      */
     const ult = this.current.sinControl[this.current.sinControl.length - 1];
     if (ult && ult.hasta === null && nowSec - ult.desde <= SIN_MANDO_MAX) return;
-    if (nowSec - this.current.end > this.idleSec + MARGEN_TICK) this.#close();
+    /**
+     * Y LAS OTRAS DOS ENTRADAS DE LA PISTA, por el mismo motivo exacto.
+     *
+     * El tramo sin mando llevaba haciendo esto desde la 1.13.0 y era el único.
+     * Desde la 1.14.0 una ventana también se mantiene abierta porque un mez o un
+     * encanto tapen el silencio, así que si `tick` no mirase la pista, el reloj
+     * de pared partiría en vivo lo que el registro no parte en frío — la misma
+     * divergencia, con otro disfraz. Medido sobre el histórico: pasaría en 21
+     * huecos con el plazo a 12 (14 a 15 s, 33 a 10 s).
+     *
+     * No hace falta un tope propio: `#tapado` ya no cuenta una ventana abierta
+     * más allá del suyo (`MEZ_MAX`, `CHARM_MAX_SEC`), así que esto no puede
+     * dejar una pelea viva para siempre.
+     */
+    if (this.#sigueAbierta(nowSec - MARGEN_TICK)) return;
+    this.#close();
   }
 
   /** Anota si un hechizo tuyo entró o fue resistido contra ese enemigo. */
@@ -1901,6 +2481,10 @@ export class EncounterTracker extends EventEmitter {
     const enc = this.current;
     enc.closed = true;
     this.current = null;
+    // Las ventanas mueren con la pelea: son la pelea. La pista de estado NO —un
+    // mez puesto antes del corte sigue puesto después, y el bicho dormido puede
+    // reaparecer en la siguiente. Se poda sola por sus topes en `#tapado`.
+    this.ventanas.clear();
     this.history.push(enc);
     if (this.history.length > 200) this.history.shift();
     this.emit('close', enc);

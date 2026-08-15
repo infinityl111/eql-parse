@@ -90,8 +90,14 @@ const GUION = [
   [38, 'Kalforgelp slashes YOU for 45 points of damage.'],
   [42, 'Kalforgelp bashes YOU for 10 points of damage.'],
   [44, 'You slash Kalforgelp for 226 points of damage.'],
-  [50, 'You slash Fright for 90 points of damage.'],
-  [51, 'You have slain Fright!'],
+  // A los 45 y no a los 50. El guion está recortado del episodio real, y el
+  // recorte dejaba a `Fright` sin una sola línea entre el segundo 33 y el 50:
+  // diecisiete de silencio, que con `PLAZO_ENEMIGO` = 12 cierran su ventana y
+  // parten esto en dos peleas. En el episodio de verdad `Fright` no se calló —
+  // el recorte se llevó sus líneas, no el bicho—, así que lo que se corrige es
+  // el guion. Lo que la prueba mira, el fuego amigo, no se toca.
+  [45, 'You slash Fright for 90 points of damage.'],
+  [46, 'You have slain Fright!'],
 ];
 
 // ── 1. La identidad declarada gana ─────────────────────────────────────────

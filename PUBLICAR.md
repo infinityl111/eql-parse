@@ -265,6 +265,49 @@ de la web construida.
 Y si la versión reconstruye, **dilo**: la primera apertura tarda porque relee el
 registro entero. Quien no lo sepa piensa que se ha colgado.
 
+### 13. Después de publicar: la comprobación que sólo se puede hacer jugando
+
+Sólo para las versiones que tocan cómo se decide dónde empieza y acaba una
+pelea. **No cierra el paso de publicar** —va después, a propósito— pero es la
+única parte de esas versiones que no se puede verificar releyendo, y por eso
+tiene que estar escrita aquí y no en la cabeza de nadie.
+
+**Por qué no la puedo hacer yo releyendo el registro.** Una pelea se cierra por
+dos caminos que no usan el mismo reloj: `feed` decide con la marca del registro
+y `tick` con el reloj de pared —ver `MARGEN_TICK` en `src/encounter.js`—. Releer
+es *uno de los dos lados*, así que comparar dos relecturas no compara nada. Y
+hay una tercera fuente de divergencia que tampoco se ve releyendo: en directo el
+analizador descarta líneas que en frío sí entran, porque su estado —las
+mascotas detectadas, el filtro de relevancia— no es el mismo recién arrancado
+que tras leer el registro entero. Medido sobre el histórico de la 1.13.0: de las
+13 peleas donde la partición en vivo y la de frío no coinciden, **4 son de esa
+causa**, y esa causa se agrava al bajar el plazo. No se puede acotar sin jugar.
+
+**Cómo se hace:**
+
+1. Juega una sesión normal con la aplicación enganchada. Una hora larga, y que
+   incluya lo que estresa el modelo: tirones encadenados sin pausa, algún bicho
+   del que te escapes, y algo que calle a un enemigo sin matarlo —un mez, un
+   miedo—.
+2. Al terminar, **sin tocar nada**, copia la carpeta del almacén a un lado.
+3. Reconstruye desde el mismo registro.
+4. Compara las dos particiones **alineando por solape, no por hora de inicio**:
+   una pelea que sólo movió el borde no es una pelea distinta, y contarla como
+   tal infla la cifra y esconde las que sí importan.
+
+**Qué tiene que salir:** cero peleas exclusivas de un lado o del otro. Lo que
+hay que mirar una por una es cualquier bloque donde el vivo tenga más trozos que
+el frío.
+
+**Y si sale mal, el hueco del corte dice de qué es** —míralo antes de tocar
+ninguna constante:
+
+| hueco del corte | qué es | qué se hace |
+| --- | --- | --- |
+| 0–5 s | un reinicio de la aplicación, o un cierre por cambio de zona | nada: es correcto |
+| cerca del plazo | el reloj de pared se comió el margen | subir `MARGEN_TICK`, que no puede cambiar la partición en frío |
+| bastante mayor que el plazo | líneas que en vivo se descartan y en frío entran | es el filtro de relevancia, otro problema y más viejo: anótalo, no toques el plazo |
+
 ---
 
 ## Por qué el orden es el que es

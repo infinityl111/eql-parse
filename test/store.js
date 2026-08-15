@@ -371,8 +371,13 @@ console.log('\npila de combates del overlay');
 
   ok(e.closedFights.length === 0, 'la pila arranca vacía');
 
+  // Los dos golpes van a 10 s, DENTRO de `PLAZO_ENEMIGO`. Estaban a 20 porque
+  // ése era el hueco que aún no partía con `idleSec = 20`; desde la 1.14.0 un
+  // silencio de 20 s del único enemigo cierra su ventana y esto serían dos
+  // peleas. Lo que esta prueba mira es la pila del overlay, no la frontera —de
+  // la frontera se ocupa `test/peleas.js`— así que se le da una pelea sola.
   e.feedEvent(golpe(1_800_000_000, 'a spectre', 1200));
-  e.feedEvent(golpe(1_800_000_020, 'a spectre', 800));
+  e.feedEvent(golpe(1_800_000_010, 'a spectre', 800));
   e.tracker.tick(1_800_000_100);
 
   ok(e.closedFights.length === 1, 'la pelea cerrada entra en la pila');

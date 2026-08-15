@@ -165,7 +165,7 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  * Sube SIEMPRE que cambie lo que se escribe a disco. Sin excepciones y sin
  * ramas de escape: `test/formato.js` no deja publicar sin subirlo.
  */
-export const FORMATO_VERSION = 9;
+export const FORMATO_VERSION = 10;
 
 /**
  * Por debajo de esta generación, lo guardado NO se puede arreglar leyéndolo
@@ -263,8 +263,19 @@ export const FORMATO_VERSION = 9;
  * que hacer, y por eso conviene saberlo. La reconstrucción arregla estas tres de
  * paso y las dudas se invalidan solas al dejar de casar. Esta nota está aquí
  * para que, cuando llegue ese día, nadie se pregunte si faltaba algo.
+ *
+ * ── Y ESE DÍA LLEGÓ: 10, POR LA 1.14.0 ────────────────────────────────────
+ *
+ * Sube porque cambia QUÉ ES UNA PELEA. No es un campo nuevo ni una cifra
+ * corregida: es la frontera, así que ninguna pelea guardada describe lo mismo
+ * que describiría hoy. Releído el registro de referencia, las 845 peleas pasan a
+ * ser 1.163 —un 38 % más y más cortas—, y no hay forma de convertir unas en
+ * otras sin volver al registro: la frontera se decide al escribir.
+ *
+ * Y era el turno de esta nota: las tres peleas con un compañero en el bando
+ * enemigo se arreglan solas al reconstruir, como decía, sin que nadie haga nada.
  */
-export const RECONSTRUIR_DESDE = 9;
+export const RECONSTRUIR_DESDE = 10;
 
 const META = 'store.json';
 
@@ -311,7 +322,16 @@ const META = 'store.json';
  * hay un aviso puntual colgado de esa misma condición (ver `avisoModelo`): un
  * histórico que cambia sin avisar es exactamente lo que este programa no hace.
  */
-export const MODELO_MEDICION = 4;
+/**
+ * ── 5, LA 1.14.0: LA FRONTERA ─────────────────────────────────────────────
+ *
+ * Los cuatro modelos anteriores corregían CIFRAS de una pelea. Éste cambia
+ * cuáles son las peleas, y por eso es el primero que NO se puede aplicar al
+ * leer: no hay nada guardado de lo que deducir dónde debería haber estado el
+ * corte. O se relee el registro o no hay modelo 5, y de ahí que
+ * `RECONSTRUIR_DESDE` suba con él por primera vez desde la 1.11.0.
+ */
+export const MODELO_MEDICION = 5;
 
 /**
  * Modelo desde el que el arreglo de `dot`/`ds` ya está aplicado.

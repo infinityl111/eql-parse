@@ -434,23 +434,72 @@ const rules = [
    *                           roban líneas lo cazó.
    */
   { kind: 'debuff', hint: 'been ', map: (m) => ({ target: m[1], ability: m[2] }),
-    re: /^(.+?) (?:have|has) been (poisoned|diseased|ensnared|mesmerized|lacerated|struck by the force of [A-Za-z']+)\.$/ },
+    re: /^(.+?) (?:have|has) been (poisoned|diseased|ensnared|lacerated|struck by the force of [A-Za-z']+)\.$/ },
   /**
-   * NO HAY REGLA PARA «X has been awakened by Y», Y ESTUVO ESCRITA UN RATO.
+   * EL MEZ, LAS TRES FRASES. Sale de `debuff` y pasa a tener tipo propio.
    *
-   * Se añadió como `survival`/`feign` dando por hecho que era romper el
-   * fingimiento de muerte. La comprobación de que no se robaban líneas a otras
-   * reglas la cazó —49 se las quitaba a `noise`— y al mirar de quién eran, la
-   * lectura no se sostenía: de las 54 del registro, sólo 6 son de Campeon y 3
-   * de un compañero. Las otras 45 son BICHOS: «A greater ice bones has been
-   * awakened», «A shin ghoul knight has been awakened» ×11. Un bicho que
-   * despierta no está fingiendo muerte — le han roto el mez.
+   * POR QUÉ SE MUEVE. `mesmerized` estaba en la lista de `debuff` de arriba, y
+   * `debuff` no lo lee NADIE: cero consumidores en todo el proyecto. Servía para
+   * no dejar la línea en el cajón de las no reconocidas y para nada más. A
+   * partir de la 1.14.0 el mez decide una frontera —una ventana de enemigo no se
+   * cierra mientras un estado medido tape el silencio— así que necesita un tipo
+   * que se pueda consultar, no un cajón compartido con el veneno.
    *
-   * Es un dato bueno y su sitio no es éste: dice a QUIÉN se le rompió el
-   * control y POR QUIÉN, que es una pregunta de la pista de estados. Queda sin
-   * regla a propósito, para no etiquetarlo mal mientras tanto. Las 49 vuelven a
-   * `noise`, que es donde estaban y donde no afirman nada.
+   * LAS TRES FRASES, contadas sobre el registro de referencia (850.171 líneas):
+   *
+   *     217  «X has been mesmerized.»                    se pone
+   *     125  «X has been awakened by Y.»                  se rompe  (116 sobre bichos, 9 sobre los tuyos)
+   *     228  «Your <mez> spell has worn off of X.»        caduca    (Mesmerization 171 · Enthrall 45 ·
+   *                                                                 Walking Sleep 10 · Mesmerize 2)
+   *
+   * LAS DOS DE CIERRE CAÍAN EN `unknown`, las 353. O sea que la apertura se leía
+   * y ninguno de los dos finales, que es la peor de las tres combinaciones
+   * posibles: una ventana que se abre y no se cierra nunca. Con las tres, 202 de
+   * los 217 mez tienen ventana con principio y final ESCRITOS; 15 se quedan sin
+   * cierre y ésos son los únicos que dependen del tope.
+   *
+   * LA FAMILIA SE ENUMERA Y NO SE GENERALIZA, que es la regla de este fichero.
+   * `^Your (.+?) spell has worn off of` se tragaría los 26 de Charm —que tienen
+   * su propia regla tres líneas más abajo y deciden un bando— más Spirit of
+   * Wolf, Endure Magic y otros veinte hechizos que no son control. Los cuatro
+   * nombres de aquí son los que dejan «has been mesmerized» detrás, comprobado
+   * emparejándolos uno a uno.
+   *
+   * EL NOMBRE NO DISTINGUE A NADIE, y hay que saberlo al usarlo: la línea dice
+   * «a shin ghoul knight», y de ésos hay tres delante. En 92 de las 130 ventanas
+   * largas hay otro homónimo mezado a la vez. Por eso esto tapa el silencio de
+   * un NOMBRE, que es justo la unidad con la que trabaja el modelo de peleas, y
+   * no el de un bicho.
    */
+  { kind: 'mez', hint: 'has been mesmerized', what: 'on',
+    re: /^(.+?) has been mesmerized\.$/, map: (m) => ({ target: m[1], on: true }) },
+  { kind: 'mez', hint: 'spell has worn off of', what: 'caduca',
+    re: /^Your (Mesmerization|Mesmerize|Enthrall|Walking Sleep) spell has worn off of (.+?)\.$/,
+    map: (m) => ({ target: m[2], ability: m[1], on: false, cierre: 'caducado' }) },
+  /**
+   * «X has been awakened by Y» YA TIENE SITIO, y este comentario es el que decía
+   * que no lo tenía.
+   *
+   * Lo que decía antes, y sigue siendo verdad: se añadió como `survival`/`feign`
+   * dando por hecho que era romper el fingimiento de muerte, la comprobación de
+   * que no se robaban líneas a otras reglas lo cazó —49 se las quitaba a
+   * `noise`— y al mirar de quién eran, la lectura no se sostenía: de las 54 del
+   * registro de entonces, sólo 6 eran de Campeon y 3 de un compañero. Las otras
+   * 45 eran BICHOS. Un bicho que despierta no está fingiendo muerte: le han roto
+   * el mez.
+   *
+   * Y lo que decía a continuación —«es un dato bueno y su sitio no es éste …
+   * queda sin regla a propósito»— era correcto entonces y ha dejado de serlo: el
+   * sitio existe desde que el mez tiene tipo propio. Es el cierre MEDIDO de la
+   * ventana, el que dice que alguien la rompió y quién.
+   *
+   * Sobre los tuyos también se escribe —9 de las 125— y se lee igual: a ti
+   * también te mezan. Quien decida qué hacer con eso es el encuentro, que es el
+   * que sabe quién es tuyo; aquí sólo se dice lo que pone la línea.
+   */
+  { kind: 'mez', hint: 'has been awakened by', what: 'roto',
+    re: /^(.+?) has been awakened by (.+?)\.$/,
+    map: (m) => ({ target: m[1], by: m[2], on: false, cierre: 'roto' }) },
   { kind: 'stance', hint: 'stance', re: /^You assume an? (.+?) stance\.$/, map: (m) => ({ stance: m[1] }) },
   { kind: 'stance', hint: 'stance', re: /^You begin to change your stance\.$/, map: () => ({ changing: true }) },
   { kind: 'invocation', hint: 'invocation', re: /^You begin reciting the (.+?) invocation\.$/, map: (m) => ({ invocation: m[1] }) },

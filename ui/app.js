@@ -2306,6 +2306,46 @@ async function renderNarrate(host) {
    * —`test/muertos.js`— si se la deja pasar por lista vacía cuando su marca del
    * fuente deja de casar, se convierte ella misma en una alarma muerta. Por eso
    * una lista vacía allí es un fallo y no un aprobado.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA OCTAVA, DE LA 1.14.0: LAS DOS PRIMERAS FAMILIAS ATACANDO EL SITIO NUEVO.
+   *
+   * No es una familia nueva. Son las dos de arriba entrando por la puerta del
+   * modelo de peleas, y por eso van aquí y no en una lista aparte: lo que hay
+   * que reconocer no es el fallo, es la forma.
+   *
+   *   la ventana como     La simulación con la que se diseñó el modelo trataba
+   *   intervalo           la participación de un nombre como UN intervalo, de su
+   *                       primera línea a su última, y hacía que la muerte
+   *                       cerrara sólo si era lo último que ese nombre hacía. Con
+   *                       eso, cuarenta esqueletos que caen de un golpe seguidos
+   *                       salían como UNA pelea de 27 minutos. Es exactamente el
+   *                       fallo del botín —colgarse de la VENTANA en vez de del
+   *                       cadáver— cometido otra vez, ahora sobre la ventana que
+   *                       define la pelea entera. La medida que salió de ahí
+   *                       decía 1.163 peleas; el modelo escrito da 1.395.
+   *
+   *   la apertura que     `APERTURA` movía `Encounter.desde` dos segundos y NO
+   *   movía sin decidir   entraba en la decisión de unir. O sea: recolección sin
+   *                       la parte de decidir. La distinción entre lo que se
+   *                       RECOGE y lo que se MIDE se inventó justo para no mentir
+   *                       en el dps —ver `APERTURA` en `src/encounter.js`— y se
+   *                       coló como fallo en la segmentación, aplicada a medias:
+   *                       la mitad que no cuesta nada puesta, la mitad que decide
+   *                       fronteras olvidada. Costaba 553 peleas de más, 1.716 en
+   *                       vez de 1.395.
+   *
+   * LO QUE LAS DOS COMPARTEN, y es la pregunta que no nos hicimos: una regla que
+   * se aplica en un sitio y no en el otro NO es media regla, es otra regla. La
+   * primera aplicaba «la muerte cierra» sólo al final; la segunda aplicaba «la
+   * ventana empieza antes» sólo al guardar. Ninguna de las dos falla al leerla:
+   * las dos fallan al contar.
+   *
+   * Y LAS DOS LAS CAZÓ LO MISMO: releer el registro entero y comparar la cifra
+   * con la que la simulación prometía. Ninguna prueba unitaria las habría
+   * encontrado, porque las dos dan resultados perfectamente coherentes consigo
+   * mismos — sólo que sobre otro modelo. Es la misma lección de la mascota: la
+   * cazó una medición, no una lectura.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
