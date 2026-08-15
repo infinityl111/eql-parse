@@ -2247,7 +2247,7 @@ async function renderNarrate(host) {
    *   1. TODO NÚMERO LLEVA SU MEDICIÓN AL LADO. No por rigor: porque es lo
    *      único que permite volver a comprobarlo. Un número sin procedencia no
    *      se puede revisar, sólo creer.
-   *   2. LOS FALLOS SE BUSCAN MIDIENDO, NO LEYENDO. Las diez familias de abajo
+   *   2. LOS FALLOS SE BUSCAN MIDIENDO, NO LEYENDO. Las once familias de abajo
    *      las cazaron mediciones —releer el registro entero y comparar con lo
    *      que el código prometía—, no lecturas del código. Dos de ellas las cazó
    *      abrir la aplicación y mirar la pantalla.
@@ -2474,6 +2474,57 @@ async function renderNarrate(host) {
    * podría pasar?». Se contesta con el residuo: clasificar TODO y ordenar por
    * frecuencia lo que no cae en ningún sitio. Un residuo del 87 % con cuatro
    * montones nombrables dentro no es ruido, es el inventario que no se hizo.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA UNDÉCIMA: LA MEDICIÓN NO ERA INDEPENDIENTE DE LO MEDIDO.
+   *
+   * La novena fue la primera cometida al MEDIR y no al codificar. Ésta es la
+   * segunda de esa rama, y es más fina: allí el filtro buscaba la cosa
+   * equivocada; aquí el instrumento estaba HECHO DE LA MISMA PIEZA que lo que
+   * pretendía juzgar, así que no podía contradecirla.
+   *
+   * TRES CASOS EN LA MISMA SEMANA, y ninguno dio un número raro:
+   *
+   *   1. UNA PRUEBA QUE NO PODÍA FALLAR. `test/rotacion.js` comprobaba que las
+   *      muertes no se doblaban sumando `x.kills` con `+`. Pero `kills` en el
+   *      resumen es la LISTA de nombres, no un número, así que la suma daba una
+   *      cadena —«0bicho 7bicho 6…»— y comparar esa cadena consigo misma pasa
+   *      siempre. Verde, y sin probar nada.
+   *
+   *   2. UN INSTRUMENTO QUE CONTABA DOBLE. Para repartir el coste de escritura
+   *      se envolvieron `fs.appendFileSync` Y `fs.writeFileSync`, sin saber que
+   *      el primero llama al segundo por dentro. Cada escritura entraba dos
+   *      veces: decía 48 MB donde hay 24, y llevó a creer durante un rato que
+   *      guardábamos cada pelea dos veces.
+   *
+   *   3. UNA ETIQUETA ESCRITA POR EL MECANISMO JUZGADO. Para separar los
+   *      sostenes de mez buenos de los malos se usó «¿se refrescó?», que la
+   *      calcula la misma pista de estado que sostiene la pelea. Dos de los
+   *      tres casos peores salían «refrescado» —un mez re-aplicado en el
+   *      segundo 40 no legitima el silencio hasta el 452— y quedaron entre los
+   *      buenos, tapando el escalón que se estaba buscando.
+   *
+   *   4. Y EL MISMO DÍA, UN ARNÉS QUE MEDÍA OTRA COSA. Para los huecos dentro
+   *      de una pelea se apuntaba la hora de cada evento tras alimentarlo,
+   *      incluidos los que el rastreador RECHAZA por irrelevantes. Resultado:
+   *      huecos de 35.399 s dentro de peleas de 50 s. Un hueco mayor que la
+   *      pelea que lo contiene es imposible por construcción, y esa imposibilidad
+   *      es lo que lo delató.
+   *
+   * EL ANTÍDOTO, y es una regla, no un cuidado:
+   *
+   *     TODA ETIQUETA QUE SIRVA PARA JUZGAR UN MECANISMO TIENE QUE PODER
+   *     CONSTRUIRSE SIN ESE MECANISMO.
+   *
+   * Y su forma práctica: darle al instrumento una INVARIANTE que sólo pueda
+   * cumplir si mide bien. «El hueco no puede ser mayor que la pelea», «la suma
+   * de muertes tiene que ser un número y distinta de cero», «los bytes escritos
+   * tienen que coincidir con los bytes en disco». Las cuatro se cazaron así, no
+   * mirando el código.
+   *
+   * POR QUÉ ES LA PEOR DE LAS ONCE: las otras diez dan un número malo, y un
+   * número malo se puede notar. Ésta da un número que CONFIRMA lo que ya creías,
+   * y encima con aspecto de medición. Es la alarma muerta con bata de laboratorio.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
