@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PROTOTIPO · datos inventados · EQL Parse · dps individual</title>
+<style>
+:root{--papel:#f6f3ec;--tinta:#15120f;--tenue:#8a8178;--linea:#dcd6c9;--panel:#fbf9f4;--sel:#ece7db;
+  --c1:#a56a05;--c2:#843d56;--c3:#c26e89;--c4:#505901;--c5:#539953;--c6:#0096b8;--resto:#8a8178}
+body.oscuro{--papel:#14161a;--tinta:#eee8de;--tenue:#767d88;--linea:#2b3038;--panel:#181b20;--sel:#242932;
+  --c1:#bd8a1f;--c2:#9a5169;--c3:#786500;--c4:#499e64;--c5:#007c99;--c6:#7b87db;--resto:#767d88}
+*{box-sizing:border-box}
+body{margin:0;padding:20px 24px 50px;background:var(--papel);color:var(--tinta);
+  font:13px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif}
+h1{font-size:17px;margin:0 0 4px;font-weight:600}
+.intro{color:var(--tenue);font-size:12.5px;max-width:82ch;margin:0 0 14px}
+.barra{display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+button{font:inherit;font-size:12.5px;padding:6px 13px;cursor:pointer;background:transparent;
+  color:var(--tinta);border:1px solid color-mix(in srgb,var(--tinta) 26%,transparent);border-radius:3px}
+button.on{background:var(--tinta);color:var(--papel);border-color:var(--tinta)}
+.sep{width:1px;height:20px;background:var(--linea);margin:0 6px}
+.op{display:none}.op.ver{display:block}
+.rotulo{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--tenue);margin-bottom:3px}
+.tit-op{font-size:15px;font-weight:600;margin:0 0 3px}
+.nota{color:var(--tenue);font-size:12.5px;max-width:86ch;margin:0 0 14px}
+.caja{border:1px solid var(--linea);border-radius:4px;padding:12px 14px;background:var(--panel);margin-bottom:12px}
+.caja h4{margin:0 0 8px;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--tenue);font-weight:600}
+.pie{font-size:11.5px;color:var(--tenue);margin-top:9px;line-height:1.6}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+.rejilla{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.mini{border:1px solid var(--linea);border-radius:3px;padding:7px 9px 4px;background:var(--papel)}
+.mini .nom{font-size:11.5px;font-weight:500;display:flex;align-items:baseline;gap:6px}
+.mini .nom em{font-style:normal;width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+.mini .nom span{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--tenue);font-size:11px}
+.mini .et{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--tenue);padding-left:14px}
+.mini svg{display:block;width:100%;height:44px;margin-top:3px}
+.mini path.d{fill:none;stroke-width:1.7;stroke-linejoin:round}
+.mini line{stroke:currentColor;opacity:.15}
+
+.panel-g{position:relative}
+.panel-g svg{display:block;width:100%;height:190px;overflow:visible}
+.rej line{stroke:currentColor;opacity:.10}
+.eje{font-size:9.5px;fill:currentColor;opacity:.5}
+.ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;transition:opacity .12s,stroke-width .12s}
+.apagada{opacity:.16}
+.rot-ln{font-size:10px;font-weight:600;paint-order:stroke;stroke:var(--papel);stroke-width:3px;stroke-linejoin:round}
+.nombres{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.nom-chip{font-size:11.5px;padding:3px 9px 3px 7px;border:1px solid var(--linea);border-radius:12px;cursor:pointer;
+  color:var(--tinta);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.nom-chip i{width:9px;height:9px;border-radius:2px;flex:0 0 auto}
+.nom-chip:hover{background:var(--sel)}
+.nom-chip b{font-weight:600;font-variant-numeric:tabular-nums;color:var(--tenue)}
+.tip{position:absolute;pointer-events:none;background:var(--papel);border:1px solid var(--linea);
+  border-radius:4px;padding:7px 9px;font-size:11.5px;box-shadow:0 2px 6px #00000018;opacity:0;white-space:nowrap;line-height:1.65}
+.tip u{text-decoration:none;display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.cruz{stroke:currentColor;opacity:.35;stroke-width:1;stroke-dasharray:3 3}
+.anota{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+.anota h5{margin:0 0 4px;font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--tenue)}
+.anota p{margin:0 0 9px;font-size:12.5px;color:var(--tenue);line-height:1.6}
+.anota b{color:var(--tinta)}
+</style>
+</head>
+<body>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  PROTOTIPO DE DISEÑO. NO ES CÓDIGO DE PRODUCCIÓN.
+  ═══════════════════════════════════════════════════════════════════════════
+
+  NINGUNA CIFRA DE ESTA PÁGINA ES REAL. Las peleas, las líneas, los dps por
+  combatiente, los nombres de enemigos y las series de las gráficas salen de un
+  generador determinista, puestas para que la maqueta se viera bien. No hay ni
+  un número medido sobre el registro de nadie.
+
+  Fecha de la maqueta: 16 de agosto de 2026.
+
+  Cuando el armazón esté construido, este fichero deja de ser la fuente y pasa
+  a ser un histórico. Si alguna de estas cifras acaba en la aplicación como
+  valor por defecto o como ejemplo, es un fallo.
+-->
+<div style="background:#8c2e2e;color:#fff;padding:10px 16px;font:600 13px/1.5 system-ui,sans-serif;
+  letter-spacing:.02em;position:sticky;top:0;z-index:999">
+  PROTOTIPO DE DISEÑO · NINGUNA CIFRA ES REAL
+  <span style="opacity:.85;font-weight:400"> — maqueta del 16 de agosto de 2026; los números salen de un
+  generador para que se vea bien, no del registro. No es código de producción.</span>
+</div>
+
+<h1>Dps individual · las dos vistas, con color</h1>
+<p class="intro">Seis colores, <b>calculados y no elegidos</b>: búsqueda sobre la banda de luminosidad y croma que
+admite tu papel, maximizando la separación del peor par y exigiendo contraste suficiente en los dos temas.
+Pasan todas las comprobaciones salvo una advertencia: dos de los seis quedan algo cerca para un ojo con
+daltonismo verde-rojo. Por eso <b>cada línea lleva su nombre escrito al final</b> — con la etiqueta puesta,
+la advertencia es admisible; sin ella, no lo sería.</p>
+
+<div class="barra">
+  <button class="on" data-op="r">Todos juntos</button>
+  <button data-op="m">Uno por cada uno</button>
+  <span class="sep"></span><button id="bT">Claro / oscuro</button>
+</div>
+
+<!-- ============ TODOS JUNTOS ============ -->
+<section class="op ver" id="op-r">
+  <div class="rotulo">Vista 1</div>
+  <p class="tit-op">Todos juntos, cada uno con su color y su nombre</p>
+  <p class="nota">Los tuyos a la izquierda, los enemigos a la derecha, cada panel con su escala. Señala un nombre
+  y su línea se queda sola. Si algún día sois más de seis, el séptimo y siguientes se funden en una línea gris
+  llamada «el resto» — nunca se inventa un color más.</p>
+
+  <div class="dos">
+    <div class="caja"><h4>Los tuyos</h4><div class="panel-g" id="p-tuyos"></div><div class="nombres" id="n-tuyos"></div></div>
+    <div class="caja"><h4>Los enemigos</h4><div class="panel-g" id="p-enem"></div><div class="nombres" id="n-enem"></div></div>
+  </div>
+  <div class="anota">
+    <div><h5>A favor</h5><p>Se leen <b>los cruces</b>: quién iba por delante y cuándo. Ocupa poco, y con el nombre
+    en la línea se entiende sin tocar nada ni consultar la leyenda.</p></div>
+    <div><h5>En contra</h5><p>Con seis líneas encima la zona baja se apelmaza. Y en una captura para el chat, si
+    dos van casi iguales, hay que fiarse del rótulo.</p></div>
+  </div>
+</section>
+
+<!-- ============ PEQUEÑOS MÚLTIPLOS ============ -->
+<section class="op" id="op-m">
+  <div class="rotulo">Vista 2</div>
+  <p class="tit-op">Un gráfico pequeño por combatiente, todos a la misma escala</p>
+  <p class="nota">Mismos colores, una casilla cada uno, ordenados por total. Las alturas se comparan de un vistazo
+  y se ve la <b>forma</b> de cada uno: quién arranca fuerte, quién sostiene, quién se cae a la mitad. Eso, con
+  seis líneas superpuestas, no se ve.</p>
+  <div class="caja"><h4>Los tuyos</h4><div class="rejilla" id="r-tuyos"></div></div>
+  <div class="caja"><h4>Los enemigos</h4><div class="rejilla" id="r-enem"></div></div>
+  <div class="anota">
+    <div><h5>A favor</h5><p>Nada se tapa con nada. Escala a doce compañeros sin despeinarse, y funciona igual de
+    bien impreso, en una captura o para alguien que no distinga los colores.</p></div>
+    <div><h5>En contra</h5><p>Ocupa más alto, y <b>los cruces no se leen</b>: para saber quién iba por delante en
+    el segundo cuarenta hay que mirar dos casillas.</p></div>
+  </div>
+</section>
+
+<script>
+const COL=['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)'];
+function serie(n,base,amp,semilla,forma){const o=[];let s=semilla;
+  for(let i=0;i<n;i++){s=(s*1103515245+12345)&0x7fffffff;const r=s/0x7fffffff-.5;
+    const f=forma?forma(i/n):1;o.push(Math.max(0,(base+amp*r)*f+amp*.35*Math.sin(i/5+semilla)));}return o;}
+function suave(a,k){return a.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-k);j<=i;j++){s+=a[j];c++}return s/c});}
+const N=64;
+const TUYOS=[
+ {n:'Campeón',t:'tú',d:suave(serie(N,150,120,7),3)},
+ {n:'Kalforgelp',t:'compañero',d:suave(serie(N,88,70,23),3)},
+ {n:'Jasarn',t:'tu mascota',d:suave(serie(N,70,60,13),3)},
+ {n:'Notarino',t:'compañero',d:suave(serie(N,62,55,37),3)},
+ {n:'Kartik',t:'mascota de Kalforgelp',d:suave(serie(N,40,38,53),3)},
+ {n:'Zibeker',t:'compañero',d:suave(serie(N,34,40,71),3,x=>x<.35?1.6:.7)}
+];
+const ENEM=[
+ {n:'a dracoliche ≥2',t:'entre todos',d:suave(serie(N,74,58,11),3)},
+ {n:'Amygdalan knight',t:'',d:suave(serie(N,46,44,29),3,x=>x>.55?1.5:.6)},
+ {n:'a glare lord',t:'',d:suave(serie(N,22,26,43),3)},
+ {n:'a dracoliche pet',t:'mascota',d:suave(serie(N,14,18,59),3)}
+];
+const med=s=>Math.round(s.d.reduce((a,b)=>a+b,0)/s.d.length);
+[TUYOS,ENEM].forEach(l=>l.sort((a,b)=>med(b)-med(a)));
+
+/* ---- pequeños múltiplos ---- */
+function mini(cont,lista){
+  const MAX=Math.max(...lista.flatMap(s=>s.d))*1.1;
+  cont.innerHTML=lista.map((s,k)=>{
+    const W=200,H=44,c=COL[k%6];
+    const p=s.d.map((v,i)=>`${i?'L':'M'}${(i*W/(s.d.length-1)).toFixed(1)} ${(H-(v/MAX)*H).toFixed(1)}`).join(' ');
+    return `<div class="mini"><div class="nom"><em style="background:${c}"></em>${s.n}<span>${med(s)} dps</span></div>
+      <div class="et">${s.t||'&nbsp;'}</div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" y1="${H-.5}" x2="${W}" y2="${H-.5}"/>
+      <path class="d" style="stroke:${c}" d="${p}"/></svg></div>`;}).join('');
+}
+mini(document.getElementById('r-tuyos'),TUYOS);
+mini(document.getElementById('r-enem'),ENEM);
+
+/* ---- todos juntos ---- */
+function junto(gid,nid,lista){
+  const cont=document.getElementById(gid),chips=document.getElementById(nid);
+  const MAX=Math.max(...lista.flatMap(s=>s.d))*1.12;
+  const W=560,H=190,ML=32,MR=96,MT=10,MB=18,n=lista[0].d.length;
+  const px=i=>ML+i*(W-ML-MR)/(n-1), py=v=>H-MB-(v/MAX)*(H-MT-MB);
+  let svg=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><g class="rej">`;
+  for(let g=0;g<=3;g++){const y=MT+g*(H-MT-MB)/3;svg+=`<line x1="${ML}" y1="${y}" x2="${W-MR}" y2="${y}"/>`;}
+  svg+='</g>';
+  for(let g=0;g<=3;g++){const y=MT+g*(H-MT-MB)/3;
+    svg+=`<text class="eje" x="2" y="${y+3.5}">${Math.round(MAX-g*MAX/3)}</text>`;}
+  [[0,'0:00'],[Math.round(n/2),'2:56'],[n-1,'5:52']].forEach(([i,t])=>
+    svg+=`<text class="eje" x="${px(i)}" y="${H-4}" text-anchor="middle">${t}</text>`);
+  lista.forEach((s,k)=>{const c=COL[k%6];
+    svg+=`<path class="ln" data-k="${k}" style="stroke:${c}" d="${s.d.map((v,i)=>`${i?'L':'M'}${px(i).toFixed(1)} ${py(v).toFixed(1)}`).join(' ')}"/>`;});
+  lista.forEach((s,k)=>{const c=COL[k%6],y=py(s.d[n-1]);
+    svg+=`<text class="rot-ln" data-k="${k}" x="${px(n-1)+6}" y="${y+3.5}" style="fill:${c}">${s.n}</text>`;});
+  svg+=`<line class="cruz" x1="0" y1="${MT}" x2="0" y2="${H-MB}" style="display:none"/></svg><div class="tip"></div>`;
+  cont.innerHTML=svg;
+  chips.innerHTML=lista.map((s,k)=>`<span class="nom-chip" data-k="${k}"><i style="background:${COL[k%6]}"></i>${s.n}<b>${med(s)}</b></span>`).join('');
+  const paths=[...cont.querySelectorAll('.ln')],rots=[...cont.querySelectorAll('.rot-ln')],cs=[...chips.children];
+  const marcar=k=>{[...paths,...rots].forEach(p=>p.classList.toggle('apagada',k>=0&&+p.dataset.k!==k));
+    cs.forEach(c=>c.style.background=(+c.dataset.k===k)?'var(--sel)':'');};
+  cs.forEach(c=>{c.onmouseenter=()=>marcar(+c.dataset.k);c.onmouseleave=()=>marcar(-1);});
+  paths.forEach(p=>{p.style.cursor='pointer';p.onmouseenter=()=>marcar(+p.dataset.k);});
+  const el=cont.querySelector('svg'),tip=cont.querySelector('.tip'),cx=cont.querySelector('.cruz');
+  el.addEventListener('mousemove',e=>{
+    const r=el.getBoundingClientRect(),xv=(e.clientX-r.left)/r.width*W;
+    let i=Math.round((xv-ML)/((W-ML-MR)/(n-1)));i=Math.max(0,Math.min(n-1,i));
+    cx.style.display='';cx.setAttribute('x1',px(i));cx.setAttribute('x2',px(i));
+    tip.innerHTML=lista.map((s,k)=>({s,k})).sort((a,b)=>b.s.d[i]-a.s.d[i])
+      .map(o=>`<u style="background:${COL[o.k%6]}"></u>${o.s.n} <b style="font-variant-numeric:tabular-nums">${Math.round(o.s.d[i])}</b>`).join('<br>');
+    tip.style.opacity=1;tip.style.left=Math.min(r.width-160,(px(i)/W)*r.width+12)+'px';tip.style.top='4px';});
+  el.addEventListener('mouseleave',()=>{tip.style.opacity=0;cx.style.display='none';marcar(-1);});
+}
+junto('p-tuyos','n-tuyos',TUYOS);
+junto('p-enem','n-enem',ENEM);
+
+document.querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-op]').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.op').forEach(s=>s.classList.toggle('ver',s.id==='op-'+b.dataset.op));});
+document.getElementById('bT').onclick=e=>{document.body.classList.toggle('oscuro');
+  e.target.classList.toggle('on',document.body.classList.contains('oscuro'));};
+</script>
+</body>
+</html>

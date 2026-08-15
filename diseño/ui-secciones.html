@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PROTOTIPO · datos inventados · EQL Parse · las secciones</title>
+<style>
+:root{
+  --papel:#f6f3ec; --tinta:#15120f; --tenue:#8a8178; --linea:#dcd6c9;
+  --panel:#fbf9f4; --sel:#ece7db; --acento:#8a6a2a; --duda:#8c5a2e;
+  /* seis categóricos calculados — validados por pares contra este papel */
+  --c1:#a56a05; --c2:#843d56; --c3:#c26e89; --c4:#505901; --c5:#539953; --c6:#0096b8;
+  --resto:#8a8178;
+  --s1:var(--c1); --s2:var(--c6); --s3:var(--c2);
+}
+body.oscuro{
+  --papel:#14161a; --tinta:#eee8de; --tenue:#767d88; --linea:#2b3038;
+  --panel:#181b20; --sel:#242932; --acento:#c8a355; --duda:#c98a52;
+  --c1:#bd8a1f; --c2:#9a5169; --c3:#786500; --c4:#499e64; --c5:#007c99; --c6:#7b87db;
+  --resto:#767d88;
+  --s1:var(--c1); --s2:var(--c6); --s3:var(--c2);
+}
+*{box-sizing:border-box}
+body{margin:0;padding:20px 24px 50px;background:var(--papel);color:var(--tinta);
+  font:13px/1.55 -apple-system,"Segoe UI",Roboto,sans-serif}
+h1{font-size:17px;margin:0 0 4px;font-weight:600}
+.intro{color:var(--tenue);font-size:12.5px;max-width:78ch;margin:0 0 14px}
+.barra{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+button{font:inherit;font-size:12.5px;padding:6px 13px;cursor:pointer;background:transparent;
+  color:var(--tinta);border:1px solid color-mix(in srgb,var(--tinta) 26%,transparent);border-radius:3px}
+button.on{background:var(--tinta);color:var(--papel);border-color:var(--tinta)}
+
+.app{border:1px solid var(--linea);border-radius:5px;overflow:hidden;background:var(--panel);
+  height:700px;display:flex;flex-direction:column;box-shadow:0 1px 3px #0000000f}
+.cabecera{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--linea);
+  background:var(--papel);flex:0 0 auto}
+.marca{font-weight:700;letter-spacing:.09em;font-size:12.5px}
+.marca span{color:var(--tenue);font-weight:400;letter-spacing:.02em;font-size:11.5px}
+.cab-der{margin-left:auto;display:flex;gap:14px;color:var(--tenue);font-size:11px;
+  text-transform:uppercase;letter-spacing:.07em;align-items:center}
+.vivo{width:7px;height:7px;border-radius:50%;background:#4a8a5a;display:inline-block;margin-right:5px}
+.cuerpo{flex:1;display:flex;min-height:0}
+
+.lateral{width:174px;flex:0 0 auto;border-right:1px solid var(--linea);padding:6px 0 8px;
+  display:flex;flex-direction:column;background:var(--panel);overflow:auto}
+.grupo{font-size:9.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--tenue);
+  padding:11px 16px 5px;font-weight:600}
+.lat-item{padding:7px 16px;display:flex;gap:11px;align-items:center;cursor:pointer;
+  border-left:2px solid transparent;font-size:12.5px}
+.lat-item:hover{background:var(--sel)}
+.lat-item.act{background:var(--sel);border-left-color:var(--acento);font-weight:600}
+.ico{width:13px;text-align:center;color:var(--tenue);font-size:11px}
+.lat-item.act .ico{color:var(--acento)}
+.punto{margin-left:auto;width:6px;height:6px;border-radius:50%;background:var(--duda)}
+.lat-pie{margin-top:auto;padding:9px 16px 0;color:var(--tenue);font-size:10.5px;
+  border-top:1px solid var(--linea);line-height:1.5}
+
+.lista{width:236px;flex:0 0 auto;border-right:1px solid var(--linea);overflow:auto;background:var(--panel)}
+body.sinlista .lista{display:none}
+.lista-cab{padding:9px 12px;border-bottom:1px solid var(--linea);display:flex;gap:6px}
+.mini{font-size:11px;padding:3px 8px;border:1px solid var(--linea);border-radius:3px;color:var(--tenue);white-space:nowrap}
+.zona{padding:11px 12px 4px;font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--tenue)}
+.pelea{padding:8px 12px;border-bottom:1px solid color-mix(in srgb,var(--linea) 50%,transparent);cursor:pointer}
+.pelea:hover{background:var(--sel)}
+.pelea.act{background:var(--sel);box-shadow:inset 2px 0 0 var(--acento)}
+.pelea b{font-weight:500;font-size:12px;display:block;line-height:1.4}
+.pelea i{font-style:normal;color:var(--tenue);font-size:11px;font-variant-numeric:tabular-nums}
+
+.principal{flex:1;overflow:auto;padding:16px 22px;min-width:0}
+.vista{display:none} .vista.ver{display:block}
+.tit{font-size:17px;font-weight:600;margin:0 0 3px;line-height:1.3}
+.sub{color:var(--tenue);font-size:11.5px;margin-bottom:14px;font-variant-numeric:tabular-nums}
+.caja{border:1px solid var(--linea);border-radius:4px;padding:12px 14px;margin-bottom:12px;background:var(--papel)}
+.caja h4{margin:0 0 3px;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--tenue);font-weight:600}
+.caja .pie{font-size:11px;color:var(--tenue);margin-top:8px}
+.fila2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fila4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.tile .n{font-size:22px;font-variant-numeric:tabular-nums;line-height:1.15}
+.tile .r{font-size:10px;color:var(--tenue);text-transform:uppercase;letter-spacing:.07em;margin-top:2px}
+.tile .d{font-size:11px;color:var(--tenue);margin-top:3px}
+.tabla{width:100%;border-collapse:collapse;font-size:12.5px}
+.tabla th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--tenue);
+  font-weight:600;padding:4px 6px;border-bottom:1px solid var(--linea)}
+.tabla td{padding:6px 6px;border-bottom:1px solid color-mix(in srgb,var(--linea) 45%,transparent);
+  font-variant-numeric:tabular-nums}
+.tabla td.txt{font-variant-numeric:normal}
+.tabla tr:last-child td{border-bottom:0}
+.chip{display:inline-block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;
+  border:1px solid var(--linea);border-radius:2px;padding:0 5px;color:var(--tenue);margin-left:6px}
+.chip.d{border-color:var(--duda);color:var(--duda)}
+.dist{color:var(--tenue);font-size:11px;font-variant-numeric:tabular-nums}
+.barrita{height:6px;background:currentColor;opacity:.2;border-radius:3px}
+
+/* --- gráfica --- */
+.graf{position:relative}
+.graf svg{display:block;width:100%;height:150px;overflow:visible}
+.rej line{stroke:currentColor;opacity:.10;stroke-width:1}
+.eje{font-size:9.5px;fill:currentColor;opacity:.5}
+.ln{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.l1{stroke:var(--s1)} .l2{stroke:var(--s2)} .l3{stroke:var(--s3)}
+.leyenda{display:flex;gap:16px;font-size:11.5px;color:var(--tenue);margin:8px 0 2px;flex-wrap:wrap}
+.leyenda i{width:14px;height:2.5px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:middle}
+.cruz{stroke:currentColor;opacity:.35;stroke-width:1;stroke-dasharray:3 3}
+.pt-h{r:4.5;stroke:var(--papel);stroke-width:2}
+.tip{position:absolute;pointer-events:none;background:var(--papel);border:1px solid var(--linea);
+  border-radius:4px;padding:7px 9px;font-size:11.5px;line-height:1.6;box-shadow:0 2px 6px #00000018;
+  white-space:nowrap;opacity:0;transition:opacity .1s}
+.tip b{font-variant-numeric:tabular-nums;font-weight:600}
+.tip u{text-decoration:none;display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+.pico{font-size:10px;fill:currentColor;opacity:.55}
+.sombra{fill:currentColor;opacity:.07}
+
+/* --- dps individual: todos juntos (principal) y uno por cada uno --- */
+.conm-vista{display:flex;gap:6px;margin:0 0 10px}
+.conm-vista button{font-size:11.5px;padding:4px 11px}
+.dps-vista{display:none}.dps-vista.ver{display:block}
+.dos-g{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.panel-g{position:relative}
+.panel-g svg{display:block;width:100%;height:172px;overflow:visible}
+.ln[data-k]{transition:opacity .12s}
+.apagada{opacity:.16}
+.rot-ln{font-size:10px;font-weight:600;paint-order:stroke;stroke:var(--papel);stroke-width:3px;stroke-linejoin:round}
+.nombres{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.nom-chip{font-size:11.5px;padding:2px 9px 2px 7px;border:1px solid var(--linea);border-radius:12px;
+  cursor:pointer;color:var(--tinta);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.nom-chip i{width:9px;height:9px;border-radius:2px;flex:0 0 auto}
+.nom-chip:hover{background:var(--sel)}
+.nom-chip b{font-weight:600;font-variant-numeric:tabular-nums;color:var(--tenue)}
+.rejilla-m{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mmul{border:1px solid var(--linea);border-radius:3px;padding:6px 8px 3px;background:var(--papel)}
+.mmul .nom{font-size:11.5px;font-weight:500;display:flex;align-items:baseline;gap:6px}
+.mmul .nom em{font-style:normal;width:8px;height:8px;border-radius:2px;flex:0 0 auto}
+.mmul .nom span{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--tenue);font-size:11px}
+.mmul .et{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--tenue);padding-left:14px}
+.mmul svg{display:block;width:100%;height:40px;margin-top:3px}
+.mmul path.d{fill:none;stroke-width:1.7;stroke-linejoin:round}
+.mmul line{stroke:currentColor;opacity:.15}
+
+.pista{display:flex;gap:3px;align-items:center;padding:7px 0 2px}
+.pt{height:9px;border-radius:2px;background:currentColor;opacity:.5}
+.pt.ab{opacity:.22;border-left:2px dashed currentColor}
+.escena{display:flex;gap:28px;align-items:flex-end;justify-content:center;padding:14px 0 4px}
+.fig{text-align:center;color:var(--tenue);font-size:10.5px}
+.fig svg{display:block;margin:0 auto 5px}
+.fig em{font-style:normal;display:block;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--duda)}
+.conmuta{display:flex;gap:0;border:1px solid var(--linea);border-radius:4px;overflow:hidden;font-size:11.5px}
+.conmuta div{padding:4px 11px;cursor:pointer;color:var(--tenue)}
+.conmuta div.act{background:var(--tinta);color:var(--papel)}
+.cab-vista{display:flex;align-items:flex-end;gap:14px;margin-bottom:12px}
+.cab-vista .sub{margin:0}
+.cab-vista .der{margin-left:auto}
+</style>
+</head>
+<body>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  PROTOTIPO DE DISEÑO. NO ES CÓDIGO DE PRODUCCIÓN.
+  ═══════════════════════════════════════════════════════════════════════════
+
+  NINGUNA CIFRA DE ESTA PÁGINA ES REAL. Las peleas, las líneas, los dps por
+  combatiente, los nombres de enemigos y las series de las gráficas salen de un
+  generador determinista, puestas para que la maqueta se viera bien. No hay ni
+  un número medido sobre el registro de nadie.
+
+  Fecha de la maqueta: 16 de agosto de 2026.
+
+  Cuando el armazón esté construido, este fichero deja de ser la fuente y pasa
+  a ser un histórico. Si alguna de estas cifras acaba en la aplicación como
+  valor por defecto o como ejemplo, es un fallo.
+-->
+<div style="background:#8c2e2e;color:#fff;padding:10px 16px;font:600 13px/1.5 system-ui,sans-serif;
+  letter-spacing:.02em;position:sticky;top:0;z-index:999">
+  PROTOTIPO DE DISEÑO · NINGUNA CIFRA ES REAL
+  <span style="opacity:.85;font-weight:400"> — maqueta del 16 de agosto de 2026; los números salen de un
+  generador para que se vea bien, no del registro. No es código de producción.</span>
+</div>
+
+<h1>Las secciones, dibujadas</h1>
+<p class="intro">La opción A con todas las secciones nuevas. Pincha en la barra lateral para recorrerlas.
+Las gráficas tienen cruceta: pasa el ratón por encima. En «Por habilidad», el dps individual —cada compañero,
+cada mascota y cada enemigo por separado— con <b>seis colores calculados</b>, no elegidos: pasan la banda de
+luminosidad, el suelo de croma y el contraste en los dos temas. En daltonismo el peor par queda en el filo, y
+por eso <b>cada línea lleva su nombre escrito al final</b>; con la etiqueta puesta la paleta es admisible, sin
+ella no lo sería.</p>
+
+<div class="barra"><button id="bT">Claro / oscuro</button></div>
+
+<div class="app">
+  <div class="cabecera">
+    <div class="marca">EQL·PARSE <span>· Campeón · Plano del Miedo</span></div>
+    <div class="cab-der"><span><span class="vivo"></span>Monitorizando</span><span>Postura</span><span>Overlay</span><span>Cambiar log</span></div>
+  </div>
+
+  <div class="cuerpo">
+    <nav class="lateral">
+      <div class="grupo">Esta pelea</div>
+      <div class="lat-item act" data-v="escena"><span class="ico">▮</span>Escena</div>
+      <div class="lat-item" data-v="hab"><span class="ico">≡</span>Por habilidad</div>
+      <div class="lat-item" data-v="botin1"><span class="ico">◈</span>Botín<span class="punto"></span></div>
+      <div class="lat-item" data-v="analisis"><span class="ico">◑</span>Análisis</div>
+
+      <div class="grupo">Todo el histórico</div>
+      <div class="lat-item" data-v="resumen"><span class="ico">▤</span>Resumen</div>
+      <div class="lat-item" data-v="enemigos"><span class="ico">✦</span>Enemigos</div>
+      <div class="lat-item" data-v="botin2"><span class="ico">◇</span>Botín</div>
+      <div class="lat-item" data-v="progreso"><span class="ico">▲</span>Progreso</div>
+      <div class="lat-item" data-v="nosabe"><span class="ico">?</span>Lo que no se sabe<span class="punto"></span></div>
+
+      <div class="grupo">Ajustes</div>
+      <div class="lat-item" data-v="avisos"><span class="ico">◉</span>Avisos</div>
+      <div class="lat-item" data-v="prefs"><span class="ico">⚙</span>Preferencias</div>
+
+      <div class="lat-pie">1.420 peleas · 14 días<br>862.705 líneas · 4,8 % sin leer</div>
+    </nav>
+
+    <aside class="lista">
+      <div class="lista-cab"><span class="mini">Últimas 24 h</span><span class="mini">Todos</span><span class="mini">Con ▾</span></div>
+      <div class="zona">Plano del Miedo · grupo 2</div>
+      <div class="pelea act"><b>Amygdalan knight, a dracoliche pet, a glare lord, a dracoliche</b><i>107 dps · 451 los tuyos · 5m 52s</i></div>
+      <div class="pelea"><b>Cazic-Thule</b><i>127 dps · 653 los tuyos · 3m 42s</i></div>
+      <div class="pelea"><b>a boogeyman, a worry wraith, Fright</b><i>136 dps · 840 los tuyos · 2m 0s</i></div>
+      <div class="pelea"><b>Dread pet, Dread</b><i>78 dps · 761 los tuyos · 2m 27s</i></div>
+      <div class="zona">Ruinas de Old Guk 3</div>
+      <div class="pelea"><b>a zol ghoul knight, a dar ghoul knight</b><i>24 dps · 113 los tuyos · 1m 38s</i></div>
+      <div class="pelea"><b>a dar ghoul knight ×2</b><i>16 dps · 99 los tuyos · 1m 47s</i></div>
+      <div class="pelea"><b>a wan ghoul knight ×2</b><i>18 dps · 129 los tuyos · 1m 6s</i></div>
+    </aside>
+
+    <main class="principal">
+
+      <!-- ============ ESCENA ============ -->
+      <section class="vista ver" id="v-escena">
+        <div class="tit">Amygdalan knight, a dracoliche pet, a glare lord, a dracoliche</div>
+        <div class="sub">Plano del Miedo · 15 ago 19:45 · 5m 52s · 107 dps · 4 abatidos</div>
+        <div class="caja">
+          <h4>Daño por segundo</h4>
+          <div class="graf" id="g1"></div>
+          <div class="leyenda">
+            <span><i style="background:var(--s1)"></i>tú y tu mascota</span>
+            <span><i style="background:var(--s2)"></i>daño que recibes</span>
+            <span><i style="background:var(--s3)"></i>el resto del grupo</span>
+            <span style="margin-left:auto">media móvil de 5 s</span>
+          </div>
+          <div class="pista">
+            <span class="pt ab" style="width:26px"></span><span class="pt" style="width:9px"></span>
+            <span class="pt" style="width:44px"></span><span class="pt" style="width:9px"></span>
+            <span class="pt" style="width:9px"></span><span class="pt" style="width:78px"></span>
+            <span class="pt" style="width:9px"></span><span class="pt" style="width:22px"></span>
+          </div>
+          <div class="escena">
+            <div class="fig"><svg width="30" height="40" viewBox="0 0 48 60" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="24" cy="12" r="7"/><path d="M24 19v20M24 24l-10 8M24 24l10 8M24 39l-7 15M24 39l7 15"/></svg>Campeón<br>234 dps</div>
+            <div class="fig"><svg width="30" height="40" viewBox="0 0 48 60" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="24" cy="12" r="7"/><path d="M24 19v20M24 24l-10 8M24 24l10 8M24 39l-7 15M24 39l7 15"/></svg>Kalforgelp<br>80 dps<em>feared</em></div>
+            <div class="fig" style="opacity:.4;padding-bottom:16px">contra</div>
+            <div class="fig"><svg width="30" height="40" viewBox="0 0 48 60" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="24" cy="12" r="7"/><path d="M24 19v20M24 24l-10 8M24 24l10 8M24 39l-7 15M24 39l7 15"/></svg>a dracoliche ≥2<br>72 dps · entre todos</div>
+            <div class="fig"><svg width="30" height="40" viewBox="0 0 48 60" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="24" cy="12" r="7"/><path d="M24 19v20M24 24l-10 8M24 24l10 8M24 39l-7 15M24 39l7 15"/></svg>a glare lord<br>10 dps</div>
+          </div>
+          <div class="pie">El daño va por nombre y no se reparte entre las figuras: cuál de ellos recibió cada golpe no se puede saber.</div>
+        </div>
+        <div class="fila2">
+          <div class="caja"><h4>Cambios de estado</h4>
+            <table class="tabla">
+              <tr><td class="txt">stunned <span class="dist">· a ti</span></td><td style="text-align:right">1 s</td><td class="dist" style="text-align:right">mediana 2 · máx 20</td></tr>
+              <tr><td class="txt">charmed <span class="dist">· un dracoliche, de tu lado</span></td><td style="text-align:right">23 s</td><td class="dist" style="text-align:right">mediana 84</td></tr>
+              <tr><td class="txt">feared <span class="dist">· Kalforgelp</span></td><td style="text-align:right">al menos hasta 0:38</td><td class="dist" style="text-align:right">no se sabe</td></tr>
+            </table>
+          </div>
+          <div class="caja"><h4>Lo que esta pelea no sabe</h4>
+            <table class="tabla">
+              <tr><td class="txt">Daño sin dueño</td><td style="text-align:right">384</td></tr>
+              <tr><td class="txt">Atribuido por deducción <span class="chip d">deducido</span></td><td style="text-align:right">1.204</td></tr>
+              <tr><td class="txt">Líneas que no supimos leer</td><td style="text-align:right">1.333</td></tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ POR HABILIDAD ============ -->
+      <section class="vista" id="v-hab">
+        <div class="tit">De dónde sale tu daño</div>
+        <div class="sub">Amygdalan knight, a dracoliche pet, a glare lord, a dracoliche · 5m 52s · 6.242 en total</div>
+
+        <div class="conm-vista">
+          <button class="on" data-dps="r">Todos juntos</button>
+          <button data-dps="m">Uno por cada uno</button>
+        </div>
+
+        <div class="dps-vista ver" id="dps-r">
+          <div class="dos-g">
+            <div class="caja"><h4>Los tuyos · dps por segundo</h4>
+              <div class="panel-g" id="p-tuyos"></div><div class="nombres" id="n-tuyos"></div></div>
+            <div class="caja"><h4>Los enemigos · dps por segundo</h4>
+              <div class="panel-g" id="p-enem"></div><div class="nombres" id="n-enem"></div></div>
+          </div>
+          <div class="pie" style="margin:-4px 0 12px">Cada combatiente por separado, la mascota aparte de su dueño, y
+          cada panel con su escala. Señala un nombre y su línea se queda sola. Del séptimo en adelante se funden en una
+          línea gris llamada «el resto»: nunca se inventa un color más.</div>
+        </div>
+
+        <div class="dps-vista" id="dps-m">
+          <div class="caja"><h4>Los tuyos</h4><div class="rejilla-m" id="r-tuyos"></div></div>
+          <div class="caja"><h4>Los enemigos</h4><div class="rejilla-m" id="r-enem"></div></div>
+          <div class="pie" style="margin:-4px 0 12px">Mismos colores, escala compartida, ordenados por total. Aquí no se
+          tapa nada y se ve la <b>forma</b> de cada uno — pero los cruces no se leen.</div>
+        </div>
+
+        <div class="caja">
+          <table class="tabla">
+            <thead><tr><th>Habilidad</th><th>Rango</th><th></th><th style="text-align:right">dps</th><th style="text-align:right">Total</th><th style="text-align:right">Golpes</th></tr></thead>
+            <tr><td class="txt">Melee</td><td class="dist">58 – 356</td><td style="width:26%"><div class="barrita" style="width:100%"></div></td><td style="text-align:right">97</td><td style="text-align:right">2.512</td><td style="text-align:right">14</td></tr>
+            <tr><td class="txt">Slay Undead</td><td class="dist">576</td><td><div class="barrita" style="width:23%"></div></td><td style="text-align:right">22</td><td style="text-align:right">576</td><td style="text-align:right">1</td></tr>
+            <tr><td class="txt">Winter's Roar</td><td class="dist">265 – 277</td><td><div class="barrita" style="width:22%"></div></td><td style="text-align:right">21</td><td style="text-align:right">542</td><td style="text-align:right">2</td></tr>
+            <tr><td class="txt">Condemnation of Nife <span class="chip">proc · 4,6/min</span></td><td class="dist">239</td><td><div class="barrita" style="width:19%"></div></td><td style="text-align:right">18</td><td style="text-align:right">478</td><td style="text-align:right">2</td></tr>
+            <tr><td class="txt">Bash</td><td class="dist">9 – 182</td><td><div class="barrita" style="width:18%"></div></td><td style="text-align:right">18</td><td style="text-align:right">463</td><td style="text-align:right">5</td></tr>
+            <tr><td class="txt">Burning Arrow <span class="chip">2 partes</span></td><td class="dist">80 – 158</td><td><div class="barrita" style="width:18%"></div></td><td style="text-align:right">18</td><td style="text-align:right">456</td><td style="text-align:right">4</td></tr>
+            <tr><td class="txt">Kick</td><td class="dist">52 – 144</td><td><div class="barrita" style="width:10%"></div></td><td style="text-align:right">10</td><td style="text-align:right">264</td><td style="text-align:right">3</td></tr>
+            <tr><td class="txt">thorns</td><td class="dist">2</td><td><div class="barrita" style="width:2%"></div></td><td style="text-align:right">1</td><td style="text-align:right">24</td><td style="text-align:right">12</td></tr>
+          </table>
+          <div class="pie">El rango es el mínimo y el máximo observados en esta pelea, no el del hechizo.</div>
+        </div>
+        <div class="fila2">
+          <div class="caja"><h4>Reparto por enemigo</h4>
+            <table class="tabla">
+              <tr><td class="txt">a dracoliche <span class="dist">≥2</span></td><td style="width:50%"><div class="barrita" style="width:81%"></div></td><td style="text-align:right">5.041</td><td style="text-align:right">81 %</td></tr>
+              <tr><td class="txt">a glare lord</td><td><div class="barrita" style="width:19%"></div></td><td style="text-align:right">1.201</td><td style="text-align:right">19 %</td></tr>
+            </table>
+          </div>
+          <div class="caja"><h4>Procs, por minuto</h4>
+            <table class="tabla">
+              <tr><td class="txt">Condemnation of Nife</td><td style="text-align:right">4,62/min</td><td class="dist" style="text-align:right">×2</td></tr>
+              <tr><td class="txt">Smiting Strike</td><td style="text-align:right">4,62/min</td><td class="dist" style="text-align:right">×2</td></tr>
+              <tr><td class="txt">Dismiss Undead</td><td style="text-align:right">2,31/min</td><td class="dist" style="text-align:right">×1</td></tr>
+            </table>
+            <div class="pie">La tasa, no la cuenta: siete procs en una pelea corta y en una larga no dicen lo mismo.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ BOTÍN DE LA PELEA ============ -->
+      <section class="vista" id="v-botin1">
+        <div class="tit">Lo que recogiste</div>
+        <div class="sub">Sólo lo tuyo: el registro no anota lo que recogen los demás</div>
+        <div class="caja">
+          <table class="tabla">
+            <thead><tr><th>Objeto</th><th>De</th><th>Cuándo</th><th style="text-align:right">Vendido por</th></tr></thead>
+            <tr><td class="txt">Sapphire Necklace</td><td class="txt">a revultant rat</td><td>2:55</td><td class="txt" style="text-align:right">—</td></tr>
+            <tr><td class="txt">Blue Diamond</td><td class="txt">a loathling lich</td><td>4:37</td><td class="txt" style="text-align:right">—</td></tr>
+            <tr><td class="txt">Ruby Crown +4</td><td class="txt">a loathling lich</td><td>6:43</td><td style="text-align:right">142p 8o 5pl 7c</td></tr>
+            <tr><td class="txt">Staff of Undermine <span class="chip d">ambiguo</span></td><td class="txt">a loathling lich <span class="dist">· ≥2 con ese nombre</span></td><td>6:56</td><td class="txt" style="text-align:right">—</td></tr>
+          </table>
+          <div class="pie">Cada objeto va a la pelea donde murió su cadáver. El registro no numera los cadáveres, así que el emparejamiento es por nombre y por cercanía: es <b>deducido</b>, no medido.</div>
+        </div>
+        <div class="caja"><h4>Monedas</h4>
+          <table class="tabla"><tr><td class="txt">25p 1o 4pl 3c</td><td style="text-align:right">×4 recogidas</td></tr></table>
+          <div class="pie">La moneda se cuelga de la pelea que estaba abierta, no de un cadáver: el registro no dice de quién sale.</div>
+        </div>
+      </section>
+
+      <!-- ============ ANÁLISIS ============ -->
+      <section class="vista" id="v-analisis">
+        <div class="tit">Análisis de la pelea</div>
+        <div class="sub">5m 52s de reloj · 4m 41s manejando · 1m 11s sin mando</div>
+        <div class="fila4">
+          <div class="caja tile"><div class="n">107</div><div class="r">dps comparable</div><div class="d">sobre el reloj entero</div></div>
+          <div class="caja tile"><div class="n">134</div><div class="r">dps sobre lo que manejabas</div><div class="d">quitando miedo y encanto</div></div>
+          <div class="caja tile"><div class="n">71 %</div><div class="r">tiempo pegando</div><div class="d">de lo que manejabas</div></div>
+          <div class="caja tile"><div class="n">2,8 s</div><div class="r">cadencia</div><div class="d">mediana entre golpes</div></div>
+        </div>
+        <div class="caja"><h4>Postura</h4>
+          <table class="tabla">
+            <tr><td class="txt">Defensive <span class="dist">0:00 – 2:14</span></td><td><div class="barrita" style="width:38%"></div></td><td style="text-align:right">evitó 1.204</td></tr>
+            <tr><td class="txt">Channeler <span class="dist">2:14 – 5:52</span></td><td><div class="barrita" style="width:62%"></div></td><td style="text-align:right">evitó 2.891</td></tr>
+          </table>
+          <div class="pie">El daño periódico y el escudo de daño no los para ninguna postura: 984 puntos de esta pelea estaban fuera de su alcance.</div>
+        </div>
+        <div class="caja"><h4>Tramos sin mando</h4>
+          <table class="tabla">
+            <tr><td class="txt">feared <span class="dist">· lo último que lanzó el enemigo fue Dragon Fear</span></td><td style="text-align:right">0:26 – 0:38</td><td style="text-align:right">12 s</td></tr>
+            <tr><td class="txt">feared <span class="dist">· sin lanzamiento enemigo cerca</span></td><td style="text-align:right">3:02 – 3:33</td><td style="text-align:right">31 s</td></tr>
+          </table>
+          <div class="pie">Ese tiempo no cuenta ni a favor ni en contra: no podías actuar.</div>
+        </div>
+      </section>
+
+      <!-- ============ RESUMEN ============ -->
+      <section class="vista" id="v-resumen">
+        <div class="cab-vista">
+          <div><div class="tit">Todo el histórico</div>
+          <div class="sub">4 – 15 de agosto · 14 días</div></div>
+          <div class="der conmuta"><div class="act">Todo</div><div>30 d</div><div>7 d</div><div>Hoy</div></div>
+        </div>
+        <div class="fila4">
+          <div class="caja tile"><div class="n">1.420</div><div class="r">peleas</div><div class="d">mediana 45 s</div></div>
+          <div class="caja tile"><div class="n">18,8 M</div><div class="r">tu daño</div><div class="d">+0,5 % por la apertura</div></div>
+          <div class="caja tile"><div class="n">4.325</div><div class="r">abatidos</div><div class="d">419 nombres distintos</div></div>
+          <div class="caja tile"><div class="n">4,8 %</div><div class="r">sin reconocer</div><div class="d">34.207 líneas</div></div>
+        </div>
+        <div class="caja">
+          <h4>Peleas por día</h4>
+          <div class="graf" id="g2"></div>
+          <div class="leyenda"><span><i style="background:var(--s1)"></i>peleas cerradas</span></div>
+        </div>
+        <div class="fila2">
+          <div class="caja"><h4>Dónde has estado</h4>
+            <table class="tabla">
+              <tr><td class="txt">Ruinas de Old Guk</td><td><div class="barrita" style="width:100%"></div></td><td style="text-align:right">412</td></tr>
+              <tr><td class="txt">Plano del Miedo</td><td><div class="barrita" style="width:42%"></div></td><td style="text-align:right">171</td></tr>
+              <tr><td class="txt">Plano del Odio</td><td><div class="barrita" style="width:38%"></div></td><td style="text-align:right">158</td></tr>
+              <tr><td class="txt">Plano del Cielo</td><td><div class="barrita" style="width:30%"></div></td><td style="text-align:right">125</td></tr>
+              <tr><td class="txt">Nagafen's Lair</td><td><div class="barrita" style="width:20%"></div></td><td style="text-align:right">82</td></tr>
+            </table>
+          </div>
+          <div class="caja"><h4>Los que más te han costado</h4>
+            <table class="tabla">
+              <thead><tr><th>Enemigo</th><th style="text-align:right">Vida estimada</th><th style="text-align:right">Veces</th></tr></thead>
+              <tr><td class="txt">Innoruuk, the Prince of Hate</td><td style="text-align:right">79.046</td><td style="text-align:right">4</td></tr>
+              <tr><td class="txt">a spite golem</td><td style="text-align:right">38.138</td><td style="text-align:right">11</td></tr>
+              <tr><td class="txt">a loathling lich</td><td style="text-align:right">26.437</td><td style="text-align:right">28</td></tr>
+              <tr><td class="txt">a scareling</td><td style="text-align:right">9.625</td><td style="text-align:right">31</td></tr>
+            </table>
+            <div class="pie">Vida estimada descontando lo que se curaron a tu costa.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ ENEMIGOS ============ -->
+      <section class="vista" id="v-enemigos">
+        <div class="tit">a shin ghoul knight</div>
+        <div class="sub">Ruinas de Old Guk · 64 muertes · primera el 28 jul, última el 15 ago</div>
+        <div class="fila4">
+          <div class="caja tile"><div class="n">64</div><div class="r">lo has matado</div></div>
+          <div class="caja tile"><div class="n">9</div><div class="r">objetos distintos</div><div class="d">recogidos por ti</div></div>
+          <div class="caja tile"><div class="n">4.412</div><div class="r">vida estimada</div><div class="d">mediana de 64</div></div>
+          <div class="caja tile"><div class="n">37 %</div><div class="r">resistes su mez</div><div class="d">14 de 38</div></div>
+        </div>
+        <div class="caja">
+          <h4>Lo que te ha caído, y cada cuánto</h4>
+          <table class="tabla">
+            <thead><tr><th>Objeto</th><th style="text-align:right">Veces</th><th style="text-align:right">Cada</th><th>Última</th></tr></thead>
+            <tr><td class="txt">Froglok Poison Gland</td><td style="text-align:right">11</td><td style="text-align:right">1 de 6</td><td class="txt">15 ago</td></tr>
+            <tr><td class="txt">Fine Steel Spear</td><td style="text-align:right">2</td><td style="text-align:right">1 de 32</td><td class="txt">12 ago</td></tr>
+            <tr><td class="txt">Mesh Bracers</td><td style="text-align:right">1</td><td style="text-align:right">1 de 64</td><td class="txt">7 ago</td></tr>
+          </table>
+          <div class="pie">Ésta es <b>tu</b> tasa, no la de la wiki: cuántas veces lo has matado sin que caiga. Es lo que dice si sigues aquí o cambias de sitio.</div>
+        </div>
+        <div class="caja"><h4>Lo que hace</h4>
+          <table class="tabla">
+            <tr><td class="txt">Mesmerization <span class="chip">mez</span></td><td style="text-align:right">38 lanzamientos</td><td class="dist" style="text-align:right">dura 11 s de mediana</td></tr>
+            <tr><td class="txt">Specter Lifetap <span class="chip">se cura a tu costa</span></td><td style="text-align:right">232</td><td class="dist" style="text-align:right">1 cada 8 s</td></tr>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ BOTÍN AGREGADO ============ -->
+      <section class="vista" id="v-botin2">
+        <div class="cab-vista">
+          <div><div class="tit">Botín</div><div class="sub">1.487 objetos distintos · 8.027 recogidas</div></div>
+          <div class="der conmuta"><div class="act">Sólo lo medido</div><div>Con lo deducido</div></div>
+        </div>
+        <div class="caja">
+          <table class="tabla">
+            <thead><tr><th>Objeto</th><th style="text-align:right">Veces</th><th>Fuente principal</th><th style="text-align:right">Zonas</th><th>Última</th><th style="text-align:right">Vendido</th></tr></thead>
+            <tr><td class="txt">Phosphorous Powder</td><td style="text-align:right">1.460</td><td class="txt">a zol ghoul knight</td><td style="text-align:right">3</td><td class="txt">15 ago</td><td style="text-align:right">—</td></tr>
+            <tr><td class="txt">Undead Froglok Tongue</td><td style="text-align:right">287</td><td class="txt">a zol ghoul knight</td><td style="text-align:right">3</td><td class="txt">15 ago</td><td style="text-align:right">—</td></tr>
+            <tr><td class="txt">Blue Diamond</td><td style="text-align:right">18</td><td class="txt">a loathling lich</td><td style="text-align:right">3</td><td class="txt">15 ago</td><td style="text-align:right">1.208p</td></tr>
+            <tr><td class="txt">Sapphire Necklace <span class="chip d">ambiguo</span></td><td style="text-align:right">11</td><td class="txt">a revultant rat</td><td style="text-align:right">2</td><td class="txt">15 ago</td><td style="text-align:right">—</td></tr>
+            <tr><td class="txt">Ruby Crown +4</td><td style="text-align:right">6</td><td class="txt">a loathling lich</td><td style="text-align:right">1</td><td class="txt">15 ago</td><td style="text-align:right">852p</td></tr>
+          </table>
+          <div class="pie">Con el conmutador en <b>sólo lo medido</b> quedan fuera 294 recogidas cuya asignación es deducida. La cifra cambia delante de ti: eso es lo que mide cuánto de este panel es firme.</div>
+        </div>
+      </section>
+
+      <!-- ============ PROGRESO ============ -->
+      <section class="vista" id="v-progreso">
+        <div class="tit">Progreso</div>
+        <div class="sub">Nivel 38 · 492 AA ganadas · 491 gastadas · 1 sin gastar</div>
+        <div class="caja">
+          <h4>Nivel en el tiempo</h4>
+          <div class="graf" id="g3"></div>
+          <div class="leyenda">
+            <span><i style="background:var(--s1)"></i>nivel</span>
+            <span><span style="display:inline-block;width:14px;height:10px;background:currentColor;opacity:.12;border-radius:2px;margin-right:6px;vertical-align:middle"></span>experiencia que el registro no dijo</span>
+          </div>
+          <div class="pie">La curva es tu último nivel más cada porcentaje que el juego ha dicho desde entonces. Lo sombreado es donde no dijo nada: no es que no subieras, es que no lo sabemos.</div>
+        </div>
+        <div class="fila4">
+          <div class="caja tile"><div class="n">0,17</div><div class="r">niveles por hora</div><div class="d">sobre tiempo activo</div></div>
+          <div class="caja tile"><div class="n">12,6</div><div class="r">muertes por hora</div></div>
+          <div class="caja tile"><div class="n">3</div><div class="r">cambios de clase</div><div class="d">PAL · RNG · SHM</div></div>
+          <div class="caja tile"><div class="n">65</div><div class="r">habilidades de AA</div></div>
+        </div>
+      </section>
+
+      <!-- ============ LO QUE NO SE SABE ============ -->
+      <section class="vista" id="v-nosabe">
+        <div class="tit">Lo que no se sabe</div>
+        <div class="sub">Todo lo que el programa ha medido de su propia ignorancia</div>
+        <div class="caja">
+          <h4>El cajón</h4>
+          <table class="tabla">
+            <thead><tr><th>Forma de línea</th><th style="text-align:right">Veces</th><th>Qué es</th></tr></thead>
+            <tr><td class="txt">X tries to cast a spell on you, but you are protected</td><td style="text-align:right">1.251</td><td class="txt">inmunidad tuya, fuera de combate</td></tr>
+            <tr><td class="txt">Your faction standing with X has been adjusted</td><td style="text-align:right">757</td><td class="txt">reputación, otra materia</td></tr>
+            <tr><td class="txt">Your will is not sufficient to command this weapon</td><td style="text-align:right">424</td><td class="txt">error de manejo</td></tr>
+            <tr><td class="txt">Furywrath's voice booms</td><td style="text-align:right">477</td><td class="txt">ambiente de zona · 0 dentro de pelea</td></tr>
+          </table>
+          <div class="pie">34.207 líneas de 862.705, el 4,8 %. Están aquí para que se vea qué parte del registro no sabemos leer, no para taparlo.</div>
+        </div>
+        <div class="fila2">
+          <div class="caja"><h4>Cosas sueltas</h4>
+            <table class="tabla">
+              <tr><td class="txt">Muertes sin dueño</td><td style="text-align:right">21</td></tr>
+              <tr><td class="txt">Botín de asignación ambigua</td><td style="text-align:right">294</td></tr>
+              <tr><td class="txt">Peleas con compañero encantado</td><td style="text-align:right">5</td></tr>
+              <tr><td class="txt">Uniones sostenidas por un estado</td><td style="text-align:right">10</td></tr>
+            </table>
+          </div>
+          <div class="caja"><h4>Límites conocidos</h4>
+            <table class="tabla">
+              <tr><td class="txt">Divergencias de reloj sin cerrar</td><td style="text-align:right">3</td></tr>
+              <tr><td class="txt">Duración de raíz</td><td class="txt" style="text-align:right">no medible</td></tr>
+              <tr><td class="txt">Nivel del enemigo</td><td class="txt" style="text-align:right">no está en el registro</td></tr>
+              <tr><td class="txt">Constantes medidas en</td><td class="txt" style="text-align:right">1 máquina</td></tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="vista" id="v-avisos"><div class="tit">Avisos</div><div class="sub">Cinco disparadores · uno de fábrica sin verificar</div>
+        <div class="caja"><table class="tabla">
+          <tr><td class="txt">You are stunned! <span class="chip">escrito por ti</span></td><td style="text-align:right">1.595 veces en tu registro</td></tr>
+          <tr><td class="txt">Lady Vox begins casting X <span class="chip">plantilla de fábrica</span></td><td style="text-align:right">33 veces en tu registro</td></tr>
+          <tr><td class="txt">You have been slain by X <span class="chip">escrito por ti</span></td><td style="text-align:right">55 veces en tu registro</td></tr>
+        </table></div>
+      </section>
+      <section class="vista" id="v-prefs"><div class="tit">Preferencias</div><div class="sub">Idioma, tema, voz, overlay, registro</div></section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+/* ---------- generador de series deterministas ---------- */
+function serie(n,base,amp,semilla){const out=[];let s=semilla;
+  for(let i=0;i<n;i++){s=(s*1103515245+12345)&0x7fffffff;
+    const r=(s/0x7fffffff-0.5);out.push(Math.max(0,base+amp*r+amp*0.5*Math.sin(i/4.3+semilla)));}
+  return out;}
+function suave(a,k){return a.map((_,i)=>{let s=0,c=0;for(let j=Math.max(0,i-k);j<=i;j++){s+=a[j];c++;}return s/c;});}
+
+function grafica(cont,series,opts){
+  opts=opts||{};
+  const W=760,H=150,ML=34,MR=8,MT=10,MB=20;
+  const n=series[0].datos.length;
+  const max=opts.max||Math.max(...series.flatMap(s=>s.datos))*1.12;
+  const px=i=>ML+i*(W-ML-MR)/(n-1), py=v=>H-MB-(v/max)*(H-MT-MB);
+  let svg=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:150px">`;
+  svg+='<g class="rej">';
+  for(let g=0;g<=3;g++){const y=MT+g*(H-MT-MB)/3;svg+=`<line x1="${ML}" y1="${y}" x2="${W-MR}" y2="${y}"/>`;}
+  svg+='</g>';
+  if(opts.sombra) opts.sombra.forEach(s=>{
+    svg+=`<rect class="sombra" x="${px(s[0])}" y="${MT}" width="${px(s[1])-px(s[0])}" height="${H-MT-MB}"/>`;});
+  for(let g=0;g<=3;g++){const y=MT+g*(H-MT-MB)/3;
+    svg+=`<text class="eje" x="2" y="${y+3.5}">${Math.round(max-(g*max/3))}</text>`;}
+  (opts.equis||[]).forEach(([i,t])=>svg+=`<text class="eje" x="${px(i)}" y="${H-5}" text-anchor="middle">${t}</text>`);
+  series.forEach((s,k)=>{
+    const d=s.datos.map((v,i)=>`${i?'L':'M'}${px(i).toFixed(1)} ${py(v).toFixed(1)}`).join(' ');
+    svg+=`<path class="ln l${k+1}" d="${d}"/>`;});
+  if(opts.pico!==undefined){const i=opts.pico,v=series[0].datos[i];
+    svg+=`<circle cx="${px(i)}" cy="${py(v)}" r="3" fill="var(--s1)"/>`;
+    svg+=`<text class="pico" x="${px(i)+6}" y="${py(v)-5}">pico ${Math.round(v)}</text>`;}
+  svg+='<line class="cruz" id="cx" x1="0" y1="'+MT+'" x2="0" y2="'+(H-MB)+'" style="display:none"/>';
+  series.forEach((s,k)=>svg+=`<circle class="pt-h" id="ph${k}" cx="0" cy="0" fill="var(--s${k+1})" style="display:none"/>`);
+  svg+='</svg><div class="tip"></div>';
+  cont.innerHTML=svg;
+  const el=cont.querySelector('svg'),tip=cont.querySelector('.tip'),cx=cont.querySelector('#cx');
+  el.addEventListener('mousemove',e=>{
+    const r=el.getBoundingClientRect(),xv=(e.clientX-r.left)/r.width*W;
+    let i=Math.round((xv-ML)/((W-ML-MR)/(n-1)));i=Math.max(0,Math.min(n-1,i));
+    cx.style.display='';cx.setAttribute('x1',px(i));cx.setAttribute('x2',px(i));
+    let html=`<b>${(opts.rotulo||(x=>x+' s'))(i)}</b><br>`;
+    series.forEach((s,k)=>{const p=cont.querySelector('#ph'+k);
+      p.style.display='';p.setAttribute('cx',px(i));p.setAttribute('cy',py(s.datos[i]));
+      html+=`<u style="background:var(--s${k+1})"></u>${s.nombre} <b>${Math.round(s.datos[i])}</b><br>`;});
+    tip.innerHTML=html;tip.style.opacity=1;
+    const lx=(px(i)/W)*r.width;
+    tip.style.left=Math.min(r.width-150,lx+12)+'px';tip.style.top='6px';
+  });
+  el.addEventListener('mouseleave',()=>{tip.style.opacity=0;cx.style.display='none';
+    series.forEach((s,k)=>cont.querySelector('#ph'+k).style.display='none');});
+}
+
+const n1=72;
+grafica(document.getElementById('g1'),[
+  {nombre:'tú y tu mascota',datos:suave(serie(n1,150,190,7),3)},
+  {nombre:'daño que recibes',datos:suave(serie(n1,70,90,19),3)},
+  {nombre:'el resto del grupo',datos:suave(serie(n1,55,70,31),3)}
+],{pico:23,equis:[[0,'0:00'],[18,'1:28'],[36,'2:56'],[54,'4:24'],[71,'5:52']]});
+
+grafica(document.getElementById('g2'),[
+  {nombre:'peleas',datos:[57,82,112,113,52,65,142,187,102,33,38,61,74,58]}
+],{equis:[[0,'4 ago'],[4,'8 ago'],[8,'12 ago'],[13,'15 ago']],rotulo:i=>'día '+(4+i)+' ago'});
+
+const niv=[];for(let i=0;i<60;i++)niv.push(37.2+i*0.014+(i>26&&i<38?0.0:0)+Math.min(0.35,i/170));
+grafica(document.getElementById('g3'),[{nombre:'nivel',datos:niv}],
+  {max:39,sombra:[[26,38]],equis:[[0,'28 jul'],[20,'4 ago'],[40,'10 ago'],[59,'15 ago']],
+   rotulo:i=>'día '+i});
+
+/* ---------- dps individual: todos juntos + uno por cada uno ---------- */
+const COL=['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)'];
+function serieF(n,base,amp,semilla,forma){const o=[];let s=semilla;
+  for(let i=0;i<n;i++){s=(s*1103515245+12345)&0x7fffffff;const r=s/0x7fffffff-.5;
+    const f=forma?forma(i/n):1;o.push(Math.max(0,(base+amp*r)*f+amp*.35*Math.sin(i/5+semilla)));}return o;}
+const ND=64;
+const TUYOS=[
+ {n:'Campeón',t:'tú',d:suave(serieF(ND,150,120,7),3)},
+ {n:'Kalforgelp',t:'compañero',d:suave(serieF(ND,88,70,23),3)},
+ {n:'Jasarn',t:'tu mascota',d:suave(serieF(ND,70,60,13),3)},
+ {n:'Notarino',t:'compañero',d:suave(serieF(ND,62,55,37),3)},
+ {n:'Kartik',t:'mascota de Kalforgelp',d:suave(serieF(ND,40,38,53),3)},
+ {n:'Zibeker',t:'compañero',d:suave(serieF(ND,34,40,71,x=>x<.35?1.6:.7),3)}
+];
+const ENEM=[
+ {n:'a dracoliche ≥2',t:'entre todos',d:suave(serieF(ND,74,58,11),3)},
+ {n:'Amygdalan knight',t:'',d:suave(serieF(ND,46,44,29,x=>x>.55?1.5:.6),3)},
+ {n:'a glare lord',t:'',d:suave(serieF(ND,22,26,43),3)},
+ {n:'a dracoliche pet',t:'mascota',d:suave(serieF(ND,14,18,59),3)}
+];
+const med=s=>Math.round(s.d.reduce((a,b)=>a+b,0)/s.d.length);
+[TUYOS,ENEM].forEach(l=>l.sort((a,b)=>med(b)-med(a)));
+
+function multiplos(cont,lista){
+  const MAX=Math.max(...lista.flatMap(s=>s.d))*1.1;
+  cont.innerHTML=lista.map((s,k)=>{
+    const W=200,H=40,c=COL[k%6];
+    const p=s.d.map((v,i)=>`${i?'L':'M'}${(i*W/(s.d.length-1)).toFixed(1)} ${(H-(v/MAX)*H).toFixed(1)}`).join(' ');
+    return `<div class="mmul"><div class="nom"><em style="background:${c}"></em>${s.n}<span>${med(s)} dps</span></div>
+      <div class="et">${s.t||'&nbsp;'}</div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" y1="${H-.5}" x2="${W}" y2="${H-.5}"/>
+      <path class="d" style="stroke:${c}" d="${p}"/></svg></div>`;}).join('');
+}
+multiplos(document.getElementById('r-tuyos'),TUYOS);
+multiplos(document.getElementById('r-enem'),ENEM);
+
+function junto(gid,nid,lista){
+  const cont=document.getElementById(gid),chips=document.getElementById(nid);
+  const MAX=Math.max(...lista.flatMap(s=>s.d))*1.12;
+  const W=560,H=172,ML=32,MR=96,MT=10,MB=18,n=lista[0].d.length;
+  const px=i=>ML+i*(W-ML-MR)/(n-1), py=v=>H-MB-(v/MAX)*(H-MT-MB);
+  let svg=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:172px"><g class="rej">`;
+  for(let g=0;g<=3;g++){const y=MT+g*(H-MT-MB)/3;svg+=`<line x1="${ML}" y1="${y}" x2="${W-MR}" y2="${y}"/>`;}
+  svg+='</g>';
+  for(let g=0;g<=3;g++){const y=MT+g*(H-MT-MB)/3;
+    svg+=`<text class="eje" x="2" y="${y+3.5}">${Math.round(MAX-g*MAX/3)}</text>`;}
+  [[0,'0:00'],[Math.round(n/2),'2:56'],[n-1,'5:52']].forEach(([i,t])=>
+    svg+=`<text class="eje" x="${px(i)}" y="${H-4}" text-anchor="middle">${t}</text>`);
+  lista.forEach((s,k)=>{svg+=`<path class="ln" data-k="${k}" style="stroke:${COL[k%6]}" d="${
+    s.d.map((v,i)=>`${i?'L':'M'}${px(i).toFixed(1)} ${py(v).toFixed(1)}`).join(' ')}"/>`;});
+  /* rótulos al final de cada línea, separados si se pisan */
+  const rot=lista.map((s,k)=>({k,n:s.n,y:py(s.d[n-1])})).sort((a,b)=>a.y-b.y);
+  const HUECO=11.5;
+  for(let i=1;i<rot.length;i++) if(rot[i].y-rot[i-1].y<HUECO) rot[i].y=rot[i-1].y+HUECO;
+  const exceso=rot.length?rot[rot.length-1].y-(H-MB):0;
+  if(exceso>0) rot.forEach(r=>r.y-=exceso);
+  rot.forEach(r=>{svg+=`<text class="rot-ln" data-k="${r.k}" x="${px(n-1)+6}" y="${r.y+3.5}" style="fill:${COL[r.k%6]}">${r.n}</text>`;});
+  svg+=`<line class="cruz" x1="0" y1="${MT}" x2="0" y2="${H-MB}" style="display:none"/></svg><div class="tip"></div>`;
+  cont.innerHTML=svg;
+  chips.innerHTML=lista.map((s,k)=>`<span class="nom-chip" data-k="${k}"><i style="background:${COL[k%6]}"></i>${s.n}<b>${med(s)}</b></span>`).join('');
+  const paths=[...cont.querySelectorAll('.ln')],rots=[...cont.querySelectorAll('.rot-ln')],cs=[...chips.children];
+  const marcar=k=>{[...paths,...rots].forEach(p=>p.classList.toggle('apagada',k>=0&&+p.dataset.k!==k));
+    cs.forEach(c=>c.style.background=(+c.dataset.k===k)?'var(--sel)':'');};
+  cs.forEach(c=>{c.onmouseenter=()=>marcar(+c.dataset.k);c.onmouseleave=()=>marcar(-1);});
+  paths.forEach(p=>{p.style.cursor='pointer';p.onmouseenter=()=>marcar(+p.dataset.k);});
+  const el=cont.querySelector('svg'),tip=cont.querySelector('.tip'),cx=cont.querySelector('.cruz');
+  el.addEventListener('mousemove',e=>{
+    const r=el.getBoundingClientRect(),xv=(e.clientX-r.left)/r.width*W;
+    let i=Math.round((xv-ML)/((W-ML-MR)/(n-1)));i=Math.max(0,Math.min(n-1,i));
+    cx.style.display='';cx.setAttribute('x1',px(i));cx.setAttribute('x2',px(i));
+    tip.innerHTML=lista.map((s,k)=>({s,k})).sort((a,b)=>b.s.d[i]-a.s.d[i])
+      .map(o=>`<u style="background:${COL[o.k%6]}"></u>${o.s.n} <b>${Math.round(o.s.d[i])}</b>`).join('<br>');
+    tip.style.opacity=1;tip.style.left=Math.min(r.width-155,(px(i)/W)*r.width+12)+'px';tip.style.top='4px';});
+  el.addEventListener('mouseleave',()=>{tip.style.opacity=0;cx.style.display='none';marcar(-1);});
+}
+junto('p-tuyos','n-tuyos',TUYOS);
+junto('p-enem','n-enem',ENEM);
+document.querySelectorAll('[data-dps]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-dps]').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.dps-vista').forEach(s=>s.classList.toggle('ver',s.id==='dps-'+b.dataset.dps));});
+
+document.querySelectorAll('.lat-item').forEach(i=>i.onclick=()=>{
+  document.querySelectorAll('.lat-item').forEach(x=>x.classList.remove('act'));i.classList.add('act');
+  const v=i.dataset.v;if(!v)return;
+  document.querySelectorAll('.vista').forEach(s=>s.classList.toggle('ver',s.id==='v-'+v));
+  document.body.classList.toggle('sinlista',!['escena','hab','botin1','analisis'].includes(v));
+});
+document.querySelectorAll('.pelea').forEach(p=>p.onclick=()=>{
+  document.querySelectorAll('.pelea').forEach(x=>x.classList.remove('act'));p.classList.add('act');});
+document.querySelectorAll('.conmuta div').forEach(a=>a.onclick=()=>{
+  a.parentNode.querySelectorAll('div').forEach(x=>x.classList.remove('act'));a.classList.add('act');});
+document.getElementById('bT').onclick=e=>{document.body.classList.toggle('oscuro');
+  e.target.classList.toggle('on',document.body.classList.contains('oscuro'));};
+</script>
+</body>
+</html>

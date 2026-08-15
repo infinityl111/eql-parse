@@ -1460,3 +1460,416 @@ suelo dicho, la procedencia visible.
 - **La agrupación del cajón conserva los nombres propios**, así que cada recuento
   por forma es un suelo y las familias reales son mayores de lo que dice la
   tabla.
+
+---
+
+# Segundo pase — 16 de agosto de 2026
+
+El primer estudio preguntaba **qué tienen**. Éste pregunta **qué les costó, y
+nuestro registro tiene esa misma forma**.
+
+**Cada hallazgo viaja con la pregunta que le hace a nuestro log.** Si era barata,
+va contestada con el número; si era cara, queda escrita como pregunta pendiente.
+Un hallazgo sin pregunta asociada no entra. Y se priorizan **cicatrices** sobre
+funciones: un «arreglamos X porque Y» vale diez veces más que un «tienen Z».
+
+## 12. Lo que revirtieron, y lo que borraron
+
+### 12.1 El hallazgo mayor de este pase: construyeron la persistencia del fold y la quitaron
+
+**11 de agosto, `JOS-230`.** Se borra `src/main/foldCache/` entero —16 ficheros: el
+formato del contenedor, el bloque de identidad, la gramática del esquema, el
+cargador, la planificación de escritura, el interruptor, el verificador en
+sombra, el censo, los ayudantes de ruta— y con él su preferencia, sus dos
+canales de IPC, el puente del preload y la casilla **Preferencias → Rendimiento
+→ «Faster start»**. El asunto: *«`JOS-230`: the fold checkpoint itself, and every
+wire it hung from»*.
+
+**§5 de este documento decía que jmoyers «no persiste el fold».** Es verdad hoy,
+y ahora sabemos que **es una decisión, no una omisión**: lo construyeron entero y
+lo sacaron.
+
+**Y el porqué está en el commit hermano** —*«the fleet stops being asked a
+question nobody answered»*— y es la clase de cicatriz que este pase busca:
+
+> *shadowChecks was ZERO on every build. The counters were the rollout gate
+> ("stays off until divergences hold at zero"), and a gate whose denominator
+> never moves cannot open.*
+
+Habían puesto la función detrás de un verificador en sombra que comparaba el
+fold restaurado contra el fold recalculado, y la puerta de salida era «cuando
+las divergencias lleven mucho en cero». **El verificador no llegó a correr ni una
+vez en ninguna compilación**, así que el contador de divergencias era 0 sobre 0 —
+y una puerta cuyo denominador no se mueve no se abre nunca. Ni siquiera pudieron
+medir si la función servía.
+
+**Es nuestra familia de la alarma muerta**, en su versión más cara: no una salida
+que nadie lee, sino **una salida que nadie lee y de la que depende que una
+función se encienda**.
+
+**La pregunta a nuestro log:** ¿tenemos alguna puerta con esa forma — una función
+o un aviso condicionado a un contador que podría no moverse nunca? **Contestada, y
+es que sí la tuvimos**: el evento `rotate` del lector se emitía desde el primer día
+y no lo escuchaba nadie (arreglado el 16 de agosto). No condicionaba ninguna
+función, así que era la versión barata de lo mismo. **Pendiente**, y es más cara de
+contestar: revisar si alguna guarda nuestra se apoya en un contador que sólo
+podría crecer si alguien ya estuviera usando lo que la guarda protege.
+
+### 12.2 Un experimento publicado y retirado la misma noche
+
+**9 de agosto, `JOS-179`** — *«the reorder experiment comes back out, search stays»*.
+Arrastrar para reordenar las alarmas (`JOS-175` + `JOS-177`, fusionado esa misma
+noche, **sin publicar**) se retira entero: el gesto, la aritmética del punto de
+suelta, las reglas de orden, el asa y la línea de inserción, el canal de IPC, su
+puerta en el preload, su manejador y su accesor de almacén.
+
+La razón, textual: *«With search shipped, reordering is silly, and the complexity
+is not worth the single request that asked for it.»* **Una sola petición lo pidió.**
+
+Y lo que hace que valga la pena anotarlo: **al quitarlo, lo que quedó se
+simplificó**, no sólo encogió. Ya no hay un gesto que suspender, así que
+desaparecen `canReorder`, el contenedor vacío de «no se puede soltar aquí», la clase
+que agrisaba el asa y el aviso de «borra la búsqueda para poder reordenar». La
+bandera de filtrado sobrevive con un solo trabajo.
+
+**La pregunta a nuestro log:** no la tiene — es una pregunta a nuestro repo, y
+**pendiente**: ¿qué tenemos publicado que pidiera una sola persona y que esté
+complicando lo de al lado?
+
+### 12.3 Y dos retiradas de superficie el mismo día
+
+**13 de agosto**: `JOS-325` *«gear sets retire — the Gear tab becomes pure search»* (4
+ficheros de interfaz + `shared/planner/gearSetTotals.ts`) y `JOS-326` *«Exaltations
+becomes search-only, and the flat wish list is the surface it feeds»* (6 ficheros
+del planificador). **Dos pestañas con estado propio sustituidas por una búsqueda.**
+El patrón se repite tres veces en cinco días: *lo que se puede buscar no
+necesita organizarse a mano*.
+
+## 13. Las constantes que NO se movieron
+
+Esperaba encontrar valores bailando. Lo que hay es lo contrario, y es un
+resultado:
+
+| constante | valor | ¿cambió desde el primer commit público? |
+|---|---:|---|
+| `LINGER_MS` | 5.000 ms | **no** |
+| `PRESENCE_GONE_MS` | 20.000 ms | **no** |
+| `FALLBACK_IDLE_MS` | 60.000 ms | **no** |
+| `CC_HOLD_MS` | 120.000 ms | **no** |
+| `ACTIVE_MS` | 3.000 ms | **no** |
+| `REPLAY_SLICE_MS` | 12 ms | **no** |
+| `REPLAY_DUTY` | 0,6 | nace el 6 de agosto (`JOS-50`), no cambia después |
+| `FIGHT_IDLE` (sowoky) | 45 s | nace el 7 de agosto (0.10.0), no cambia después |
+| `BOOTSTRAP_CAP` (sowoky) | 40 MB | **no**, desde el primer commit |
+
+Comprobado abriendo el fichero en el primer commit público y comparando con el
+de hoy: las cinco de encuentro salen **byte a byte idénticas** a través de 1.109
+commits.
+
+**LA SALVEDAD, Y ES GRANDE.** Su historia pública empieza el 4 de agosto con un
+commit llamado *«initial public source under FSL-1.1-MIT»*. **Lo que pasó antes no
+está.** Así que lo que se puede afirmar es «estables durante los once días
+públicos», no «nunca se movieron». Un valor que nace ya redondo —20.000, 60.000,
+120.000— suele ser un valor elegido, no medido, y su propia nota de
+`CC_HOLD_MS` lo dice: existe *«so a lone mez can't pin a fight open forever»*, que
+es un argumento de forma, no una medición.
+
+**La pregunta a nuestro log, contestada:** las nuestras sí se movieron y con
+medición al lado — `MARGEN_TICK` de 3 a 5 con **dos bases distintas escritas**, y
+`PLAZO_ENEMIGO` elegido dentro de una banda 10–15 medida. La comparación no dice
+que ellos acierten más: dice que **nosotros sabemos por qué**, y ellos no tienen
+dónde mirarlo.
+
+## 14. La mitad de agregación, que es la que viene después
+
+Lo que el primer pase declaró sin leer. Se lee ahora porque el dps individual va
+a necesitarlo.
+
+### 14.1 El DPS: media móvil de 5 s, y el rótulo la dice
+
+`renderer/src/features/combat/dashboardData.ts:216-246`:
+
+| constante | valor | qué decide |
+|---|---:|---|
+| `SMOOTH_MS` | **5.000 ms** | la ventana de la media móvil |
+| `MAX_BUCKETS` | 360 | tope de vértices de la polilínea |
+| `LIVE_WINDOW_MS` | 120.000 ms | cuánto de una pelea viva se ve antes de desplazarse |
+
+El cubo mínimo es **1 s** y crece para que la línea nunca pase de 360 vértices.
+La serie es una **media móvil de cola**, y el divisor no es siempre 5 s: al
+principio de la pelea vale `min(i+1, w) × bucketMs`, o sea sólo los cubos que
+existen. **Ésa es su respuesta a las peleas cortas** — no hay caso especial, el
+divisor encoge solo.
+
+**Dos decisiones que valen más que las constantes:**
+
+**(a) La cifra al pasar el ratón sale de la MISMA serie que la línea.**
+`dpsAt.ts:1-6`: *«sampled from the chart's OWN rolling series, never computed a
+second way […] so the timeline's hover number and the DPS curve's line can never
+disagree»*. Es nuestra regla de una pregunta, un sitio, aplicada a un gráfico.
+
+**(b) No se interpola entre cubos**, y el motivo está escrito
+(`dpsAt.ts:22-25`): *«the series is bucketed at >=1s and the readout says so ("Ns
+rolling"), so smoothing the steps away would invent a rate the log cannot
+support»*. Y el pie lo declara: `rollingNote` imprime literalmente «5s rolling»
+y añade «~ estimated» cuando el anillo de eventos se truncó.
+
+**Y su ley 9**, que es la que más nos toca al construir el gráfico:
+
+> **One time base per chart.** *A curve's vertices, markers, axis and hover
+> inverse all read ONE `{t0, t1, bucketMs}`; samples anchor at bucket centres.*
+
+Con su cicatriz al lado: mezclar un mapeo por fracción-de-índice para los
+vértices con uno por fracción-de-tiempo para las marcas **estiraba las marcas un
+cubo entero en el borde derecho**, y una ventana medida en reloj de pared las
+hacía *nadar* contra una curva quieta en cada tic. Y la frase que cierra:
+*«Canvas is never the answer to arithmetic disagreement.»*
+
+**La pregunta a nuestro log, y es la que decide el diseño del gráfico:** ¿cuántas
+de nuestras peleas duran menos que la ventana de suavizado? **Contestada en el
+primer estudio y aquí se conecta**: con media de 5 s, una pelea de 6 s es
+prácticamente un solo punto. Su solución —divisor que encoge al principio— es
+exactamente lo que hace que eso no mienta, y no la habíamos considerado.
+
+### 14.2 Las rondas: un concepto que no tenemos
+
+`main/combat/rounds.ts:1-30`. EQ **anota** el contraataque, el frenesí y el
+aplastamiento, y **no dice nada** del ataque doble o triple: un barrido de 1,35
+millones de líneas encuentra **cero anotaciones** contra miles de segundos con
+varios golpes medidos. Así que una ronda es un sustituto, y el honesto es:
+
+> *one round = the swings ONE attacker made with ONE verb, at ONE target, in ONE
+> second.*
+
+**El peligro que les enseñó a meter el objetivo en la clave**, y está medido: el
+apuñalamiento por la espalda tiene un tiempo de reutilización de ~10 s, así que
+cuatro en un segundo es mecánicamente imposible. Su registro tiene **exactamente
+cinco segundos así, y los cinco con la misma forma**: dos objetivos distintos con
+la **misma secuencia ordenada de daños** en cada uno — *una* ronda de ataque doble
+repartida entre dos defensores e impresa dos veces. Agrupar sólo por objetivo
+daría dos rondas de dos golpes; agrupar sin él daría una de cuatro.
+
+**La pregunta a nuestro log: ¿tenemos ese abanico?** **Pendiente** — es barata de
+contestar y no la he hecho: buscar segundos con el mismo atacante, el mismo
+verbo y la misma secuencia de importes sobre dos objetivos distintos.
+
+### 14.3 Los procs: la tasa se divide por la ventana que la explica
+
+`main/combat/procViews.ts:149-165`. Una tasa por minuto necesita un denominador,
+y ellos distinguen **tres estados** en vez de dividir siempre por la pelea:
+
+- **CONOCIDO** — hay un tramo observado que concede el proc (un veneno aplicado,
+  un buff con su ventana). La tasa se divide por ese tramo, exacta.
+- **DESCONOCIDO** — el tramo existe pero este segmento no lo vio. Se divide por el
+  segmento y se marca `sourceAmbiguous`.
+- **NO PROCEDE** — un proc innato de clase. No hay ventana que observar ni que
+  echar de menos, así que **marcarlo de ambiguo invitaría a buscar algo que no
+  existe**. Divide por el segmento, sin más.
+
+Esa tercera rama es la decisión buena: *no toda ausencia de dato es una duda*.
+
+**Y su ley 11** resuelve la pregunta que yo hacía —qué pasa cuando la pelea es
+tan corta que la tasa no significa nada— por un camino que no se me había
+ocurrido: **las puertas de exclusividad son conscientes de la tasa**. Afirmar
+«nunca dispara sin X» exige que la exposición sin X **prediga** evidencia —al
+menos 3 disparos esperados al ritmo propio de esa vía— y no un mínimo plano de
+golpes. Su ejemplo: *289 golpes le niegan a un objeto lo que 225 le conceden a
+otro, y esa asimetría es el punto*.
+
+**La pregunta a nuestro log, contestada a medias:** nosotros ya hacemos lo mismo
+en espíritu con `det.shapeFew` —«faltan N golpes para poder dar la forma»— pero con
+un **mínimo plano de 8**, no con una expectativa por vía. **Pendiente:** medir si
+ese 8 plano niega la forma a habilidades de cadencia lenta que ya tienen muestra
+suficiente para su propio ritmo.
+
+### 14.4 La curación: reglas de honestidad, no de agregación
+
+`main/combat/healing.ts:1-26`. Va **al lado** del daño, en el mismo acumulador —así
+hereda la selección de pelea y el congelado de zona— y no se resta de nada. Lo
+que importa son sus cuatro reglas, que son todas de lo que **no** se puede decir:
+
+- **La sobrecuración es un SUELO, no una tasa.** Se deriva sólo de la forma con
+  paréntesis, que EQ escribe exactamente cuando lo crudo supera a lo efectivo.
+  Una línea sin paréntesis aporta 0.
+- **Los tics de una curación con duración se distinguen, pero no se atribuyen.**
+  Corregido el 4 de agosto: la forma existe —752 líneas, 12 hechizos—, y lo que
+  siguen sin poder hacer es decir *de qué lanzamiento* es cada tic.
+- **Las absorciones no llevan importe: se cuentan, no se valoran.** No entran en
+  ninguna suma porque no hay nada que sumar.
+- **Una curación que el log anuncia y no cuantifica** (el *Mend* del monje) tiene
+  vía propia, clasificada `unstated`, con recuento y total 0 — *«that 0 is the
+  absence of a measurement, not a measurement of zero»*.
+
+La última frase es la nuestra, palabra por palabra: es la razón por la que en
+nuestro resumen un campo no se escribe en vez de escribir un cero.
+
+**La pregunta a nuestro log:** ¿nuestro dps por combatiente contesta lo mismo que
+el suyo? **No, y ahora se puede decir en qué se diferencia:** el suyo es una media
+móvil de 5 s por cubo de 1 s, sobre daño saliente separado en cuatro bandas (tú,
+mascota, grupo, entrante). El nuestro es un total dividido por una duración —con
+`dps`, `dpsOwn` y `dpsActive` como tres respuestas distintas—. **No son el mismo
+número con distinto suavizado: son una serie y un escalar.**
+
+## 15. Los tres detectores de gemelos, medidos sobre nuestro registro
+
+### 15.1 La deducción sobre `nombre#generación`: se sostiene a medias
+
+La deducción era: *el ciclo de vida incrementa la generación — muere una
+instancia, se retira, la siguiente línea abre generación nueva*.
+
+**Comprobado en `world.ts:224-236`**: `spawn()` lleva un contador por nombre y lo
+incrementa al crear. Pero tiene **cinco puntos de llamada**, y sólo uno es el que
+la deducción describe:
+
+| línea | cuándo nace una generación |
+|---|---|
+| `world.ts:329` | no hay instancia activa de ese nombre — **el camino de la deducción** |
+| `world.ts:415` | un encanto que no puede vincularse a una instancia viva |
+| `world.ts:451` | una mascota invocada que se reclama |
+| `world.ts:526` | **evidencia de gemela, sin ninguna muerte de por medio** |
+| `world.ts:625` | un «fantasma»: se crea y se retira en el acto para no matar a la mascota |
+
+**La deducción se sostiene como uno de cinco caminos, y el que se deja fuera es
+justo el interesante**: la línea 526 abre una generación **porque el log ha
+demostrado que hay dos**, no porque una haya muerto. Eso es el detector, y no
+depende del ciclo de vida en absoluto.
+
+**Y su precondición es mucho más estrecha de lo que parecía** (`world.ts:523-527`):
+
+> *only meaningful while a pet is live*
+
+El detector **sólo actúa mientras hay una mascota encantada viva de ese nombre**.
+Fuera de un encanto no dispara nunca. Lo que buscan no es «hay gemelos» en
+general: es «tu mascota y un hostil comparten nombre», que es el caso que les
+borra el daño de la mascota.
+
+### 15.2 Cuánto dan sobre nuestro registro
+
+Medido sobre 1.579 peleas. La columna que importa es la última: **cuántas veces
+dicen algo que nuestro suelo no supiera ya** —el suelo sabe que hubo dos en
+cuanto ve dos muertes—.
+
+| detector | disparos | ya lo sabía el suelo | **ganancia** |
+|---|---:|---:|---:|
+| contradicción del encanto (pegas a un nombre que tienes encantado) | 6 | 5 | **1** |
+| contradicción del propio nombre (X→X) | 109 | 40 | **69** |
+| tick de veneno repetido (sowoky) | 12 | 12 | **0** |
+
+**El resultado es el contrario del que esperábamos los dos.** El del veneno —la
+idea más bonita del primer estudio— **no aporta nada sobre este registro**: los 12
+casos ya los sabía el suelo por una muerte. Y el de X→X, que era una nota al pie,
+delata **69 nombres** que el suelo no tenía: 52 nombres distintos, encabezados por
+`a shin ghoul knight` (10 peleas), `an ire ghast` (6) y `a dar ghoul knight` (5).
+
+**Y una corrección de método dentro de la propia medición**, que es la undécima
+familia otra vez: el primer recuento de X→X dio **2.077** disparos, de los que
+**1.169 eran `campeon→campeon`** — mi propio personaje, por daño reflejo. Un
+detector de gemelos que cuenta al jugador no detecta gemelos. Acotado a nombres
+con forma de bicho y sin daño propio, quedan 109.
+
+**La pregunta a nuestro log, contestada:** el detector que vale aquí es el que no
+venía del competidor grande sino del pequeño y por otro camino. **Pendiente:** los
+69 son nombres-en-pelea, no individuos; cuánto subiría el suelo en total no está
+medido.
+
+## 16. Las diez incidencias de sowoky que faltaban
+
+Son autoauditorías con fichero, línea y entrelazado. Para cada una, si tenemos
+esa forma:
+
+| # | qué es | ¿la tenemos? |
+|---|---|---|
+| `#1` | el overlay **crece al arrastrarlo** con escalado de pantalla fraccionario (175 %): de 340×240 a 632×524 en un arrastre, y el tamaño se persiste | **pendiente**, y barata: sólo hace falta un monitor al 175 % |
+| `#3` | se puede arrastrar **fuera de la pantalla** (`y: -144` observado), y unos límites guardados mayores que la pantalla se restauran tal cual | **pendiente** — tenemos guardado de posición del overlay |
+| `#6` | al cerrar la aplicación se persiste `overlay.shown=false`, así que **la restauración automática no puede funcionar nunca** | forma conocida: un estado de salida que contradice la intención de arranque |
+| `#8` | **cero `isDestroyed()` en todo el repo**: entre `close()` y el evento `closed` la guarda `if (win)` pasa sobre una ventana muerta | **pendiente y barata de mirar**: tenemos envíos al overlay por evento |
+| `#11` | el overlay **se suelda al cursor**: sin `releasePointerCapture`, el modo atravesable se activa a mitad de arrastre y el `pointerup` no llega nunca | no aplica igual —no tenemos arrastre propio— pero la forma sí: un estado que sólo se limpia con un evento que puede no llegar |
+| `#12` | bloquear con el cursor **quieto** deja la salida de emergencia atravesable: nada se mueve, así que el recálculo no corre | **la forma es nuestra**: cualquier recálculo disparado sólo por movimiento |
+| `#15` | el botín en vivo refresca las misiones y **no** refresca el tablero del cielo: falta una línea | **la forma es nuestra y de las peores**: dos consumidores del mismo suceso, uno actualizado |
+| `#16` | la vista reducida **oculta por defecto lo empezado** y estructuralmente nunca puede enseñar la pista del jefe | forma conocida: dos superficies de «lo mismo» con configuraciones separadas |
+
+**La lectura de conjunto, y es la que vale:** ocho de las diez son de **ventana**,
+y ninguna es de parseo. Coincide con lo que ya decía el primer estudio —diez de
+las veinticuatro incidencias de los dos repos son de ventana— y refuerza la
+conclusión: **un overlay es caro de tener bien, y el coste no está en el
+contenido**.
+
+**La pregunta a nuestro log:** ninguna de las ocho se contesta con el registro. Se
+contestan **abriendo la aplicación en un monitor escalado**, que es una clase de
+medición que no hacemos.
+
+## 17. Los 469 commits sin clasificar: qué familias aparecen
+
+Muestra de los 45 de asunto más largo. Familias que **no** estaban en nuestra
+lista de once:
+
+- **La superficie que estorba a lo que explica.** *«the class filter loses its
+  tooltip — a hover box over an input you type into blocks the very dropdown it
+  explains»*. Un elemento de ayuda que tapa aquello que ayuda a usar.
+- **La instrumentación que nadie puede leer.** *«and the digest reads them back —
+  instrumentation nobody can read is not instrumentation»*. Es la alarma muerta
+  girada hacia la telemetría: medir y no tener dónde mirarlo.
+- **La prueba puesta donde el fallo ocurrió, no donde adula.** *«the drag-cost
+  gate is placed where it has been watched fail, not where it flattered»*, y
+  *«the hook is pinned where it broke, by running the real hook across a
+  container swap»*. Nosotros lo hacemos por instinto; ellos lo tienen escrito.
+- **La negación de más.** *«north is north again — one wrong word in the plan,
+  one spurious negation at render»*: una palabra mal en el plan que se convierte
+  en una negación de más al pintar. Es un fallo de **traducción entre el
+  documento y el código**, y no lo teníamos como familia.
+- **Lo que el juego enuncia frente a lo que no.** *«the level graph draws the
+  percentages the game states, and shades the stretches it does not»*: sombrear
+  lo no dicho en vez de interpolarlo. Es nuestra doctrina de procedencia
+  aplicada a un gráfico, que es justo lo que viene ahora.
+- **El colapso periódico de la documentación.** *«The daily collapse, 2026-08-13:
+  AGENTS.md 20,020 → 17,969 words, the histories move to the archive»*. Tienen un
+  **ritual de poda** del documento de leyes, con las historias mudándose a un
+  archivo. Nosotros crecemos y no podamos.
+
+**La pregunta a nuestro repo, contestada:** la última nos toca hoy. Este documento
+va por `~1.400 líneas` y las once familias de `ui/app.js` por unas 300. Ninguno
+tiene ritual de poda ni archivo al que mudar lo viejo.
+
+## 18. Sus trece leyes, enteras
+
+El primer estudio citó cinco. Están todas en `AGENTS.md:724-870`, bajo el título
+*«World-model laws (hard-won; do not relearn these)»*.
+
+| # | la ley, en corto | ¿nosotros? |
+|---|---|---|
+| 1 | **Los mensajes antes que la inferencia.** Lo inferido va etiquetado como inferido | **la tenemos** — medido/deducido/declarado |
+| 2 | **Los nombres están sucios: se normalizan en los bordes, se muestran crudos** | **la contradecimos sin querer**, y es lo que estamos arreglando: usamos la clave plegada como texto de pantalla |
+| 3 | **Los mensajes compartidos son la norma.** 123 familias de «se ha desvanecido»; una frase no nombra un hechizo | **no la habíamos pensado**: nuestra pista de estados asume que el mensaje identifica |
+| 4 | **Entidades, no nombres; disposición, no identidad.** «Mascota» no es una clase del modelo | **parcial**: separamos el encantado del salvaje, pero por clave de texto |
+| 5 | **Los agregados mienten: derívese de identidades.** Sumar ganancias cuenta dos veces los reembolsos | **no la habíamos pensado** |
+| 6 | **Decir lo que el log no puede decir**, con la lista de no-distinguibles | **la tenemos** — el «sin identificar» y el suelo |
+| 7 | **Los encuentros cierran por evidencia** | **la tenemos**, y coincidimos en la forma (§3.1) |
+| 8 | **Fallo y resistencia son de primera clase y sin importe** | **la tenemos** — los evitados cuentan como suceso |
+| 9 | **Una sola base de tiempo por gráfico** | **no la habíamos pensado**, y es la que hace falta ahora |
+| 10 | **Los intervalos revisables se unen AL LEER; nada estampa sus identificadores** | **no la habíamos pensado** |
+| 11 | **Las puertas de exclusividad son conscientes de la tasa** | **la contradecimos**: nuestro mínimo de 8 golpes es plano |
+| 12 | **Los renombrados entre fuentes son conocimiento, nunca aproximación** | **la tenemos** — nuestra tabla de zonas es a mano |
+| 13 | **Un hueco muerte→muerte es una COTA SUPERIOR, no una medida** | **la tenemos en espíritu** (el suelo), no para reapariciones |
+
+**El recuento: cinco las tenemos, cuatro no las habíamos pensado, dos las
+contradecimos sin querer, una la contradecimos a medias y una la tenemos en otro
+sitio.** Las dos que contradecimos —la 2 y la 11— son las dos que ya estaban en
+nuestra cola antes de leer esto, lo cual es tranquilizador y no una coincidencia:
+son las que dan síntomas.
+
+## 19. Lo que sigue sin leer
+
+- **`shared/respawn.ts` (1.242 líneas)** y todo el aparato de temporizadores de
+  reaparición. Su ley 13 lo resume, pero el código no se ha abierto.
+- **La telemetría** (`shared/telemetry.ts` 1.037 + `telemetryRollup.ts` 837 +
+  `TELEMETRY.md`). Es un asunto entero con implicaciones que no son técnicas.
+- **Su aparato de ventanas** (`main/windows.ts` 1.049) más allá de las cinco
+  decisiones de overlay que ya se citaron en §7.
+- **`procWindows.ts` (759) y `procDetect.ts` (523)**: se ha leído cómo se divide una
+  tasa, no cómo se detecta un proc.
+- **Los 424 commits restantes** de los 469 sin clasificar.
+
+**Y una salvedad de método sobre todo este pase:** los repos siguen avanzando.
+jmoyers estaba en `a61efb3` (14 de agosto) y sowoky en `877636a` (15 de agosto)
+cuando se leyeron. Nada de aquí se ha vuelto a comprobar contra su HEAD de hoy.
+
