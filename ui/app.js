@@ -2346,6 +2346,76 @@ async function renderNarrate(host) {
    * encontrado, porque las dos dan resultados perfectamente coherentes consigo
    * mismos — sólo que sobre otro modelo. Es la misma lección de la mascota: la
    * cazó una medición, no una lectura.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA NOVENA, Y ES LA PRIMERA DE LA FAMILIA COMETIDA AL **MEDIR**, NO AL CODIFICAR.
+   *
+   * Al preparar el examen por zonas de la 1.14.0 se filtraron las peleas «de
+   * verdad» con `/Plane of Fear|Plane of Hate|Nagafen|Vox|Plane of Sky/` sobre
+   * el NOMBRE DE LA ZONA, y se concluyó por escrito: «de Vox no hay peleas en el
+   * registro».
+   *
+   * Lady Vox vive en The Permafrost Caverns. Hay 2.400 líneas que la nombran,
+   * seis peleas suyas y su cadáver saqueado. El filtro no buscaba a un enemigo:
+   * buscaba una zona que se llamara como él.
+   *
+   * ES LA MISMA RAÍZ QUE LAS SEIS PRIMERAS —identificar algo por un nombre que
+   * no es lo que lo distingue— y por eso va aquí y no en una lista de erratas.
+   * Lo nuevo es dónde apareció: no en el código que se publica, sino en la
+   * consulta con la que se decide qué publicar. Un filtro es código igual, sólo
+   * que se escribe una vez, se lee una vez y nadie lo revisa.
+   *
+   * LO QUE COSTÓ, y es lo que hace que merezca estar escrita: esa frase llevó a
+   * sospechar que las alarmas de Lady Vox se habían sacado de una wiki. Eran
+   * suyas, medidas y vivas —el disparador casa 33 veces en su registro, con seis
+   * hechizos de ella—. Una medición mal filtrada no da un número raro que
+   * alguien note: da una frase confiada, y la frase se cita después.
+   *
+   * LA PREGUNTA QUE HABÍA QUE HACERSE, y es distinta de la de las otras seis
+   * porque el sujeto es otro: «¿este filtro busca la cosa, o busca su nombre en
+   * un campo que no es el suyo?». La zona no es el enemigo, igual que el nombre
+   * no era el cadáver.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA DÉCIMA, Y NO ES UN FALLO: UNA TAXONOMÍA INVENTADA NO FALLA, NO VE.
+   *
+   * Este proyecto ha medido todos sus umbrales. `VENTANA_CADAVER`, `AMBIGUO_SEG`,
+   * `CHARM_MAX_SEC`, `MARGEN_TICK`, `SIN_MANDO_MAX`, `VIDA_JEFE`,
+   * `PLAZO_ENEMIGO`, `MEZ_MAX`: cada número tiene su medición al lado y su nota
+   * de qué lo haría cambiar. Ni uno solo se puso a ojo.
+   *
+   * Y NUNCA MEDIMOS LA TAXONOMÍA. Las categorías de `src/spells.js` —heal,
+   * charm, mez, fear, root, summon, escape, resurrect, dispel, nuke— salieron de
+   * una idea razonable de qué categorías DEBERÍA haber en un juego así. Nadie
+   * miró el registro para preguntar qué le tiran de verdad.
+   *
+   * Lo que dice el registro, medido sobre 30.152 lanzamientos:
+   *
+   *   lo que le tiran y no tiene categoría   robo de vida (1.148 lanzamientos
+   *                                          enemigos, 984 veces el bicho se cura
+   *                                          a su costa), ralentización con nombre
+   *                                          de lore (483), aturdimiento (207),
+   *                                          drenaje de maná (316)
+   *   lo que tiene categoría y no le tiran   `charm` con ocho claves funcionando
+   *                                          por dos · `resurrect` entera
+   *                                          sostenida por UNA coincidencia
+   *
+   * POR QUÉ ES OTRA CLASE DE FALLO. Un umbral mal puesto da un número raro y
+   * alguien lo nota. Una taxonomía inventada no da ningún número: las cosas que
+   * no tienen categoría simplemente no aparecen, y lo que no aparece no se echa
+   * de menos. No falla — no ve. Es la salida muerta girada del revés: allí se
+   * calculaba algo que nadie leía; aquí no se calcula nada porque nadie preguntó.
+   *
+   * Y ENCIMA SE DEFIENDE SOLA: como las categorías que sí existen funcionan, la
+   * pantalla parece completa. `charm` funcionando por dos claves de ocho no se
+   * distingue de `charm` funcionando por las ocho, porque las seis muertas no
+   * dejan hueco visible en ninguna parte.
+   *
+   * LA PREGUNTA QUE FALTABA, y es de las que hay que hacerse ANTES de escribir la
+   * lista: «¿estas categorías salen de mirar lo que pasa, o de imaginar lo que
+   * podría pasar?». Se contesta con el residuo: clasificar TODO y ordenar por
+   * frecuencia lo que no cae en ningún sitio. Un residuo del 87 % con cuatro
+   * montones nombrables dentro no es ruido, es el inventario que no se hizo.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {

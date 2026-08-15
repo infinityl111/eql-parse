@@ -1795,3 +1795,23 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .upd-pct { font-family: var(--mono); font-size: 11px; color: var(--bone-dim); }
 .upd-nota { font-size: 11.5px; color: var(--bone-dim); }
 .upd-nota.bad { color: var(--t-ds); }
+
+/* ── Procedencia de un disparador ─────────────────────────────────────────
+   Escrito por ti / plantilla de fábrica, y cuántas veces ha casado de verdad.
+   Los mismos dos colores que el resto del programa usa para separar lo que
+   está vivo de lo que sólo lo parece. */
+.trig-proc { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.trig-proc .tag, .tag-ej { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 3px; border: 1px solid transparent; white-space: nowrap; }
+.tag-tmpl { color: var(--bone-faint); border-color: var(--slate-600); }
+.tag-mine { color: var(--t-cold); border-color: var(--t-cold); }
+.tag-viva { color: var(--t-good, #7FB77E); border-color: currentColor; }
+.tag-muerta { color: var(--t-bad, #B0555F); border-color: currentColor; }
+.tag-ej { color: var(--bone-faint); border-color: var(--slate-600); margin-right: 5px; }
+.trig-note { border-left: 2px solid var(--slate-600); padding-left: 9px; margin-bottom: 12px; }
+.trig-aviso { margin: 0 0 8px; padding: 7px 9px; border-radius: 4px;
+  background: var(--slate-700); border-left: 2px solid var(--bone-faint); }
+/* Cero coincidencias EN ESTA SESIÓN no es una alarma muerta: es que acabas de
+   abrir. Se pinta neutro y no en rojo — el rojo afirmaría algo que este
+   contador no puede saber, porque no sobrevive al cierre de la aplicación. */
+.tag-neutra { color: var(--bone-faint); border-color: var(--slate-600); }

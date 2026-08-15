@@ -61,6 +61,42 @@ export class TriggerEngine extends EventEmitter {
     for (const d of defs) {
       const bad = TriggerEngine.#LEGACY.find((L) => L.id === d.id && String(d.pattern ?? '').includes(L.badPattern));
       if (bad && d.enabled !== false) { d.enabled = false; d.retired = true; }
+      /**
+       * LA PROCEDENCIA SE DEDUCE AL CARGAR, y sin esto la etiqueta MIENTE.
+       *
+       * Se vio al abrir la aplicación y mirar: la plantilla del jefe salía
+       * rotulada «escrito por ti». Los disparadores se guardaron en
+       * `triggers.json` antes de que existiera el campo `origen`, así que
+       * ninguno lo trae — y sin campo, la interfaz asumía lo tuyo.
+       *
+       * Es el mismo problema que `#LEGACY` de arriba: cambiar la plantilla en el
+       * código no arregla las instalaciones que ya la tenían guardada. Y la
+       * consecuencia era peor que no tener etiqueta: una etiqueta que dice lo
+       * contrario de la verdad, justo en el sitio que se acababa de poner para
+       * evitar una confusión.
+       *
+       * SE MIRA EL PATRÓN Y NO EL `id`: si le has cambiado el patrón a una
+       * plantilla, ya es tuya — eso es exactamente lo que la plantilla te pide
+       * que hagas, y quien lo ha hecho no merece que se le siga llamando copia.
+       */
+      if (d.origen === undefined) {
+        const plantilla = STARTER_TRIGGERS.find((s) => s.id === d.id);
+        d.origen = plantilla && plantilla.pattern === d.pattern ? 'plantilla' : 'tuyo';
+      }
+      /**
+       * Y EL TEMPORIZADOR INVENTADO, retirado de lo ya guardado.
+       *
+       * Quitar `timerSeconds: 12` del valor de fábrica no toca la copia que ya
+       * tiene el usuario: seguía contando atrás y diciendo «Vox lista» a los
+       * doce segundos que nadie cronometró. Se retira sólo si el patrón sigue
+       * siendo el de la plantilla — si lo has cambiado por tu jefe, tus segundos
+       * son tuyos y no se tocan.
+       */
+      const plant = STARTER_TRIGGERS.find((s) => s.id === d.id);
+      if (plant && plant.pattern === d.pattern && plant.timerSeconds === 0 && d.timerSeconds > 0) {
+        d.timerSeconds = 0;
+        d.timerRetirado = true;
+      }
     }
     this.defs = defs;
     this.compiled = defs.filter((d) => d.enabled !== false).map(compile);
@@ -88,6 +124,22 @@ export class TriggerEngine extends EventEmitter {
       if (!c.re) continue;
       const m = c.re.exec(line);
       if (!m) continue;
+      /**
+       * CUÁNTAS VECES HA CASADO ESTE DISPARADOR CONTRA TU REGISTRO.
+       *
+       * Es lo que separa una promesa de un hecho. Una plantilla de fábrica dice
+       * lo que DEBERÍA cazar; este número dice lo que ha cazado, y sin él una
+       * plantilla que no case nunca —una frase transcrita de una wiki con una
+       * palabra distinta— tiene exactamente la misma pinta que una que salta a
+       * diario. Es la alarma muerta otra vez, importada en vez de escrita.
+       *
+       * Se cuenta en el compilado Y en la definición: el compilado se rehace en
+       * cada `load()` y el número tiene que sobrevivir a eso para poder
+       * guardarse y enseñarse en la ficha del disparador.
+       */
+      c.vistas = (c.vistas ?? 0) + 1;
+      const def = this.defs.find((d) => d.id === c.id);
+      if (def) { def.vistas = (def.vistas ?? 0) + 1; def.vistaAt = Date.now(); }
 
       const speak = substitute(c.speak, m, line);
       const text = substitute(c.text, m, line);
@@ -182,45 +234,84 @@ export class TriggerEngine extends EventEmitter {
   clearTimers() { this.timers.clear(); }
 }
 
-/** Plantillas de arranque. Las específicas de un jefe hay que verificarlas
- *  contra tu propio log: los emotes exactos de EQL no están documentados. */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PLANTILLAS DE ARRANQUE, Y SU PROCEDENCIA — que hasta la 1.14.1 no se veía.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Las específicas de un jefe hay que verificarlas contra tu propio log: los
+ * emotes exactos de EQL no están documentados en ninguna parte.
+ *
+ * ESA FRASE LLEVABA AQUÍ DESDE QUE SE ESCRIBIÓ LA LISTA, Y NO LA HA LEÍDO NADIE:
+ * `ui/triggers.js` no pintaba ni esta advertencia ni el campo `note` de cada
+ * plantilla. Salida muerta, y lo muerto era justo el aviso que evitaba la
+ * sospecha — un usuario abrió el editor, vio «Lady Vox» en cinco sitios que él
+ * no había escrito, y concluyó lo razonable: que venía de una wiki.
+ *
+ * NO VENÍA. `^Lady Vox begins casting` casa **33 veces** en su registro, con
+ * seis hechizos de ella, y tiene seis peleas suyas en The Permafrost Caverns.
+ * Lo que estaba mal no era la regla: era que nada decía de dónde salía.
+ *
+ * ── CADA PLANTILLA DECLARA DE QUÉ ESTÁ HECHA ────────────────────────────────
+ *
+ *   `origen: 'plantilla'`   viene de fábrica y NO se ha verificado contra tu
+ *                           registro. Lo que escribas tú no lleva esta marca.
+ *   `note`                  qué comprobar antes de fiarse, en la ficha.
+ *   `vistas`                cuántas veces ha casado de verdad. Lo pone el motor.
+ *
+ * Es el mismo vocabulario que ya usan `raid.src.*`, `mate.src.*` y `adv.src.*`:
+ * lo que has dicho tú, lo que consta y lo que se ha supuesto no pueden verse
+ * iguales. Los disparadores eran lo único del proyecto sin esa distinción.
+ */
 export const STARTER_TRIGGERS = [
   {
-    id: 'stunned', name: 'Te han aturdido', enabled: true,
+    id: 'stunned', name: 'Te han aturdido', enabled: true, origen: 'plantilla',
     pattern: '^You are stunned!$', regex: true,
     speak: 'aturdido', text: 'ATURDIDO', sound: 'warn', color: '#E08A4B', holdMs: 2000,
   },
   {
-    id: 'cast-any', name: 'Alguien empieza a castear', enabled: false,
+    id: 'cast-any', name: 'Alguien empieza a castear', enabled: false, origen: 'plantilla',
     pattern: '^(.+?) begins casting (.+?)\\.$', regex: true,
     speak: '${1} lanza ${2}', text: '${1} → ${2}', holdMs: 3000,
-    note: 'Inservible tal cual: en una pelea con adds salta decenas de veces. '
-        + 'Para casteos importantes usa "Casteos enemigos" en Ajustes de voz, que filtra por '
-        + 'categoría y sólo avisa de enemigos. Esta plantilla es para vigilar a UNO concreto: '
-        + '^Lady Vox begins casting',
+    note: 'tg.note.castAny',
   },
   {
-    id: 'boss-cast', name: 'Plantilla: casteo de un jefe', enabled: false,
+    id: 'boss-cast', name: 'Plantilla: casteo de un jefe', enabled: false, origen: 'plantilla',
     pattern: '^Lady Vox begins casting (.+?)\\.$', regex: true,
     speak: 'Vox lanza ${1}', text: 'VOX · ${1}', sound: 'alert', color: '#6FC7D8',
-    timerLabel: 'Vox · ${1}', timerSeconds: 12, timerWarnAt: 3, timerRestart: 'restart',
+    /**
+     * SIN TEMPORIZADOR DE FÁBRICA, y esto es un cambio de la 1.14.1.
+     *
+     * Aquí ponía `timerSeconds: 12`. Ese 12 era el ÚNICO número inventado de
+     * toda la plantilla —el patrón se mide contra tu registro, el número no— y
+     * viajaba con la misma cara que el resto: una cuenta atrás en pantalla y una
+     * voz diciendo «Vox lista» a los doce segundos, sin que nadie hubiera
+     * cronometrado nada. El registro no escribe el tiempo de reutilización de un
+     * hechizo enemigo en ninguna línea, así que no se puede medir leyéndolo: hay
+     * que cronometrarlo jugando.
+     *
+     * Se va del valor de fábrica en vez de marcarse, porque marcarlo no arregla
+     * lo que hacía: seguiría hablando. Lo pone quien lo use, que es quien puede
+     * medirlo. El resto de la plantilla —patrón, voz, texto— se queda: eso sí
+     * casa, 33 veces en el registro de referencia.
+     */
+    timerLabel: 'Vox · ${1}', timerSeconds: 0, timerWarnAt: 3, timerRestart: 'restart',
     timerEndSpeak: 'Vox lista', holdMs: 5000,
-    note: 'Cambia el nombre y los segundos por los del jefe que te interese.',
+    note: 'tg.note.bossCast',
   },
   {
-    id: 'pet-dead', name: 'Plantilla: muerte concreta', enabled: false,
+    id: 'pet-dead', name: 'Plantilla: muerte concreta', enabled: false, origen: 'plantilla',
     pattern: '^Nombre exacto has been slain by', regex: true,
     speak: 'ha caído', text: 'CAÍDO', sound: 'warn',
-    note: 'La muerte de tu mascota ya se avisa sola en Ajustes de voz. Esta plantilla es '
-        + 'para vigilar a alguien concreto: pon su nombre exacto o saltará con cualquier muerte.',
+    note: 'tg.note.petDead',
   },
   {
-    id: 'my-death', name: 'Has muerto', enabled: true,
+    id: 'my-death', name: 'Has muerto', enabled: true, origen: 'plantilla',
     pattern: '^You have been slain by (.+?)!$', regex: true,
     speak: 'has muerto', text: 'MUERTO · ${1}', sound: 'end', color: '#B0555F', holdMs: 6000,
   },
   {
-    id: 'zone', name: 'Cambio de zona', enabled: false,
+    id: 'zone', name: 'Cambio de zona', enabled: false, origen: 'plantilla',
     pattern: '^You have entered (.+?)\\.$', regex: true,
     text: '${1}', holdMs: 2500,
   },

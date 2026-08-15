@@ -39,6 +39,12 @@ export function renderTriggers(host) {
         <button id="tExport">${t('tg.export')}</button>
         <button id="tReset">${t('tg.templates')}</button>
       </div>
+      <!--
+        LA ADVERTENCIA DE CABECERA, que llevaba escrita en src/triggers.js
+        desde que se escribió la lista y no la pintaba nadie. Salida muerta, y
+        lo muerto era justo el aviso que evitaba la sospecha.
+      -->
+      <div class="hint trig-aviso">${esc(t('tg.aviso.plantillas'))}</div>
       <div id="tItems"></div>
       <div class="tts-panel">
         <div class="sec-title eyebrow">${t('tg.voiceSound')}</div>
@@ -102,7 +108,40 @@ function renderEditor() {
     host.innerHTML = `<div class="empty"><h2>${t('tg.noneSel')}</h2><p>${t('tg.noneSelHint')}</p></div>`;
     return;
   }
+  /**
+   * LA PROCEDENCIA Y EL CONTADOR, ARRIBA DEL TODO.
+   *
+   * Esto no existía, y su ausencia costó una sospecha entera: un usuario abrió
+   * este editor, vio «Lady Vox» en cinco sitios que él no había escrito y
+   * concluyó lo razonable —que las frases venían de una wiki—. No venían: su
+   * disparador casa 33 veces en su propio registro. Lo que faltaba no era la
+   * regla, era decir de dónde salía.
+   *
+   * Dos cosas, y las dos son las que el resto del proyecto ya hace en todas
+   * partes (`raid.src.*`, `mate.src.*`, `adv.src.*`):
+   *
+   *   de dónde viene   plantilla de fábrica sin verificar, o escrito por ti
+   *   qué ha hecho     cuántas veces ha casado DE VERDAD contra tu registro
+   *
+   * El contador es la mitad que convierte la etiqueta en un hecho. Una
+   * plantilla dice lo que debería cazar; «visto 33 veces» dice lo que caza, y
+   * «no ha casado ni una vez» dice lo otro — que es exactamente la alarma
+   * muerta que este proyecto persigue, sólo que importada en vez de escrita.
+   */
+  const esPlantilla = d.origen === 'plantilla';
+  const vistas = d.vistas ?? 0;
+  const proc = `
+    <div class="trig-proc">
+      <span class="tag ${esPlantilla ? 'tag-tmpl' : 'tag-mine'}"
+            title="${esc(t(esPlantilla ? 'tg.origen.plantillaHint' : 'tg.origen.tuyoHint'))}"
+        >${esc(t(esPlantilla ? 'tg.origen.plantilla' : 'tg.origen.tuyo'))}</span>
+      <span class="tag ${vistas ? 'tag-viva' : 'tag-neutra'}" title="${esc(t('tg.vistasHint'))}"
+        >${vistas ? esc(t('tg.vistas', { n: vistas })) : esc(t('tg.vistasNunca'))}</span>
+    </div>
+    ${d.note ? `<div class="hint trig-note">${esc(t(d.note))}</div>` : ''}`;
+
   host.innerHTML = `
+    ${proc}
     ${field(t('tg.name'), 'fName', d.name)}
     <div class="field">
       <label class="eyebrow">${t('tg.pattern')}</label>
@@ -152,6 +191,16 @@ function renderEditor() {
     <div class="sec-title eyebrow" style="margin-top:18px">Probar</div>
     <div class="field">
       <input id="fTestLine" class="wide num" value="${esc(testLine)}" placeholder="${esc(t('tg.testLine'))}">
+      <!--
+        LA LÍNEA DE PRUEBA VA MARCADA COMO EJEMPLO, y no se quita.
+
+        Es una línea real de EverQuest y por eso enseña la forma que tiene —un
+        «nombre del jefe» enseñaría menos—. Pero sin marca se lee como
+        contenido: aquí y en los tres marcadores de los campos, «Lady Vox»
+        aparecía cinco veces en esta pantalla sin que nada dijera que era un
+        ejemplo, y eso bastó para que pareciera un catálogo importado.
+      -->
+      <div class="hint"><span class="tag tag-ej">${esc(t('tg.ejemplo'))}</span> ${esc(t('tg.ejemploHint'))}</div>
       <div class="hint">${t('tg.testHelp')}</div>
     </div>
     <div id="tResult"></div>
