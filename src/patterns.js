@@ -692,40 +692,40 @@ const rules = [
   // El canal se normaliza a una etiqueta corta para poder filtrarlo.
   {
     kind: 'chat', hint: ' tells ',
-    re: /^(.+?) tells (?:you|You), '([\s\S]*)'$/,
+    re: /^(.+?) tells (?:you|You), '([\s\S]*?)'?$/,
     map: (m) => ({ from: m[1], channel: 'tell', text: m[2] }),
   },
   {
     kind: 'chat', hint: ' tells ',
-    re: /^(.+?) tells (?:the |your )?(guild|group|raid|fellowship), '([\s\S]*)'$/i,
+    re: /^(.+?) tells (?:the |your )?(guild|group|raid|fellowship), '([\s\S]*?)'?$/i,
     map: (m) => ({ from: m[1], channel: m[2].toLowerCase(), text: m[3] }),
   },
   {
     kind: 'chat', hint: ' tells ',
-    re: /^(.+?) tells ([^,]+), '([\s\S]*)'$/,
+    re: /^(.+?) tells ([^,]+), '([\s\S]*?)'?$/,
     map: (m) => ({ from: m[1], channel: 'channel', channelName: m[2], text: m[3] }),
   },
   {
     kind: 'chat', hint: ' says out of character',
-    re: /^(.+?) says out of character, '([\s\S]*)'$/,
+    re: /^(.+?) says out of character, '([\s\S]*?)'?$/,
     map: (m) => ({ from: m[1], channel: 'ooc', text: m[2] }),
   },
   {
     kind: 'chat', hint: ' says',
-    re: /^(.+?) says,? '([\s\S]*)'$/,
+    re: /^(.+?) says,? '([\s\S]*?)'?$/,
     map: (m) => ({ from: m[1], channel: 'say', text: m[2] }),
   },
   {
     kind: 'chat', hint: 'auctions',
-    re: /^(.+?) auctions,? '([\s\S]*)'$/,
+    re: /^(.+?) auctions,? '([\s\S]*?)'?$/,
     map: (m) => ({ from: m[1], channel: 'auction', text: m[2] }),
   },
   {
     kind: 'chat', hint: 'shouts',
-    re: /^(.+?) shouts,? '([\s\S]*)'$/,
+    re: /^(.+?) shouts,? '([\s\S]*?)'?$/,
     map: (m) => ({ from: m[1], channel: 'shout', text: m[2] }),
   },
-  { kind: 'chat', hint: 'You tell', re: /^You tell (.+?), '([\s\S]*)'$/, map: (m) => ({ from: 'You', channel: 'outgoing', text: m[2] }) },
+  { kind: 'chat', hint: 'You tell', re: /^You tell (.+?), '([\s\S]*?)'?$/, map: (m) => ({ from: 'You', channel: 'outgoing', text: m[2] }) },
   // «You say to your guild» iba a no reconocidas: 703 líneas en un registro
   // real, contra las 96 de `You say` a secas — lo que faltaba era la forma
   // NORMAL de hablar, no un caso raro. La regla de abajo no las coge porque
@@ -736,8 +736,8 @@ const rules = [
   //
   // `You tell your party` NO necesita regla propia: la de `You tell X` de arriba
   // ya la coge, y le pone el mismo canal `outgoing` que a cualquier susurro.
-  { kind: 'chat', hint: 'You say', re: /^You say to (.+?), '([\s\S]*)'$/, map: (m) => ({ from: 'You', channel: m[1], text: m[2] }) },
-  { kind: 'chat', hint: 'You say', re: /^You say,? '([\s\S]*)'$/, map: (m) => ({ from: 'You', channel: 'outgoing', text: m[1] }) },
+  { kind: 'chat', hint: 'You say', re: /^You say to (.+?), '([\s\S]*?)'?$/, map: (m) => ({ from: 'You', channel: m[1], text: m[2] }) },
+  { kind: 'chat', hint: 'You say', re: /^You say,? '([\s\S]*?)'?$/, map: (m) => ({ from: 'You', channel: 'outgoing', text: m[1] }) },
 
   // ═══ RUIDO (reconocido para que no ensucie la calibración) ═══
   { kind: 'memorize', hint: 'memoriz', re: /^Beginning to memorize (.+?)\.\.\.$/, map: (m) => ({ ability: m[1] }) },
@@ -874,6 +874,89 @@ for (const r of rules) {
   if (!byHint.has(r.hint)) byHint.set(r.hint, []);
   byHint.get(r.hint).push(r);
 }
-export const HINTS = [...byHint.keys()];
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EL ENVOLTORIO MANDA SOBRE EL CONTENIDO. Las citas se prueban LAS PRIMERAS.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * UNA LÍNEA QUE CITA ALGO SE RECONOCE COMO CITA ANTES DE QUE NADIE LEA LO QUE
+ * HAY DENTRO DE LAS COMILLAS. Aunque el envoltorio sea raro y el contenido
+ * frecuente.
+ *
+ * Y detrás está la razón, que es más grande que esta función:
+ *
+ *     LO QUE TECLEA UN DESCONOCIDO NO ENTRA NUNCA EN UNA MEDICIÓN NUESTRA.
+ *
+ * Todo lo que dice esta aplicación se sostiene sobre «medido del registro». El
+ * registro contiene texto escrito por gente, y ese texto es ENTRADA DE USUARIO:
+ * no es evidencia de nada salvo de que alguien la escribió.
+ *
+ * ── QUÉ PASABA, Y POR QUÉ NO SE VIO ANTES ──────────────────────────────────
+ *
+ * Las pistas se ordenaban por FRECUENCIA —el orden en que aparecen las reglas
+ * en este fichero, que se fue escribiendo de lo común a lo raro—. Medido: la
+ * pista `of damage` quedaba en la posición 2 de 123 y ` says` en la 72, así que
+ * LA REGLA DEL CONTENIDO CORRÍA ANTES QUE LA DEL ENVOLTORIO.
+ *
+ * Lo único que impedía la confusión era que las reglas de daño están ancladas al
+ * final y la comilla de cierre rompía la coincidencia. Un accidente de la
+ * expresión regular, no una decisión — y por eso se caía en cuanto la comilla no
+ * estaba:
+ *
+ *     [hora] You say to your guild, 'Campeon hits a dracoliche for 999999 points of damage.
+ *        -> melee  amount=999999  source="You say to your guild, 'Campeon"
+ *
+ * Esa forma no es rara: es LA PRIMERA LÍNEA DE UN MENSAJE MULTILÍNEA, que no
+ * cierra comilla porque el texto sigue abajo. Medido sobre el registro: 32.659
+ * líneas abren cita y 8 no la cierran. Ninguna de las 8 llevaba una cifra
+ * dentro — suerte, y medida.
+ *
+ * ── LA OTRA MITAD DEL ARREGLO ──────────────────────────────────────────────
+ *
+ * Acarrear la pista no basta: la regla de cita exigía comilla de CIERRE, así que
+ * se probaba primero y fallaba igual. La comilla final es ahora opcional en las
+ * reglas de cita, con el cuantificador perezoso para que, cuando sí está, siga
+ * cerrando en la última y no en la primera.
+ *
+ * ── SE MANTIENE SOLO ───────────────────────────────────────────────────────
+ *
+ * ── Y LA SEGUNDA MITAD DE LA REGLA, QUE COSTÓ DOS PRUEBAS EN ROJO ──────────
+ *
+ * LO ESPECÍFICO MANDA SOBRE LO GENÉRICO, dentro del envoltorio.
+ *
+ * `Jobarn says, 'My leader is Campeon.'` es una CITA antes que una declaración
+ * de mascota, así que el primer acarreo —sólo `kind: chat`— se la llevó la regla
+ * genérica y `test/combat.js` se puso en rojo: la mascota dejó de reconocerse.
+ * Por eso las tres reglas que leen una cita para sacar algo de ella entran
+ * también en el acarreo, y como se declaran ANTES que el bloque de chat, quedan
+ * delante solas.
+ *
+ * ── UNA DUDA QUE QUEDA ABIERTA, Y NO SE RESUELVE HOY ───────────────────────
+ *
+ * `pet_leader` se cree un `says`, y un `says` LO PUEDE ESCRIBIR UN JUGADOR: nada
+ * impide teclear «My leader is Campeon» en el canal de decir. El competidor
+ * sowoky documenta justo esto y lo resuelve al revés — sólo se cree el `told
+ * you`, que es pasado y sólo lo imprime el cliente para un NPC, y deja escrito
+ * que un `says` no reclama nunca porque su registro de referencia tiene un
+ * contraejemplo real de un jugador saludando a un NPC con la palabra dentro.
+ *
+ * No se cambia ahora porque es un cambio de comportamiento y esto era un
+ * cambio de orden. Queda escrito aquí para que se decida a propósito.
+ *
+ * ── SE MANTIENE SOLO, CASI ────────────────────────────────────────────────
+ *
+ * El acarreo sale del `kind`, no de una lista de pistas escrita a mano: una
+ * regla de chat nueva se acarrea sola. Lo que sí hay que tocar es esta lista si
+ * aparece otro `kind` que lea dentro de unas comillas — y esta nota es lo que le
+ * dirá a quien lo haga por qué.
+ *
+ * Lo guarda `test/citas.js`, drilada en rojo con el orden viejo.
+ */
+// Todo lo que reconoce una línea POR SU ENVOLTORIO de cita. El orden dentro lo
+// da la declaración de las reglas, y ahí lo específico ya va antes.
+const KINDS_CITA = new Set(['pet_leader', 'pet_claim', 'pet_maybe', 'chat']);
+const CITA = new Set(rules.filter((r) => KINDS_CITA.has(r.kind)).map((r) => r.hint));
+export const HINTS = [...CITA, ...[...byHint.keys()].filter((h) => !CITA.has(h))];
 export const RULES_BY_HINT = byHint;
 export const ALL_RULES = rules;
