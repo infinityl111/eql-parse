@@ -393,10 +393,24 @@ const rules = [
    *
    *      Lo de «overcome the stun» se comprobó por si era un TERCER final del
    *      aturdimiento, que habría dejado barras abiertas en el reproductor: no
-   *      lo es. Hay 1.447 «You are stunned!» y 1.456 «You are no longer
-   *      stunned.», así que los pares cierran solos y sobran nueve cierres —los
-   *      que empezaron antes de que arrancara el registro, que es exactamente el
-   *      extremo abierto que la barra dibuja.
+   *      lo es. Los pares cierran solos.
+   *
+   *      Y AQUÍ HABÍA UNA EXPLICACIÓN FALSA, corregida al medirla. Decía que los
+   *      cierres sobrantes eran «los que empezaron antes de que arrancara el
+   *      registro, que es exactamente el extremo abierto que la barra dibuja».
+   *      Medido sobre el registro entero: son ONCE —1.629 aperturas contra 1.640
+   *      cierres— y DIEZ ocurren a media sesión, con horas de registro por
+   *      delante y por detrás. Sólo el primero podría ser lo que decía.
+   *
+   *      Lo que encaja es otra cosa: un aturdimiento que aterriza sobre uno que
+   *      ya estaba puesto no escribe apertura nueva y sí escribe su cierre. La
+   *      ráfaga del 10 de agosto —cinco cierres entre las 01:21:59 y las
+   *      01:23:06— es exactamente esa forma.
+   *
+   *      SE DEJA ESCRITO PORQUE UNA NOTA EQUIVOCADA ES PEOR QUE NINGUNA: ésta se
+   *      citó al diseñar el extremo abierto de la barra, y de ahí salió un
+   *      rótulo que afirmaba 58 segundos que nunca existieron. Ver
+   *      `tramosDePista` en `ui/reproduccion.js`.
    *
    * LA REGLA AL AÑADIR ALGO AQUÍ: se enumera, no se generaliza, y se dice a cuál
    * de los tres montones pertenece lo que se deja fuera. Un cajón con tres cosas
@@ -732,7 +746,26 @@ const rules = [
   { kind: 'noise', hint: 'too far away', re: /^Your target is too far away/, map: () => ({}) },
   { kind: 'noise', hint: 'cannot see your target', re: /^You cannot see your target\.$/, map: () => ({}) },
   { kind: 'noise', hint: 'Insufficient Mana', re: /^Insufficient Mana to cast this spell!$/, map: () => ({}) },
-  { kind: 'noise', hint: 'while stunned', re: /^You can't cast spells while stunned!$/, map: () => ({}) },
+  /**
+   * ESTO NO ES RUIDO: ES LA PRUEBA DE QUE ESTABAS ATURDIDO.
+   *
+   * El juego no siempre escribe «You are stunned!». Medido sobre el registro:
+   * 1.629 aperturas contra 1.640 cierres, o sea ONCE cierres cuya apertura no
+   * existe. Y en ocho de los once esta línea —7.820 en total— cae dentro del
+   * hueco y dice con todas las letras que el aturdimiento estaba puesto.
+   *
+   * LO QUE COSTABA, con el caso que lo destapó: una barra del Plano del Miedo
+   * rotulada «58 s aturdido, ya estaba al empezar la pelea». No duró 58 s —el
+   * aturdimiento más largo emparejado de TODO el registro dura 20— sino 1: la
+   * prueba está en el segundo 57 y el cierre en el 58. Los 58 eran la distancia
+   * del principio de la pelea al cierre, calculada desde un borde recortado y
+   * enseñada como un hecho.
+   *
+   * `on` no viaja: esta línea no ABRE el estado, lo ATESTIGUA. Quien reconstruye
+   * el principio es `tramosDePista`, y lo hace anclando en el cierre anterior.
+   */
+  { kind: 'stun', hint: 'while stunned', what: 'prueba',
+    re: /^You can't cast spells while stunned!$/, map: () => ({ target: 'You', prueba: true }) },
   { kind: 'noise', hint: 'Auto attack', re: /^Auto attack is (on|off)\.$/, map: (m) => ({ on: m[1] === 'on' }) },
   { kind: 'noise', hint: 'considerable effort', re: /^This creature would take considerable effort/, map: () => ({}) },
   { kind: 'noise', hint: 'first click', re: /^You must first click on the being/, map: () => ({}) },

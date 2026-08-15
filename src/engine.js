@@ -7,6 +7,8 @@ import { Parser } from './parser.js';
 import { EncounterTracker, DAMAGE_KINDS, forma } from './encounter.js';
 import { Casteos } from './casteos.js';
 import { TriggerEngine } from './triggers.js';
+// El recuento de muertes por nombre, compartido con las figuras del reproductor.
+import { muertesPorNombre } from './suelo.js';
 import { advise, liveAdvice } from './advisor.js';
 import { Narrator } from './narrator.js';
 import { setLang } from './i18n.js';
@@ -1281,9 +1283,13 @@ export class Engine extends EventEmitter {
         // Nombre de la pelea: el enemigo abatido, nunca los tuyos.
         const foesDown = enc.kills.filter((k) => foeSet.has(k.victim));
         if (foesDown.length) {
-          const c = {};
-          for (const k of foesDown) c[k.victim] = (c[k.victim] ?? 0) + 1;
-          return Object.entries(c).map(([n, x]) => (x > 1 ? `${n} ×${x}` : n)).join(', ');
+          // El recuento sale de `src/suelo.js`, que es el mismo que usan las
+          // figuras del reproductor. Aquí se contaba a mano con un objeto, y
+          // dos recuentos del mismo hecho en dos ficheros es la forma que ya
+          // nos costó 25 abatidos: la mayúscula inicial casaba en un sitio y en
+          // el otro no. Ver la nota de ese módulo.
+          return [...muertesPorNombre(foesDown)]
+            .map(([n, x]) => (x > 1 ? `${n} ×${x}` : n)).join(', ');
         }
         const foes = [...enc.targetTotals].filter(([n]) => n !== (this.self ?? 'You'));
         foes.sort((a, b) => b[1] - a[1]);

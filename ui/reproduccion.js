@@ -171,30 +171,101 @@ export const PISTA = new Map([
  * los aturdimientos caen de ese lado, y está bien: lo que la barra tiene que
  * enseñar es el estado LARGO, que es el que explica un hueco de la curva.
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EL PRINCIPIO QUE EL JUEGO NO ESCRIBE, Y CÓMO SE RECUPERA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * EL CASO: una barra rotulada «58 s aturdido, ya estaba al empezar la pelea».
+ * El aturdimiento más largo emparejado de todo el registro dura 20 s, así que 58
+ * no era una duración: era la distancia del principio de la pelea al cierre,
+ * calculada desde un borde recortado y enseñada como un hecho.
+ *
+ * LO QUE PASA DE VERDAD: el juego a veces no escribe «You are stunned!». Son 11
+ * cierres sin apertura en 1.640. Pero SÍ escribe, mientras dura, «You can't cast
+ * spells while stunned!» —7.820 veces—, que es una prueba de estado que estaba
+ * en el cajón de las no reconocidas. Con ella se recupera el principio en 8 de
+ * los 11, y la barra de arriba pasa de 58 s a **1 s**.
+ *
+ * ── EL ANCLA ES EL CIERRE ANTERIOR, NO LA PRUEBA MÁS CERCANA ──────────────
+ *
+ * Esto se hizo mal en el primer intento y conviene que quede escrito. Agrupando
+ * las pruebas «por cercanía» —hacia atrás mientras no haya un hueco de 20 s— la
+ * ráfaga del 10 de agosto daba duraciones de 30, 37, 55 y **67 s**: el
+ * agrupador encadenaba varios aturdimientos seguidos y los servía como uno.
+ * Otra vez por encima del máximo medido.
+ *
+ * ANCLAR POR CERCANÍA ES IDENTIDAD POR PROXIMIDAD, que es la familia que este
+ * proyecto lleva once fallos persiguiendo. El principio de un aturdimiento sin
+ * apertura escrita es la PRIMERA prueba posterior al cierre anterior, porque
+ * antes de ese cierre el estado era otro. Lo guarda `test/pista.js` con esa
+ * misma ráfaga: si alguien vuelve a anclar por cercanía, se pone roja.
+ *
+ * Y SI NO HAY PRUEBA, la barra se queda abierta de verdad —3 de los 11— y
+ * entonces no imprime duración. Ver `pintaBarras`.
+ */
 export function tramosDePista(sucesos, duracion) {
   const fuera = [];
   const tramos = [];
   const abiertos = new Map();          // clase -> suceso de apertura
+  // Pruebas de estado sin apertura: `{clase -> [segundos]}`. No abren nada; sólo
+  // sirven para reconstruir un principio que el juego no escribió.
+  const pruebas = new Map();
+  // Dónde acabó el último tramo de cada clase: es el ancla. Ver la nota.
+  const ultimoCierre = new Map();
   for (const x of sucesos ?? []) {
+    if (x.prueba) {
+      if (!pruebas.has(x.clase)) pruebas.set(x.clase, []);
+      pruebas.get(x.clase).push(x.s);
+      continue;
+    }
     if (!PISTA.get(x.clase)?.par) { fuera.push(x); continue; }
     if (x.on === true) {
       // Dos aperturas seguidas sin cierre: la segunda manda y la primera se
       // cierra donde empieza la segunda, que es lo único que se sabe.
       const previo = abiertos.get(x.clase);
-      if (previo) tramos.push({ clase: x.clase, desde: previo.s, hasta: x.s, abre: false, cierra: true, quien: previo.quien });
+      if (previo) {
+        tramos.push({ clase: x.clase, desde: previo.s, hasta: x.s, abre: false, cierra: true, quien: previo.quien });
+        ultimoCierre.set(x.clase, x.s);
+      }
       abiertos.set(x.clase, x);
     } else {
       const ini = abiertos.get(x.clase);
       abiertos.delete(x.clase);
+      /**
+       * SIN APERTURA ESCRITA, SE INTENTA RECUPERAR EL PRINCIPIO. Ver la nota.
+       *
+       * La primera prueba POSTERIOR AL CIERRE ANTERIOR de esta misma clase. El
+       * ancla es el cierre, no la cercanía: antes de él el estado era otro y
+       * encadenar hacia atrás junta aturdimientos distintos en uno.
+       */
+      const desdeCierre = ultimoCierre.get(x.clase) ?? -1;
+      const rec = ini ? null
+        : (pruebas.get(x.clase) ?? []).find((s) => s > desdeCierre && s <= x.s);
       tramos.push({
         clase: x.clase,
-        desde: ini ? ini.s : 0,
+        desde: ini ? ini.s : (rec ?? 0),
         hasta: x.s,
-        // Sin apertura, el estado venía de antes de la pelea.
-        abre: !ini,
+        /**
+         * LAS DOS BANDERAS, SEPARADAS, porque son dos cosas distintas y se
+         * dicen distinto:
+         *
+         *   abre        el estado venía de ANTES de la ventana. Se sabe el
+         *               final y no el principio: no hay duración que dar.
+         *   reconstruido  el juego no escribió la apertura y el principio se
+         *               ha recuperado de una prueba de estado. La duración es
+         *               buena y el rótulo dice de dónde sale.
+         *
+         * Iban en el mismo saco —`abre: !ini`— y por eso una barra con el
+         * principio perfectamente recuperable se rotulaba «ya estaba al empezar»
+         * con un número inventado detrás.
+         */
+        abre: !ini && rec === undefined,
+        reconstruido: !ini && rec !== undefined && rec !== null,
         cierra: false,
         quien: (ini ?? x).quien,
       });
+      ultimoCierre.set(x.clase, x.s);
     }
   }
   // Lo que se quedó abierto llega al final de la pelea, y se dice.
@@ -252,7 +323,7 @@ export function sucesosDePista(g, self) {
       // `on` viaja porque es lo que permite emparejar los dos extremos de un
       // estado y dibujar una barra en vez de dos puntos. Sin él, la duración
       // que el registro sí da se perdía aquí. Ver `tramosDePista`.
-      out.push({ s, clase: x.clase, on: x.on ?? null,
+      out.push({ s, clase: x.clase, on: x.on ?? null, prueba: x.prueba === true,
         quien: x.destino ?? x.origen ?? null, habilidad: x.habilidad ?? null });
     }
   });
@@ -326,11 +397,26 @@ export function pintaBarras(barras, reloj) {
   return (barras ?? []).map((b) => {
     const info = PISTA.get(b.clase);
     const nombre = info ? t(info.clave) : b.clase;
+    /**
+     * UN EXTREMO ABIERTO NO IMPRIME DURACIÓN. Ver `tramosDePista`.
+     *
+     * Aquí se calculaba `hasta - desde` SIEMPRE y se pegaba detrás la nota de
+     * «ya estaba al empezar». La barra sabía que estaba recortada y el texto no
+     * la consultaba: la regla estaba puesta en el dibujo y no en la letra, y
+     * salía un «58 s» que era la distancia al borde, no una duración.
+     *
+     * Lo único cierto de una barra abierta por la izquierda es hasta cuándo
+     * duró; por la derecha, desde cuándo. Eso es lo que se dice.
+     */
     const dur = Math.max(0, b.hasta - b.desde);
-    const abierto = b.abre || b.cierra;
-    const titulo = `${reloj(b.desde)} → ${reloj(b.hasta)} · ${nombre} · ${dur} s`
-      + (b.quien ? ` — ${b.quien}` : '')
-      + (abierto ? ` · ${t(b.abre ? 'rp.pista.abreAntes' : 'rp.pista.cierraDespues')}` : '');
+    const sujeto = b.quien ?? t('rp.pista.aTi');
+    const cabeza = `${reloj(b.desde)} → ${reloj(b.hasta)} · ${nombre} — ${sujeto}`;
+    const titulo = b.abre
+      ? `${cabeza} · ${t('rp.pista.abreAntes')} · ${t('rp.pista.alMenosHasta', { s: reloj(b.hasta) })}`
+      : b.cierra
+        ? `${cabeza} · ${t('rp.pista.cierraDespues')} · ${t('rp.pista.alMenosDesde', { s: reloj(b.desde) })}`
+        : `${cabeza} · ${dur} s`
+          + (b.reconstruido ? ` · ${t('rp.pista.reconstruido')}` : '');
     return `<i class="rp-tramo e-${esc(b.clase)} p${b.peso}${b.abre ? ' abre' : ''}${b.cierra ? ' cierra' : ''}"
       style="left:${b.px}px;width:${b.ancho}px" data-s="${b.desde}" title="${esc(titulo)}"></i>`;
   }).join('');
@@ -616,20 +702,64 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
   const idDe = (n) => `fig-${String(n).replace(/[^a-zA-Z0-9]/g, '_')}`;
 
   // ── El escenario ───────────────────────────────────────
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * N FIGURAS POR NOMBRE, Y LA IMAGEN SALE DE LA SILUETA
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * CUÁNTAS. Las del suelo medido —`a.figuras`, de `src/suelo.js`, el mismo
+   * módulo que cuenta el «×N» del título—. Con dos «a loathling lich» se dibujan
+   * dos, y la primera muerte apaga UNA: antes apagaba la única que había y el
+   * segundo seguía lanzando sobre un dibujo gris.
+   *
+   * ── POR QUÉ AQUÍ NO HAY RETRATOS, Y SÍ EN LA FICHA DEL ENEMIGO ──────────
+   *
+   * La escena se dibuja SÓLO con siluetas. Los retratos de la wiki van a la
+   * ficha del enemigo, donde una foto grande y sola con su marco aguanta el HUD
+   * que traen dentro y hasta informa.
+   *
+   * Y LA RAZÓN NO ES EL ASPECTO, ES QUE ESE MATERIAL NO ESTÁ VERIFICADO. Se
+   * montó una fila de ejemplo con los 147 retratos cacheados junto a las
+   * siluetas, sobre una pelea real de 21 enemigos —10 con retrato, 11 sin—, y lo
+   * que se vio al mirarla:
+   *
+   *   Lord Darish            NO ES UNA CRIATURA: es una moneda de oro
+   *   Emperor Crush / pet    la misma imagen para dos bichos distintos
+   *   Marrowbane, Bonefire   traen el «>> nombre <<» del objetivo y la X de
+   *   an orc thaumaturgist   cerrar ventana quemados en el píxel
+   *
+   * No hay forma barata de comprobar las 147 una a una. Meterlas en la escena
+   * es aceptar que algún día salga una moneda donde va un bicho y no enterarnos
+   * — y en una fila de veintiuna figuras pequeñas nadie mira ninguna de cerca.
+   * En la ficha, grande y sola, un fallo así se ve al instante.
+   *
+   * PENDIENTE PARA LA FICHA: que Miguel pueda marcar una imagen como equivocada.
+   * Una foto mala se ve peor grande y sola que pequeña en una fila, así que el
+   * sitio donde la imagen sí entra es el que necesita la forma de rechazarla.
+   */
   const columna = (lista, lado) => `<div class="rp-col rp-${lado}">
     ${lista.map((a) => {
-    const retrato = lado === 'enemigo' ? retratos.get(a.nombre) : null;
     const fig = a.mascota ? FIGURAS.mascota : (lado === 'enemigo' ? FIGURAS.enemigo : FIGURAS.jugador);
+    const n = Math.max(1, a.figuras ?? 1);
     return `<div class="rp-act ${a.esTu ? 'yo' : ''} fuera" data-act="${esc(a.nombre)}"
-        data-desde="${a.desde ?? ''}" id="${idDe(a.nombre)}">
+        data-desde="${a.desde ?? ''}" data-figuras="${n}" id="${idDe(a.nombre)}">
         <div class="rp-fig">
-          ${retrato
-    ? `<img class="rp-retrato" src="${esc(retrato)}" alt="">`
-    : `<svg viewBox="0 0 48 60" class="rp-svg">${fig}</svg>`}
+          <div class="rp-figs" title="${n > 1 ? esc(t('rp.fig.cualCae')) : ''}">${
+  Array.from({ length: n }, (_, i) => `<svg viewBox="0 0 48 60" class="rp-svg" data-i="${i}">${fig}</svg>`).join('')
+}</div>
           <div class="rp-flot"></div>
         </div>
         <div class="rp-nom">${esc(a.nombre)}${a.mascota ? ` <i>${esc(t('rp.pet'))}</i>` : ''}</div>
-        <div class="rp-dps"><b class="num">0</b> <span class="u">dps</span></div>
+        <!--
+          EL DPS VA UNA VEZ POR NOMBRE, NO UNA POR FIGURA.
+          Con dos figuras, un «47 dps» debajo de cada una se leería como que
+          cada una hizo 47. El registro no permite repartirlo: cuál de los dos
+          recibió cada golpe no se puede saber nunca. Así que la cifra es del
+          NOMBRE y va una sola vez, con su aclaración cuando hay más de una.
+        -->
+        <div class="rp-dps"><b class="num">0</b> <span class="u">dps</span>${
+  n > 1 ? ` <i class="rp-conj" title="${esc(t('rp.fig.dpsConjunto'))}">${esc(t('rp.fig.entreTodos'))}</i>` : ''
+}</div>
         <!--
           LA BARRA VA DEBAJO, no encima de la figura.
           Estaba arriba, que es por donde suben los flotantes: el nombre del
@@ -799,7 +929,24 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
         flotar(x.destino, `+${n0(x.cantidad)}${veces}`, 'cura', i++);
       } else if (x.tipo === 'muere') {
         flotar(x.destino, esc(t('rp.dies')), 'muere', i++);
-        host.querySelector(`#${idDe(x.destino)}`)?.classList.add('caido');
+        /**
+         * UNA MUERTE APAGA UNA FIGURA, NO EL NOMBRE ENTERO.
+         *
+         * Aquí se le ponía `.caido` al bloque del nombre, así que con dos bichos
+         * iguales la primera muerte apagaba a los dos y el que quedaba vivo
+         * seguía pegando desde un dibujo gris. Ahora se apaga la primera que
+         * siga en pie, y las demás continúan.
+         *
+         * CUÁL CAE ES ARBITRARIO Y SE DICE. El registro afirma que cayó uno de
+         * ellos, no cuál: no hay nada en la línea que los distinga. Elegir «la
+         * primera que queda» no es información, es un orden cualquiera — y por
+         * eso el grupo lleva `rp.fig.cualCae` en su rótulo.
+         */
+        const bloque = host.querySelector(`#${idDe(x.destino)}`);
+        const enPie = bloque?.querySelectorAll('.rp-svg:not(.caida)');
+        if (enPie?.length) enPie[0].classList.add('caida');
+        // Sin figuras en pie, el nombre entero se apaga: ya no queda ninguno.
+        if (enPie && enPie.length <= 1) bloque.classList.add('caido');
       } else if (x.tipo === 'estado') {
         flotar(x.destino, esc(t(`rp.estado.${x.clase}`) || x.clase), 'estado', i++);
       } else if (x.tipo === 'lanza') {

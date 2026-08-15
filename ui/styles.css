@@ -1815,3 +1815,22 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
    abrir. Se pinta neutro y no en rojo — el rojo afirmaría algo que este
    contador no puede saber, porque no sobrevive al cierre de la aplicación. */
 .tag-neutra { color: var(--bone-faint); border-color: var(--slate-600); }
+
+/* ── N figuras por nombre ──────────────────────────────────────────────────
+   El suelo medido: con dos bichos iguales se dibujan dos siluetas, y cada
+   muerte apaga UNA. Se solapan un poco a propósito —son el mismo bicho
+   repetido, no una fila de cosas distintas— y la que cae se queda tendida en
+   vez de desaparecer: sigue siendo un cadáver en la escena. */
+.rp-figs { display: flex; align-items: flex-end; justify-content: center; }
+/* El solape era de -22px sobre una caja de 48 y las dos siluetas se fundían
+   en una sola con dos cabezas: se leía como un bicho raro, no como dos bichos.
+   Se vio pintado, no razonando. Con -10px se distinguen y siguen leyéndose como
+   el mismo bicho repetido; las de detrás van algo más pequeñas y apagadas para
+   que el ojo las ordene en profundidad en vez de en fila. */
+.rp-figs .rp-svg + .rp-svg { margin-left: -10px; }
+.rp-figs .rp-svg:nth-child(2) { transform: scale(.92); opacity: .8; }
+.rp-figs .rp-svg:nth-child(n+3) { transform: scale(.85); opacity: .62; }
+.rp-figs .rp-svg { transition: opacity .25s, transform .25s; }
+.rp-figs .rp-svg.caida { opacity: .28; transform: rotate(90deg) translateY(6px); }
+.rp-conj { font-size: 9.5px; font-style: normal; color: var(--bone-faint);
+  letter-spacing: .03em; margin-left: 3px; }

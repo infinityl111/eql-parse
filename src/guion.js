@@ -1,3 +1,5 @@
+// El suelo de individuos por nombre, compartido con el «×N» del título.
+import { suelosDe } from './suelo.js';
 /**
  * El guion de una pelea: sus sucesos, segundo a segundo, para reproducirla.
  *
@@ -192,6 +194,10 @@ export function guion(f, lineas, Parser, self = null) {
         destino: ev.target ?? ev.source ?? tuyoPorLaFrase,
         origen: ev.source ?? null,
         on: ev.on ?? null,
+        // Una PRUEBA de estado no abre ni cierra: atestigua que estaba puesto.
+        // Con ella se recupera el principio que el juego a veces no escribe.
+        // Ver `tramosDePista` en `ui/reproduccion.js`.
+        prueba: ev.prueba === true,
         cantidad: ev.amount ?? 0, habilidad: ev.ability ?? null,
       });
     }
@@ -236,6 +242,58 @@ export function guion(f, lineas, Parser, self = null) {
   // Quien no sale en ninguna línea no llegó a entrar. Se queda fuera del
   // escenario en vez de aparecer de pie sin hacer nada toda la pelea.
   for (const a of actores.values()) if (a.desde === undefined) a.desde = null;
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * CUÁNTAS FIGURAS LLEVA CADA NOMBRE, Y CUÁNDO SE APAGA CADA UNA
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * EL FALLO QUE ARREGLA, con sus palabras: «se ve morir a uno y se le sigue
+   * pegando al cadáver». Había UNA figura por nombre, así que con dos «a
+   * loathling lich» la primera muerte apagaba la figura y el segundo seguía
+   * lanzando `Tishan's Clash` sobre un dibujo gris. El dato para hacerlo bien ya
+   * estaba en pantalla —el título de la pelea dice «×2»— y la escena no lo usaba.
+   *
+   * N SALE DEL SUELO MEDIDO, no de una estimación: muertes del nombre más una si
+   * hay actividad suya DESPUÉS de la última. Y sale de `src/suelo.js`, que es el
+   * mismo módulo que cuenta el «×N» del título — no una copia.
+   *
+   * `muertes` viaja con los instantes porque es lo que permite apagar UNA por
+   * cada muerte en su segundo, en vez de apagarlas todas a la vez.
+   *
+   * CUÁL SE APAGA ES ARBITRARIO y el reproductor lo dice: el registro afirma que
+   * cayó uno de ellos, no cuál. Ver `rp.fig.cualCae`.
+   */
+  const kills = (f?.kills ?? []).map((k) => (typeof k === 'string' ? k : k?.victim));
+  const instantes = new Map();
+  for (const kt of f?.killTimes ?? []) {
+    const n = String(kt.name ?? '').charAt(0).toLowerCase() + String(kt.name ?? '').slice(1);
+    if (!instantes.has(n)) instantes.set(n, []);
+    instantes.get(n).push(kt.t);
+  }
+  // ¿Hay líneas de ese nombre después de su última muerte? Se mira sobre los
+  // segundos ya recorridos, que es donde está la actividad de verdad.
+  const ultimaLinea = new Map();
+  for (const [seg, xs] of porSegundo) {
+    for (const x of xs) {
+      for (const n of [x.origen, x.destino]) {
+        if (!n) continue;
+        const k = String(n).charAt(0).toLowerCase() + String(n).slice(1);
+        if ((ultimaLinea.get(k) ?? -1) < seg) ultimaLinea.set(k, seg);
+      }
+    }
+  }
+  const suelos = suelosDe(kills,
+    (nombre, ultMuerte) => (ultimaLinea.get(nombre) ?? -1) > ultMuerte,
+    instantes);
+  for (const a of actores.values()) {
+    const clave = a.nombre.charAt(0).toLowerCase() + a.nombre.slice(1);
+    a.figuras = suelos.get(clave) ?? 1;
+    // Los instantes en que cae una de las suyas, en orden. Una por muerte; si el
+    // suelo es mayor que las muertes, la de más no cae en toda la pelea.
+    a.caidas = (instantes.get(clave) ?? []).slice().sort((x, y) => x - y)
+      .map((t) => Math.max(0, Math.round(t - inicio)));
+  }
 
   return {
     inicio, duracion: dur,
