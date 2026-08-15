@@ -226,10 +226,10 @@ líneas). La cabecera del fichero (`logEvents.ts:1-6`):
 **sowoky — un objeto `RX` con 55 expresiones**, probadas en un orden explícito
 (`engine.js:190`), y una guarda barata delante:
 
-```js
-// engine.js:193
-const COMBATISH = /points? of (?:\w+ )?damage|has taken \d+ damage|healed .+ for \d+|has been slain|You have slain|, but .{0,60}(?:miss|dodge|parr|ripost|block|absorb)/;
-```
+una sola expresión (`COMBATISH`, `engine.js:193`) que exige que la línea
+contenga una de seis marcas —«points of … damage», «has taken N damage»,
+«healed … for N», «has been slain», «You have slain», o un «, but …» seguido de
+un verbo de evasión a menos de 60 caracteres— antes de probar ninguna de las 55.
 
 `engine.js:184` documenta el orden: *«most frequent first; you_slain before
 slain_by, youdied before died»*.
@@ -254,35 +254,27 @@ Los tres la vimos. **Los tres la resolvemos distinto, y el tercero es el mejor.*
 
 **jmoyers — minúsculas totales, y sólo para la clave.** `parseCommon.ts:37-45`:
 
-```ts
-/**
- * Canonical identity key for an entity name. EQ writes the same mob with
- * different casing (charm lines lowercase the article, damage lines capitalize
- * it); keying state by this lowercased form makes lookups case-stable.
- */
-export function idKey(name: string): string {
-  const n = name.trim().toLowerCase()
-  if (n === 'you' || n === 'yourself' || n === 'your') return 'you'
-  return n
-}
-```
+`idKey(name)` recorta el nombre y lo pasa **entero a minúsculas**; las tres
+formas de la primera persona —`you`, `yourself`, `your`— colapsan en una sola
+clave. El comentario da el motivo con la misma observación que nosotros: las
+líneas de encanto escriben el artículo en minúscula y las de daño lo
+capitalizan, así que una clave insensible a la caja es lo que hace estables las
+búsquedas.
 
 Y en `AGENTS.md:730` lo elevan a ley: **«Names are dirty; canonicalize at
 boundaries, display raw.»** *Clave en minúsculas; se muestra el nombre crudo.*
 
 **sowoky — plegado con prueba.** `engine.js:352-365`:
 
-```js
-// Sentence-capitalization fold for bare common-noun mobs: "orc legionnaire"
-// prints "Orc legionnaire hits…" at line start and "…slash orc legionnaire"
-// mid-sentence — two rows for one mob. The lowercase variant having been
-// seen is the proof the capital is sentence case (a real name like "Lord
-// Darish" never prints lowercase), so fold Xxx → xxx only on that evidence.
-const foldCap = n => {
-  const lower = n[0].toLowerCase() + n.slice(1);
-  return lower !== n && seenNames.has(lower) ? lower : n;
-};
-```
+`foldCap(n)` baja la inicial **sólo si la variante en minúscula ya se ha visto**
+en algún otro sitio del registro; si no, devuelve el nombre tal cual. El conjunto
+`seenNames` se llena antes con todos los nombres que aparecen en cualquiera de
+los seis campos de nombre de los eventos.
+
+El razonamiento que dejan escrito al lado: «orc legionnaire» se imprime
+capitalizado al abrir frase y en minúscula a mitad, que son dos filas para un
+bicho; y **haber visto la minúscula es la prueba de que la mayúscula era de
+frase**, porque un nombre propio nunca se imprime en minúscula.
 
 **Nosotros — plegamos siempre, sin prueba, y el resultado se enseña.**
 `src/suelo.js:56`:
@@ -319,10 +311,11 @@ está usando como texto de pantalla.** Es la familia de siempre vista desde otro
 **jmoyers — instancias con generación.** `src/main/combat/world.ts:1-14`:
 
 > *The engine historically keyed everything by bare name. That collapses
-> same-named twins: when you charm one "a fire giant warrior" while a hostile "a
-> fire giant warrior" is present, both share a name key, so the pet and the mob
-> it tanks are indistinguishable. This model gives every spawn a distinct
-> INSTANCE identity (`${nameKey}#${gen}`) so twins are separate entities.*
+> same-named twins […] the pet and the mob it tanks are indistinguishable.*
+
+La salida: **cada aparición recibe una identidad de instancia propia**, formada
+por la clave del nombre y un número de generación, de modo que los gemelos son
+entidades separadas en la agregación y en el ciclo de vida del encanto.
 
 Y una **tabla de decisiones de ciclo de vida** entera en el comentario
 (`world.ts:16-98`), con esta declaración de sesgo:
@@ -340,16 +333,16 @@ nombre hacia ese mismo nombre. Y en la muerte, cinco casos según quién mate
 **sowoky — detección por ticks de veneno.** Esto no lo tenemos y es la idea más
 bonita de todo el estudio. `engine.js:746-758`:
 
-```js
-// Tick-stack taint. One caster's DoT ticks a given entity once per
-// tick, so the same (second, spell, caster) landing twice on one name
-// means two mobs are wearing that name and this fight's totals are a
-// blend of both.
-if (e.cat === "dot") {
-  const dk = `${epochSec(t)}|${e.spell}|${e.src || "anon"}`;
-  if (ft.dotKeys.has(dk)) ft.dotStack = true; else ft.dotKeys.add(dk);
-}
-```
+Cada tick de veneno se resume en una clave de tres partes —**segundo entero,
+hechizo y lanzador**— y se guarda en un conjunto por pelea. Si la misma clave
+llega dos veces, la pelea se marca (`dotStack`). El lanzador sale del propio
+evento; la forma anónima, que no lo trae, agrupa todas juntas bajo una etiqueta
+única.
+
+El razonamiento: el veneno de un lanzador tiquea **una vez por tick y por
+entidad**, así que dos ticks idénticos en el mismo segundo sobre un nombre
+significan que hay dos bichos llevándolo, y que las sumas de esa pelea son una
+mezcla de los dos.
 
 Es un **detector de homónimos que no necesita ningún modelo de identidad**: sale
 de una propiedad física del juego (un veneno tiquea una vez por tick por
@@ -366,23 +359,27 @@ nosotros *¿cuántos había como mínimo?*.
 
 `src/main/log/parseWorld.ts:132-156` es el trozo con más medición del repo:
 
-```ts
-const YOU_DIED = 'You died.'
-```
+una constante con el texto exacto `You died.`, comparada por **igualdad**, no
+por expresión regular, y probada antes que ninguna otra forma que acabe en
+«died.».
 
-> *When the killing blow is a DoT tick (or anything else with no attacker to
-> name), the client prints this instead of the slain sentence — same death, no
-> killer. Measured over the 1.11M-line sweep log: 23 player deaths, 22 slain
-> sentences and this one line, so the two shapes together are the whole set.*
+> *When the killing blow is a DoT tick (or anything else with no attacker to name),
+> the client prints this instead of the slain sentence — same death, no killer.*
+
+Medido sobre 1,11 millones de líneas: **23 muertes del jugador, 22 con frase de
+«slain» y esta única línea**, así que entre las dos formas está el conjunto
+entero.
 
 Y el gemelo del bicho, `MOB_DIED_RE = /^(.+?) died\.$/` (`parseWorld.ts:156`):
 
-> *FULL-LOG SWEEP (read-only, 2026-08-08, eqlog_Primitive_freeport.txt, 1.44M
-> lines): 21 lines end in " died." — 2 are `You died.` […] and the other 19 are
-> mob names. NOT ONE of the 21 has a `slain` line within ±3 lines, so this shape
-> never duplicates a slain sentence and cannot double-count a kill. 15 of the 19
-> carry `You gain experience!` on the line immediately before […] The sibling log
-> eqlog_Primitive_halas.txt has 0.*
+Barrido de sólo lectura sobre 1,44 millones de líneas, el 8 de agosto: **21
+líneas acaban en «died.»**, dos del jugador y **19 de nombres de bicho**.
+**Ninguna de las 21** tiene una línea de «slain» a menos de tres líneas, así que
+la forma nunca duplica una muerte ni la cuenta dos veces; **15 de las 19** llevan
+la línea de experiencia justo delante. Y el dato que explica por qué esto costó
+dos versiones:
+
+> *The sibling log eqlog_Primitive_halas.txt has 0.*
 
 Ese último dato —*el log hermano tiene cero*— es la razón de que a ellos les
 costara dos versiones (`JOS-88` el 7 de agosto, `JOS-101` el 8). La forma no
@@ -436,11 +433,12 @@ veces en el registro no entra*— con otro nombre.
 `engine.js:41-58`, uno de los comentarios mejor razonados que he leído en
 cualquiera de los dos repos:
 
-> *Past-tense "told you" is how the client prints an NPC-to-you tell; live
-> players print present-tense ("tells you"), so a player can't produce this line.
-> Only YOUR OWN pet's tells are ever shown to you. […] Says never claim: player
-> chat is a say too, and the reference log holds a real counterexample ("Kurns
-> says, 'Hail, Master Xalg'" — a player hailing an NPC).*
+> *Past-tense "told you" is how the client prints an NPC-to-you tell; live players
+> print present-tense ("tells you"), so a player can't produce this line.*
+
+Y sólo se te enseñan los susurros de **tu propia** mascota. Los «says» no
+reclaman nunca, con contraejemplo medido en su registro de referencia: un jugador
+saludando a un NPC con la palabra «Master» dentro de la frase.
 
 Y la corrección de un fallo suyo, dentro del mismo comentario: *«The name is
 free-form ((.+?)) so a charmed mob's tells claim it too — the old `[A-Z][a-z]+`
@@ -474,10 +472,13 @@ instante — **medido: 18 golpes, 398 puntos, en una sola mascota en un solo
 pull.** La regla ancha y obvia («cualquier cosa que haya sido hostil») la miden
 mal en el mismo corpus:
 
-> *Warlord Skarlon mind-controls the reporter's own healer, so `Sonista slashes
-> YOU for 5 points of damage.` lands 27 seconds before `Sonista healed you for
-> 1219 hit points by Healing Light.` […] **Being hit is something that HAPPENS to
-> you; hitting is something you DO, and only the second one names a mob.***
+Un jefe controla mentalmente al sanador del propio jugador, así que **una línea de
+ese sanador pegándote llega 27 segundos antes de otra curándote**: con la regla
+ancha, un jugador de verdad habría vuelto al conjunto de hostiles. La frase con
+la que lo zanjan:
+
+> ***Being hit is something that HAPPENS to you; hitting is something you DO, and
+> only the second one names a mob.***
 
 La regla que sobrevive es *«un nombre al que TÚ has hecho daño es un bicho»*, en
 una sola dirección, y **conductual a propósito**: *«it works identically for a mob
@@ -495,9 +496,30 @@ borrar sin conocerlos, así que **cada recuento por forma es un suelo**):
 líneas                    951.773
 reconocidas               893.941
 sin reconocer              57.814   (6,07 %)
+sin cabecera de hora           18   (ni una cosa ni la otra — abajo)
 formas distintas            6.612
 las 90 formas mayores      33.188   (57,4 % del cajón)
 ```
+
+**Las 18 que no están en ninguno de los dos montones son continuaciones de
+mensajes de chat multilínea.** 893.941 + 57.814 + 18 = 951.773, exacto. El
+parser exige una cabecera `[hora]` para clasificar, y cuando un mensaje del
+juego lleva un salto de línea dentro, la segunda mitad se escribe **sin
+cabecera** y no es ni reconocida ni desconocida: es que no hay línea que
+clasificar. Son 18 en todo el registro, en cinco episodios:
+
+- seis líneas de un pegote de Discord que alguien copió al chat (líneas
+  15.755–15.760);
+- dos veces el pie «Please visit https://everquestlegends.com…» de un aviso del
+  servidor (17.681 y 74.646);
+- cinco de dos avisos de mantenimiento con su hora, su duración estimada y su
+  motivo (30.330–30.332, 31.121–31.122);
+- tres de alguien pegando en el chat su propio desglose de daño (312.541,
+  314.362, 537.834);
+- dos de un aviso de bloqueo de raid (554.426–554.427).
+
+No es un residuo sin nombre: es **una tercera categoría real**, y ahora tiene su
+fila en la cuenta.
 
 Las familias grandes, y quién las tiene. **Los totales por familia se suman sobre
 las 600 formas mayores**, así que son suelos: la cola de 6.000 formas restantes
@@ -544,24 +566,21 @@ La ley, `AGENTS.md:794-796`:
 
 Las constantes, `src/main/combat/encounter.ts:166-175`:
 
-```ts
-export const LINGER_MS = 5_000
-export const PRESENCE_GONE_MS = 20_000
-export const FALLBACK_IDLE_MS = 60_000
-export const CC_HOLD_MS = 120_000
-export const ACTIVE_MS = 3_000
-```
+| constante | valor | qué mide |
+|---|---:|---|
+| `LINGER_MS` | 5 s | lo que se espera tras el último daño atribuido antes de cerrar |
+| `PRESENCE_GONE_MS` | **20 s** | sin ninguna señal de presencia, la instancia se da por ida |
+| `FALLBACK_IDLE_MS` | 60 s | silencio total: cierra aunque nadie haya muerto |
+| `CC_HOLD_MS` | 120 s | lo que un mez sin refrescar sigue sosteniendo |
+| `ACTIVE_MS` | 3 s | la ventana de «activo» del denominador |
 
 Y el mecanismo, `lifecycle.ts:79-99`, `hostilePresence()`:
 
-```ts
-for (const id of enc.engaged) {
-  if (st.world.isLivePet(id)) continue
-  const seen = enc.engagedSeen.get(id) ?? enc.lastTs
-  const gone = st.world.isRetired(id) || now - seen >= PRESENCE_GONE_MS
-  if (!gone) { allGone = false; break }
-}
-```
+Recorre las instancias enganchadas, **salta las que son mascota viva** —una
+mascota no es algo que estemos matando, y como no muere nunca mantendría
+abierta para siempre cualquier pelea de encantar—, y da una por ida si el modelo
+del mundo la ha retirado **o** si lleva `PRESENCE_GONE_MS` sin ser vista. Corta
+en cuanto encuentra una que sigue: la respuesta es «¿están todas idas?».
 
 **Léase al lado de nuestro `#sigueAbierta`.** Es la misma forma:
 
@@ -576,28 +595,42 @@ for (const id of enc.engaged) {
 | qué cuenta como presencia | daño, fallos, resistencias, control, curaciones | actividad de la línea |
 
 **La coincidencia es del modelo, no de las cifras.** Los dos definimos la pelea
-como *el conjunto de enemigos cuyas ventanas de participación se solapan*, con
-cierre por evidencia y no por silencio global. Ninguno de los dos preguntó
-«¿cuánto lleva el log callado?». Nuestro `PLAZO_ENEMIGO = 12` y su
-`PRESENCE_GONE_MS = 20` son el mismo parámetro con distinto valor.
+como *el conjunto de enemigos cuyas ventanas de participación se solapan*, y en
+los dos **el cierre normal es por evidencia**: la ventana de cada enemigo, no un
+reloj global. Nuestro `PLAZO_ENEMIGO = 12` y su `PRESENCE_GONE_MS = 20` son el
+mismo parámetro con distinto valor.
+
+**Y hay que decirlo con precisión, porque la frase se va a citar suelta:**
+jmoyers **sí** pregunta «¿ha pasado algo?» — es su `FALLBACK_IDLE_MS` de 60 s, y
+su propio comentario lo enuncia justo así. Lo que no hace ninguno de los dos es
+preguntarlo **sobre el registro entero**: él lo pregunta **por encuentro**, sobre
+los eventos atribuidos a esa pelea, y nosotros no lo preguntamos en absoluto
+porque el plazo por enemigo ya cierra. La diferencia con el `idleSec = 20` que
+tirábamos no es que ellos no tengan reloj de silencio: es **sobre qué lo miden**.
 
 **Y hay dos cosas suyas que nosotros no tenemos, las dos aprendidas rompiéndose:**
 
 **(a) La ausencia se mide con más evidencia que el daño.** `lifecycle.ts:65-77`:
 
-> *The old rule reused LINGER_MS here and counted only DAMAGE as evidence, so a
-> second mob that was merely missing (or casting, or being out-damaged by its
-> friend) looked dead after 5s — and the moment its friend actually died, the
-> whole pull finalized and **the survivor's remaining fight became a bogus second
-> encounter**.*
+La regla vieja reutilizaba aquí los 5 s de cortesía y **contaba sólo el daño como
+evidencia**: un segundo bicho que sólo estaba fallando —o lanzando, o eclipsado
+por su compañero— parecía muerto a los cinco segundos. Y entonces:
+
+> *the moment its friend actually died, the whole pull finalized and **the
+> survivor's remaining fight became a bogus second encounter**.*
 
 **(b) El sostén del mez es un veto sobre UN camino, no sobre el cierre.**
 `lifecycle.ts:117-131`, y merece la cita entera:
 
-> *CC_HOLD_MS (120s) deliberately exceeds FALLBACK_IDLE_MS (60s), and the hold
-> used to short-circuit this whole function — so ONE stale hold defeated EVERY
-> closure path and pinned the fight open for two full minutes of silence. […] a
-> hold vetoes only the death-close, because that is the judgement it actually
+Los 120 s del sostén **superan a propósito** los 60 s del respaldo. El sostén
+cortocircuitaba antes la función entera, y ésa es la cicatriz:
+
+> *ONE stale hold defeated EVERY closure path and pinned the fight open for two
+> full minutes of silence.*
+
+Lo que enviaron en su lugar reparte las preguntas:
+
+> *a hold vetoes only the death-close, because that is the judgement it actually
 > informs ("is this engaged instance still alive?"). The fallback is a different
 > question — "has anything at all happened?"*
 
@@ -614,18 +647,18 @@ damage timestamp), never `now`»* — nuestra separación `feed` / `tick`.
 
 `engine.js:624`:
 
-```js
-/* ─── fights: one per mob encounter, closed by its death line ──────────────*/
-const FIGHT_IDLE = 45; // s without any event touching the mob (mez refreshes it)
-```
+la cabecera de esa sección declara **una pelea por encuentro con un bicho,
+cerrada por su línea de muerte**, y una única constante `FIGHT_IDLE = 45`
+segundos sin ningún evento que toque a ese bicho — un mez la refresca.
 
 **Una pelea = un bicho.** No hay agrupación. `open` es un `Map` de nombre a
 pelea (`engine.js:633`), y el barrido de cierre es por entrada
 (`engine.js:696`):
 
-```js
-for (const [key, f] of open) if ((t - f.last) / 1000 > FIGHT_IDLE) close(key, f.last);
-```
+en cada evento se recorre el mapa entero de peleas abiertas y se cierra toda
+entrada cuyo último toque quede a más de `FIGHT_IDLE` del instante actual. El
+cierre se sella con **la hora del último toque**, no con la del evento que lo
+dispara.
 
 **Por qué diverge: porque pregunta otra cosa.** Su unidad de análisis es el
 bicho, no la pelea. Lo que produce con ella (`engine.js:660-671`):
@@ -657,12 +690,13 @@ Nosotros lo arreglamos hace poco (`src/raid.js`, restar curación antes de
 clasificar jefe). sowoky lo tiene con una guarda que nosotros no
 (`engine.js:723-731`):
 
-> *It only counts against a fight that is ALREADY open and it **does not
-> touch()** — a heal is not evidence of an encounter (a passing healer topping up
-> a mob we never engaged would otherwise invent a fight), and refreshing the idle
-> clock off a heal would move existing fight boundaries. Failure mode: **a heal
-> landing in the gap between two fights of the same mob is dropped rather than
-> guessed onto one of them.***
+Una curación sólo cuenta contra una pelea **ya abierta**, y no refresca el reloj
+de inactividad. Dos motivos escritos: una curación no prueba que haya un
+encuentro —un sanador de paso inventaría una pelea— y refrescar con ella movería
+fronteras existentes. Y declaran lo que eso deja fuera:
+
+> *Failure mode: **a heal landing in the gap between two fights of the same mob is
+> dropped rather than guessed onto one of them.***
 
 Una curación **cuenta** para las cotas pero **no abre ni prolonga** una pelea. Es
 un matiz que ni jmoyers ni nosotros tenemos escrito.
@@ -711,11 +745,12 @@ Esto es lo más interesante y no es obvio. `src/main/log/replaySlicer.ts:1-30`:
 `REPLAY_DUTY = 0.6` (`replaySlicer.ts:59`), que es la parte que un usuario
 reportó:
 
-> *`setImmediate` resumes the fold almost instantly (MEASURED below at
-> 0.01–0.06 ms), so a sliced replay still runs one core flat out for its whole
-> duration — 43 s of it on this machine's log, beside EverQuest and OBS. So each
-> expired slice now RESTS on a real timer instead […] **The owner's rule, in his
-> words: better that it finishes stably than quickly.***
+Ceder el turno devuelve el control casi al instante —**medido en 0,01–0,06 ms**—,
+así que una relectura troceada seguía teniendo **un núcleo al máximo durante sus
+43 segundos enteros**, con EverQuest y OBS al lado. Por eso cada trozo agotado
+descansa ahora sobre un temporizador de verdad.
+
+> ***The owner's rule, in his words: better that it finishes stably than quickly.***
 
 Doce milisegundos de trabajo, ocho de descanso. Cuesta 43 s → ~72 s de reloj y
 deja el 40 % de un núcleo al juego. Y el porqué de no ponerlo configurable
@@ -742,12 +777,13 @@ problema de los 31 s no se ha resuelto en ninguno de los dos con paralelismo.**
 `scanHistory.ts:37-46` — `firstMbMs`, con la definición de por qué es una medida
 de disco y no del parser:
 
-> *the read stream's high-water mark IS a megabyte, so the first chunk to satisfy
-> this is the first read, and **it is stamped BEFORE that chunk is folded**.
-> Nothing this app does with the bytes is inside the number; what is inside it is
-> the time the operating system — and anything sitting between it and the disk,
-> **an on-access virus scanner being the hypothesis this exists to test** — took
-> to hand them over.*
+El tope del flujo de lectura **es** un megabyte, así que el primer trozo que la
+satisface es la primera lectura, y el sello se pone **antes** de plegarlo: nada
+de lo que la aplicación hace con los bytes entra en el número. Lo que entra es lo
+que tardaron en entregarlos el sistema operativo y todo lo que haya entre él y el
+disco —
+
+> *an on-access virus scanner being the hypothesis this exists to test*
 
 Y ausente si el fichero mide menos de 1 MB: *«a partial read is a different
 measurement wearing this one's name»*. Etiqueta honesta.
@@ -818,6 +854,50 @@ sowoky sí persiste (`vendor/parse.js`, `STATE.kills`), con una marca de agua po
 fichero (`state.files[f] = { ts, n }`, `parse.js:224`) — y su incidencia `#9` es
 justamente que esa marca se desactiva en el camino en vivo.
 
+### 5.1 El precio de esa salida, que el apartado no nombraba
+
+**Si la verdad es el fold, la historia muere con el fichero de registro.** Eso
+no es una pega teórica: Miguel se plantea renombrar el log cuando crezca y
+empezar otro, y ése es exactamente el día en que las dos posturas se separan.
+
+**Medido sobre el almacén de hoy** (`%APPDATA%\eql-parse`, 15 de agosto de 2026):
+
+| | |
+|---|---:|
+| peleas guardadas | 1.474 |
+| ...reconstruibles leyendo sólo el log de hoy | **1.474 (100 %)** |
+| entradas de botín | 111 |
+| ...reconstruibles | **111 (100 %)** |
+| peleas cuyo fichero de origen ya no existe | **0** |
+
+Hoy el 100 % es reconstruible **porque el registro no se ha rotado nunca**: la
+pelea más antigua del almacén es del 4 de agosto a las 09:13 y el primer suceso
+del log es del mismo día a las 09:04. El almacén no está guardando historia que
+el log no tenga; está guardando **tiempo**.
+
+**El día que Miguel rote, ese 100 % pasa a 0 % para todo lo anterior al corte.**
+Y entonces «no persistir el fold» deja de ser una alternativa disponible: sin
+almacén, rotar borra el histórico. jmoyers puede permitirse su postura porque su
+registro de referencia es un fichero que nadie ha rotado; no es una propiedad de
+su arquitectura, es una propiedad de su corpus.
+
+**Y el otro lado del precio, también medido.** El pliegue completo en frío del
+registro de hoy —parseo y segmentación, sin escribir en el almacén— tarda **13,8
+s para 74,3 MB**, o sea **0,186 s/MB**. Al ritmo medido de Miguel (6,2 MB y
+79.349 líneas por día de juego, 12 días de juego en el fichero):
+
+| plazo | tamaño | líneas | pliegue en frío |
+|---|---:|---:|---:|
+| hoy | 74,3 MB | 952.188 | **13,8 s** |
+| 6 meses | 1,10 GB | 14,5 M | **3,5 min** |
+| 12 meses | 2,21 GB | 29,0 M | **7,0 min** |
+
+Siete minutos es lo que costará cada reconstrucción forzada dentro de un año si
+el registro no se rota. **Ése es el precio real de cada cambio de formato que
+decidamos**, y es el argumento tanto para rotar como para dejar de forzar
+reconstrucciones. Las dos cosas tiran en la misma dirección; lo que no se puede
+es rotar Y no persistir.
+
 ---
 
 ## 6. Arquitectura: qué significa «extensible event-stream»
@@ -871,10 +951,9 @@ líneas es probablemente la correcta.
 
 Ellos tienen **diez** clases de overlay (no ocho), `src/shared/types.ts:75`:
 
-```ts
-export const OVERLAY_KINDS: OverlayKind[] = ['fight', 'overall', 'events',
-  'heal-fight', 'heal-overall', 'toast', 'buffs', 'debuffs', 'xp', 'respawn']
-```
+una lista con diez identificadores: pelea, global, sucesos, curación de la
+pelea, curación global, avisos emergentes, buffs, debuffs, experiencia y
+reapariciones.
 
 El oficio de Electron que hay debajo, que es lo copiable sin copiar código:
 
@@ -935,19 +1014,20 @@ Y una nota que separa dato consultado de dato medido explícitamente
 
 ### 8.2 Lo mejor del estudio: minar la asociación en vez de escribir la regla
 
-Nuestro cajón tiene ~11.100 líneas de emotes de buff (`Your feet move faster.`
-×4.023, `Your mind begins to clear.` ×3.567…). **Ninguno de los dos las tiene
-escritas a mano.** jmoyers hace otra cosa (`src/main/data/messageOverlay.ts:1-30`):
+Nuestro cajón tiene **13.331 líneas** de emotes de buff que aterrizan en ti
+(`Your feet move faster.` ×4.023, `Your mind begins to clear.` ×3.567…; los cinco
+que enumera §2.6 suman 11.275 y el resto de la familia pone el otro par de
+miles). **Ninguno de los dos las tiene escritas a mano.** jmoyers hace otra cosa (`src/main/data/messageOverlay.ts:1-30`):
 
 > *The user's directive: "augment the spell database with our own method of
 > verifying variations of the cast messages for everything we encounter." This is
 > that method.*
->
-> *As the buffs model folds the log (replay AND live), it feeds every player cast
-> (`observeCast`) and every candidate message line (`observeMessage`) here. The
-> overlay MINES the association between a message and the spell the player was
-> casting when it appeared, keyed by (messageText, spellKey), and counts how often
-> each pairing recurs.*
+
+El mecanismo: mientras el modelo de buffs pliega el registro —en la relectura y
+en vivo— le entrega cada lanzamiento del jugador y cada línea candidata a ser un
+mensaje. La capa **mina la asociación** entre un mensaje y el hechizo que se
+estaba lanzando cuando apareció, con la pareja (texto, hechizo) como índice, y
+cuenta cuántas veces se repite.
 
 Y de esas cuentas sale un **veredicto por mensaje**:
 
@@ -967,13 +1047,14 @@ medido. La medición no la escribe un humano: la escribe el registro.
 Y trae con ella su propio fallo, que es de los nuestros
 (`messageOverlay.ts:41-52`):
 
-> *The mining is a FOLD […] What it is seeded with used to be a single flat pile:
-> the committed baseline PLUS `<userData>/message-overlay.json`, which is what the
-> last session's identical fold had already written. So each cold launch added the
-> log's observations to a snapshot that already contained them: **MEASURED
-> 22 -> 44 -> 88 across three launches, doubling forever**, and every derived
-> verdict (n>=2 is VERIFIED) resting on counts that **describe the number of times
-> the app has STARTED rather than what the log says**.*
+El minado es un pliegue, y lo sembraban con un montón plano: la instantánea
+publicada más el fichero que el pliegue idéntico de la sesión anterior ya había
+escrito. Cada arranque en frío sumaba las observaciones del registro a una foto
+que ya las contenía — **medido: 22 → 44 → 88 en tres arranques**. Su propia
+conclusión:
+
+> *every derived verdict (n>=2 is VERIFIED) resting on counts that **describe the
+> number of times the app has STARTED rather than what the log says**.*
 
 La corrección es de forma, no un filtro: un cubo por origen, y volver a plegar un
 origen **reemplaza** su aportación en vez de sumarla — *«which makes mining
@@ -1118,11 +1199,26 @@ suelo dicho, la procedencia visible.
 - **Incidencias:** las 11 de jmoyers y las 13 de sowoky, listadas con `gh issue
   list --state all`; leídos íntegros los cuerpos de 11 de ellas.
 - **Mediciones nuestras:** todas sobre
-  `D:\EVERQUEST LEGENDS\Logs\eqlog_Campeon_erudin.txt`, 74,3 MB, 951.773 líneas,
-  con nuestro propio `src/parser.js`.
-- **Nada de su código ha entrado en nuestro árbol.** Las citas de este documento
-  son citas, con su fichero y su línea, y su licencia sigue siendo la suya
-  (§0).
+  `D:\EVERQUEST LEGENDS\Logs\eqlog_Campeon_erudin.txt`, 74,3 MB, 951.773 líneas
+  no vacías el 15 de agosto de 2026, con nuestro propio `src/parser.js`. **Es un
+  fichero vivo**: Miguel sigue jugando y el registro crece, así que una
+  remedición dará cifras algo mayores. Todas las de aquí son de esa foto.
+- **NI UNA LÍNEA DE SU CÓDIGO EN ESTE FICHERO, Y ESO ES UNA CORRECCIÓN.** La
+  primera versión de este documento traía **diez bloques ejecutables suyos
+  pegados literalmente** —el normalizador de clave de jmoyers, el plegado de
+  mayúscula de sowoky, su guarda barata de líneas de combate, el bloque de ticks
+  de veneno, el bucle de presencia hostil, las cinco constantes de encuentro, la
+  lista de overlays, la constante de inactividad y su barrido de cierre— y a la
+  vez esta misma línea afirmaba que no había ninguno. Los diez están sustituidos
+  por descripciones nuestras; **los valores y los nombres de constante se quedan,
+  porque son hechos**.
+
+  El caso urgente era el plegado de mayúscula de sowoky, que es AGPL y es
+  exactamente la pieza que vamos a escribir: mientras su fuente estuviera aquí,
+  no podríamos decir que la nuestra sale de la medición.
+- **Las citas de prosa sí se quedan**, acortadas a la frase que sostiene el
+  argumento. Son razonamiento de diseño, citado con su fichero y su línea para
+  comentarlo, y ninguna supera las 51 palabras.
 
 **Lo que falta, dicho para que no se confunda con cubierto:**
 
