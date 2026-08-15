@@ -143,5 +143,45 @@ console.log('\nel cartel de actualización pide su idioma');
   } finally { globalThis.fetch = original; }
 }
 
+/**
+ * ── NOTAS ESCRITAS PARA UNA VERSIÓN QUE NUNCA SE PUBLICÓ ──────────────────
+ *
+ * Lo que se comprueba aquí es LA REGLA, sin red: la comprobación de verdad sólo
+ * puede hacerla `web:build`, que es quien habla con GitHub. Pero la regla tiene
+ * dos mitades que se pueden equivocar solas —cuándo calla y cuándo no— y ésas
+ * sí se prueban en frío.
+ *
+ * El caso real: la v1.13.0 no llegó a existir como release, con sus cinco `.md`
+ * escritos y todo el mundo seis días en la 1.12.0. Ver `web/huerfanas.mjs`.
+ */
+{
+  console.log('\nnotas sin release');
+  const os = await import('node:os');
+  const { notasHuerfanas } = await import('../web/huerfanas.mjs');
+  const dir = fs.mkdtempSync(path.join(os.default.tmpdir(), 'notas-'));
+  for (const f of ['1.12.0.es.md', '1.13.0.es.md', '1.13.0.de.md', '1.14.0.es.md']) {
+    fs.writeFileSync(path.join(dir, f), 'x');
+  }
+  const publicadas = [{ tag: 'v1.12.0' }];
+
+  // Primera construcción: la de hoy todavía no existe, y es correcto que así sea.
+  ok(notasHuerfanas(publicadas, '1.14.0', dir).length === 0,
+    'en la primera construcción calla: la release de hoy aún no existe por diseño');
+
+  // Segunda: ya existe la de hoy, así que se exige que estén TODAS.
+  const h = notasHuerfanas([{ tag: 'v1.14.0' }, ...publicadas], '1.14.0', dir);
+  ok(h.length === 1 && h[0] === '1.13.0',
+    'en la segunda, señala la versión con notas y sin release', h.join(', '));
+
+  ok(notasHuerfanas([{ tag: 'v1.14.0' }, { tag: 'v1.13.0' }, ...publicadas], '1.14.0', dir).length === 0,
+    'y calla en cuanto esa versión tiene la suya');
+
+  // Un solo idioma escrito cuenta igual: alguien redactó para alguien.
+  fs.rmSync(path.join(dir, '1.13.0.es.md'));
+  ok(notasHuerfanas([{ tag: 'v1.14.0' }, ...publicadas], '1.14.0', dir)[0] === '1.13.0',
+    'con un solo idioma escrito también salta');
+  fs.rmSync(dir, { recursive: true, force: true });
+}
+
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');
 process.exit(failed ? 1 : 0);

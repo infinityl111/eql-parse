@@ -16,6 +16,26 @@ estaba en ninguna parte del árbol y hubo que recuperarlo ejecutándolo. Ya es
 `npm run web:deploy`. Si al leer esto encuentras otro paso que no puedas copiar
 de algún sitio, ése es el siguiente.
 
+## Y la quinta es este documento: nació saltándose un paso
+
+Se descubrió seis días después, al publicar la 1.14.0. **La release v1.13.0 nunca
+llegó a existir**: el commit estaba en `main`, los cinco `.md` estaban escritos,
+`PUBLICAR.md` se había redactado durante esa misma publicación — y no había ni
+release, ni etiqueta, ni borrador. Todo el mundo siguió en la 1.12.0 seis días, y
+nada lo dijo.
+
+**REDACTAR EL RITUAL Y EJECUTARLO SE PARECEN LO BASTANTE COMO PARA CONFUNDIRLOS.**
+Escribiendo «paso 5: crea la release» con el detalle de qué fichero copiar y por
+qué, la sensación de haberlo hecho es casi la de hacerlo: se toca el mismo
+material, se comprueba lo mismo, se sale con la misma impresión de tarea cerrada.
+Es la forma exacta de la salida muerta que persigue `ui/app.js` —trabajo que se
+ejecuta bien y no llega a nadie— sólo que aplicada al propio documento que existe
+para evitarla.
+
+No se arregla teniendo más cuidado. Se arregla con una guarda que mire el dato,
+y el dato ya estaba: `web:build` se trae las releases de la API en cada
+construcción. **Ver el paso 9**, que es donde vive ahora esa comprobación.
+
 ---
 
 ## La regla que resume todo lo demás
@@ -149,6 +169,21 @@ compruébalo con los ojos:
 ### 9. `npm run web:build` — **la segunda**
 
 Ahora la release existe, así que ésta sí trae la página de la versión nueva.
+
+**Y es la que comprueba que no te dejaste ninguna atrás.** Como la release de hoy
+ya está creada, esta construcción exige que **toda versión con notas escritas en
+`web/notas/` tenga su release** — y se para si no. Es la red que faltaba el día
+que la v1.13.0 no llegó a existir: ver `web/huerfanas.mjs`, y arriba, «nació
+saltándose un paso».
+
+En la primera construcción no salta, y no es un descuido: allí la release de hoy
+todavía no existe **por diseño**, porque esa construcción es justamente la que
+genera lo que hace falta para crearla. La propia release de hoy dice en qué
+pasada estamos, así que la guarda no necesita que nadie le pase nada.
+
+Si se pone roja, hay dos salidas y ninguna es seguir: **publicar esa release**, o
+**borrar sus notas**. Unas notas escritas y sin publicar no son un borrador — son
+algo redactado para alguien que no lo ha leído.
 
 ### 10. Despliega la web
 

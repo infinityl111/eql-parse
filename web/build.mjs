@@ -29,6 +29,8 @@ import { fileURLToPath } from 'node:url';
 import { IDIOMAS, CON_PROSA, NOMBRE_IDIOMA, T, FUNCIONES } from './textos.js';
 import { setLang, t } from '../src/i18n.js';
 import { sustituirRotulos } from './rotulos.mjs';
+// La red que faltaba: notas escritas para una versión que nunca se publicó.
+import { exigirNotasPublicadas } from './huerfanas.mjs';
 
 const RAIZ = path.dirname(fileURLToPath(import.meta.url));
 const PROY = path.join(RAIZ, '..');
@@ -108,6 +110,7 @@ const CAPTURAS = [
 ];
 
 // ── Las novedades ───────────────────────────────────────────────────────────
+
 async function releases() {
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`,
@@ -722,6 +725,7 @@ async function main() {
   if (huecos.length) throw new Error(`textos sin escribir: ${huecos.join(', ')}`);
 
   const rels = await releases();
+  exigirNotasPublicadas(rels, JSON.parse(fs.readFileSync(path.join(PROY, 'package.json'), 'utf8')).version);
 
   // Imágenes: las capturas de los README y la muestra del reproductor.
   // Una copia por cada ruta distinta que pidan las cinco páginas. Si sólo hay
