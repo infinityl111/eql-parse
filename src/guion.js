@@ -289,6 +289,22 @@ export function guion(f, lineas, Parser, self = null) {
   for (const a of actores.values()) {
     const clave = a.nombre.charAt(0).toLowerCase() + a.nombre.slice(1);
     a.figuras = suelos.get(clave) ?? 1;
+    /**
+     * DE QUÉ SE APOYA EL SUELO, porque no todas las N valen lo mismo.
+     *
+     * Medido sobre el histórico, de los 495 nombres con N≥2:
+     *
+     *   451 (91,1 %)  se apoyan en DOS O MÁS MUERTES — el registro las escribió
+     *    18 (3,6 %)   el último individuo se apoya sólo en actividad posterior
+     *    26 (5,3 %)   N=2 apoyado SÓLO en actividad posterior, con una muerte
+     *
+     * Los 44 del segundo y tercer grupo son los que tienen la afirmación más
+     * floja: «hubo otro» sale de que siguieron llegando líneas del nombre, no
+     * de una segunda muerte escrita. Sigue siendo cierto —un muerto no pega—
+     * pero es una inferencia y la interfaz lo dice.
+     */
+    const nMuertes = (instantes.get(clave) ?? []).length;
+    a.suelo = { muertes: nMuertes, porActividad: a.figuras > Math.max(1, nMuertes) };
     // Los instantes en que cae una de las suyas, en orden. Una por muerte; si el
     // suelo es mayor que las muertes, la de más no cae en toda la pelea.
     a.caidas = (instantes.get(clave) ?? []).slice().sort((x, y) => x - y)

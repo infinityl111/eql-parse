@@ -1834,3 +1834,8 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .rp-figs .rp-svg.caida { opacity: .28; transform: rotate(90deg) translateY(6px); }
 .rp-conj { font-size: 9.5px; font-style: normal; color: var(--bone-faint);
   letter-spacing: .03em; margin-left: 3px; }
+/* «al menos 3» debajo del nombre. N es un suelo y «×3» se lee como exactamente
+   tres: el juego no numera los bichos, así que la cifra mínima es lo único que
+   el registro sostiene. Va en pequeño y apagado — es una precisión, no un dato
+   que compita con el nombre. */
+.rp-suelo { font-size: 9.5px; color: var(--bone-faint); letter-spacing: .02em; margin-top: 1px; }

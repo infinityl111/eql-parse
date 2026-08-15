@@ -737,6 +737,25 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
    * Una foto mala se ve peor grande y sola que pequeña en una fila, así que el
    * sitio donde la imagen sí entra es el que necesita la forma de rechazarla.
    */
+  /**
+   * QUÉ DICE EL GRUPO DE FIGURAS AL PASAR POR ENCIMA.
+   *
+   * N ES UN SUELO Y «×2» SE LEE COMO EXACTAMENTE DOS. Si hubo tres y murió uno,
+   * se dibujan dos — y lo que el registro sostiene es «al menos dos». EQL no
+   * numera los bichos: no hay forma de saber cuántos había, sólo cuántos hubo
+   * COMO MÍNIMO. Así que el texto dice «al menos», y no el número a secas.
+   *
+   * Y dice de qué se apoya, porque no todas las N valen lo mismo: 451 de los
+   * 495 nombres con N≥2 del histórico se apoyan en dos o más muertes escritas,
+   * y 44 en que siguieron llegando líneas del nombre después de la última. Lo
+   * segundo es cierto —un muerto no pega— pero es una inferencia, no una línea.
+   */
+  const rotuloSuelo = (a, n) => [
+    t('rp.fig.alMenos', { n }),
+    a.suelo?.porActividad ? t('rp.fig.porActividad') : null,
+    t('rp.fig.cualCae'),
+  ].filter(Boolean).join(' ');
+
   const columna = (lista, lado) => `<div class="rp-col rp-${lado}">
     ${lista.map((a) => {
     const fig = a.mascota ? FIGURAS.mascota : (lado === 'enemigo' ? FIGURAS.enemigo : FIGURAS.jugador);
@@ -744,12 +763,20 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
     return `<div class="rp-act ${a.esTu ? 'yo' : ''} fuera" data-act="${esc(a.nombre)}"
         data-desde="${a.desde ?? ''}" data-figuras="${n}" id="${idDe(a.nombre)}">
         <div class="rp-fig">
-          <div class="rp-figs" title="${n > 1 ? esc(t('rp.fig.cualCae')) : ''}">${
+          <div class="rp-figs" title="${n > 1 ? esc(rotuloSuelo(a, n)) : ''}">${
   Array.from({ length: n }, (_, i) => `<svg viewBox="0 0 48 60" class="rp-svg" data-i="${i}">${fig}</svg>`).join('')
 }</div>
           <div class="rp-flot"></div>
         </div>
         <div class="rp-nom">${esc(a.nombre)}${a.mascota ? ` <i>${esc(t('rp.pet'))}</i>` : ''}</div>
+        <!--
+          «AL MENOS N» VA EN SU PROPIA LÍNEA, no pegado al nombre.
+          Se probó detrás del nombre y se vio pintado: la columna es estrecha
+          y el nombre se corta con puntos suspensivos, así que salía «a vampire
+          bat AL …» y en el de al lado no salía nada. Un rótulo que la mitad de
+          las veces desaparece es peor que no ponerlo.
+        -->
+        ${n > 1 ? `<div class="rp-suelo" title="${esc(rotuloSuelo(a, n))}">${esc(t('rp.fig.alMenosCorto', { n }))}</div>` : ''}
         <!--
           EL DPS VA UNA VEZ POR NOMBRE, NO UNA POR FIGURA.
           Con dos figuras, un «47 dps» debajo de cada una se leería como que
