@@ -705,10 +705,71 @@ Lo que enviaron en su lugar reparte las preguntas:
 > informs ("is this engaged instance still alive?"). The fallback is a different
 > question — "has anything at all happened?"*
 
-**Nuestro `MEZ_MAX = 226` es un sostén sin ese matiz.** No es un fallo
-demostrado —tendría que medirse—, pero es la pregunta que su experiencia deja
-sobre la mesa: *un mez sin refrescar, ¿mantiene abierta una pelea que ya no
-existe?*
+**Nuestro `MEZ_MAX = 226` es un sostén sin ese matiz** — y aquí quedaba escrita
+la pregunta que su cicatriz dejaba abierta: *un mez sin refrescar, ¿mantiene
+viva una pelea que ya no existe?*
+
+#### La respuesta, medida el 16 de agosto: no nos afecta, y la razón es estructural
+
+Su fallo era que el sostén **cortocircuitaba la función entera**, así que uno
+rancio derrotaba TODOS los caminos de cierre. El nuestro vive **dentro del bucle
+por enemigo** (`src/encounter.js:1593`) y hace `continue` al fallar (`:1594`):
+sostiene UNA ventana, y las demás se siguen examinando. Y no puede resucitar a
+un muerto — la rama del muerto (`:1590`) sale antes de consultarlo.
+
+**La medición que lo cierra**, y es la única que valía: partir el registro dos
+veces, con el camino del sostén y sin él.
+
+| | peleas |
+|---|---:|
+| con el sostén | 1.571 |
+| sin el sostén | 1.615 |
+| **fronteras que el sostén evita** | **44** |
+
+Y el barrido de un respaldo por silencio, sobre el hueco interno mayor de cada
+pelea (mediana 2 s, p90 8 s, p99 14 s):
+
+| respaldo | peleas que se partirían | de ésas, **con sostén** |
+|---:|---:|---:|
+| 45 s | 8 | **8** |
+| 60 s | 7 | **7** |
+| 90 s | 3 | **3** |
+| 180 s | 1 | **1** |
+
+**No hay ni una sola pelea sostenida por nada**, así que un respaldo como el suyo
+dispararía cero veces. Y de las siete con silencio mayor de 60 s, **cuatro las
+sostiene un ENCANTO** (161, 74, 67 y 65 s) — legítimas por nuestra propia
+doctrina, y un respaldo por silencio a secas las cortaría. **No se añade
+respaldo y no se toca `MEZ_MAX`.**
+
+#### Lo que sí queda, y no es un umbral
+
+Las **tres** peleas que un mez sobre una **mascota enemiga** mantiene unidas. El
+caso es estructural y no lo arregla ninguna constante: **una mascota enemiga
+despawnea con su dueño y nunca escribe su propia despedida**, así que el sostén
+espera un final que el registro no va a escribir jamás; sólo lo para el tope.
+
+La mayor, del 11 de agosto a las 11:26:24, dura 475 s y sin el sostén serían
+tres peleas, cortadas en +308 s y +421 s:
+
+| tramo | sucesos | daño | nombres | exclusivos suyos |
+|---|---:|---:|---:|---|
+| A +0–308 s | 1.105 | 9.548 | 6 | `a tsu ghoul wizard`, **`a tsu ghoul wizard pet`**, `Garobab` |
+| B +308–421 s | 542 | 5.839 | 6 | `a vis ghoul knight`, `Rolendor` |
+| C +421–475 s | 356 | 3.955 | 7 | `a zol ghoul knight`, `a basalt gargoyle`, `a wan ghoul knight` |
+
+Cada tramo tiene enemigos que no salen en los otros, y **la mascota mezada sólo
+aparece en el primero**: B y C son tirones distintos encadenados al suyo.
+
+> **CORRECCIÓN.** Una versión anterior de este apartado daba «1.356 sucesos,
+> 13.149 de daño y un corte del plazo en +68 s» para esta misma pelea. **Esas
+> cifras eran incorrectas** y se dejan escritas aquí porque el motivo importa: el
+> arnés que las produjo apuntaba la hora de CADA evento tras alimentarlo al
+> rastreador, incluidos los que éste rechaza por irrelevantes, así que metía
+> combate ajeno dentro de la pelea. Y el «+68 s» salía de suponer que el campo
+> `sostenes` prueba que la pelea se habría cerrado sin el sostén — no lo prueba:
+> `#sigueAbierta` devuelve en cuanto encuentra UNA ventana abierta, así que otro
+> enemigo pudo mantenerla igual. Ver la undécima familia en `ui/app.js`.
 
 Y un tercero, que es un detalle de cierre que nosotros resolvimos igual
 (`lifecycle.ts:104-107`): *«Finalization always stamps the encounter's lastTs (a

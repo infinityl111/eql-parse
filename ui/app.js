@@ -2525,6 +2525,30 @@ async function renderNarrate(host) {
    * POR QUÉ ES LA PEOR DE LAS ONCE: las otras diez dan un número malo, y un
    * número malo se puede notar. Ésta da un número que CONFIRMA lo que ya creías,
    * y encima con aspecto de medición. Es la alarma muerta con bata de laboratorio.
+   *
+   * ── Y SU ANTÍDOTO EN POSITIVO, que es una herramienta y no un cuidado ──────
+   *
+   *     PARA SABER QUÉ HACE UNA REGLA, CORRE EL MUNDO CON ELLA Y SIN ELLA.
+   *     NUNCA LE PREGUNTES A LA REGLA.
+   *
+   * Cada vez que hemos preguntado al mecanismo nos ha contestado lo que él cree,
+   * que es justo lo que estábamos auditando: el campo «refrescado» lo escribe la
+   * misma pista de estado que sostiene la pelea; el campo `sostenes` lo anota el
+   * sostén cuando decide, y como `#sigueAbierta` devuelve en cuanto encuentra UNA
+   * ventana abierta, un sostén anotado NUNCA probó que la pelea se hubiera
+   * cerrado sin él; y la lista del arnés la llenaba el propio arnés.
+   *
+   * Lo que sí lo prueba: partir el registro DOS VECES, con el camino y sin él, y
+   * restar. Medido así, el sostén cambia 44 fronteras de 1.571 — un número que
+   * ninguna de las tres preguntas anteriores podía dar, porque las tres
+   * preguntaban al acusado.
+   *
+   * ES EL ORÁCULO DE EQUIVALENCIA DE jmoyers PUESTO DEL REVÉS. Ellos pliegan los
+   * mismos ficheros con y sin trocear y exigen que salga IGUAL, para probar que
+   * una optimización no cambia nada. Aquí se corre con y sin una regla y se exige
+   * que salga DISTINTO, y la diferencia es exactamente lo que hace la regla. La
+   * misma herramienta contestando las dos preguntas que importan de un cambio:
+   * «¿esto no cambia nada?» y «¿qué cambia esto?».
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
