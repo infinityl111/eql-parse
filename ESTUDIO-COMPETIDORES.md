@@ -13,7 +13,7 @@ con qué método.
 
 | | jmoyers/everquest-companion | sowoky/eqltools-companion | EQL Parse |
 |---|---|---|---|
-| Licencia | **FSL-1.1-MIT** | **AGPL-3.0** | (la nuestra) |
+| Licencia | **FSL-1.1-MIT** | **AGPL-3.0** | **FSL-1.1-MIT** |
 | Commits leídos | 1.109 (4–14 ago 2026) | 45 (30 jul–15 ago 2026) | — |
 | Versión al leerlo | 0.28.0 | 0.19.1 | 1.14.1 |
 | Código | 196.103 líneas TypeScript | 13.261 líneas JS | — |
@@ -53,6 +53,19 @@ Version 3, 19 November 2007
 
 `package.json`: `"license": "AGPL-3.0"`. Copyleft fuerte: cualquier trozo suyo
 dentro de EQL Parse arrastraría a EQL Parse entero a la AGPL.
+
+**Y desde el 16 de agosto de 2026, la nuestra es la misma que la de jmoyers.**
+Miguel ha elegido FSL-1.1-MIT: `LICENSE` en la raíz con el texto canónico
+de **fsl.software** —no el suyo, que lleva su nombre dentro— y
+`"license": "FSL-1.1-MIT"` en el `package.json`.
+
+**Y sí es un identificador SPDX válido**, contra lo que parecía: está en la
+lista oficial de 733 licencias junto a `FSL-1.1-ALv2`, y `npm pack` no emite
+ningún aviso, así que no hace falta el `SEE LICENSE IN LICENSE` de reserva.
+
+Compartir licencia **no cambia nada de lo de arriba**: que dos proyectos usen la
+misma no autoriza a ninguno a copiar del otro. La FSL protege a cada titular por
+separado.
 
 **Consecuencia práctica.** La regla que ya teníamos —*leer no es copiar, lo suyo
 es consultado, se mide contra el registro de Miguel y se escribe nuestra regla*—

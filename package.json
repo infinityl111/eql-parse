@@ -29,7 +29,8 @@
       "src/**",
       "ui/**",
       "build/icon.ico",
-      "package.json"
+      "package.json",
+      "LICENSE"
     ],
     "win": {
       "target": "nsis",
@@ -70,5 +71,6 @@
   "engines": {
     "node": ">=20"
   },
-  "author": "Miguel Ángel Fernández"
+  "author": "Miguel Ángel Fernández",
+  "license": "FSL-1.1-MIT"
 }

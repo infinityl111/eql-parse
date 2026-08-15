@@ -1839,3 +1839,15 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
    el registro sostiene. Va en pequeño y apagado — es una precisión, no un dato
    que compita con el nombre. */
 .rp-suelo { font-size: 9.5px; color: var(--bone-faint); letter-spacing: .02em; margin-top: 1px; }
+
+/* ── Acerca de ─────────────────────────────────────────────────────────── */
+.dlg.acerca { width: min(520px, 100%); }
+.acerca-v { font-family: var(--display); font-size: 15px; color: var(--bone); margin-bottom: 2px; }
+.acerca-sec { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.acerca-sec .eyebrow { margin-bottom: 6px; }
+/* El texto legal va en inglés y con su propia caja: se lee como una cita, no
+   como interfaz, que es lo que es. */
+.acerca-legal { margin: 0 0 6px; font-size: 12px; line-height: 1.5; color: var(--bone-dim); }
+.acerca-legal code { font-size: 11px; color: var(--bone); }
+#fCredit { cursor: pointer; }
+#fCredit:hover { color: var(--bone); }

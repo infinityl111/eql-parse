@@ -109,3 +109,71 @@ export function pedirDatos({ titulo, texto = '', campos = [], aceptar = 'OK', ca
     inputs[0]?.select();
   });
 }
+
+/**
+ * ACERCA DE: versión, licencia y avisos de terceros.
+ *
+ * ── POR QUÉ EL TEXTO LEGAL VA EN INGLÉS ───────────────────────────────────
+ *
+ * Por lo mismo que la jerga del juego (`src/jerga.js`): traducir una licencia
+ * la cambia. El nombre de la FSL, la frase de la conversión a MIT y el aviso de
+ * los terceros son el texto que rige, y una versión española sería una
+ * paráfrasis con aspecto de documento — que es peor que no tenerla, porque
+ * alguien la leería como si valiese.
+ *
+ * Lo que SÍ se traduce es el rótulo que trae aquí y las frases que explican qué
+ * es cada cosa. La regla es la de siempre: se traduce lo que orienta, no lo que
+ * obliga.
+ *
+ * ── LOS AVISOS DE TERCEROS, Y QUÉ SE COMPROBÓ ─────────────────────────────
+ *
+ * El instalador empaqueta Chromium, Node y Electron, y los tres exigen que sus
+ * avisos de copyright viajen con lo que se distribuye. Comprobado sobre el
+ * paquete que generamos hoy (`dist/win-unpacked`): `LICENSE.electron.txt` y
+ * `LICENSES.chromium.html` —9,45 MB, con 111 menciones de Node y OpenSSL
+ * dentro— ya estaban, porque los pone electron-builder solo.
+ *
+ * La que NO estaba era la NUESTRA: `build.files` listaba `electron/`, `src/`,
+ * `ui/`, el icono y el `package.json`, y no el `LICENSE`. O sea que
+ * repartíamos los avisos de todos menos el propio. Añadido.
+ */
+export function acercaDe({ version, licencia, t }) {
+  const foco = document.activeElement;
+  const fondo = document.createElement('div');
+  fondo.className = 'dlg-fondo';
+  fondo.innerHTML = `<div class="dlg acerca" role="dialog" aria-modal="true" aria-label="${esc(t('about.title'))}">
+    <div class="dlg-h">${esc(t('about.title'))}</div>
+    <div class="acerca-v"><b>EQL Parse</b> <span class="num">${esc(version || '—')}</span></div>
+    <p class="dlg-t hint">${esc(t('about.what'))}</p>
+
+    <div class="acerca-sec">
+      <div class="eyebrow">${esc(t('about.license'))}</div>
+      <!-- En inglés a propósito: es el texto que rige. Ver la cabecera. -->
+      <p class="acerca-legal">Functional Source License, Version 1.1, MIT Future License
+        (<code>FSL-1.1-MIT</code>)<br>Copyright 2026 Miguel Ángel Fernández</p>
+      <p class="hint">${esc(t('about.futureMit'))}</p>
+    </div>
+
+    <div class="acerca-sec">
+      <div class="eyebrow">${esc(t('about.thirdParty'))}</div>
+      <p class="acerca-legal">This application bundles Electron, Chromium and Node.js.
+        Their copyright notices ship with the installer as
+        <code>LICENSE.electron.txt</code> and <code>LICENSES.chromium.html</code>,
+        in the same folder as the executable.</p>
+    </div>
+
+    <div class="dlg-btns"><button type="button" class="dlg-si">${esc(t('about.close'))}</button></div>
+  </div>`;
+  document.body.appendChild(fondo);
+
+  const cerrar = () => {
+    document.removeEventListener('keydown', teclas, true);
+    fondo.remove();
+    try { foco?.focus?.(); } catch { /* se fue de la página */ }
+  };
+  const teclas = (e) => { if (e.key === 'Escape') { e.preventDefault(); cerrar(); } };
+  document.addEventListener('keydown', teclas, true);
+  fondo.addEventListener('mousedown', (e) => { if (e.target === fondo) cerrar(); });
+  fondo.querySelector('.dlg-si').addEventListener('click', cerrar);
+  fondo.querySelector('.dlg-si').focus();
+}

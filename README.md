@@ -361,6 +361,32 @@ ahí salen los límites del programa, y ninguno se disimula:
   ella: el log no distingue un esquive de postura de una parada normal, y lo
   que se ve es sólo el 5% de ataques que se colaron. Ahí se enseña el reparto,
   pero no se recomienda nada.
+---
+
+## Licencia
+
+**Functional Source License, Version 1.1, MIT Future License** (`FSL-1.1-MIT`).
+El texto completo está en [LICENSE](LICENSE), en inglés, que es el idioma en el
+que rige.
+
+En dos frases: puedes usarlo, leerlo, modificarlo y redistribuirlo para
+cualquier cosa **menos** para hacerle la competencia. Y **cada versión pasa
+automáticamente a licencia MIT dos años después de publicarse** — la 1.15.0, de
+agosto de 2026, será MIT en agosto de 2028. La restricción caduca; el código no.
+
+Las versiones anteriores a la 1.15.0 se publicaron **sin licencia explícita**:
+todos los derechos reservados. A partir de la 1.15.0, FSL-1.1-MIT. Las
+publicaciones antiguas se quedan donde están — sin licencia son *más*
+restrictivas que la FSL, así que no hay nada que retirar, y borrar una
+publicación no borraría ni la etiqueta, ni los commits, ni lo que ya haya
+clonado nadie.
+
+## Contribuciones
+
+Bienvenidas. Quien envíe un cambio acepta que su aportación se publique bajo la
+licencia del proyecto, la misma de arriba, y conserva la autoría de lo que
+escribió.
+
 
 ---
 

@@ -6,7 +6,7 @@ import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { copiarAlPortapapeles } from './clip.js';
-import { pedirDatos } from './dialogo.js';
+import { pedirDatos, acercaDe } from './dialogo.js';
 import { initTriggers, renderTriggers } from './triggers.js';
 import { plate, DIBUJADAS } from './plates.js';
 import { grafica, STANCE_COLOR, W, H, BAND } from './grafica.js';
@@ -5428,6 +5428,13 @@ window.eql.appVersion?.().then((v) => {
 }).catch(() => { /* si no la da, el pie se queda con el nombre y el crédito */ });
 
 $('btnHelp')?.addEventListener('click', openWizard);
+
+// ACERCA DE, colgado del crédito del pie.
+//
+// No lleva botón propio en la barra: el pie ya enseña el nombre y la versión,
+// así que es donde mira quien busca ese dato. Un botón más arriba sería una
+// cosa más que estorba a diario para algo que se abre dos veces en la vida.
+$('fCredit')?.addEventListener('click', () => acercaDe({ version, licencia: 'FSL-1.1-MIT', t }));
 $('btnSetup').addEventListener('contextmenu', (e) => { e.preventDefault(); openWizard(); });
 
 // ═══════════ Avisos ═══════════

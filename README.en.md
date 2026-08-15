@@ -364,6 +364,30 @@ where the program's limits come from, and none of them are papered over:
   would come in without it: the log doesn't distinguish a stance evade from an
   ordinary parry, and what you see is only the 5% of attacks that got through.
   There the split is shown, but nothing is recommended.
+---
+
+## License
+
+**Functional Source License, Version 1.1, MIT Future License** (`FSL-1.1-MIT`).
+The full text is in [LICENSE](LICENSE).
+
+In two sentences: you may use, read, modify and redistribute it for anything
+**except** competing with it. And **every version automatically becomes
+MIT-licensed two years after its release** — 1.15.0, from August 2026, turns MIT
+in August 2028. The restriction expires; the code does not.
+
+Versions before 1.15.0 shipped **with no explicit license**: all rights
+reserved. From 1.15.0 onwards, FSL-1.1-MIT. The older releases stay where they
+are — with no license they are *more* restrictive than the FSL, so there is
+nothing to withdraw, and deleting a release would not delete the tag, the
+commits, or anything anyone has already cloned.
+
+## Contributing
+
+Welcome. Anyone sending a change accepts that their contribution is published
+under the project's license, the same one above, and keeps authorship of what
+they wrote.
+
 
 ---
 
