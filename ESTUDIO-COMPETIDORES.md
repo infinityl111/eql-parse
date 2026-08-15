@@ -534,6 +534,17 @@ clasificar. Son 18 en todo el registro, en cinco episodios:
 No es un residuo sin nombre: es **una tercera categoría real**, y ahora tiene su
 fila en la cuenta.
 
+**Y son la mitad de un fenómeno con dos caras.** Un mensaje de chat partido en
+varias líneas nos ataca por arriba y por abajo a la vez:
+
+- **Las líneas de abajo** —las continuaciones— no traen cabecera `[hora]`, así
+  que el parser no llega a clasificarlas. Son estas 18.
+- **La línea de arriba** —la primera— sí trae cabecera y abre comilla, pero no
+  la cierra, porque el texto sigue debajo. Son **8 en todo el registro**, de
+  32.659 que abren cita. Ésas caían en la regla de daño.
+
+La misma forma partida, dos fallos distintos, uno por cada extremo.
+
 **El denominador del 6,07 %.** El fichero tiene **951.773 líneas físicas no
 vacías** y **951.755 registros lógicos** (las 18 de arriba son líneas pero no
 son registros). El porcentaje está calculado sobre **los registros lógicos** —
@@ -786,9 +797,55 @@ eso eran aproximadamente correctos, aunque hoy sale 25,5 s (la diferencia cabe
 en un disco distinto, una caché fría o una versión anterior; no se ha
 investigado más porque el orden de magnitud es el mismo).
 
-**LA CIFRA COMPARABLE ES 25,5 s, 0,342 s/MB**, porque es la que sufre el usuario
-cuando le sale el cartel de migración. Y trae dentro un dato que cambia el
-apartado: **escribir cuesta 13,6 s de los 25,5, más de la mitad del total**.
+**LA CIFRA COMPARABLE ES ~25 s, 0,32-0,34 s/MB**, porque es la que sufre el
+usuario cuando le sale el cartel de migración.
+
+#### Y dentro de la D: 24 % disco, 76 % CPU
+
+«Escribir cuesta 13,6 s» fue una resta —D menos C— y esa resta **no es el coste
+de escribir**: incluye también la CPU de construir cada pelea. Instrumentado el
+sistema de ficheros llamada a llamada (24,4 s, 1.491 peleas, 16,3 ms/pelea):
+
+| qué | llamadas | ms | MB |
+|---|---:|---:|---:|
+| `mkdir` de una carpeta que **ya existe** | 3.801 | **2.291** | 0 |
+| `fights.ndjson` | 1.491 | 1.062 | 24,1 |
+| `resume.json` — un puntero de 200 bytes | 1.492 | **1.011** | 0,3 |
+| `fights.idx` | 1.491 | 837 | 0,8 |
+| el resto (hechizos, AA, botín, mascotas, enciclopedia) | 933 | 536 | 5,0 |
+| **todo el disco** | **9.209** | **5.737** | |
+
+**El disco es 5,7 s de los 24,4 — un 24 %.** Los otros 18,6 s son CPU: leer,
+parsear, segmentar y agregar cada pelea.
+
+Dos partidas de esas 5,7 s no llevan información a ningún sitio: **2,3 s creando
+una carpeta que ya existe 3.801 veces** y **1,0 s reescribiendo 1.492 veces un
+fichero de 200 bytes** que sólo hace falta al final. Son 3,3 s, el 13 % de la
+reconstrucción entera. No se ha tocado nada: el reparto va antes que el arreglo.
+
+(Un aviso sobre el instrumento, porque el primer intento salió al doble: envolver
+`appendFileSync` **y** `writeFileSync` cuenta cada escritura dos veces, porque en
+Node el primero llama al segundo por dentro. Las cifras de arriba llevan guarda
+de reentrada. El intento sin ella decía 48 MB en `fights.ndjson` — el doble de
+los 24 que ocupa de verdad— y por un momento pareció que escribíamos cada pelea
+dos veces. No: eran 1.491 escrituras para 1.491 peleas.)
+
+#### Y crece con los megabytes, no con lo ya guardado
+
+La pregunta que decide si la pared empeora sola. Reconstruyendo sobre el 25 %,
+50 %, 75 % y 100 % del registro:
+
+| parte | MB | peleas | total | ms/pelea | s/MB |
+|---|---:|---:|---:|---:|---:|
+| 25 % | 18,9 | 313 | 5,8 s | 18,7 | 0,310 |
+| 50 % | 37,7 | 652 | 11,6 s | 17,7 | 0,306 |
+| 75 % | 56,6 | 989 | 17,5 s | 17,7 | 0,310 |
+| 100 % | 75,6 | 1.490 | 23,9 s | 16,1 | 0,317 |
+
+**Lineal, y el coste por pelea si acaso BAJA.** No hay término que crezca con lo
+que ya hay en el almacén: ni el `seen` de la identidad lógica —es un `Map`— ni el
+índice, que se añade al final. Así que la proyección a un año no se queda corta
+por ese lado, que era el temor razonable.
 
 Eso ordena la comparación de otra manera. Ellos repliegan en cada arranque y no
 escriben nunca: pagan la etapa C —11,9 s en nuestro registro— cada vez que
@@ -1283,8 +1340,9 @@ separar.
 
 **Donde vamos por detrás, y es medible:** el plegado de mayúscula sin prueba (152
 de 164 nombres propios), las 9.965 líneas de facción que son la puerta a detectar
-muertes que el log no escribe, la reconstrucción de 25,5 s —de los que 13,6 son
-de escritura— que ellos han evitado sin
+muertes que el log no escribe, la reconstrucción de ~25 s —de los que 5,7 son
+de disco y 3,3 de ésos no llevan información a ningún sitio— que ellos han
+evitado sin
 hilos —troceando y descansando—, y la ausencia de oráculos de equivalencia en las
 pruebas.
 
