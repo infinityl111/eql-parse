@@ -24,6 +24,26 @@ const pct = (v) => `${((v || 0) * 100).toFixed(1)}%`;
 const secs = (s) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`);
 const $ = (id) => document.getElementById(id);
 
+/**
+ * ¿CAYÓ ESTE BICHO EN ESTA PELEA? Comparando sin la mayúscula inicial.
+ *
+ * `kills` se guarda con el nombre TAL CUAL venía en la línea de muerte —EQ
+ * capitaliza al abrir frase— mientras que el nombre de la ficha viene de la
+ * fila del combatiente, que `Encounter.actor` normaliza. Las dos formas
+ * conviven en la misma pelea guardada.
+ *
+ * MEDIDO sobre el histórico: 9 filas de esta lista decían «sobrevivió» de un
+ * bicho que había caído —`heart harpie` ×2, `orc legionnaire` ×2, `dry bones
+ * skeleton`, `phoboplasm`, `royal guard`, `royal guard pet`, `orc centurion`—.
+ * Es el mismo fallo que le quitaba 25 abatidos al bestiario, por la otra
+ * puerta: la regla se había arreglado en `foes.js` y no aquí. Ver la nota de
+ * deuda en `src/store.js`.
+ */
+const cayoEn = (pelea, nombre) => {
+  const baja = (s) => String(s ?? '').charAt(0).toLowerCase() + String(s ?? '').slice(1);
+  return (pelea?.kills ?? []).some((k) => baja(k) === baja(nombre));
+};
+
 // La red de seguridad, montada antes que nada: si algo revienta al arrancar,
 // tiene que verse igual que si revienta luego.
 let version = '';
@@ -2198,6 +2218,44 @@ async function renderNarrate(host) {
    * es única —colapsa los renglones que comparten instante, incluido el `null`
    * de «desde siempre», que por eso puede ser sólo uno—. Se repinta igual,
    * porque una tabla que no refleja lo guardado despista aunque no borre nada.
+   *
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ANTES DE LA LISTA, LO QUE EXPLICA POR QUÉ HACE FALTA UNA LISTA
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   *     NO FALLABA NADA VISIBLE: UN NÚMERO MÁS BAJO NO SE DISTINGUE DE UN
+   *     NÚMERO CORRECTO.
+   *
+   * Ésa es la forma que tienen TODOS los fallos de esta lista, y no es una
+   * familia más: es la razón por la que las familias hacen falta.
+   *
+   *   el daño inflado por el fuego amigo      un total que sumaba de más
+   *   el tiempo parado que no era tuyo        un porcentaje que te acusaba
+   *   los abatidos que faltaban               una ficha con menos muertes
+   *   la vida estimada con la mitad de las    un promedio sobre menos muestras
+   *   muestras
+   *
+   * Ninguno rompió nada. No hubo excepción, ni pantalla en blanco, ni cifra
+   * absurda: hubo números plausibles, en su sitio, con su formato correcto,
+   * describiendo algo que no había pasado. Un `undefined` en la interfaz lo ve
+   * cualquiera en diez segundos; «14 abatidos» donde eran 28 no lo ve nadie
+   * nunca, porque no hay nada con qué compararlo.
+   *
+   * DE AHÍ SALEN LAS DOS REGLAS DE ESTA CASA, y ahora se entiende por qué son
+   * las dos que son:
+   *
+   *   1. TODO NÚMERO LLEVA SU MEDICIÓN AL LADO. No por rigor: porque es lo
+   *      único que permite volver a comprobarlo. Un número sin procedencia no
+   *      se puede revisar, sólo creer.
+   *   2. LOS FALLOS SE BUSCAN MIDIENDO, NO LEYENDO. Las diez familias de abajo
+   *      las cazaron mediciones —releer el registro entero y comparar con lo
+   *      que el código prometía—, no lecturas del código. Dos de ellas las cazó
+   *      abrir la aplicación y mirar la pantalla.
+   *
+   * Y por eso una salida muerta es peligrosa aunque no rompa nada: mientras
+   * nadie la lea, es el único sitio donde vive la prueba de un fallo que no
+   * falla. Las 130 entradas de `hpSamples` que nadie leía escondían 25 abatidos
+   * perdidos del bestiario.
    *
    * ═══════════════════════════════════════════════════════════════════════════
    * Y VAN SEIS CON LA MISMA RAÍZ: DEJAR QUE UN DATO INESTABLE MANDE SOBRE UNA
@@ -4893,7 +4951,7 @@ function encFoe() {
         <span class="nm">${esc(cuando(s.at))}</span>
         <span class="num dim">${secs(s.duration)}</span>
         <span class="num">${n0(s.raidDps)} dps</span>
-        <span class="num dim">${(s.kills ?? []).includes(f.name)
+        <span class="num dim">${cayoEn(s, f.name)
     ? esc(t('enc.fell')) : esc(t('enc.survived'))}</span>
       </button>`).join('')}</div>` : `<div class="hint">${esc(t('flt.none'))}</div>`}`;
 }

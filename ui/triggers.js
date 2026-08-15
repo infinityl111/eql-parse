@@ -136,12 +136,15 @@ function renderEditor() {
   const cuenta = (d.vistas && typeof d.vistas === 'object') ? d.vistas : null;
   const mismoLog = !cuenta?.registro || cuenta.registro === (cfg.logPath ?? null);
   const vistas = cuenta ? (cuenta.n ?? 0) : 0;
+  // El verde afirma «esto caza en TU registro», así que sólo se pone cuando
+  // la cuenta habla del registro de ahora. Con la de otro va en neutro: se
+  // vio pintado en claro y el verde estaba afirmando de más.
   const proc = `
     <div class="trig-proc">
       <span class="tag ${esPlantilla ? 'tag-tmpl' : 'tag-mine'}"
             title="${esc(t(esPlantilla ? 'tg.origen.plantillaHint' : 'tg.origen.tuyoHint'))}"
         >${esc(t(esPlantilla ? 'tg.origen.plantilla' : 'tg.origen.tuyo'))}</span>
-      <span class="tag ${vistas ? 'tag-viva' : 'tag-neutra'}" title="${esc(t('tg.vistasHint'))}"
+      <span class="tag ${vistas && mismoLog ? 'tag-viva' : 'tag-neutra'}" title="${esc(t('tg.vistasHint'))}"
         >${vistas ? esc(t(mismoLog ? 'tg.vistas' : 'tg.vistasOtro', { n: vistas })) : esc(t('tg.vistasNunca'))}</span>
     </div>
     ${d.note ? `<div class="hint trig-note">${esc(t(d.note))}</div>` : ''}`;

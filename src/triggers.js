@@ -150,7 +150,13 @@ export class TriggerEngine extends EventEmitter {
     };
   }
 
-  match(line, _t) {
+  /**
+   * @param {object} [opts]
+   *   - mudo  cuenta la coincidencia y NO hace nada más: ni voz, ni texto, ni
+   *           sonido, ni temporizadores. Es lo que usa la relectura del
+   *           registro al arrancar — ver la nota en `engine.js`.
+   */
+  match(line, _t, opts = {}) {
     for (const c of this.compiled) {
       if (!c.re) continue;
       const m = c.re.exec(line);
@@ -171,6 +177,9 @@ export class TriggerEngine extends EventEmitter {
       c.vistas = (c.vistas ?? 0) + 1;
       const def = this.defs.find((d) => d.id === c.id);
       if (def) this.#anota(def);
+
+      // Contado ya está; lo demás es hablar, y en la relectura no se habla.
+      if (opts.mudo) continue;
 
       const speak = substitute(c.speak, m, line);
       const text = substitute(c.text, m, line);

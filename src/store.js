@@ -193,6 +193,40 @@ export const FORMATO_VERSION = 10;
  *
  * ═══ DEUDA APUNTADA, PARA QUE LA PAGUE LA PRÓXIMA RECONSTRUCCIÓN ═══
  *
+ * ── DEUDA VIVA (1.14.1): `kills` y `hpSamples` GUARDAN EL NOMBRE SIN NORMALIZAR
+ *
+ * EQ capitaliza el nombre al abrir frase —«A shin ghoul knight has been slain»—
+ * y lo deja en minúscula a mitad —«You slash a shin ghoul knight»—.
+ * `Encounter.actor` normaliza la fila del combatiente; `kills`, `hpSamples` y
+ * `dead` se escriben con el nombre TAL CUAL venía en la línea de muerte. O sea
+ * que en el mismo fichero conviven las dos formas para el mismo bicho.
+ *
+ * LO QUE COSTÓ, medido: 25 abatidos de 4.348 no llegaban al bestiario y con
+ * ellos 39 muestras de vida —`orc legionnaire` perdía 14 de sus muertes— y 9
+ * filas de la lista de la enciclopedia decían «sobrevivió» de un bicho que
+ * había caído.
+ *
+ * SE ARREGLÓ AL LEER, y fue lo correcto: así queda bien el histórico que ya
+ * está en disco y nadie tiene que reconstruir por esto. Pero el disco se queda
+ * con las dos formas PARA SIEMPRE, y eso tiene un precio con fecha:
+ *
+ *     CUALQUIER LECTOR NUEVO DE `kills` TIENE QUE ACORDARSE DE NORMALIZAR,
+ *     Y ACORDARSE NO ES UNA GUARDA.
+ *
+ * Ya pasó dos veces en el mismo día: se arregló en `foes.js` y seguía crudo en
+ * `ui/app.js`. Es la forma que esta casa lleva once fallos persiguiendo — la
+ * regla puesta en un sitio y no en el otro no es media regla, es otra regla.
+ *
+ * QUÉ LA PAGA: la próxima vez que algo obligue a subir `RECONSTRUIR_DESDE` por
+ * otro motivo, se normaliza AL ESCRIBIR —misma clave que usa `actor()`— y ese
+ * día se pueden quitar los dos parches de lectura: `mismoNombre` en
+ * `src/foes.js` y `cayoEn` en `ui/app.js`. No antes: no vale forzar una
+ * reconstrucción a nadie por 25 abatidos que ya se leen bien.
+ *
+ * Hoy los lectores de `kills` son tres y los tres están comprobados:
+ * `src/foes.js` (normaliza), `ui/app.js` (normaliza) y `src/narrator.js` (sólo
+ * usa `.length`, no compara nombres).
+ *
  * SUBE A 9 EN LA 1.13.0, Y ESO ES UNA DECISIÓN QUE SE TOMÓ AL REVÉS PRIMERO.
  *
  * La deuda empezó siendo UN punto y detectable, y con eso la respuesta correcta
