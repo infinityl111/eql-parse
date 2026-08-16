@@ -50,7 +50,7 @@ nada. Un arreglo sin clasificar es un arreglo cuyo valor nadie midió.
 | cepillo | estado | encontrado | A | B | C |
 |---|---|---:|---:|---:|---:|
 | **1 · Ramas nunca pisadas** | primera corrida hecha | **1.333 bloques** | 0 | 4 | 1 |
-| **2 · Imposibilidades** | **17 escritas, las 17 en silencio** | 2 afirmaciones falsas mías | 0 | 0 | 2 |
+| **2 · Imposibilidades** | **17 corriendo, en silencio · 1 recuperada, sin instalar** | 2 mal escritas · **1 recuperada salta en 5 nombres** | 0 | **1** | 2 |
 | **3.1 · Pertenencia** (familia 1) | **cepillado** | 2 primas | 0 | 2 | 0 |
 | **3.2 · Pronombre** (familia 13) | **cepillado** | 46 candidatas, 2 reales | 1 | 1 | 0 |
 | **3.3 · Número desnudo** (familia 12) | **cepillado** | 469 pinzas, 52 de la forma | 1 | **13 cubiertas** | 0 |
@@ -167,6 +167,46 @@ nombre propio no garantiza un individuo**, lo cual toca también al detector X�
 > **mundo** o sobre **nuestra propia escritura**. Las de en medio —«esto no suele
 > pasar»— son heurísticas disfrazadas, y una heurística que salta 39 veces no
 > enseña nada: entrena a ignorarla.
+
+### Y la primera vuelve, bien escrita — porque no era falsa, estaba mal escrita
+
+**Campeón lo corrigió** ([D7](HECHOS-DECLARADOS.md)): *en EverQuest nunca hay dos
+nameds iguales a la vez*. Eso no dice que no pueda morir dos veces — una pelea
+nuestra dura hasta 475 s— **dice que no hay dos**. La forma con filo:
+
+> **DOS MUERTES DEL MISMO NAMED SEPARADAS POR MENOS QUE SU REAPARICIÓN MÍNIMA
+> MEDIDA SON IMPOSIBLES.**
+
+**Necesita la cifra de reaparición, así que las dos cosas se cerraron juntas**
+([`HALLAZGOS.md` §3.9](HALLAZGOS.md)). Corrida con la cota de **60 s** sobre los
+108 nombres que la regla marca como named: **13 parejas de muertes en 5 nombres**.
+
+| salta | veces | la más corta | qué era |
+|---|---:|---:|---|
+| `Cleric of Innoruuk` | 6 | **8 s** | un **título**: hay muchos |
+| `Amygdalan warrior` | 2 | **14 s** | una **raza** |
+| ``Innoruuk`s Chosen`` | 1 | 48 s | un **título** |
+| ``Noclin`s Pet`` | 2 | 37 s | **la mascota de otro jugador** |
+| ``Sir Lucan D`Lere`` | 2 | **11 s** | **un named de verdad, sin explicar** |
+
+**Cuatro de los cinco no contradicen D7: contradicen la REGLA con la que
+detectamos nameds.** La imposibilidad, bien escrita, **encontró el fallo de la
+población y no el del mundo** — que es exactamente lo que tiene que hacer una
+imposibilidad cuando la afirmación de partida es buena.
+
+**Y el quinto es la pregunta abierta para Campeón**, con las cuatro líneas
+delante en [D7](HECHOS-DECLARADOS.md).
+
+> **La lección de método, y va con la de arriba:** una imposibilidad que salta no
+> siempre acusa al dato. Aquí acusa **al filtro que eligió a quién mirar**. Antes
+> de retirarla —como hice— hay que preguntarse si lo que está mal es la
+> afirmación o la población.
+
+**Y una salvedad de la cota**, porque el instrumento vuelve a ser del material
+que juzga: la reaparición mínima medida es **una cota superior**, así que usarla
+como suelo genera falsos positivos. Con la cota por zona salta uno más,
+`lord Darish` a 7:48 contra el 8:04 de Clan Crushbone — **16 segundos de margen
+sobre un número que ya es un techo**. Por eso la corrida buena es la de 60 s.
 
 **El hueco conocido:** las once miran **el almacén**. Ninguna mira lo que el
 reproductor calcula a partir de él — y el fallo del segundo cero vivía justo ahí.

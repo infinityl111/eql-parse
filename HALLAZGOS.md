@@ -1253,7 +1253,76 @@ Befallen, **la wiki acierta el racimo** y el único desacuerdo se explica mejor 
 su clave sin zona que por un error suyo. **No es «la wiki está mal»: es que la
 wiki no dice de qué servidor ni de qué zona habla, y las dos cosas importan.**
 
-### 3.9 La forma que tendría, si se construye
+### 3.9 La reaparición, rehecha SÓLO sobre nameds
+
+**Sale de [D7](HECHOS-DECLARADOS.md)**: si un named es siempre el mismo, el
+intervalo entre su muerte y su siguiente aparición **es exactamente lo que
+queremos medir, sin filtro**. Todo el problema de §3.2 —«un nombre no es un punto
+de aparición»— desaparece por construcción.
+
+**La población**, con el mismo discriminador que la mayúscula: 446 enemigos del
+almacén → **158 sin artículo** → **108 vistos en MAYÚSCULA a mitad de frase** →
+**102 que no dan señales de repetirse** → **85 tras apartar 17 mascotas de named**
+(una mascota va y viene con su dueño: no es un punto de aparición propio).
+
+| | |
+|---|---:|
+| pares (zona, named) con al menos un intervalo | **27** |
+| con **n ≥ 2** | **14** |
+| con n ≥ 5 | 1 |
+| intervalos descartados por cambio de zona | 186 |
+
+| n | mín | mediana | máx | zona / named |
+|---:|---:|---:|---:|---|
+| 4 | **4:57** | 17:04 | 22:21 | Befallen 2 / ``asaka L`Rei`` |
+| 3 | **4:31** | 6:16 | 23:03 | Befallen 2 / `gynok Moltor` |
+| 3 | **10:33** | 11:18 | 12:11 | Clan Crushbone 4 / `bonefire` |
+| 3 | **10:25** | 11:02 | 12:06 | Clan Crushbone 4 / `lord Darish` |
+| 3 | **8:04** | 8:04 | 9:41 | Clan Crushbone 4 / `marrowbane` |
+| 3 | **8:06** | 10:23 | 10:28 | Clan Crushbone 4 / `emperor Crush` |
+| 3 | **8:04** | 10:26 | 10:27 | Clan Crushbone 4 / ``ambassador D`Vinn`` |
+| 2 | **4:27** | 4:28 | 4:28 | Befallen 2 / ``kahaptra Z`Taj`` |
+| 2 | **8:05** | 9:52 | 9:52 | Clan Crushbone 4 / `bloodgurgler` |
+| 2 | 9:01 | 32:16 | 32:16 | Befallen 2 / ``footman of V`Zher`` |
+
+**Y LOS RACIMOS SALEN MUCHO MÁS LIMPIOS que con la población general:**
+
+| zona | racimos |
+|---|---|
+| **Clan Crushbone 4** | **[8:04 · 8:04 · 8:05 · 8:06]** · 10:25 · 10:33 |
+| **Befallen 2** | **[4:27 · 4:31]** · 4:57 · 9:01 |
+
+**Cuatro nameds distintos de Clan Crushbone dentro de dos segundos**, y dos de
+Befallen dentro de cuatro. Con la población general esto salía enterrado entre
+mínimos de 1:02 y 1:13 que eran nombres con varios individuos; **con los nameds
+no hay ninguno por debajo del minuto**.
+
+**Y es justo la población para la que uno quiere temporizador.** La función se
+estrecha —de 38 candidatos a 14 pares— y **mejora**: menos ruido, valores
+compartidos y nombres que el jugador reconoce.
+
+**Lo que sigue faltando:** con **1 solo par de n≥5**, la parte medida se apoya en
+muy poco. Sigue creciendo sola con cada muerte campada.
+
+### 3.10 X→X no prueba gemelo en un named
+
+Si no hay dos, un named haciéndose daño a sí mismo **no puede ser un gemelo**:
+es escudo de daño, espinas o autolesión.
+
+**Medido: de los 411 disparos de X→X, sólo 2 caen sobre un named** —
+``Cazic-Thule``, y las dos líneas son la forma de la autolesión:
+
+```
+Cazic-Thule hit Cazic-Thule for 7 points of magic damage by Life Leech.
+```
+
+**`Life Leech` es un lifetap.** Bajo D7 esos dos disparos **nunca fueron prueba
+de nada**, y eran los únicos que el detector podía aportar sobre un named.
+
+**No cambia la decisión —X→X ya no entraba en el suelo— pero cierra el control:**
+sobre nameds la forma es directamente inválida, no sólo poco rentable.
+
+### 3.11 La forma que tendría, si se construye
 
 **Las dos columnas: el consultado predice, la medición audita.**
 

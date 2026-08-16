@@ -343,3 +343,74 @@ feigning death, because a spell hit you.*», 42 veces).
 sólo en algunas circunstancias, o el FD falla de verdad nueve de cada diez veces?
 Es la pregunta que decide si el 11,4 % es una tasa de éxito o una laguna del
 registro.
+
+---
+
+## D7 · Si el enemigo es un named, es siempre el mismo: nunca hay dos a la vez
+
+| | |
+|---|---|
+| **quién** | Campeón |
+| **cuándo** | 16 de agosto de 2026 |
+| **seguridad** | afirmado sin reservas |
+| **estado** | **apoyado por medición, con UNA excepción sin explicar** |
+
+**Qué dice.** En EverQuest no existen dos ejemplares del mismo *named* al mismo
+tiempo. Puede morir y volver —una pelea nuestra dura hasta 475 s, tiempo de
+sobra— pero **no hay dos a la vez**.
+
+**Qué cierra, y son tres cosas de golpe:**
+
+1. **La imposibilidad que se había retirado vuelve, bien escrita.** Decía «un
+   nombre propio es UN individuo» y se retiró porque ``Sir Lucan D`Lere`` cae dos
+   veces en la misma pelea. **No era falsa: estaba mal escrita.** La forma con
+   filo es *«dos muertes del mismo named separadas por menos que su reaparición
+   mínima medida son imposibles»*.
+2. **La reaparición se estrecha y se limpia.** Todo el problema del filtro era
+   «un nombre no es un punto de aparición»; con un named eso no pasa.
+3. **X→X deja de probar gemelo en un named.** Si no hay dos, un named
+   haciéndose daño es escudo, espinas o autolesión.
+
+### Lo medido, y dónde falla
+
+**Corrida la imposibilidad con la cota de 60 s** —el suelo de lo que el juego
+documenta, medido por los dos lados— sobre los 108 nombres sin artículo vistos en
+mayúscula a mitad de frase: **saltan 13 parejas de muertes en 5 nombres**.
+
+| nombre | veces | la más corta | qué es |
+|---|---:|---:|---|
+| `Cleric of Innoruuk` | 6 | **8 s** | un **título**, no un named: hay muchos |
+| `Amygdalan warrior` | 2 | **14 s** | una **raza**, no un named |
+| ``Innoruuk`s Chosen`` | 1 | 48 s | un **título** |
+| ``Noclin`s Pet`` | 2 | 37 s | **la mascota de otro jugador** |
+| ``Sir Lucan D`Lere`` | 2 | **11 s** | **un named de verdad. Sin explicar.** |
+
+**Cuatro de los cinco no contradicen D7: contradicen la REGLA CON LA QUE
+detectamos nameds.** Son títulos, razas y la mascota de un jugador, y la regla
+«sin artículo» los mete dentro.
+
+**El quinto sí es la excepción, y las líneas están:**
+
+```
+[Fri Aug 14 00:31:12 2026] You have slain Sir Lucan D`Lere!
+[Fri Aug 14 00:31:23 2026] Sir Lucan D`Lere has been slain by Jobn!
+
+[Fri Aug 14 19:30:25 2026] You have slain Sir Lucan D`Lere!
+[Fri Aug 14 19:30:55 2026] Sir Lucan D`Lere has been slain by Gann!
+```
+
+**Dos días distintos, once y treinta segundos, matadores distintos.** Bajo D7 eso
+no puede pasar salvo que reaparezca en once segundos, y ningún named lo hace.
+
+**PREGUNTA PARA CAMPEÓN, con la lista delante y sin inventar nada:**
+
+- ¿`Sir Lucan D`Lere` tiene algo especial —una instancia, un evento, dos
+  ejemplares en la ciudad— o D7 tiene excepciones?
+- ¿Es correcto tratar `Cleric of Innoruuk`, `Amygdalan warrior`,
+  ``Innoruuk`s Chosen`` como **no** nameds, aunque se escriban con mayúscula?
+- ¿Hay alguna otra forma de reconocer un named desde el registro que no sea la
+  mayúscula? Porque de los 108 que la regla marca, **6 no lo son** (5,6 %).
+
+**Hasta que se conteste, la regla «sin artículo y en mayúscula a mitad de frase»
+es un SUELO con un 5,6 % de falsos positivos conocidos**, y ninguna función debe
+apoyarse en ella sin decirlo.
