@@ -290,3 +290,56 @@ tienen varios. Si un «único» no es único:
 13 visitas— pero sí **acota lo que se puede prometer**: mientras esto no se
 conteste, un temporizador de reaparición no puede decir «éste es el bicho»,
 sólo «un bicho con este nombre».
+
+---
+
+## D6 · Feign Death hace que los enemigos pierdan el agro y SE VAYAN; puede fallar
+
+| | |
+|---|---|
+| **quién** | Campeón |
+| **cuándo** | 16 de agosto de 2026 |
+| **seguridad** | afirmado sin reservas, **corrigiendo a Claude** |
+| **estado** | **apoyado por medición**, con un límite grande — ver abajo |
+
+**Qué dice.** *Feign Death* hace que los enemigos **pierdan el objetivo y se
+marchen de verdad**. No se quedan quietos: se van. Y **puede fallar**.
+
+**La maniobra completa**, que es lo que da sentido al resto: se enraíza a uno de
+cinco, vienen los cinco, se finge muerte, **se van cuatro**, el enraizado no
+puede andar, te levantas y lo matas solo. **Son dos tramos y una sola maniobra**,
+y el primero **no es una pelea: es una preparación.**
+
+**Qué corrige.** Claude había escrito que con FD los enemigos quedaban «callados
+pero presentes», como bajo un *mez*, y propuso un **sostén** que mantuviera sus
+ventanas abiertas. **Es falso, y el arreglo habría sido peor que el fallo**: un
+sostén habría pegado el tirón abortado con la muerte posterior y habría
+fabricado una pelea de cinco enemigos donde cuatro no hicieron nada — que es
+exactamente el fallo del sostén del *mez* que estudiamos en el competidor.
+
+**Si se van, cerrar sus ventanas es CORRECTO.** La frontera no está mal puesta.
+
+**Lo que sí falta**, y no es una regla de cierre: **el tramo previo no debería
+contar como pelea**. No hubo muertes de ninguna parte, y hoy le calculamos dps y
+entra en las medias.
+
+### El límite que la medición le pone a esta declaración
+
+**No se puede saber desde el registro si un Feign Death funcionó.** De 351
+intentos, sólo **40 (11,4 %)** escriben la línea de éxito. El resto —el 89 %— no
+escribe ni éxito ni fallo. Y no lo explica estar en combate o no: 11,0 % dentro
+de una pelea, 11,9 % fuera.
+
+**Consecuencia directa:** cualquier regla que dependa de «el FD funcionó» es
+inconstruible. Lo más que puede decir una etiqueta es **«hubo un intento de FD al
+final del tramo»**.
+
+**Y no hay línea de levantarse.** `stands up` no aparece ni una vez en 990.000
+líneas. El final del fingimiento sólo se sabe porque vuelves a actuar — salvo
+cuando lo rompe un hechizo, que sí tiene línea propia («*You are no longer
+feigning death, because a spell hit you.*», 42 veces).
+
+**Pendiente para Miguel:** ¿la línea «*Campeon has fallen to the ground*» sale
+sólo en algunas circunstancias, o el FD falla de verdad nueve de cada diez veces?
+Es la pregunta que decide si el 11,4 % es una tasa de éxito o una laguna del
+registro.

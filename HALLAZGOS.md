@@ -631,6 +631,116 @@ leer, pero es la única de 1.547 y la puerta por la que entró sigue abierta.
 residuo del 0,06 % piden la misma comprobación, y el primero era mío. **Antes de
 explicar un residuo hay que comprobar que el residuo existe.**
 
+### 2.7 Los tramos que acaban sin que muera nadie
+
+**Medido el 16 de agosto de 2026** sobre las 1.578 peleas del almacén de Miguel y
+`eqlog_Campeon_erudin.txt`. **No se ha tocado nada**: esto es la población, y la
+regla se decide con los números delante.
+
+**De dónde sale.** De una corrección de Campeón, anotada como
+[D6](HECHOS-DECLARADOS.md): *Feign Death* no deja a los enemigos «callados pero
+presentes» —eso era mío y era falso—: **se van**. La maniobra es enraizar a uno,
+fingir muerte, que se marchen los demás, levantarse y matar al que no puede
+andar. **Son dos tramos y una sola maniobra**, y el primero no es una pelea.
+
+#### 1a · Cuántos son y cuánto pesan
+
+| | |
+|---|---:|
+| peleas del almacén | 1.578 |
+| **sin muerte de NINGUNA parte** —ni enemigo ni Campeón— | **134 (8,5 %)** |
+| su daño **hecho**, sobre el total | 182.551 de 24.528.689 — **0,74 %** |
+| su daño **recibido**, sobre el total | 174.298 de 6.219.960 — **2,80 %** |
+| duración | mediana **9 s** · p90 67 s · máx 443 s |
+
+**Una de cada doce peleas guardadas no tiene una sola muerte dentro**, y pesan
+mucho más en lo que recibes que en lo que haces —2,80 % contra 0,74 %—, que es
+exactamente la forma de un tirón abortado: te pegan y no matas.
+
+#### 1b/1c · Por qué acabaron
+
+| | |
+|---|---:|
+| con un **Feign Death** cerca del final | **81 (60,4 %)** |
+| con **cambio de zona** | 8 |
+| con **invisibilidad** | 2 |
+| con Gate / Origin / Evacuate | 0 |
+| **SIN MANIOBRA DETECTABLE** | **43 (32,1 %)** |
+
+**Un tercio no tiene causa escrita.** Ésa es la cifra que decide, y dice que una
+regla que sólo mire el *feign* dejaría fuera a uno de cada tres.
+
+#### 2 · Lo que el registro dice del propio Feign Death, y es poco
+
+| forma | veces |
+|---|---:|
+| `You begin casting Feign Death.` | **391** (en **351** racimos) |
+| `Campeon has fallen to the ground.` — **el éxito** | **40** |
+| `Your Feign Death spell is interrupted.` — **el fallo al lanzar** | **51** |
+| **ninguna de las dos** | **300 (76,7 %)** |
+| `stands up` o equivalente — **el levantarse** | **0 en 990.051 líneas** |
+| `You are no longer feigning death, because a spell hit you.` | 42 |
+
+> **NO SE PUEDE SABER DESDE EL REGISTRO SI UN FEIGN DEATH FUNCIONÓ.** Sólo el
+> **11,4 %** de los racimos escribe la línea de éxito, y no lo explica estar en
+> combate o no: **11,0 % dentro de una pelea, 11,9 % fuera**.
+>
+> **Cualquier regla que dependa de «el FD funcionó» es inconstruible.** Lo más
+> que puede decir una etiqueta es «hubo un **intento** de FD al final».
+
+**Y no hay línea de levantarse.** El final del fingimiento sólo se sabe porque
+vuelves a actuar — salvo cuando lo rompe un hechizo, que sí tiene línea propia.
+**Es el mismo problema que la mascota enemiga**: un estado cuyo final el registro
+no escribe. La diferencia es que aquí **no hace falta sostener nada**, así que no
+lo hereda.
+
+#### 2 · ¿Se van casi todos y queda uno?
+
+**No como patrón dominante.** De los 81 tramos con FD, **42 tienen dos o más
+enemigos**:
+
+| | |
+|---|---:|
+| queda **exactamente uno** — la maniobra que describe Campeón | **12** |
+| no queda **ninguno** | 11 |
+| quedan **varios** | 19 |
+
+Y de los 39 restantes, **23 son de un solo enemigo que sigue apareciendo
+después**: ni se fue ni murió.
+
+**La maniobra existe y es 12 de 42.** No es el patrón que explica el conjunto, y
+por eso no puede ser la regla.
+
+#### Y `King Tranix` no era esto
+
+Es uno de los 15 pares de fronteras sospechosas, y con las líneas delante **no
+encaja en la categoría**:
+
+```
+21:16:32  You begin casting Feign Death.
+21:16:32  You regain your concentration and continue your casting.
+          (ni «has fallen to the ground» ni «spell is interrupted»)
+21:16:33 … 21:16:45   catorce segundos sin una sola línea suya
+21:16:46  King Tranix begins casting Shadow Vortex.   <- VUELVE
+```
+
+**Los enemigos vuelven, los mismos, catorce segundos después.** No se fueron. Y
+el registro **no dice si el fingimiento funcionó**. Así que el caso sigue sin
+causa escrita: lo único medido es el silencio.
+
+#### Lo que NO se hace con estos tramos
+
+- **No se fusionan.** Los que se fueron no participaron en la muerte de después,
+  y unirlos fabricaría una pelea de cinco donde cuatro no hicieron nada — el
+  fallo del sostén del *mez*, cometido por nosotros.
+- **No se borran.** El daño recibido es real: 174.298 puntos.
+- **Y no se inventa la regla**: con un 32,1 % sin causa detectable y la maniobra
+  explicando 12 de 42, los números no sostienen todavía ninguna de las tres.
+
+**La forma que probablemente tendrá es una ETIQUETA y no un filtro** —«este tramo
+acabó sin muertes», visible, abrible y fuera de las medias— pero eso se decide
+con esta tabla delante y no antes.
+
 ## 3. Reaparición: la medición, su código, y por qué esto sí puede existir
 
 **Nada de esto es una función. Es medición y lectura.** Miguel quiere que al matar

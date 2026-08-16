@@ -59,8 +59,9 @@ nada. Un arreglo sin clasificar es un arreglo cuyo valor nadie midió.
 | **4 · ¿Esta guarda hace algo?** | pendiente | — | — | — | — |
 | **5 · Romper las guardas** | pendiente | — | — | — | — |
 | **6 · El cajón, con otra pregunta** | pendiente | — | — | — | — |
-| **7 · El oráculo tonto** | **3 propiedades corriendo** | **15 fronteras sospechosas** | **1** | 0 | 0 |
+| **7 · El oráculo tonto** | **3 propiedades corriendo** | **15 fronteras: 2 explicadas, 13 abiertas** | 0 | **2** | 0 |
 | **8 · El punto ciego del reproductor** | **cerrado**: ejecutable y vigilado | 1 comprobación mal escrita | 0 | 0 | 1 |
+| **9 · Tramos sin ninguna muerte** | **población medida** | **134 de 1.578** (8,5 %) | 0 | **1** | 0 |
 
 **Lo cepillado hasta hoy: 3 de las 14 familias.** Once dianas dibujadas y sin
 disparar.
@@ -134,7 +135,7 @@ una lista de mil trescientas cosas leída de golpe es otra alarma muerta.
 batería de pruebas: `test/` comprueba que el código hace lo decidido sobre líneas
 escritas a mano; esto comprueba que **lo que hay en el disco pudo ocurrir**.
 
-**Hoy son once y las once callan** sobre las 1.493 peleas del almacén de Miguel:
+**Hoy son diecisiete —once sobre el almacén y seis sobre lo que dibuja el reproductor— y las diecisiete callan.** Las once del almacén, sobre 1.578 peleas:
 
 1. Una pelea no dura menos que nada.
 2. Nadie cae antes de que empiece la pelea ni después de que acabe.
@@ -365,7 +366,38 @@ las dos imposibilidades falsas del primer día, y por eso van juntas:
 **Antes de añadir una comprobación hay que preguntarse cuántas veces va a saltar
 si todo está bien.** Si la respuesta no es «ninguna», no está terminada.
 
-**Pendiente:** mirar las 15 una a una. No se toca nada hasta clasificarlas.
+### Dos de las quince no son un fallo de frontera
+
+**Son una categoría de tramo que no teníamos.** Corregido por Campeón el 16 de
+agosto y anotado como [D6](HECHOS-DECLARADOS.md):
+
+*Feign Death* **no** deja a los enemigos «callados pero presentes» —eso lo
+escribí yo y era falso—: **pierden el agro y se van**. Y si se van, **cerrar sus
+ventanas es correcto**: la frontera está bien puesta.
+
+**El sostén que llegué a proponer habría sido peor que el fallo.** Habría pegado
+el tirón abortado con la muerte posterior y habría fabricado una pelea de cinco
+enemigos donde cuatro no hicieron nada — que es exactamente el fallo del sostén
+del *mez* que le estudiamos al competidor, cometido por nosotros y con el
+estudio delante.
+
+**Lo que sí hay es un tramo que no es una pelea**: la preparación de una
+maniobra —enraizar a uno, fingir muerte, que se marchen los demás— que hoy
+cuenta como pelea, tiene dps y entra en las medias. **134 de 1.578 peleas no
+tienen una sola muerte dentro** (8,5 %), y pesan **2,80 % de lo recibido** contra
+**0,74 % de lo hecho**. La tabla entera, en
+[`HALLAZGOS.md` §2.7](HALLAZGOS.md).
+
+> **Y no se puede construir la regla obvia:** de 351 intentos de *Feign Death*,
+> sólo **40 (11,4 %)** escriben la línea de éxito, y **no hay línea de
+> levantarse** —cero en 990.051 líneas—. **El registro no dice si funcionó.**
+
+**`King Tranix` sigue sin causa**, y no es esto: sus enemigos **vuelven** catorce
+segundos después, los mismos. No se fueron.
+
+**Y quedan 13 sin mirar.**
+
+**Pendiente:** mirar las 13 una a una. No se toca nada hasta clasificarlas.
 
 ## LO QUE NO ENTRA EN LA 1.15.0, con su clase
 
@@ -374,8 +406,8 @@ que costaría y por qué se queda fuera.
 
 | # | qué | clase | por qué no entra |
 |--:|---|:--:|---|
-| 1 | **Los 15 pares de peleas partidas** que comparten un enemigo vivo | **A** | Sin clasificar. Uno está explicado —`King Tranix`, ver abajo— y catorce no. Tocar la frontera mueve **todas** las cifras del histórico. |
-| 2 | **`King Tranix`: el mecanismo, no el umbral** | **A** | Explicado y medido (abajo). El arreglo toca el cierre por ausencia. |
+| 1 | **Los 15 pares de peleas partidas** que comparten un enemigo vivo | **A** | **Dos son la categoría nueva** —tramo de preparación, no fallo de frontera— y **trece siguen sin causa**. Tocar la frontera mueve **todas** las cifras del histórico. |
+| 2 | **Los 134 tramos sin ninguna muerte** (8,5 % de las peleas) | **B** | Categoría de tramo que no teníamos, no un fallo. No se fusionan, no se borran, y la regla no se inventa: **32,1 % no tiene causa detectable** y el registro no dice si un *feign* funcionó. [`HALLAZGOS.md` §2.7](HALLAZGOS.md). |
 | 3 | **La marca de «nombre deducido» sale en 50 nombres y sólo 25 son permanentes** | **B** | Se pone al cerrar cada pelea y la prueba llega después. Limpiarlo al final de la reconstrucción **exige reescribir `fights.ndjson`, y eso renombra todas las peleas** (ver `src/store.js`). Pide persistir el conjunto de formas atestiguadas. |
 | 4 | **La separación clave / presentación en dos campos** | **B** | Cambio de formato del almacén. Va con la interfaz, en la **1.16.0**. |
 | 5 | **`npm run ui:check` falla en `Page.captureScreenshot` a los 30 s** | **B** | **Preexistente**: falla igual con los cambios guardados en el `stash`. La parte de medición del DOM pasa antes de romperse. |
@@ -397,22 +429,35 @@ Trazado el momento exacto, línea a línea:
 21:16:46  King Tranix begins casting Shadow Vortex.
 ```
 
-**Miguel fingió muerte.** El jefe perdió el objetivo y estuvo **catorce segundos
-sin escribir una sola línea**. `PLAZO_ENEMIGO` son **12**: a los 12 s de silencio
-su ventana se cierra, y con la única ventana cerrada la pelea se cierra. Un
-segundo después vuelve a pegar y empieza otra.
+El jefe estuvo **catorce segundos sin escribir una sola línea**. `PLAZO_ENEMIGO`
+son **12**: a los 12 s de silencio su ventana se cierra, y con la única ventana
+cerrada la pelea se cierra. Un segundo después vuelve a pegar y empieza otra.
 
 **No es que los lanzamientos no cuenten como presencia** —sí cuentan, se
 comprobó—: es que **no hubo ninguna línea que contar**.
 
-**Y no explica los otros catorce.** Buscando `feign` alrededor de las quince
-fronteras: **2 de 15**. Los otros trece tienen otra causa, sin mirar todavía.
+> **CORREGIDO el 16 de agosto, y la corrección es de Campeón.** Aquí ponía
+> «**Miguel fingió muerte** y el jefe perdió el objetivo», y de ahí saqué que
+> hacía falta **un sostén** que mantuviera la ventana abierta mientras finges.
+> **Las dos cosas estaban mal**, y la segunda era peligrosa:
+>
+> - con *Feign Death* los enemigos **se van de verdad**, no se quedan callados,
+>   así que **cerrar sus ventanas es CORRECTO** ([D6](HECHOS-DECLARADOS.md));
+> - y el sostén habría pegado el tirón abortado con la muerte posterior,
+>   **fabricando una pelea de cinco enemigos donde cuatro no hicieron nada** —
+>   el fallo del sostén del *mez* que le estudiamos al competidor, cometido por
+>   nosotros y con el estudio delante.
+>
+> **Y este caso ni siquiera es feign:** el registro **no escribe** ni el éxito ni
+> el fallo del fingimiento, y **los enemigos VUELVEN** catorce segundos después,
+> los mismos. No se fueron. Sigue sin causa escrita.
 
-**Por qué no entra hoy:** el arreglo es una regla nueva de cierre —«mientras
-finges muerte, la ausencia del enemigo no cuenta»— y eso **mueve fronteras en
-todo el histórico**, o sea el dps, los totales y el recuento de peleas de todo el
-mundo. Eso no se mete el día que se publica. **Va a la 1.16.0 con esta cifra
-delante.**
+**Lo que sí salió de tirar del hilo** es una categoría de tramo que no teníamos
+—los 134 sin ninguna muerte, 8,5 %— medida en
+[`HALLAZGOS.md` §2.7](HALLAZGOS.md). **No es un fallo de frontera y no se arregla
+tocando el cierre.**
+
+**Y quedan trece de las quince sin causa.** Ésas siguen abiertas.
 
 ## Lo que este fichero no es
 
