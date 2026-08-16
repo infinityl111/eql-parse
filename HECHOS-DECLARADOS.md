@@ -383,13 +383,16 @@ mayúscula a mitad de frase: **saltan 13 parejas de muertes en 5 nombres**.
 | `Amygdalan warrior` | 2 | **14 s** | una **raza**, no un named |
 | ``Innoruuk`s Chosen`` | 1 | 48 s | un **título** |
 | ``Noclin`s Pet`` | 2 | 37 s | **la mascota de otro jugador** |
-| ``Sir Lucan D`Lere`` | 2 | **11 s** | **un named de verdad. Sin explicar.** |
+| ``Sir Lucan D`Lere`` | 2 | **11 s** | **un named de verdad — explicado por [D8](HECHOS-DECLARADOS.md)** |
 
-**Cuatro de los cinco no contradicen D7: contradicen la REGLA CON LA QUE
-detectamos nameds.** Son títulos, razas y la mascota de un jugador, y la regla
-«sin artículo» los mete dentro.
+**NINGUNO DE LOS CINCO CONTRADICE D7.** Cuatro contradicen **la regla con la que
+detectamos nameds** —son títulos, razas y la mascota de un jugador, y «sin
+artículo» los mete dentro— y el quinto lo explica D8: es un named que muere dos
+veces, no dos nameds.
 
-**El quinto sí es la excepción, y las líneas están:**
+**El quinto YA NO ES UNA EXCEPCIÓN: lo explica [D8](HECHOS-DECLARADOS.md).** Sir
+Lucan muere, aparece en esqueleto con el mismo nombre y hay que matarlo otra vez.
+No hay dos a la vez: hay uno que muere dos veces. Las líneas:
 
 ```
 [Fri Aug 14 00:31:12 2026] You have slain Sir Lucan D`Lere!
@@ -399,13 +402,11 @@ detectamos nameds.** Son títulos, razas y la mascota de un jugador, y la regla
 [Fri Aug 14 19:30:55 2026] Sir Lucan D`Lere has been slain by Gann!
 ```
 
-**Dos días distintos, once y treinta segundos, matadores distintos.** Bajo D7 eso
-no puede pasar salvo que reaparezca en once segundos, y ningún named lo hace.
+**Dos días distintos, once y treinta segundos, matadores distintos** — y las dos
+veces es la misma maniobra: matarlo, que salga el esqueleto, y matarlo otra vez.
 
 **PREGUNTA PARA CAMPEÓN, con la lista delante y sin inventar nada:**
 
-- ¿`Sir Lucan D`Lere` tiene algo especial —una instancia, un evento, dos
-  ejemplares en la ciudad— o D7 tiene excepciones?
 - ¿Es correcto tratar `Cleric of Innoruuk`, `Amygdalan warrior`,
   ``Innoruuk`s Chosen`` como **no** nameds, aunque se escriban con mayúscula?
 - ¿Hay alguna otra forma de reconocer un named desde el registro que no sea la
@@ -414,3 +415,116 @@ no puede pasar salvo que reaparezca en once segundos, y ningún named lo hace.
 **Hasta que se conteste, la regla «sin artículo y en mayúscula a mitad de frase»
 es un SUELO con un 5,6 % de falsos positivos conocidos**, y ninguna función debe
 apoyarse en ella sin decirlo.
+
+---
+
+## D8 · Sir Lucan tiene una versión viva y una muerta: al matarlo aparece en esqueleto
+
+| | |
+|---|---|
+| **quién** | Campeón |
+| **cuándo** | 16 de agosto de 2026 |
+| **seguridad** | afirmado sin reservas |
+| **estado** | **apoyado por medición** — y **NO contradice [D7](HECHOS-DECLARADOS.md)** |
+
+**Qué dice.** Al matar a ``Sir Lucan D`Lere`` **aparece automáticamente su versión
+esqueleto**, y hay que matarlo otra vez para que suelte el objeto de misión.
+
+**No hay dos a la vez: hay uno que muere dos veces.** D7 se mantiene entera, y la
+excepción que parecía tener deja de serlo.
+
+### Lo medido: aparece CON EL MISMO NOMBRE, y por eso no se distingue
+
+```
+[00:31:12] You have slain Sir Lucan D`Lere!
+[00:31:13] Sir Lucan D`Lere is pierced by YOUR thorns for 30 points…
+[00:31:13] Sir Lucan D`Lere punches YOU for 8 points of damage.
+```
+
+**Un segundo.** El mismo nombre, sin variante, sin sufijo, sin una sola línea que
+diga que ha cambiado de forma. **Desde el registro esto es indistinguible de un
+segundo individuo del mismo nombre.**
+
+(El golpe de 8 puntos contra el jefe que pegaba cientos sugiere que la versión
+esqueleto es mucho más débil — pero eso es una inferencia sobre un dato, no una
+línea, y otros candidatos no la cumplen.)
+
+### Una tercera categoría, y las tres se escriben igual
+
+Hasta hoy un nombre que muere y sigue actuando sólo podía ser **varios
+individuos** o **una reaparición**. Ahora son tres, con la **transformación**, y
+el registro escribe las tres exactamente igual.
+
+**Medido sobre las 990.051 líneas** —muerte de un nombre y ese mismo nombre
+actuando **como sujeto** en 10 segundos o menos:
+
+| | |
+|---|---:|
+| casos | **819** |
+| nombres distintos | **143** |
+| ...con artículo (candidatos a varios individuos) | 118 |
+| ...**sin artículo** | **25** |
+
+**La forma NO aísla la transformación.** Los 25 sin artículo están dominados por
+títulos y razas que ya sabíamos que se repiten —`orc legionnaire` 19 veces,
+`orc centurion` 13, `Cleric of Innoruuk` 10— y ``Sir Lucan D`Lere`` aparece con
+**2**, indistinguible de ellos por la forma.
+
+### Los doce candidatos, para preguntar
+
+**De los nombres que parecen únicos, doce muestran la forma.** Si la
+transformación es un patrón del juego y no un caso, están aquí:
+
+| | veces |
+|---|---:|
+| `bazzzazzt` · `Slizik the Mighty` | 2 |
+| `Eye of Veeshan` · `Dread` · `bizzzzt` · `bzzzt` | 1 |
+| `Sister of the Spire` · `Master of Spite` · `Warlord Skarlon` | 1 |
+| `Terror pet` · `Dread pet` · `Fright pet` | 1 |
+
+**PREGUNTA PARA CAMPEÓN:** ¿alguno de estos tiene también una segunda versión al
+morir? `Dread`, `Terror` y `Fright` son los tres del Plano del Miedo, y
+`Master of Spite` y `Sister of the Spire` del Plano del Odio — si el mecanismo es
+suyo, se ve aquí. **Si son varios, la transformación merece nombre propio; si es
+sólo Sir Lucan, es un caso y se queda como tal.**
+
+---
+
+## D9 · En Plano del Cielo la muerte de un enemigo hace aparecer OTROS, con otro nombre
+
+| | |
+|---|---|
+| **quién** | Campeón |
+| **cuándo** | 16 de agosto de 2026 |
+| **seguridad** | afirmado, con «hay algunos casos más ligados a misiones, pero pocos» |
+| **estado** | **apoyado por medición** |
+
+**Qué dice.** Al matar cierto caballo aparecen dos más —depende del nombre del
+caballo— y al matar una abeja `bzzzt` aparece una `bazaatt` o similar.
+
+**Es DISTINTO de [D8](HECHOS-DECLARADOS.md):** allí vuelve **el mismo** con su
+nombre; aquí aparecen **otros** con otro nombre.
+
+### Lo medido, y las cadenas salen solas
+
+Sobre las 141 muertes del Plano del Cielo, buscando «muere X y en ≤10 s estrena
+nombre Y»: **18 casos**, y se repiten:
+
+| veces | cadena | huecos |
+|---:|---|---|
+| 4 | `bzzazzt` → `bazzzazzt` | 0, 0, 1, 1 |
+| 3 | `bazzzazzt` → `bzzzt` | 0, 1, 1 |
+| 3 | `bzzzt` → ``bazzt Zzzt`` | 0, 0, 0 |
+| 2 | `bazzzazzt` → `bizazzzt` | 0, 1 |
+| 2 | `an essence carrier` → `an essence tamer` | 0, 0 |
+| 1 | `an essence harvester` → `a soul harvester` | 0 |
+| 1 | **`a gust of wind` → `a windrider drake`** | 8 |
+
+**La cadena de las abejas está entera y con sus nombres.** Y `a gust of wind` →
+`a windrider drake` es, con toda probabilidad, el caballo — aunque el hueco de 8 s
+lo hace menos limpio que las abejas.
+
+**Los huecos de las cadenas de verdad son 0 o 1 segundo.** Ésa es la firma.
+
+**PREGUNTA PARA CAMPEÓN:** ¿`a gust of wind` es el caballo? ¿Y `an essence
+carrier` / `an essence harvester` son también cadena, o es que iban en grupo?

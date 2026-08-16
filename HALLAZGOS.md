@@ -1322,7 +1322,161 @@ de nada**, y eran los únicos que el detector podía aportar sobre un named.
 **No cambia la decisión —X→X ya no entraba en el suelo— pero cierra el control:**
 sobre nameds la forma es directamente inválida, no sólo poco rentable.
 
-### 3.11 La forma que tendría, si se construye
+### 3.11 Plano del Cielo queda FUERA de la medición de reaparición
+
+**Sale de [D9](HECHOS-DECLARADOS.md).** En el Plano del Cielo la muerte de un
+enemigo **hace aparecer otros con otro nombre**. Un bicho que aparece porque
+mataste a otro **no ha reaparecido por un reloj**, y ese intervalo mediría una
+cadena de invocación, no un temporizador.
+
+**Se excluye hasta saber más**, y esto es lo que se quita: los pares de Plano del
+Cielo de §3.9 —`eye of Veeshan`, `bzzazzt`, `bazzzazzt`, `Slizik the Mighty`—
+**que son 4 de los 14 pares con n≥2**. Los racimos que quedan —Clan Crushbone
+[8:04 · 8:04 · 8:05 · 8:06] y Befallen [4:27 · 4:31]— **no dependían de Sky**, así
+que la conclusión no se mueve; lo que se estrecha es la muestra.
+
+**Y explica el mínimo de 0 s de Sky que quedaba raro**: no era ruido de
+mismo-segundo. Era la cadena.
+
+#### La frontera hace lo correcto: comprobado, no arreglado
+
+**Si al matar aparecen dos y actúan en el acto, sus ventanas se solapan y el
+componente conexo debería meterlos en la misma pelea.** Eso es lo que queremos.
+Comprobado sobre los 18 casos de Sky:
+
+| | |
+|---|---:|
+| los dos en **la misma pelea** | **17** |
+| en peleas distintas | 1 |
+
+**Un negativo medido, y de los buenos:** la definición de pelea de la 1.14.0 —un
+componente conexo— absorbe un mecanismo del juego que no conocíamos cuando se
+escribió. **No se toca nada.**
+
+#### Minar la cadena: qué costaría, y por qué no se hace hoy
+
+**La idea vale**, y es la de ellos aplicada a otra cosa: igual que jmoyers mina
+qué emote va con qué hechizo contando, aquí se puede aprender **«qué invoca matar
+esto»** contando pares. Saldría una tabla **medida del registro de Campeón que no
+está en ninguna wiki de este juego, porque no hay wiki de este juego**.
+
+**El código está escrito** —es la misma medición de arriba— y no es el coste.
+**El coste es la discriminación**, medido sobre todo el registro:
+
+| | |
+|---|---:|
+| casos «muere X y en ≤10 s estrena Y» | **475** |
+| pares distintos | **399** |
+| vistos ≥ 2 veces | 49 |
+| vistos ≥ 3 veces | 20 |
+
+**Y la cabeza de la lista es ruido:** `a decaying skeleton → noclin's Pet` (la
+mascota de otro que llega), `a froglok shin knight → a shin ghoul knight` (el
+siguiente del tirón), `a fire giant warrior → Warlord Skarlon` (el siguiente del
+campamento). **Sin separar «apareció porque» de «lo pulé después», la tabla sería
+mayormente falsa.**
+
+**Lo que la haría viable, y sale del propio dato:** las cadenas de verdad tienen
+**hueco de 0 o 1 segundo** —las abejas: 0,0,1,1 · 0,1,1 · 0,0,0— y el ruido
+tiene 4 a 10. **Con el corte en 1 s y exigiendo repetición ≥2, el trabajo se
+reduce a revisar a mano una lista corta.** Eso es lo que costaría: un día de
+medición y una lista para Campeón, no una función.
+
+### 3.12 Y lo que esto deja escrito: dos reglas
+
+> **EL REGISTRO DA FORMAS, NO CAUSAS.**
+
+**Tres veces esta semana la misma forma ha tenido varias causas posibles**, y las
+tres veces habríamos elegido mal solos:
+
+| la forma | las causas que puede tener |
+|---|---|
+| **X→X** — un nombre se hace daño | dos gemelos · escudo de daño o espinas · **autolesión** (`Cannibalize`, un lifetap) |
+| **hueco corto entre muertes** | varios individuos · reaparición rápida · **transformación** ([D8](HECHOS-DECLARADOS.md)) |
+| **silencio del enemigo** | mez · **feign death** ([D6](HECHOS-DECLARADOS.md)) · la zona vacía |
+| **muerte seguida de un nombre nuevo** | el siguiente del tirón · **cadena de invocación** ([D9](HECHOS-DECLARADOS.md)) |
+
+**Quien sabe cuál era, las cuatro veces, es Campeón.** El registro escribe lo que
+pasa, no por qué pasa, y **una forma con tres causas no se resuelve midiendo
+más**: se resuelve preguntando. Por eso existe
+[`HECHOS-DECLARADOS.md`](HECHOS-DECLARADOS.md) y por eso lo declarado es una
+categoría y no una excusa.
+
+> **EL JUEGO NO ES UNIFORME.**
+
+**Llevamos una semana midiendo como si una regla sacada de Befallen valiera en
+todas partes, y el Plano del Cielo demuestra que no.** A partir de ahora **toda
+regla medida dice EN QUÉ ZONAS se comprobó.**
+
+**El alcance de lo que hay, medido sobre las 1.578 peleas del almacén** —47 zonas
+base, y **ocho concentran el 65 %**:
+
+| zona base | peleas | % | acumulado |
+|---|---:|---:|---:|
+| The Ruins of Old Guk 2 | 240 | 15,2 % | 15,2 % |
+| The Warrens | 168 | 10,6 % | 25,9 % |
+| **The Plane of Sky** | 125 | 7,9 % | 33,8 % |
+| The Plane of Fear | 121 | 7,7 % | 41,4 % |
+| Befallen 2 | 101 | 6,4 % | 47,8 % |
+| Nagafen's Lair | 96 | 6,1 % | 53,9 % |
+| The Plane of Fear 4 | 90 | 5,7 % | 59,6 % |
+| The Plane of Hate 4 | 89 | 5,6 % | 65,3 % |
+
+**Y el alcance de cada regla que hoy damos por buena:**
+
+| regla | dónde se midió |
+|---|---|
+| `PLAZO_ENEMIGO = 12` (banda 10–15) | **todas las zonas**, sobre el registro entero |
+| el suelo de individuos | **todas las zonas** |
+| el racimo de reaparición | **Clan Crushbone 4 y Befallen 2** — y ya no Sky |
+| la tasa del *feign* (11,6 %) | **todas**, pero la maniobra se midió sobre 42 tramos repartidos |
+| el control de X→X | **todas**, con 19 nombres |
+| la cadena de invocación | **sólo Plano del Cielo** |
+
+**Ninguna se cambia. Sólo dicen su alcance**, que es lo que faltaba.
+
+### 3.13 La reaparición queda parada por MUESTRA, no por código
+
+**Lo que falta no es análisis: son partidas.**
+
+| | |
+|---|---:|
+| pares (zona, named) con n ≥ 2 | **14** — y 10 tras quitar Sky |
+| con n ≥ 5 | **1** |
+
+**El análisis está hecho y se sostiene** —la pendiente de 0,976 dice que el reloj
+arranca en la muerte, los racimos por zona tienen p < 0,0001, y el cruce con la
+wiki cuadra al segundo en ``kahaptra Z`Taj``—. Lo que no hay es **repetición**.
+
+**Y crece sola con cada muerte campada**, así que si Campeón quiere ayudarla, las
+zonas que ya tienen racimo son las que más rinden por partida:
+
+- **Clan Crushbone 4** — racimo en **8:04** con cuatro nameds
+  (`marrowbane`, `emperor Crush`, ``ambassador D`Vinn``, `bloodgurgler`) y otro
+  en **10:25–10:33** (`lord Darish`, `bonefire`).
+- **Befallen 2** — racimo en **4:27–4:31** (``kahaptra Z`Taj``, `gynok Moltor`).
+
+**Cada muerte de uno de esos seis, campada en el sitio, es una muestra directa
+sobre un valor que ya tiene tres o cuatro.** Con dos o tres sesiones el `n≥5`
+pasa de uno a varios.
+
+#### Y el filtro tiene que decir POR QUÉ descarta
+
+**Hoy el corte de 60 s descarta a `Cleric of Innoruuk` y a ``Sir Lucan D`Lere``
+por el mismo motivo aparente, y no es el mismo motivo:** uno tiene varios
+individuos y el otro es único y muere dos veces ([D8](HECHOS-DECLARADOS.md)).
+
+**Para la medición da igual** —los 11 s de Sir Lucan habrían salido publicados
+como «reaparece en 11 s», un número falso con pinta de medido— **pero el rótulo
+no puede decir lo mismo de los dos**. Las dos etiquetas, cuando esto se escriba:
+
+- **«varios individuos»** — cuando consta que hubo dos a la vez (dos muertes en
+  una pelea, o X→X con prueba dura).
+- **«muertes demasiado juntas, causa sin determinar»** — cuando sólo consta que
+  murió dos veces demasiado seguidas. Ahí caben la transformación, la
+  reaparición rápida y el individuo que no vimos, **y el registro no las separa**.
+
+### 3.14 La forma que tendría, si se construye
 
 **Las dos columnas: el consultado predice, la medición audita.**
 

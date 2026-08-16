@@ -31,9 +31,42 @@ Las dos saltaron. **La segunda era falsa. La primera no: estaba MAL ESCRITA**, y
 volvió con filo en cuanto Campeón dio la afirmación buena — más abajo. Y una
 heurística que salta 39 veces no enseña nada: **entrena a ignorarla**.
 
-> **Corolario, que costó retirar una buena:** antes de retirar una imposibilidad
-> que salta hay que preguntarse **si lo que está mal es la afirmación o la
-> población a la que se aplica**. La retiré sin hacerlo.
+**Y la del nombre propio ni siquiera acusaba al mundo:** Sir Lucan D`Lere
+muere dos veces porque **aparece en esqueleto y hay que matarlo otra vez**
+([D8](HECHOS-DECLARADOS.md)). El mundo era como Campeón decía; lo que estaba mal
+era mi lectura de él.
+
+### La regla de los tres sospechosos
+
+> **UNA IMPOSIBILIDAD QUE SALTA TIENE TRES SOSPECHOSOS: EL MUNDO, LA AFIRMACIÓN,
+> O LA POBLACIÓN QUE ELEGISTE MIRAR.**
+> **Por defecto acusamos a la afirmación, que es el único de los tres que se
+> borra de un plumazo.**
+
+**La cicatriz, y es de las que se ven enteras.** «Un nombre propio es UN
+individuo» saltó cinco veces. La leí como **la afirmación es falsa** y la retiré.
+
+**Cuatro de los cinco saltos acusaban a la POBLACIÓN** —`Cleric of Innoruuk` es
+un título, `Amygdalan warrior` una raza, ``Noclin`s Pet`` la mascota de un
+jugador: la regla «sin artículo» los metía dentro— y **el quinto acusaba a mi
+lectura del MUNDO**: ``Sir Lucan D`Lere`` no son dos, es uno que muere dos veces
+porque **aparece en esqueleto** ([D8](HECHOS-DECLARADOS.md)).
+
+**Ninguno de los cinco acusaba a la afirmación**, que era la única a la que
+acusé.
+
+**Por qué se acusa siempre a la afirmación:** es la barata. Borrar una línea de
+`imposibles.js` cuesta un segundo; revisar la población pide otra medición y
+revisar el mundo pide preguntar a alguien y esperar. **La cuenta sale mal: lo que
+se borra es justo lo que había costado escribir.**
+
+**El orden bueno, y va antes de tocar nada:**
+
+1. **¿La población es la que creo?** — ¿a quién se está aplicando la
+   comprobación, y entra alguien que no debería?
+2. **¿El mundo es como creo?** — a [`HECHOS-DECLARADOS.md`](HECHOS-DECLARADOS.md),
+   y si no consta, se pregunta.
+3. **Y sólo entonces, ¿la afirmación es falsa?**
 
 ## Cómo se clasifica lo que aparece
 
@@ -55,7 +88,7 @@ nada. Un arreglo sin clasificar es un arreglo cuyo valor nadie midió.
 | cepillo | estado | encontrado | A | B | C |
 |---|---|---:|---:|---:|---:|
 | **1 · Ramas nunca pisadas** | primera corrida hecha | **1.333 bloques** | 0 | 4 | 1 |
-| **2 · Imposibilidades** | **17 corriendo, en silencio · 1 recuperada, sin instalar** | 2 mal escritas · **1 recuperada salta en 5 nombres** | 0 | **1** | 2 |
+| **2 · Imposibilidades** | **17 corriendo, en silencio · 1 recuperada, esperando al rótulo del filtro** | 1 mal escrita · **1 recuperada, y sus 5 saltos acusaban al filtro y al mundo, no a ella** | 0 | **1** | 1 |
 | **3.1 · Pertenencia** (familia 1) | **cepillado** | 2 primas | 0 | 2 | 0 |
 | **3.2 · Pronombre** (familia 13) | **cepillado** | 46 candidatas, 2 reales | 1 | 1 | 0 |
 | **3.3 · Número desnudo** (familia 12) | **cepillado** | 469 pinzas, 52 de la forma | 1 | **13 cubiertas** | 0 |
@@ -67,6 +100,7 @@ nada. Un arreglo sin clasificar es un arreglo cuyo valor nadie midió.
 | **7 · El oráculo tonto** | **3 propiedades corriendo** | **15 peleas cortadas en mitad del combate** | **15** | 0 | 0 |
 | **8 · El punto ciego del reproductor** | **cerrado**: ejecutable y vigilado | 1 comprobación mal escrita | 0 | 0 | 1 |
 | **9 · Tramos sin ninguna muerte** | **población medida** | **134 de 1.578** (8,5 %) | 0 | **1** | 0 |
+| **10 · La cadena de invocación** (Sky) | **comprobado, negativo bueno** | 18 casos · **17 de 18 en una sola pelea** | 0 | 0 | 0 |
 
 **Lo cepillado hasta hoy: 3 de las 14 familias.** Once dianas dibujadas y sin
 disparar.
@@ -200,8 +234,15 @@ detectamos nameds.** La imposibilidad, bien escrita, **encontró el fallo de la
 población y no el del mundo** — que es exactamente lo que tiene que hacer una
 imposibilidad cuando la afirmación de partida es buena.
 
-**Y el quinto es la pregunta abierta para Campeón**, con las cuatro líneas
-delante en [D7](HECHOS-DECLARADOS.md).
+**Y el quinto ya está contestado: [D8](HECHOS-DECLARADOS.md).** Sir Lucan
+D`Lere muere y **aparece en esqueleto con el mismo nombre**; hay que matarlo otra
+vez. No son dos: es uno que muere dos veces, y D7 queda entera.
+
+> **CUÁNDO SE PUEDE INSTALAR:** cuando el filtro **diga por qué descarta cada
+> uno** —«varios individuos» frente a «muertes demasiado juntas, causa sin
+> determinar»—. Entonces saltará **cero veces con datos buenos**, que es la
+> condición. Hoy saltaría cinco, y una que salta con datos correctos entrena a
+> ignorarla.
 
 > **La lección de método, y va con la de arriba:** una imposibilidad que salta no
 > siempre acusa al dato. Aquí acusa **al filtro que eligió a quién mirar**. Antes
