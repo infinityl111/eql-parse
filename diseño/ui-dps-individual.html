@@ -1,4 +1,44 @@
 <!DOCTYPE html>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  PROTOTIPO · 16 de agosto de 2026 · LAS CIFRAS SON INVENTADAS
+  ═══════════════════════════════════════════════════════════════════════════
+
+  LAS SEIS REGLAS DEL GRÁFICO DE DPS, PARA QUIEN LO CONSTRUYA.
+  Salen del estudio de los competidores (ESTUDIO-COMPETIDORES.md §14.1 y §14.5).
+
+  1 · Cubos de 1 s, media móvil de cola de 5 s, tope de 360 vértices. El cubo
+      crece cuando la pelea no cabe en 360.
+  2 · LA CIFRA DEL RATÓN SALE DE LA MISMA SERIE QUE LA LÍNEA. Nunca de otro
+      sitio: si se calcula dos veces, algún día no coincidirán.
+  3 · NO SE INTERPOLA ENTRE CUBOS. La serie está cubeteada a >=1 s y el pie lo
+      dice; suavizar los escalones inventa un ritmo que el registro no sostiene.
+  4 · PELEAS CORTAS: SIN CASO ESPECIAL. El divisor es min(i+1, w) x cubo, o sea
+      sólo los cubos que existen — encoge solo al principio de la pelea.
+  5 · UNA SOLA BASE DE TIEMPO POR GRÁFICO (ley 9 de jmoyers). Vértices, marcas,
+      eje e inversa del ratón leen UN {t0, t1, cubo}; las muestras se anclan en
+      el CENTRO del cubo.
+
+  6 · Y EL AVISO SOBRE ESTA MISMA MAQUETA, QUE TIENE LA FORMA EXACTA DE SU
+      CICATRIZ:
+
+      ESTE FICHERO DIBUJA POR ÍNDICE —`px = ML + i*(W-ML-MR)/(n-1)`— Y ESCRIBE
+      LAS HORAS DEL EJE A MANO: [[0,'0:00'],[n/2,'2:56'],[n-1,'5:52']].
+
+      El ratón invierte ese mismo mapeo por índice, así que HOY ES COHERENTE
+      CONSIGO MISMO y por eso se ve bien. Vale exactamente mientras los cubos
+      sean CONTIGUOS Y DE UN SEGUNDO.
+
+      SE ROMPE EN CUANTO HAYA QUE DIEZMAR PARA EL TOPE DE 360: el índice deja de
+      ser proporcional al tiempo, las horas dejan de caer donde dicen, y el
+      desacuerdo aparece EN EL BORDE DERECHO — que es justo donde ellos lo
+      vieron, estirando las marcas un cubo entero.
+
+      CONSTRÚYASE MAPEANDO POR TIEMPO DESDE LA PRIMERA LÍNEA. No «se arregla
+      luego»: el mapeo por índice es correcto hasta que deja de serlo, y no da
+      ningún síntoma antes.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
 <html lang="es">
 <head>
 <meta charset="utf-8">

@@ -1,4 +1,5 @@
 import { RULES_BY_HINT, HINTS } from './patterns.js';
+import { claveDeNombre } from './nombres.js';
 import { STANCES, mitigationFor, normStance } from './stances.js';
 import { classifySpell } from './spells.js';
 
@@ -154,6 +155,8 @@ export class Parser {
     // nombres, y guardando sólo la última el primero de «a hardened skeleton»
     // se perdía —dos peleas distintas, con veinte minutos de por medio—.
     this.charmed = new Map();
+    /** clave de nombre -> forma escrita A MITAD DE FRASE. Ver `#atestiguaFormas`. */
+    this.formas = new Map();
     /**
      * TODO NOMBRE QUE HAYA ESTADO ENCANTADO EN ESTA SESIÓN. No se vacía nunca.
      *
@@ -434,13 +437,67 @@ export class Parser {
     if (plano === 'you' || plano === 'yourself' || plano === 'myself') {
       return this.self ?? 'You';
     }
-    // EQ capitaliza al principio de frase: "A fire giant warrior" y
-    // "a fire giant warrior" son el mismo enemigo. Sólo tocamos el artículo,
-    // para no estropear nombres propios como "King Tranix".
+    /**
+     * ── LA MINÚSCULA, SÓLO SI ESTÁ ATESTIGUADA ──────────────────────────
+     *
+     * EQ capitaliza al principio de frase: «A fire giant warrior» y «a fire
+     * giant warrior» son el mismo enemigo, y bajar el artículo los junta.
+     *
+     * PERO NO SIEMPRE EL ARTÍCULO ES ARTÍCULO. Hay nombres en los que el «The»
+     * forma parte del nombre y el juego lo escribe en mayúscula A MITAD DE
+     * FRASE, que es la única posición donde la mayúscula significa algo:
+     *
+     *     You slash The Spiroc Guardian for 120 points of damage.
+     *
+     * Bajarlo ahí no junta nada: estropea el nombre. Medido sobre el registro
+     * de referencia son CINCO —`The Spiroc Guardian`, `The Spiroc Lord`,
+     * `The Prophet`, `The Mighty Bear Paw`, `The Muglwump`— y los cinco se
+     * estaban enseñando mal.
+     *
+     * ASÍ QUE MANDA LA PRUEBA: si de este nombre se ha visto una forma a mitad
+     * de frase, esa es la buena y se devuelve tal cual. Si no se ha visto
+     * ninguna, se sigue bajando el artículo, que es la apuesta correcta
+     * mientras no haya evidencia — y quien la use sabe que es una deducción,
+     * porque `formaAtestiguada` devuelve `null`.
+     */
+    const atestiguada = this.formas.get(claveDeNombre(name));
+    if (atestiguada) return atestiguada;
     return name.replace(/^(An?|The) /, (m) => m.toLowerCase());
   }
 
+  /**
+   * ¿Qué forma de este nombre ha escrito el juego A MITAD DE FRASE?
+   *
+   * `null` cuando no lo ha escrito nunca fuera del principio de frase, y
+   * entonces lo que se enseña es una DEDUCCIÓN y no una medida. Ver
+   * `nombreDeducido` en `src/encounter.js`.
+   */
+  formaAtestiguada(nombre) {
+    return this.formas.get(claveDeNombre(nombre)) ?? null;
+  }
+
+  /**
+   * Anota la forma con la que el juego escribe un nombre CUANDO NO ABRE FRASE.
+   *
+   * Se llama antes de normalizar, que es el único momento en el que la forma
+   * cruda sigue estando. Y sólo cuenta si NO abre la línea: al principio de
+   * frase todo va en mayúscula y no atestigua nada.
+   */
+  #atestiguaFormas(ev) {
+    const body = ev.raw ?? '';
+    for (const n of [ev.source, ev.target, ev.victim, ev.killer, ev.caster]) {
+      if (!n || typeof n !== 'string') continue;
+      const plano = n.toLowerCase();
+      if (plano === 'you' || plano === 'yourself' || plano === 'myself' || plano === 'unknown') continue;
+      if (body.startsWith(n)) continue;          // abre frase: no dice nada
+      const k = claveDeNombre(n);
+      if (!this.formas.has(k)) this.formas.set(k, n);
+    }
+  }
+
   #post(ev) {
+    // La forma cruda sólo existe aquí: después se normaliza.
+    this.#atestiguaFormas(ev);
     // EQL marca el resultado entre paréntesis al final de la línea:
     // (Critical), (Riposte), (Flurry)… Sin esto los críticos no se contaban.
     if (ev.flag) {

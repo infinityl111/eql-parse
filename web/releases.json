@@ -36,7 +36,7 @@
    "state": "uploaded",
    "size": 78802950,
    "digest": "sha256:0cc73ae0a21229612c7d624bd87fda03cfef513683e6c57aae8ca410fb2147da",
-   "download_count": 0,
+   "download_count": 4,
    "created_at": "2026-08-15T15:40:18Z",
    "updated_at": "2026-08-15T15:40:21Z",
    "browser_download_url": "https://github.com/infinityl111/eql-parse/releases/download/v1.14.1/EQL-Parse-1.14.1-setup.exe"

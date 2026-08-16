@@ -1,6 +1,6 @@
 {
   "name": "eql-parse",
-  "version": "1.14.1",
+  "version": "1.15.0",
   "type": "module",
   "description": "Parser DPS en tiempo real para EverQuest Legends",
   "main": "electron/main.cjs",
@@ -19,7 +19,9 @@
     "enc:rebuild": "node bin/enc-rebuild.js",
     "ui:docs": "node bin/ui-docs.js",
     "web:webp": "node bin/webp.js",
-    "web:peso": "node bin/web-peso.js"
+    "web:peso": "node bin/web-peso.js",
+    "imposibles": "node bin/imposibles.js",
+    "reproductor": "node bin/reproductor.js"
   },
   "build": {
     "appId": "dev.miguelangelfernandez.eqlparse",

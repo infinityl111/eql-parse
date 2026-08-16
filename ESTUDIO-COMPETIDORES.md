@@ -11,6 +11,24 @@ haga con esto lo decide Miguel, con el documento delante.
 citar, no se afirma. Donde una medición es nuestra, se dice sobre qué registro y
 con qué método.
 
+**CINCO FICHEROS, Y SE REPARTEN POR LA PREGUNTA QUE CONTESTAN, no por la fecha.**
+
+| fichero | contesta |
+|---|---|
+| **éste** | qué tienen ellos y qué nos enseña |
+| [`HALLAZGOS.md`](HALLAZGOS.md) | **qué hemos medido de lo nuestro** |
+| [`ESTUDIO-ARCHIVO.md`](ESTUDIO-ARCHIVO.md) | cómo llegamos aquí, y por qué creímos otra cosa |
+| [`HECHOS-DECLARADOS.md`](HECHOS-DECLARADOS.md) | quién lo dijo, cuándo, y qué lo mediría |
+| [`CACERIA.md`](CACERIA.md) | **dónde no hemos mirado** |
+
+**Este documento creció sin freno porque todo cabía bajo su título.** Ya no.
+
+**La regla del reparto: LA MARCA SE QUEDA, LA HISTORIA SE MUDA.** Donde hubo un
+error queda una línea con su fecha y su enlace —borrarla sería fingir que ese
+sitio nunca engañó— y el relato entero vive en el archivo. Lo mismo con lo
+mudado: **cada sección de aquí conserva su hallazgo y manda al archivo por el
+detalle**. Nada de lo archivado está desmentido; contesta otra pregunta.
+
 | | jmoyers/everquest-companion | sowoky/eqltools-companion | EQL Parse |
 |---|---|---|---|
 | Licencia | **FSL-1.1-MIT** | **AGPL-3.0** | **FSL-1.1-MIT** |
@@ -81,541 +99,47 @@ con el mismo nombre»— no es código.
 
 ## 1. Las tres fuentes, y qué vale cada una
 
-### 1.1 El historial de commits: el diario de qué se rompió, con fecha
+> **Mudado entero a [`ESTUDIO-ARCHIVO.md`, Parte II](ESTUDIO-ARCHIVO.md)**: el
+> recorrido por los 1.109 commits de jmoyers día a día, la clasificación por
+> familias y las incidencias una a una. Contesta *de dónde salió*, no *qué es
+> verdad*.
 
-jmoyers lleva **1.109 commits en once días**, del 4 al 14 de agosto:
+**Lo que hay que saber de las fuentes, en cuatro líneas:**
 
-```
-24  2026-08-04     192  2026-08-09     128  2026-08-12
-111 2026-08-05     113  2026-08-10     150  2026-08-13
-109 2026-08-06     100  2026-08-11      61  2026-08-14
-31  2026-08-07      90  2026-08-08
-```
-
-sowoky lleva 45, casi todos de publicación de versión.
-
-Clasifiqué los 815 commits de trabajo de jmoyers (fuera los 294 `Merge JOS-nnn`,
-que repiten el asunto de la rama) por palabras clave en el asunto. **Es un suelo,
-no un censo**: sus asuntos son prosa, y 469 no casan con ninguna familia.
-
-```
-  86  ventanas y overlays
-  82  atribución: de quién es el daño (mascota, encanto, ajenos)
-  72  datos consultados (wiki, catálogos, imágenes)
-  51  reglas de línea / parser
-  47  buffs, mez, temporizadores
-  40  rendimiento y arranque
-  22  actualizador, instalación, plataformas
-   7  frontera de pelea / segmentación
-   7  persistencia / migración
-   4  muerte y su evidencia
-   1  identidad de nombres / gemelos
-```
-
-**La lectura que importa: la atribución cuesta más que el parseo.** «De quién es
-este daño» (82) supera a «qué dice esta línea» (51). La frontera de pelea sale a
-7 — no porque sea fácil, sino porque la resolvieron pronto y no volvieron.
-
-Ejemplos, con su fecha y su asunto literal:
-
-| fecha | asunto | de qué habla |
-|---|---|---|
-| 2026-08-04 | `Charm ownership: a broadcast is not a deed — the stranger's pet leaves your meter` | un anuncio de encanto no prueba que la mascota sea tuya |
-| 2026-08-06 | `JOS-54: one pet at a time — re-summoning retires the animation you had` | invocar retira la anterior |
-| 2026-08-07 | `JOS-88: a death with no killer is still a death` | `You died.` sin matador |
-| 2026-08-08 | `JOS-101: the killerless mob death, and Phinigel joins the roster` | `<Nombre> died.` |
-| 2026-08-09 | `JOS-156: the 0.16.0 notes say death and absence both end a bar` | **la muerte y la ausencia cierran las dos** |
-| 2026-08-09 | `JOS-176: a mez hold dies with the mob that held it, and never lands on your pet` | el mez retirado deja de sostener |
-| 2026-08-12 | `JOS-270: an ally's pet ends the way the evidence says it should, not the way it was bound` | la evidencia manda sobre el vínculo |
-| 2026-08-14 | `JOS-349: the pet stays parsed - a lost subject token cost a shaman his whole pet` | un token perdido borró una mascota entera |
-| 2026-08-14 | `JOS-350: the mob page joins its own kills, through the ONE mob key` | una sola clave de nombre |
-
-`JOS-350` es literalmente nuestro `src/suelo.js`: dos sitios contando lo mismo,
-unificados en una clave.
-
-### 1.2 Las incidencias
-
-**No son la misma cosa en los dos repos, y conviene saberlo antes de leerlas.**
-
-**jmoyers: 11 incidencias, escritas por usuarios reales.** Reparto: 3 abiertas,
-8 cerradas. Lo que reportan:
-
-- `#11` (2026-08-05) — «*just installed this while I was on my level 50 loadout
-  and it is incorrectly identifying my level/class even after combat. I'm
-  assuming it is just looking for most recent level gain text*». El usuario
-  enumera las salidas del juego que darían el dato bien: `/who`,
-  `/alternateadv list`, `/output inventory`, `/output faction`,
-  `/output achievements`. Respuesta del autor: *«anything that can reinforce what
-  is there and then be kept up real-time, i will build in as first class.
-  anything that requires user to do repeated intervention […] i will prob
-  deprioritize»*. **Es exactamente nuestra medición del `/outputfile`: 60 de 81
-  no aparecen en el registro.** Un usuario llegó a la misma conclusión desde el
-  otro lado.
-- `#13` — falta un hechizo concreto en la lista de alarmas (*Spirit of the Puma*),
-  y añadirlo a mano no funciona.
-- `#15` — los *lull* se quedan a 0 s en el overlay de buffs y no se van.
-- `#25`, `#26`, `#28` — Linux, Umu launcher, Crossover en Mac: la ventana sale
-  recortada por arriba, o sale sólo la barra de título.
-- `#29` — el actualizador falla. El usuario, sueco, sospecha del separador
-  decimal de su *locale*. **No lo era**: era una respuesta vacía o parcial de
-  GitHub que el updater trataba como error de JSON.
-- `#27`, `#30` — cosas de Plane of Sky.
-
-**Reparto por materia: 5 de 11 son de ventana o plataforma** (`#25`, `#26`, `#28`
-de plataforma; `#14` y `#22`, controles que se solapan en resoluciones
-estrechas), **1 de actualizador** (`#29`), **2 de que a un dato le falta una
-fuente** (`#11`, `#27`), **1 de un temporizador que no se limpia** (`#15`) **y 2
-de contenido** (`#13`, `#30`).
-
-Ni una sola incidencia de usuario sobre atribución de daño, sobre
-homónimos o sobre dónde empieza una pelea. Los usuarios reportan lo que **ven**;
-lo que se calcula mal en silencio no lo reporta nadie. Es la frase de este
-proyecto entera: *un número más bajo no se distingue de un número correcto.*
-
-**sowoky: 13 incidencias, todas abiertas, todas del 14 de agosto, todas
-autoauditorías.** No son reportes de usuario: son hallazgos escritos con
-fichero, línea, entrelazado paso a paso y esbozo de arreglo. Como corpus de
-fallos de este dominio valen muchísimo, y tres tocan cosas nuestras:
-
-- **`#13` — atribución de mascota con gemela homónima.** *«a same-named twin
-  pet's death cuts YOUR pet's claim (held-span protection only covers charms)»*.
-  El motor ya sabe que existen gemelos y **ya se protege contra ellos para los
-  encantos**: una línea de primera persona («*your charm has worn off*») crea un
-  `held` span, y dentro de él se suprimen las fronteras ambiguas —«murió», «me
-  pegó»—. La incidencia dice que esa protección **no cubre las mascotas
-  invocadas**, que se reclaman por la vía de los *tells*. Y lo enuncia así:
-
-  > *the documented Innoruuk`s Chosen case, where **proof outranks inference***
-
-  Eso es, palabra por palabra, nuestra `identidad-declarada-gana`. Dos
-  implementaciones independientes han llegado al mismo principio y le han puesto
-  casi el mismo nombre.
-
-- **`#9` — doble conteo de muertes.** Cuando el fichero encoge, `main.js:294-299`
-  reinicia el offset a 0 *alegando* que la marca de agua evita recontar; pero los
-  bytes releídos entran por el camino en vivo, y ese camino desactiva la marca a
-  propósito (`renderer/app.js:279-284`, `{ hwm: false }`). *«The invariant is not
-  honored on exactly the path that cites it.»* **Es nuestra familia: la regla
-  puesta en un sitio y no en el otro.**
-
-- **`#5` — el volcado de inventario destruye lo saqueado entre que se escribe y
-  que llega.** El manejador hace `LIVE_HAVE = new Map()` sin comparar contra
-  `mtime`, y el sondeo tarda hasta 3 s. Lo notable: *«the inverse skew IS handled
-  elsewhere — `deliveredAfter(INV.mtime)` at `app.js:1995`»*. **El peligro se
-  conocía en una dirección y se pasó por alto en la otra.** Misma familia otra
-  vez.
-
-### 1.3 El código
-
-Lo que sigue.
-
----
+- **El historial de commits es la fuente buena**, y es un diario de qué se
+  rompió con fecha: 1.109 commits en once días, del 4 al 14 de agosto.
+- **LA LECTURA QUE IMPORTA, y sigue siendo el hallazgo mayor del primer pase:**
+  **la atribución cuesta más que el parseo.** «De quién es este daño» son 82
+  commits; «qué dice esta línea», 51. La frontera de pelea sale a 7 — no porque
+  sea fácil, sino porque la resolvieron pronto y no volvieron.
+- **La clasificación es un SUELO, no un censo**: sus asuntos son prosa y 469 no
+  casan con ninguna familia (repasados en §17).
+- **Las incidencias son autoauditorías con fichero y línea**, y ocho de las diez
+  de sowoky son de ventana y ninguna de parseo (§16).
 
 ## 2. El parser
 
-### 2.1 Cómo escriben las reglas
-
-**jmoyers — cascada de clasificadores tipados.**
-
-`src/main/log/parseCommon.ts:1-8`:
-
-> *The single parse pass is a CASCADE of per-family classifiers whose ORDER IS
-> SEMANTIC (e.g. the resist family must test the possessive-YOUR form before the
-> named-caster form because 712 spell names contain `'s`).*
-
-Cada clasificador es `(ClassifyCtx) => LogEvent | null` puro
-(`parseCommon.ts:26`), y `parser.ts` tiene la única lista ordenada. Son **41
-clasificadores** repartidos en 10 ficheros (`parseCombat.ts`, `parseCasts.ts`,
-`parseWorld.ts`, `parseWho.ts`, `parseGroup.ts`, `parseAcquire.ts`,
-`parseSession.ts`…) y **88 constantes `*_RE`**, con 78 regex ancladas en `^`.
-
-La salida es una unión discriminada declarada en `src/shared/logEvents.ts` (1.480
-líneas). La cabecera del fichero (`logEvents.ts:1-6`):
-
-> *ONE parse pass over the EQ Legends log produces this discriminated union […]
-> every consumer subscribes to the stream instead of running its own regexes.
-> Keep this pure and serializable — no behavior, just data.*
-
-**sowoky — un objeto `RX` con 55 expresiones**, probadas en un orden explícito
-(`engine.js:190`), y una guarda barata delante:
-
-una sola expresión (`COMBATISH`, `engine.js:193`) que exige que la línea
-contenga una de seis marcas —«points of … damage», «has taken N damage»,
-«healed … for N», «has been slain», «You have slain», o un «, but …» seguido de
-un verbo de evasión a menos de 60 caracteres— antes de probar ninguna de las 55.
-
-`engine.js:184` documenta el orden: *«most frequent first; you_slain before
-slain_by, youdied before died»*.
-
-**Nosotros — 149 reglas indexadas por 123 pistas de subcadena**
-(`src/patterns.js`, `src/parser.js:202`). El reparto por `kind`:
-
-```
-noise:42  survival:10  chat:10  loot:8  dot:4  cast:4  death:4  buff_land:4
-stun:3  mez:3  spell:2  melee:2  miss:2  crit:2  heal:2  cast_recover:2
-control:2  buff_fade:2  stance:2  invocation:2  memorize:2  root:2
-+ 32 kinds con una regla cada uno
-```
-
-Los tres somos comparables en tamaño de gramática (149 / 88 / 55) y los tres
-usamos el mismo truco de coste: una prueba barata de subcadena antes de la
-regex. Nadie ha encontrado un atajo que los otros no tengan.
-
-### 2.2 La trampa de la mayúscula al abrir frase
-
-Los tres la vimos. **Los tres la resolvemos distinto, y el tercero es el mejor.**
-
-**jmoyers — minúsculas totales, y sólo para la clave.** `parseCommon.ts:37-45`:
-
-`idKey(name)` recorta el nombre y lo pasa **entero a minúsculas**; las tres
-formas de la primera persona —`you`, `yourself`, `your`— colapsan en una sola
-clave. El comentario da el motivo con la misma observación que nosotros: las
-líneas de encanto escriben el artículo en minúscula y las de daño lo
-capitalizan, así que una clave insensible a la caja es lo que hace estables las
-búsquedas.
-
-Y en `AGENTS.md:730` lo elevan a ley: **«Names are dirty; canonicalize at
-boundaries, display raw.»** *Clave en minúsculas; se muestra el nombre crudo.*
-
-**sowoky — plegado con prueba.** `engine.js:352-365`:
-
-`foldCap(n)` baja la inicial **sólo si la variante en minúscula ya se ha visto**
-en algún otro sitio del registro; si no, devuelve el nombre tal cual. El conjunto
-`seenNames` se llena antes con todos los nombres que aparecen en cualquiera de
-los seis campos de nombre de los eventos.
-
-El razonamiento que dejan escrito al lado: «orc legionnaire» se imprime
-capitalizado al abrir frase y en minúscula a mitad, que son dos filas para un
-bicho; y **haber visto la minúscula es la prueba de que la mayúscula era de
-frase**, porque un nombre propio nunca se imprime en minúscula.
-
-**Nosotros — plegamos siempre, sin prueba, y el resultado se enseña.**
-`src/suelo.js:56`:
-
-```js
-const n = String(bruto).charAt(0).toLowerCase() + String(bruto).slice(1);
-```
-
-y `src/engine.js:1291` usa esas claves **como rótulo visible** de la pelea.
-
-**Medido sobre el registro de Miguel** (951.773 líneas; método: se recorre el log
-con nuestro propio parser y se agrupan las víctimas de los eventos `death`):
-
-```
-víctimas distintas                                        472
-con inicial mayúscula y sin artículo                      164
-  ...con prueba de que la minúscula existe                 12   ← plegado correcto
-  ...SIN esa prueba                                       152   ← plegado sin fundamento
-```
-
-Los 152 son nombres propios: `Lord Nagafen`, `Warlord Skarlon`, `King Tranix`,
-`Master Yael`, `Magus Rokyl`, `Amygdalan warrior`, `Gorgalosk`. El rótulo que se
-construya para ellos por esa vía dice *«lord Nagafen»*. La regla de sowoky —
-plegar sólo si la minúscula se ha visto de verdad — habría acertado en los 164:
-pliega los 12 y deja los 152 en paz. La de jmoyers también, por otra vía: separan
-CLAVE de PRESENTACIÓN, y nosotros usamos la clave para las dos cosas.
-
-**El fallo de fondo no es la mayúscula: es que la normalización de identidad se
-está usando como texto de pantalla.** Es la familia de siempre vista desde otro
-ángulo — un valor calculado para una pregunta, respondiendo otra.
-
-### 2.3 Homónimos: tres respuestas distintas, todas medidas
-
-**jmoyers — instancias con generación.** `src/main/combat/world.ts:1-14`:
-
-> *The engine historically keyed everything by bare name. That collapses
-> same-named twins […] the pet and the mob it tanks are indistinguishable.*
-
-La salida: **cada aparición recibe una identidad de instancia propia**, formada
-por la clave del nombre y un número de generación, de modo que los gemelos son
-entidades separadas en la agregación y en el ciclo de vida del encanto.
-
-Y una **tabla de decisiones de ciclo de vida** entera en el comentario
-(`world.ts:16-98`), con esta declaración de sesgo:
-
-> *all rules deterministic; ambiguity is flagged, never silently guessed toward
-> the worse failure mode — a false pet-death drops all subsequent pet damage, so
-> we bias AWAY from retiring the pet on ambiguity.*
-
-Lo que **prueba** que hay una gemela (`world.ts:47-50`): daño tuyo hacia el
-nombre mientras una instancia de ese nombre está encantada, **o** daño de ese
-nombre hacia ese mismo nombre. Y en la muerte, cinco casos según quién mate
-(`world.ts:60-79`), tres de ellos marcados como ambiguos, con la regla explícita:
-*«When ambiguous and a twin exists we always keep the pet.»*
-
-**sowoky — detección por ticks de veneno.** Esto no lo tenemos y es la idea más
-bonita de todo el estudio. `engine.js:746-758`:
-
-Cada tick de veneno se resume en una clave de tres partes —**segundo entero,
-hechizo y lanzador**— y se guarda en un conjunto por pelea. Si la misma clave
-llega dos veces, la pelea se marca (`dotStack`). El lanzador sale del propio
-evento; la forma anónima, que no lo trae, agrupa todas juntas bajo una etiqueta
-única.
-
-El razonamiento: el veneno de un lanzador tiquea **una vez por tick y por
-entidad**, así que dos ticks idénticos en el mismo segundo sobre un nombre
-significan que hay dos bichos llevándolo, y que las sumas de esa pelea son una
-mezcla de los dos.
-
-Es un **detector de homónimos que no necesita ningún modelo de identidad**: sale
-de una propiedad física del juego (un veneno tiquea una vez por tick por
-entidad). Marca la pelea como `tainted` y el resumen por bicho decide qué se
-cree. Y el sesgo está declarado: la forma anónima agrupa todas juntas, *«the
-pessimistic side — it can over-flag, never silently trust a blended fight»*.
-
-**Nosotros** — no distinguimos gemelos. Ponemos un **suelo** (`src/suelo.js`) y lo
-decimos en pantalla: «al menos 3». Los tres enfoques responden a preguntas
-distintas: jmoyers *quién es cada uno*, sowoky *¿me puedo fiar de esta suma?*,
-nosotros *¿cuántos había como mínimo?*.
-
-### 2.4 Muerte sin apertura, y muerte sin matador
-
-`src/main/log/parseWorld.ts:132-156` es el trozo con más medición del repo:
-
-una constante con el texto exacto `You died.`, comparada por **igualdad**, no
-por expresión regular, y probada antes que ninguna otra forma que acabe en
-«died.».
-
-> *When the killing blow is a DoT tick (or anything else with no attacker to name),
-> the client prints this instead of the slain sentence — same death, no killer.*
-
-Medido sobre 1,11 millones de líneas: **23 muertes del jugador, 22 con frase de
-«slain» y esta única línea**, así que entre las dos formas está el conjunto
-entero.
-
-Y el gemelo del bicho, `MOB_DIED_RE = /^(.+?) died\.$/` (`parseWorld.ts:156`):
-
-Barrido de sólo lectura sobre 1,44 millones de líneas, el 8 de agosto: **21
-líneas acaban en «died.»**, dos del jugador y **19 de nombres de bicho**.
-**Ninguna de las 21** tiene una línea de «slain» a menos de tres líneas, así que
-la forma nunca duplica una muerte ni la cuenta dos veces; **15 de las 19** llevan
-la línea de experiencia justo delante. Y el dato que explica por qué esto costó
-dos versiones:
-
-> *The sibling log eqlog_Primitive_halas.txt has 0.*
-
-Ese último dato —*el log hermano tiene cero*— es la razón de que a ellos les
-costara dos versiones (`JOS-88` el 7 de agosto, `JOS-101` el 8). La forma no
-aparece en todos los registros.
-
-**Nosotros ya cubrimos las dos.** Medido sobre el registro de Miguel: **2 líneas
-`<Nombre> died.` y 6 `You died.`, las 8 reconocidas, 0 en el cajón.** No es una
-laguna nuestra, y conviene dejarlo escrito para que nadie «arregle» algo que ya
-está.
-
-**La forma que sí nos falta la tiene sowoky, y es la inversa:** una muerte que no
-imprime ninguna línea de muerte. `engine.js:625-627`:
-
-> *A kill prints a same-second burst of xp/coin/faction lines, often BEFORE its
-> death line; the burst carries the kill's XP and coin. **A burst with no death
-> line anywhere near it, right where a fight was active, is a silent kill.***
-
-El código está en `engine.js:637-648` (agrupa xp/coin/faction en clusters con
-ventana de 2 s, y marca `nearDeath`) y `engine.js:704-713` (un cluster sin muerte
-cerca cierra la pelea abierta más reciente con `f.inferred = true`). **Marcado
-como inferido, no mezclado con lo medido.**
-
-Nosotros no leemos ninguna de las tres líneas de la ráfaga. **Medido: 9.965
-líneas `Your faction standing with …` en el registro de Miguel caen enteras en
-nuestro cajón.**
-
-### 2.5 Mascotas y encanto
-
-**jmoyers — tres señales, un solo sitio.** `AGENTS.md:749`, ley 4:
-
-> *AND THE CLAIM IS WHAT TRIGGERS IT, NOT THE SUMMON (JOS-188): an upgraded pet
-> is a new NAME; three lines produce the claim (tell / leader say / your own
-> pet-only buff landing), all through one `bindPetClaim`, on purpose.*
-
-Tres señales; **un solo punto de entrada, a propósito**. Nosotros tenemos las
-mismas tres (`src/parser.js:237`: `My leader is <tú>`, `told you 'Attacking…
-Master'`, tus propias órdenes) y también las metemos por un `#ownPet` único.
-Convergencia limpia.
-
-Y el invariante de una mascota a la vez está en los DOS modelos suyos, con
-alcances distintos y a sabiendas (`AGENTS.md:744-753`):
-
-> *enforced in TWO models with different reach, measured, not an oversight
-> (JOS-54) […] the crossover is an unobserved shape and gets no invented rule —
-> **awaiting-sample law**.*
-
-Esa «*awaiting-sample law*» es nuestra regla —*una regla candidata que casa cero
-veces en el registro no entra*— con otro nombre.
-
-**sowoky — la señal de reclamo, y por qué es un `told you` y no un `says`.**
-`engine.js:41-58`, uno de los comentarios mejor razonados que he leído en
-cualquiera de los dos repos:
-
-> *Past-tense "told you" is how the client prints an NPC-to-you tell; live players
-> print present-tense ("tells you"), so a player can't produce this line.*
-
-Y sólo se te enseñan los susurros de **tu propia** mascota. Los «says» no
-reclaman nunca, con contraejemplo medido en su registro de referencia: un jugador
-saludando a un NPC con la palabra «Master» dentro de la frase.
-
-Y la corrección de un fallo suyo, dentro del mismo comentario: *«The name is
-free-form ((.+?)) so a charmed mob's tells claim it too — the old `[A-Z][a-z]+`
-capture silently missed every mob-named actor.»* Su captura de nombre asumía
-nombre de jugador y perdía cualquier mascota con nombre de bicho.
-
-**El encanto ajeno, y la negativa a adivinar.** `engine.js:413-422`:
-
-> *the tell alone loses whole fights: a charmed mob only tells you [when
-> ordered] […] more than one broadcast falls in the window, neither is
-> [claimed]* — **el caso se RECHAZA en vez de adivinarse.**
-
-`engine.js:492`: *«the window means a second charmer is in earshot and the log
-cannot say [which]»*. Y jmoyers, desde su primer día (commit del 4 de agosto):
-**«a broadcast is not a deed»**. Los dos llegaron a lo mismo: un anuncio público
-de encanto no prueba de quién es la mascota.
-
-**El compañero encantado.** El caso más caro que documenta jmoyers no es de
-encanto sino de su primo — el sanador controlado mentalmente. `src/main/combat/state.ts:460-500`:
-
-```
-You hit Lord of Loathing for 941 points of unresistable damage by Harm Touch X.
-Lord of Loathing has taken 509 damage from your Harm Touch X. (Critical)
-Your life force drains away.
-Lord of Loathing healed you for 509 hit points by Leech Touch I.
-```
-
-Su propio *lifetap* imprime «*<bicho> te curó*», y fichar a ese bicho como
-jugador borraba todos los golpes de la mascota contra él a partir de ese
-instante — **medido: 18 golpes, 398 puntos, en una sola mascota en un solo
-pull.** La regla ancha y obvia («cualquier cosa que haya sido hostil») la miden
-mal en el mismo corpus:
-
-Un jefe controla mentalmente al sanador del propio jugador, así que **una línea de
-ese sanador pegándote llega 27 segundos antes de otra curándote**: con la regla
-ancha, un jugador de verdad habría vuelto al conjunto de hostiles. La frase con
-la que lo zanjan:
-
-> ***Being hit is something that HAPPENS to you; hitting is something you DO, and
-> only the second one names a mob.***
-
-La regla que sobrevive es *«un nombre al que TÚ has hecho daño es un bicho»*, en
-una sola dirección, y **conductual a propósito**: *«it works identically for a mob
-no catalog has ever heard of»*. El catálogo no se consulta ni cuando el bicho
-está en él.
-
-### 2.6 El cajón: qué no reconocemos, y quién de ellos sí
-
-**Medición nuestra**, con nuestro parser sobre el registro entero de Miguel
-(script: agrupa cada línea no reconocida por *forma*, sustituyendo dígitos por
-`N` y el contenido entrecomillado por `'…'`; los nombres propios no se pueden
-borrar sin conocerlos, así que **cada recuento por forma es un suelo**):
-
-```
-líneas                    951.773
-reconocidas               893.941
-sin reconocer              57.814   (6,07 % — ver el denominador abajo)
-sin cabecera de hora           18   (ni una cosa ni la otra — abajo)
-formas distintas            6.612
-las 90 formas mayores      33.188   (57,4 % del cajón)
-```
-
-**Las 18 que no están en ninguno de los dos montones son continuaciones de
-mensajes de chat multilínea.** 893.941 + 57.814 + 18 = 951.773, exacto. El
-parser exige una cabecera `[hora]` para clasificar, y cuando un mensaje del
-juego lleva un salto de línea dentro, la segunda mitad se escribe **sin
-cabecera** y no es ni reconocida ni desconocida: es que no hay línea que
-clasificar. Son 18 en todo el registro, en cinco episodios:
-
-- seis líneas de un pegote de Discord que alguien copió al chat (líneas
-  15.755–15.760);
-- dos veces el pie «Please visit https://everquestlegends.com…» de un aviso del
-  servidor (17.681 y 74.646);
-- cinco de dos avisos de mantenimiento con su hora, su duración estimada y su
-  motivo (30.330–30.332, 31.121–31.122);
-- tres de alguien pegando en el chat su propio desglose de daño (312.541,
-  314.362, 537.834);
-- dos de un aviso de bloqueo de raid (554.426–554.427).
-
-No es un residuo sin nombre: es **una tercera categoría real**, y ahora tiene su
-fila en la cuenta.
-
-**Y son la mitad de un fenómeno con dos caras.** Un mensaje de chat partido en
-varias líneas nos ataca por arriba y por abajo a la vez:
-
-- **Las líneas de abajo** —las continuaciones— no traen cabecera `[hora]`, así
-  que el parser no llega a clasificarlas. Son estas 18.
-- **La línea de arriba** —la primera— sí trae cabecera y abre comilla, pero no
-  la cierra, porque el texto sigue debajo. Son **8 en todo el registro**, de
-  32.659 que abren cita. Ésas caían en la regla de daño.
-
-La misma forma partida, dos fallos distintos, uno por cada extremo.
-
-**El denominador del 6,07 %.** El fichero tiene **951.773 líneas físicas no
-vacías** y **951.755 registros lógicos** (las 18 de arriba son líneas pero no
-son registros). El porcentaje está calculado sobre **los registros lógicos** —
-57.814 / 951.755 = 6,075 %— porque el cajón mide qué parte de lo CLASIFICABLE no
-sabemos clasificar, y una continuación sin cabecera no es clasificable. Sobre
-las líneas físicas sale 6,074 %: a dos decimales las dos dan 6,07, pero son dos
-preguntas distintas y conviene que la etiqueta diga cuál contesta.
-
-**¿Es una regla o una casualidad?** La cabecera **es una regla, y estricta**:
-`parseHeader` (`src/parser.js:69-77`) exige un `[` en la posición 0, un `]` en la
-25, un nombre de mes conocido en la 5-8 y que día, hora, minuto, segundo y año
-sean números; si algo falla devuelve `null` y `parse` (`src/parser.js:188-190`)
-no llega a clasificar. Una línea sin cabecera **no puede** producir un evento.
-
-**PERO ESO NO NOS PROTEGE DEL CHAT, Y CONVIENE SABERLO.** Una línea de chat sí
-trae cabecera, así que la pregunta de verdad es otra: ¿puede alguien escribir
-una cifra en el chat y que la contemos? **Sí, y la exclusión que hoy lo impide es
-accidental.** Medido:
-
-- Las reglas de daño están ancladas (`^…$`) pero capturan el emisor con `(.+?)`,
-  así que se tragan el prefijo del canal sin protestar.
-- El orden no nos salva: la pista `of damage` se prueba **en la posición 2** de
-  las 123, y ` says` en la 72. **La regla de daño se prueba ANTES que la de chat.**
-- Lo único que hoy impide la confusión es que la regla de daño está anclada al
-  final y **la comilla de cierre del chat rompe la coincidencia**.
-
-De donde: una línea de chat que **no cierre comilla** —la primera línea de un
-mensaje multilínea, que es justo la forma de tres de las 18— cae en la regla de
-daño. Probado sobre nuestro propio parser:
-
-```
-  [hora] You say to your guild, 'Campeon hits a dracoliche for 999999 points of damage.
-     -> melee  amount=999999  source="You say to your guild, 'Campeon"
-
-  [hora] Fulano tells the guild, 'a dracoliche has been slain by Campeon!
-     -> death
-```
-
-**Y ahora la parte tranquilizadora, que también está medida:** en el registro de
-Miguel hay **21.867 líneas con forma de chat**, de las que **9 no cierran
-comilla**, y **ninguna de las 21.867 se clasifica como daño, muerte o curación**.
-El agujero existe y nadie lo ha pisado — los tres desgloses que Miguel pegó en el
-chat de hermandad son resúmenes de dps, que no tienen forma de línea de daño.
-
-Es un vector latente, no una corrupción viva. Queda escrito aquí para que la
-próxima persona que toque el orden de las pistas sepa qué está sosteniendo.
-
-Las familias grandes, y quién las tiene. **Los totales por familia se suman sobre
-las 600 formas mayores**, así que son suelos: la cola de 6.000 formas restantes
-sólo puede sumar. La única cifra contada directamente sobre el registro entero es
-la de facción (9.965 líneas; la agrupación por formas recoge 9.914 de ellas).
-
-| líneas | familia | jmoyers | sowoky |
-|---:|---|---|---|
-| 13.331 | emotes de buff que aterriza en ti (`Your feet move faster.` 4.023, `Your mind begins to clear.` 3.567, `Your wounds begin to heal.` 1.953, `A burst of strength surges through your body.` 721, `Your life force drains away.` 1.011) | **minado, no escrito** (§8.2) | no |
-| 9.965 | `Your faction standing with … has been adjusted by N.` y sus variantes | no como evento de log (sólo lee el volcado `/output faction`, `outputs/kinds.ts:138`) | **sí** — `engine.js:124`, y es una de las tres patas de la ráfaga que detecta muertes silenciosas |
-| 1.901 | `<Alguien> tries to cast a spell on you, but you are protected.` | no | **sí** — `engine.js:179` |
-| 3.803 | comercio y oficios: `You have fashioned the items together…`, `You receive N platinum … from <mercader> for <objeto>`, `Merchant X told you, '…'` | **sí** — `parseAcquire.ts:84`, y `You receive` en el mismo fichero | parcial (`You receive` en `engine.js`) |
-| 7.351 | `<Nombre> rages.`, `<Nombre>'s voice booms.`, `You overcome the stun!`, `You go berserk.`, `You already have your target's attention.`, `Your target is out of range`, `You must first select a target for this spell!`, `Your will is not sufficient to command this weapon.`, `You lacked the skills to fashion X`, `You can no longer advance your skill…` | **ninguno de los dos tiene ninguna de éstas** | ídem |
-
-Dos conclusiones, y las dos son negativas útiles:
-
-1. **De las diez formas sueltas más frecuentes de nuestro cajón, ninguno de los
-   dos tiene ocho.** El cajón no es una lista de deberes atrasados: es en su
-   mayoría ruido que nadie parsea, y eso vale como confirmación externa.
-2. **Las dos familias que sí tienen y nosotros no —facción (9.965) y protegido
-   (1.901)— no son «una línea más»: son la entrada a una capacidad.** La
-   facción es la ráfaga que delata una muerte que el log no escribe; el
-   «protected» es la contrapartida de un buff activo.
-
----
+> **Mudado entero a [`ESTUDIO-ARCHIVO.md`, Parte II](ESTUDIO-ARCHIVO.md)**, con
+> sus citas y sus tablas: cómo escriben las reglas, los homónimos, la muerte sin
+> matador, las mascotas y el encanto, y el cajón de lo no reconocido.
+
+**Los cinco hallazgos que siguen siendo verdad hoy:**
+
+1. **LA TRAMPA DE LA MAYÚSCULA AL ABRIR FRASE.** EQ escribe «A shin ghoul
+   knight has been slain» al abrir frase y «a shin ghoul knight» a mitad. Los
+   dos competidores lo pliegan; nosotros lo plegamos **en cinco sitios distintos**
+   (§19.3) y usamos la clave plegada como texto de pantalla. **Es la ley 2 de
+   jmoyers y la contradecimos.** Ya costó 25 abatidos.
+2. **HOMÓNIMOS: tres respuestas distintas y todas medidas.** La suya es
+   `nombre#generación` con cinco caminos de creación (§15.1); la nuestra es el
+   suelo declarado.
+3. **MUERTE SIN APERTURA Y MUERTE SIN MATADOR** son formas reales del registro,
+   y la que nos falta es la inversa que sí tiene sowoky.
+4. **MASCOTAS Y ENCANTO son la mitad cara del parseo**, y su caso más caro no es
+   de parseo sino de atribución: el compañero encantado.
+5. **EL CAJÓN: 34.207 líneas que no sabemos leer, el 6,07 %** de 951.773 líneas
+   físicas no vacías. Está contado y **no lo mira nadie** — es la alarma muerta
+   escrita con esas palabras en `patterns.js`.
 
 ## 3. La definición de pelea
 
@@ -670,6 +194,25 @@ como *el conjunto de enemigos cuyas ventanas de participación se solapan*, y en
 los dos **el cierre normal es por evidencia**: la ventana de cada enemigo, no un
 reloj global. Nuestro `PLAZO_ENEMIGO = 12` y su `PRESENCE_GONE_MS = 20` son el
 mismo parámetro con distinto valor.
+
+**Y «con distinto valor» no significa que los dos valores sean la misma clase de
+cosa.** Esta frase se aplanó en la primera redacción y hay que deshacerlo, porque
+§13 lo mide: sus cinco constantes de encuentro **nacen redondas —5.000, 20.000,
+60.000, 120.000, 3.000— y llegan byte a byte idénticas desde el primer commit
+público**, once días y 1.109 commits después. Un valor que nace redondo y no se
+mueve nunca es, con toda probabilidad, **un valor elegido y no medido**; y su
+propia nota de `CC_HOLD_MS` lo confirma en el único caso que la trae, porque
+argumenta de forma —*«so a lone mez can't pin a fight open forever»*— y no de
+medición. No se puede afirmar que el 20 salga de mirar un registro: **su historia
+anterior al 4 de agosto no es pública**, así que lo que se puede decir es que
+nunca han enseñado de dónde sale.
+
+Nuestro **12 sale de una banda medida de 10–15 s** y con la medición escrita al
+lado. Esto no dice que acertemos más: **dice que sabemos por qué, y ellos no
+tienen dónde mirarlo**. Lo que converge entre los dos proyectos es **el modelo
+—ventana por enemigo, cierre por evidencia—, no la cifra**; y presentar la cifra
+como convergencia sería cambiar un acuerdo estructural, que es el hallazgo de
+verdad, por una coincidencia numérica que no existe.
 
 **Y hay que decirlo con precisión, porque la frase se va a citar suelta:**
 jmoyers **sí** pregunta «¿ha pasado algo?» — es su `FALLBACK_IDLE_MS` de 60 s, y
@@ -761,15 +304,10 @@ tres peleas, cortadas en +308 s y +421 s:
 Cada tramo tiene enemigos que no salen en los otros, y **la mascota mezada sólo
 aparece en el primero**: B y C son tirones distintos encadenados al suyo.
 
-> **CORRECCIÓN.** Una versión anterior de este apartado daba «1.356 sucesos,
-> 13.149 de daño y un corte del plazo en +68 s» para esta misma pelea. **Esas
-> cifras eran incorrectas** y se dejan escritas aquí porque el motivo importa: el
-> arnés que las produjo apuntaba la hora de CADA evento tras alimentarlo al
-> rastreador, incluidos los que éste rechaza por irrelevantes, así que metía
-> combate ajeno dentro de la pelea. Y el «+68 s» salía de suponer que el campo
-> `sostenes` prueba que la pelea se habría cerrado sin el sostén — no lo prueba:
-> `#sigueAbierta` devuelve en cuanto encuentra UNA ventana abierta, así que otro
-> enemigo pudo mantenerla igual. Ver la undécima familia en `ui/app.js`.
+> **CORREGIDO el 15 de agosto.** Aquí decía «1.356 sucesos, 13.149 de daño, corte
+> en +68 s». Arnés que contaba combate ajeno, y un campo (`sostenes`) tomado por
+> prueba de algo que no prueba. **La historia entera, en
+> [`ESTUDIO-ARCHIVO.md` §A1](ESTUDIO-ARCHIVO.md).**
 
 Y un tercero, que es un detalle de cierre que nosotros resolvimos igual
 (`lifecycle.ts:104-107`): *«Finalization always stamps the encounter's lastTs (a
@@ -1064,7 +602,96 @@ sowoky sí persiste (`vendor/parse.js`, `STATE.kills`), con una marca de agua po
 fichero (`state.files[f] = { ts, n }`, `parse.js:224`) — y su incidencia `#9` es
 justamente que esa marca se desactiva en el camino en vivo.
 
-### 5.1 El precio de esa salida, que el apartado no nombraba
+> **ESTE APARTADO ESTABA ESCRITO AL REVÉS, Y EL SEGUNDO PASE LO DA LA VUELTA.**
+> Lo de arriba se lee como si ellos hubieran ELEGIDO no persistir y nosotros
+> fuéramos por detrás. **No es eso lo que pasó** — ver §5.1, escrita con lo que
+> §12.1 encontró el 16 de agosto.
+
+### 5.1 Y AL REVÉS: no vamos por detrás aquí, vamos por delante y con recibo
+
+**El hallazgo de §12.1 cambia el signo de todo este apartado.** «jmoyers no
+persiste el fold» es verdad hoy, y §5 lo presentaba como una postura de diseño de
+la que nosotros nos apartábamos. Lo que de verdad ocurrió es otra cosa:
+
+**LO CONSTRUYERON ENTERO Y LO BORRARON EL 11 DE AGOSTO SIN HABERLO PODIDO MEDIR
+NUNCA.** Dieciséis ficheros en `src/main/foldCache/` —formato de contenedor,
+bloque de identidad, gramática del esquema, cargador, planificación de escritura,
+interruptor, verificador en sombra, censo, ayudantes de ruta— más su preferencia,
+sus dos canales de IPC, el puente del preload y la casilla **Preferencias →
+Rendimiento → «Faster start»**. Todo fuera, en un commit.
+
+**Y NO LO QUITARON PORQUE MIDIERAN QUE NO SERVÍA. Lo quitaron porque no pudieron
+medirlo.** La función estaba detrás de un verificador en sombra que comparaba el
+fold restaurado contra el fold recalculado, y la puerta de salida era «cuando las
+divergencias lleven mucho tiempo en cero». Su propio commit lo dice:
+
+> *shadowChecks was ZERO on every build. The counters were the rollout gate
+> («stays off until divergences hold at zero»), and a gate whose denominator never
+> moves cannot open.*
+
+**El verificador no corrió ni una vez.** Cero divergencias sobre cero
+comprobaciones. La puerta no podía abrirse, así que la función pasó de su vida
+entera apagada y salió sin que nadie supiera si valía.
+
+**LO QUE ESO CAMBIA DE LA COMPARACIÓN, punto por punto:**
+
+| | jmoyers | EQL Parse |
+|---|---|---|
+| ¿existe persistencia de lo derivado? | la construyó y la borró | **sí, en producción** |
+| ¿se ha comprobado que lo persistido es correcto? | **nunca corrió el verificador** | **sí**: 1.474 de 1.474 peleas y 111 de 111 entradas de botín reconstruibles desde el log, 0 huérfanas |
+| ¿se sabe lo que cuesta rehacerlo? | no está publicado | **sí**: 25,5 s / 74,6 MB = 0,342 s/MB, medido (§4.0) |
+| ¿se sabe lo que costará dentro de un año? | — | **sí**: 12,9 min proyectados, con la salvedad de linealidad escrita |
+| ¿qué pasa si el registro se rota? | **se pierde el histórico entero**: su corpus es un fichero que nadie ha rotado | **no se pierde**: para eso está el almacén |
+
+**LA FRASE QUE HAY QUE CORREGIR** es la de §5: *«su respuesta a ese problema no es
+tener mejores migraciones de datos derivados: es no tener datos derivados
+persistidos»*. La respuesta real es **«intentaron tener las dos cosas, la puerta
+no abrió, y se quedaron con la mitad barata»**. Nosotros tenemos la cara cara
+—almacén, formato, migración forzada cuando toca— **y además el recibo de que
+funciona**, que es exactamente lo único que a ellos les faltó.
+
+#### EL CONTRAPESO, y va aquí y no en otro apartado: la primera factura del recibo
+
+**Persistir lo derivado tiene una factura concreta, y el 16 de agosto llegó.**
+
+El plegado de la mayúscula inicial se arregló **AL LEER y no al escribir**, a
+propósito, con este argumento escrito en `src/foes.js`: *«así queda bien también
+el histórico que ya está guardado, sin pedirle a nadie que reconstruya»*. Es
+correcto **para todo lo que se vuelva a plegar**.
+
+**El bestiario no se vuelve a plegar: se acumula.** Y hoy, en el fichero de
+Miguel, **9 nombres de 440 dicen menos muertes de las que sus propias peleas
+contienen** —`orc legionnaire` **29 contra 43**, `heart harpie` 3 contra 5,
+`dry bones skeleton` **0 contra 1**—. Rehaciéndolo desde el almacén, **7 de los 9
+se arreglan solos**: eran datos rancios de antes del arreglo. Las 14 muertes que
+aquel parche recuperó **siguen faltando** porque nadie ha ejecutado
+`npm run enc:rebuild`.
+
+> **UN ARREGLO «AL LEER» NO ALCANZA A UN ACUMULADOR.** Cura la vía, no el
+> depósito. Y el depósito es lo que se enseña.
+
+**Ésta es la contrapartida exacta de lo de arriba, y por eso va al lado y no en
+un apartado propio.** Nosotros tenemos el recibo de que lo persistido es
+reconstruible —1.474 de 1.474— y ellos no; y a cambio tenemos **un agregado que
+se quedó con lo viejo y que nadie iba a mirar**. Su postura —*«el fold es la
+verdad y se rehace»*— no tiene esta factura, porque no hay depósito que se quede
+atrás. **Las dos caras son de la misma moneda y las dos están medidas.**
+
+**Y LO QUE SÍ SEGUIMOS DEBIÉNDOLES, para no cambiar un aplanamiento por otro:**
+su postura *«el fold es la verdad y se rehace»* sigue siendo más limpia **si el
+fold no bloquea**, y ése es un asunto de §4 y no de éste. Que su puerta no abriera
+no hace buena nuestra arquitectura: hace **medible** la nuestra y **no medida** la
+suya.
+
+**Y LA LECCIÓN QUE NOS LLEVAMOS DE SU CICATRIZ NO ES SOBRE EL FOLD**, es sobre la
+puerta — y por eso está escrita como regla junto a la undécima familia en
+`ui/app.js`:
+
+> **UNA PUERTA QUE SE ABRE CUANDO UN CONTADOR LLEVA TIEMPO A CERO TIENE QUE
+> DEMOSTRAR PRIMERO QUE EL CONTADOR SE MUEVE. Un cero de «no ha divergido» y un
+> cero de «no se ha medido» se escriben igual.**
+
+### 5.2 El precio de esa salida, que el apartado no nombraba
 
 **Si la verdad es el fold, la historia muere con el fichero de registro.** Eso
 no es una pega teórica: Miguel se plantea renombrar el log cuando crezca y
@@ -1119,220 +746,43 @@ es rotar Y no persistir.
 
 ---
 
-## 6. Arquitectura: qué significa «extensible event-stream»
+## 6. Arquitectura, overlays y datos consultados
 
-En concreto significa **un bus síncrono con una unión discriminada**.
+> **Mudado a [`ESTUDIO-ARCHIVO.md`, Parte II](ESTUDIO-ARCHIVO.md)** (§6, §7 y §8
+> del primer pase, enteros).
 
-`src/main/log/bus.ts:1-14`:
+**ARQUITECTURA.** «Extensible event-stream» significa **un bus síncrono con una
+unión discriminada**: el contrato está publicado y el motor es un suscriptor más.
+En el nuestro, añadir una sección toca el parser.
 
-> *Both feeders (the historical scan and the live tailer) call emit(); every
-> consumer […] subscribes. **Subscribers fire in registration order,
-> synchronously, in the emitting call stack — no async, no queue** — so the
-> scan's strict file order is preserved end-to-end.*
+**OVERLAYS.** **Cinco de sus trece incidencias son de overlay**, y con §16 son
+ocho de diez en sowoky. **Un overlay es caro de tener bien, y el coste no está en
+el contenido**: está en la ventana, el escalado de pantalla y el ratón.
 
-Las piezas:
-
-1. **Una pasada de parseo**, cascada de 41 clasificadores puros
-   (`parser.ts`), que produce `LogEvent` (`shared/logEvents.ts`).
-2. **Un bus** (`bus.ts`), con una bandera `live` que distingue el replay
-   histórico del vivo: *«Consumers use it to gate side effects that should only
-   happen live (IPC pushes) while still folding historical events into their
-   snapshot state.»*
-3. **Consumidores independientes** que se suscriben: reducers de botín/muertes/
-   niveles/AA, el motor de combate, el modelo del mundo.
-4. **Eventos derivados** (`bus.ts:31-46`): un consumidor puede sintetizar un
-   evento (`buffExpired`, `epoch`, `offlineGap`) mientras pliega uno primario y
-   devolverlo al bus; se **encolan** y se entregan después del primario, para no
-   reentrar en el bucle de escucha a mitad.
-
-Y un detalle que es puro oficio (`bus.ts:31-40`): el bus **enmarca** el drenaje
-de derivados con un `probe` para que el banco de pruebas pueda atribuir su coste
-a una fila propia — *«the modules' totals would quietly include work done on
-somebody else's behalf, and "the derived drain costs X" could only ever be a
-guess»*.
-
-**Qué costaría en el nuestro añadir una sección.** Hoy `src/parser.js:202`
-devuelve un evento y quien lo consume lo hace por llamada directa desde
-`src/engine.js`. No hay bus: hay un motor que sabe de todos los consumidores. La
-diferencia concreta con lo suyo no es el bus en sí —es que su `logEvents.ts` es
-**el contrato publicado** y el motor es un suscriptor más, mientras que en el
-nuestro el motor **es** el contrato. Un consumidor nuevo nuestro tiene que
-entrar por `engine.js`; uno suyo se registra y no toca nada.
-
-sowoky no tiene bus: `engine.js` produce un array `P.events` y todo lo demás son
-funciones que recorren ese array (`buildClaims`, `buildFights`, `buildMobStats`,
-`buildSegments`, `analyze`). Es la forma más simple que funciona, y para 13k
-líneas es probablemente la correcta.
-
----
-
-## 7. Overlays
-
-Ellos tienen **diez** clases de overlay (no ocho), `src/shared/types.ts:75`:
-
-una lista con diez identificadores: pelea, global, sucesos, curación de la
-pelea, curación global, avisos emergentes, buffs, debuffs, experiencia y
-reapariciones.
-
-El oficio de Electron que hay debajo, que es lo copiable sin copiar código:
-
-- **Click-through con reenvío de ratón.** `windows.ts:498`:
-  `w.setIgnoreMouseEvents(true, { forward: overlayMouseForward(kind) })`. El
-  `forward: true` mantiene los `mousemove` llegando, así que la ventana sigue
-  «sabiendo» que el ratón está encima aunque los clics la atraviesen — es lo que
-  permite que un overlay se revele al pasar por encima sin dejar de ser
-  transparente al clic. sowoky usa el mismo truco (`main.js:278-282`) y lo
-  documenta igual: *«forward:true keeps mouse-move events flowing so the overlay
-  can still [react]»*, más una **zona activa para despinchar**
-  (`main.js:805-812`).
-- **Transparencia por elemento, no de ventana.** `windows.ts:714`:
-  *«translucency (per-element alpha beats window-level setOpacity)»*. Es una
-  decisión, no un detalle: `setOpacity` atenúa también el texto.
-- **Un píxel de holgura al comparar límites.** `windows.ts:607-611`:
-  *«`setBounds` is not always an identity: on a scaled display the value [comes
-  back different]»*. Es la causa de la incidencia `#1` de sowoky —*«Overlay window
-  grows while dragging it (fractional display scale)»*— que sigue abierta.
-- **No mover la ventana por muestra de cursor.** `windows.ts:1004`: *«a setBounds
-  per cursor sample would be a window-manager round trip at 125 Hz»*.
-- **Restaurar límites guardados con cordura.** sowoky `main.js:80`:
-  `OVERLAY_KEEP_ON_SCREEN`, y su incidencia `#3` dice que aun así se puede
-  arrastrar fuera de pantalla y restaurar tamaños imposibles.
-
-**Sus incidencias de overlay abiertas son 5 de 13** (`#1`, `#3`, `#11`, `#12`,
-`#16`), y las de jmoyers de plataforma otras 3 (`#26`, `#28`, `#25`). **Diez de
-las veinticuatro incidencias de los dos repos son de ventana.** Un overlay es
-caro de tener bien, y el coste no está en el contenido.
-
----
-
-## 8. Datos consultados
-
-### 8.1 La foto con su fecha
-
-Cada catálogo suyo lleva su procedencia dentro del propio JSON:
-
-| fichero | tamaño | claves de cabecera |
-|---|---:|---|
-| `data/items.json` | 8.443 kB | `scrapedAt, source, count, items` |
-| `data/spells.json` | 956 kB | `scrapedAt, schema, count, withEffects, spells` |
-| `data/messageOverlay.baseline.json` | 401 kB | `version, updatedAt, messages, stats` |
-| `data/pageEra.json` | 178 kB | `scrapedAt, source, count, eraRevision, pages, refs, mobs` |
-| `data/classes.json` | 62 kB | `scrapedAt, names, stances, …` |
-| `data/respawns.json` | 55 kB | `source, scrapedAt, rows` |
-
-**`scrapedAt` + `source` + `count` en todos.** Y los recolectores son scripts
-nombrados y versionados en `package.json`: `scrape:items`, `scrape:spells`,
-`scrape:mobs`, `scrape:quests`, `scrape:respawns`, `scrape:bosses`,
-`scrape:classes`, `scrape:posky`, `scrape:page-era`, `fetch:images`.
-
-Es la regla de la **«foto con una fecha»** ya implementada: el dato consultado no
-se mezcla con el medido y lleva encima cuándo se sacó y de dónde.
-
-Y una nota que separa dato consultado de dato medido explícitamente
-(`data/spellCorrectionsList.ts:3`): *«`spells.json` is a SCRAPE»*.
-
-### 8.2 Lo mejor del estudio: minar la asociación en vez de escribir la regla
-
-Nuestro cajón tiene **13.331 líneas** de emotes de buff que aterrizan en ti
-(`Your feet move faster.` ×4.023, `Your mind begins to clear.` ×3.567…; los cinco
-que enumera §2.6 suman 11.275 y el resto de la familia pone el otro par de
-miles). **Ninguno de los dos las tiene escritas a mano.** jmoyers hace otra cosa (`src/main/data/messageOverlay.ts:1-30`):
-
-> *The user's directive: "augment the spell database with our own method of
-> verifying variations of the cast messages for everything we encounter." This is
-> that method.*
-
-El mecanismo: mientras el modelo de buffs pliega el registro —en la relectura y
-en vivo— le entrega cada lanzamiento del jugador y cada línea candidata a ser un
-mensaje. La capa **mina la asociación** entre un mensaje y el hechizo que se
-estaba lanzando cuando apareció, con la pareja (texto, hechizo) como índice, y
-cuenta cuántas veces se repite.
-
-Y de esas cuentas sale un **veredicto por mensaje**:
-
-- `VERIFIED` — el mensaje sigue siempre al mismo hechizo (n≥2). Verlo prueba que
-  ese hechizo aterrizó.
-- `SHARED / GENERIC` — sigue a varios (*«You feel different.» para toda ilusión,
-  «You feel much faster.» para cuatro hastes*). **No puede nombrar un hechizo por
-  sí solo.**
-- `CONTRADICTS-WIKI` — la asociación observada contradice a `spells.json`. *«the
-  wiki is known-wrong in places»*.
-- `UNKNOWN` — pocas observaciones para juzgar.
-
-**Es nuestra taxonomía medido/deducido/declarado aplicada a la construcción misma
-de las reglas**, y con la wiki en el sitio de «declarado» y perdiendo contra lo
-medido. La medición no la escribe un humano: la escribe el registro.
-
-Y trae con ella su propio fallo, que es de los nuestros
-(`messageOverlay.ts:41-52`):
-
-El minado es un pliegue, y lo sembraban con un montón plano: la instantánea
-publicada más el fichero que el pliegue idéntico de la sesión anterior ya había
-escrito. Cada arranque en frío sumaba las observaciones del registro a una foto
-que ya las contenía — **medido: 22 → 44 → 88 en tres arranques**. Su propia
-conclusión:
-
-> *every derived verdict (n>=2 is VERIFIED) resting on counts that **describe the
-> number of times the app has STARTED rather than what the log says**.*
-
-La corrección es de forma, no un filtro: un cubo por origen, y volver a plegar un
-origen **reemplaza** su aportación en vez de sumarla — *«which makes mining
-idempotent by construction»*, con una prueba que pliega tres arranques en frío
-simulados y exige salida idéntica byte a byte
-(`tests/messageOverlayIdempotence.test.mts`).
+**DATOS CONSULTADOS.** Todos sus catálogos llevan **`scrapedAt` + `source` +
+`count`**, y los recolectores son scripts que se pueden volver a correr. **Es
+nuestra taxonomía medido/deducido/declarado aplicada a la construcción del
+catálogo**, y es la práctica que copiamos en §20.6 para la tabla de reapariciones.
+Lo mejor del primer estudio sigue siendo **minar la asociación en vez de escribir
+la regla**.
 
 ---
 
 ## 9. Pruebas
 
-**jmoyers: 356 ficheros `*.test.mts`, 105.387 líneas, más 98 ficheros de e2e.**
-Más líneas de prueba que de `src/shared` entero (36.909).
+> **El detalle, en [`ESTUDIO-ARCHIVO.md`, Parte II](ESTUDIO-ARCHIVO.md).**
 
-Lo que prueban, y cómo:
-
-- **Contra el registro real, congelado.** Hay 16 scripts `fixtures:*` en
-  `package.json` (`fixtures:combat`, `fixtures:pet-claim`, `fixtures:cc-duration`,
-  `fixtures:poison-slow`…) que **extraen** trozos del log de verdad a
-  `tests/fixtures/` (137 ficheros). El commit del 12 de agosto lo dice bien:
-  *«JOS-287: the swap boundary is frozen in a fixture, so the guard stops needing
-  the owner's log»*.
-- **Oráculos de equivalencia.** `tests/replayChunking.test.mts` pliega los
-  mismos fixtures con y sin troceado y compara los flujos byte a byte
-  (`replaySlicer.ts:26`). `tests/bench/engineOracle.mts` es un banco con oráculo.
-- **Idempotencia.** `tests/messageOverlayIdempotence.test.mts`, arriba.
-- **Módulos puros a propósito, para poder probarlos sin Electron**:
-  `coldRead.ts:10-12` (*«tests/startupDiscriminators.test.mts drives it
-  directly»*), `storeMigrations.ts:22-25`.
-- **Rachet de lint**: `lint:measure` y `lint:ratchet` (`scripts/lint-report.mts`)
-  — el número de avisos sólo puede bajar.
-
-**sowoky: cero pruebas en el repo.** A cambio tiene dos cosas: un
-`scripts/simulate-log.mjs` (195 líneas) que fabrica registros, y —según
-`engine.js:7-10`— un **contrato de doble transcripción** contra una
-implementación de referencia en Python que vive en otro repo:
-
-> *the algorithm and **both-transcriptions contract** (logparse_ref.py, diffed by
-> check_log_parser.py) are unchanged*
-
-Es decir: el mismo parser escrito dos veces, en dos lenguajes, y una herramienta
-que compara sus salidas. No es una batería de pruebas, es un oráculo — y para un
-parser puede que sea más fuerte.
-
-**Nosotros: 44 ficheros en `test/`, 10.341 líneas**, los 44 encadenados en el
-`npm test` del `package.json`.
+| | ficheros | líneas |
+|---|---:|---:|
+| jmoyers | 356 `*.test.mts` + 98 e2e | 105.387 |
+| sowoky | **ninguna en el repo** | 0 |
+| EQL Parse | 45 en `test/` | ~10.400 |
 
 **La comparación justa, que era lo que se preguntaba:** construir guardas contra
-fallos concretos y medidos **no es raro**, es exactamente lo que hace el
-competidor grande, y lo hace con diez veces nuestro volumen (105.387 líneas
-frente a 10.341). Lo que
-sí es distinto es el **método**: nosotros escribimos una prueba por fallo
-encontrado, con el caso real dentro (los cuatro *shin ghoul knight* del 5 de
-agosto en `test/figuras.js`). Ellos hacen eso **y además** oráculos de
-equivalencia, que es una clase de prueba que no tenemos: no comprueban un
-resultado esperado, comprueban que **dos caminos dan lo mismo**. Es la única
-forma de probar una optimización.
-
----
+un registro real no es lo mismo que construirlas contra una especificación. Las
+nuestras se escriben con líneas copiadas del log de Miguel, y las suyas con
+fixtures. **Y ninguna de las dos cosas caza lo que caza una medición sobre el
+registro entero** — la lección de §19.
 
 ## 10. Lo que no tienen
 
@@ -1424,19 +874,23 @@ suelo dicho, la procedencia visible.
   no vacías el 15 de agosto de 2026, con nuestro propio `src/parser.js`. **Es un
   fichero vivo**: Miguel sigue jugando y el registro crece, así que una
   remedición dará cifras algo mayores. Todas las de aquí son de esa foto.
-- **NI UNA LÍNEA DE SU CÓDIGO EN ESTE FICHERO, Y ESO ES UNA CORRECCIÓN.** La
-  primera versión de este documento traía **diez bloques ejecutables suyos
-  pegados literalmente** —el normalizador de clave de jmoyers, el plegado de
-  mayúscula de sowoky, su guarda barata de líneas de combate, el bloque de ticks
-  de veneno, el bucle de presencia hostil, las cinco constantes de encuentro, la
-  lista de overlays, la constante de inactividad y su barrido de cierre— y a la
-  vez esta misma línea afirmaba que no había ninguno. Los diez están sustituidos
-  por descripciones nuestras; **los valores y los nombres de constante se quedan,
-  porque son hechos**.
 
-  El caso urgente era el plegado de mayúscula de sowoky, que es AGPL y es
-  exactamente la pieza que vamos a escribir: mientras su fuente estuviera aquí,
-  no podríamos decir que la nuestra sale de la medición.
+  **LAS DEL 16 DE AGOSTO POR LA TARDE SON DE OTRA FOTO Y LO DICEN**: 80,7 MB y
+  **985.189 líneas con cabecera**, hasta el 16 a las 00:24. Son las de §15.2
+  (detectores de gemelos), §19 (el reproductor) y §20 (reaparición). Donde una
+  cifra de esa tanda contradice a una de la anterior, **no es que el registro haya
+  crecido**: es una corrección, va marcada como tal y su historia está en
+  [`ESTUDIO-ARCHIVO.md`](ESTUDIO-ARCHIVO.md).
+- **Dos almacenes, y las mediciones que importan se hacen sobre los dos.** El de
+  Miguel (1.493 peleas con combatientes) y uno reconstruido el 16 de agosto desde
+  el mismo registro (1.504). Cuando una cifra sale igual sobre los dos, se dice;
+  cuando no, tampoco se esconde.
+- **NI UNA LÍNEA DE SU CÓDIGO EN ESTE FICHERO, Y ESO ES UNA CORRECCIÓN.**
+  **Corregido el 15 de agosto**: había diez bloques ejecutables suyos pegados
+  mientras esta misma línea afirmaba que no había ninguno. Sustituidos por
+  descripciones nuestras; los valores y los nombres de constante se quedan,
+  porque son hechos. **La historia entera, en
+  [`ESTUDIO-ARCHIVO.md` §A2](ESTUDIO-ARCHIVO.md).**
 - **Las citas de prosa sí se quedan**, acortadas a la frase que sostiene el
   argumento. Son razonamiento de diseño, citado con su fichero y su línea para
   comentarlo, y ninguna supera las 51 palabras.
@@ -1448,8 +902,10 @@ suelo dicho, la procedencia visible.
   agregación —`aggregate.ts`, `rounds.ts`, `procWindows.ts`, `procDetect.ts`,
   `healing.ts`— está sin leer. Ahí es donde vive su modelo de *rondas* y de
   *procs*, y por lo que se ve en `AGENTS.md` ley 6 es sofisticado.
-- **`src/shared/respawn.ts` (1.242) y toda la maquinaria de temporizadores de
-  reaparición** — sin leer.
+- ~~**`src/shared/respawn.ts` (1.242) y toda la maquinaria de temporizadores de
+  reaparición** — sin leer.~~ **LEÍDO el 16 de agosto — ver §20.5.** Quedan sin
+  abrir sus superficies (`RespawnOverlay.tsx`, `RespawnRowBar.tsx`) y sus cinco
+  baterías de pruebas de reaparición (unas 92.000 líneas entre todo).
 - **Su telemetría** (`shared/telemetry.ts` 1.037 + `telemetryRollup.ts` 837 +
   `TELEMETRY.md`) — sin leer. Es un asunto entero con implicaciones que no son
   técnicas.
@@ -1475,75 +931,22 @@ funciones: un «arreglamos X porque Y» vale diez veces más que un «tienen Z»
 
 ## 12. Lo que revirtieron, y lo que borraron
 
-### 12.1 El hallazgo mayor de este pase: construyeron la persistencia del fold y la quitaron
+> **Mudado a [`ESTUDIO-ARCHIVO.md`, Parte II](ESTUDIO-ARCHIVO.md)**: los tres
+> casos con sus commits y sus citas.
 
-**11 de agosto, `JOS-230`.** Se borra `src/main/foldCache/` entero —16 ficheros: el
-formato del contenedor, el bloque de identidad, la gramática del esquema, el
-cargador, la planificación de escritura, el interruptor, el verificador en
-sombra, el censo, los ayudantes de ruta— y con él su preferencia, sus dos
-canales de IPC, el puente del preload y la casilla **Preferencias → Rendimiento
-→ «Faster start»**. El asunto: *«`JOS-230`: the fold checkpoint itself, and every
-wire it hung from»*.
+**EL HALLAZGO MAYOR DEL SEGUNDO PASE ESTÁ ASCENDIDO A §5.1**, que es donde le
+toca: el 11 de agosto **borraron la persistencia del fold entera** —16 ficheros—
+**sin haberla podido medir nunca**, porque su verificador en sombra no corrió ni
+una vez y *«a gate whose denominator never moves cannot open»*. De ahí sale la
+**regla de la puerta**, escrita junto a la undécima familia en `ui/app.js`.
 
-**§5 de este documento decía que jmoyers «no persiste el fold».** Es verdad hoy,
-y ahora sabemos que **es una decisión, no una omisión**: lo construyeron entero y
-lo sacaron.
+**Y dos retiradas más, con la misma lección de producto:** un experimento de
+reordenar alarmas retirado la misma noche —*«una sola petición lo pidió»*— y dos
+pestañas con estado propio sustituidas por una búsqueda. **El patrón se repite
+tres veces en cinco días: lo que se puede buscar no necesita organizarse a mano.**
 
-**Y el porqué está en el commit hermano** —*«the fleet stops being asked a
-question nobody answered»*— y es la clase de cicatriz que este pase busca:
-
-> *shadowChecks was ZERO on every build. The counters were the rollout gate
-> ("stays off until divergences hold at zero"), and a gate whose denominator
-> never moves cannot open.*
-
-Habían puesto la función detrás de un verificador en sombra que comparaba el
-fold restaurado contra el fold recalculado, y la puerta de salida era «cuando
-las divergencias lleven mucho en cero». **El verificador no llegó a correr ni una
-vez en ninguna compilación**, así que el contador de divergencias era 0 sobre 0 —
-y una puerta cuyo denominador no se mueve no se abre nunca. Ni siquiera pudieron
-medir si la función servía.
-
-**Es nuestra familia de la alarma muerta**, en su versión más cara: no una salida
-que nadie lee, sino **una salida que nadie lee y de la que depende que una
-función se encienda**.
-
-**La pregunta a nuestro log:** ¿tenemos alguna puerta con esa forma — una función
-o un aviso condicionado a un contador que podría no moverse nunca? **Contestada, y
-es que sí la tuvimos**: el evento `rotate` del lector se emitía desde el primer día
-y no lo escuchaba nadie (arreglado el 16 de agosto). No condicionaba ninguna
-función, así que era la versión barata de lo mismo. **Pendiente**, y es más cara de
-contestar: revisar si alguna guarda nuestra se apoya en un contador que sólo
-podría crecer si alguien ya estuviera usando lo que la guarda protege.
-
-### 12.2 Un experimento publicado y retirado la misma noche
-
-**9 de agosto, `JOS-179`** — *«the reorder experiment comes back out, search stays»*.
-Arrastrar para reordenar las alarmas (`JOS-175` + `JOS-177`, fusionado esa misma
-noche, **sin publicar**) se retira entero: el gesto, la aritmética del punto de
-suelta, las reglas de orden, el asa y la línea de inserción, el canal de IPC, su
-puerta en el preload, su manejador y su accesor de almacén.
-
-La razón, textual: *«With search shipped, reordering is silly, and the complexity
-is not worth the single request that asked for it.»* **Una sola petición lo pidió.**
-
-Y lo que hace que valga la pena anotarlo: **al quitarlo, lo que quedó se
-simplificó**, no sólo encogió. Ya no hay un gesto que suspender, así que
-desaparecen `canReorder`, el contenedor vacío de «no se puede soltar aquí», la clase
-que agrisaba el asa y el aviso de «borra la búsqueda para poder reordenar». La
-bandera de filtrado sobrevive con un solo trabajo.
-
-**La pregunta a nuestro log:** no la tiene — es una pregunta a nuestro repo, y
-**pendiente**: ¿qué tenemos publicado que pidiera una sola persona y que esté
-complicando lo de al lado?
-
-### 12.3 Y dos retiradas de superficie el mismo día
-
-**13 de agosto**: `JOS-325` *«gear sets retire — the Gear tab becomes pure search»* (4
-ficheros de interfaz + `shared/planner/gearSetTotals.ts`) y `JOS-326` *«Exaltations
-becomes search-only, and the flat wish list is the surface it feeds»* (6 ficheros
-del planificador). **Dos pestañas con estado propio sustituidas por una búsqueda.**
-El patrón se repite tres veces en cinco días: *lo que se puede buscar no
-necesita organizarse a mano*.
+**La pregunta a nuestro repo, PENDIENTE:** ¿qué tenemos publicado que pidiera una
+sola persona y esté complicando lo de al lado?
 
 ## 13. Las constantes que NO se movieron
 
@@ -1703,6 +1106,50 @@ que importa son sus cuatro reglas, que son todas de lo que **no** se puede decir
 La última frase es la nuestra, palabra por palabra: es la razón por la que en
 nuestro resumen un campo no se escribe en vez de escribir un cero.
 
+### 14.5 PARA CUANDO SE CONSTRUYA EL DPS: las seis reglas, juntas
+
+**Esto no es un plan de trabajo: es la hoja que hay que tener delante el día que
+se escriba el gráfico.** Está aquí y **también en la cabecera de
+`diseño/ui-dps-individual.html`**, que es donde va a mirar quien lo construya.
+
+**1 · La forma de la serie.** Cubos de **1 s**, media móvil de cola de **5 s**,
+tope de **360 vértices**; el cubo crece cuando la pelea no cabe en 360.
+
+**2 · La cifra del ratón sale de LA MISMA SERIE que la línea.** Nunca calculada
+por otro camino. Es nuestra regla de *una pregunta, un sitio* aplicada a un
+gráfico, y su versión de ella lo dice mejor: *«so the timeline's hover number and
+the DPS curve's line can never disagree»*.
+
+**3 · No se interpola entre cubos.** La serie está cubeteada a ≥1 s y el pie lo
+declara («5 s móviles»); **suavizar los escalones inventaría un ritmo que el
+registro no sostiene**.
+
+**4 · Peleas cortas: sin caso especial.** El divisor es `min(i+1, w) × cubo`, o
+sea sólo los cubos que existen: **encoge solo** al principio de la pelea. Es la
+respuesta a «una pelea de 6 s con media de 5 s es casi un punto», y es mejor que
+cualquier umbral porque no hay umbral.
+
+**5 · UNA SOLA BASE DE TIEMPO POR GRÁFICO (su ley 9).** Vértices, marcas, eje e
+inversa del ratón leen **un** `{t0, t1, cubo}`; las muestras se anclan en el
+**centro** del cubo. Su cicatriz: mezclar mapeo por fracción-de-índice con mapeo
+por fracción-de-tiempo **estiraba las marcas un cubo entero en el borde derecho**.
+
+**6 · Y EL AVISO CONCRETO SOBRE LA MAQUETA, que tiene la forma exacta de esa
+cicatriz.** `diseño/ui-dps-individual.html` **dibuja por ÍNDICE**
+—`px = ML + i*(W-ML-MR)/(n-1)`— y escribe las horas del eje **a mano**
+(`[[0,'0:00'],[n/2,'2:56'],[n-1,'5:52']]`). El ratón invierte ese mismo mapeo por
+índice, así que **hoy es coherente consigo mismo**, y por eso se ve bien.
+
+**Vale exactamente mientras los cubos sean contiguos y de un segundo.** Se rompe
+**en cuanto haya que diezmar para el tope de 360**: entonces el índice deja de ser
+proporcional al tiempo, las horas escritas a mano dejan de caer donde dicen, y el
+desacuerdo aparece **en el borde derecho**, que es justo donde ellos lo vieron.
+
+> **Constrúyase mapeando POR TIEMPO desde la primera línea.** No «se arregla
+> luego»: el mapeo por índice es correcto hasta que deja de serlo, sin dar
+> ningún síntoma antes. La maqueta es la cicatriz de jmoyers dibujada, con datos
+> inventados y todo.
+
 **La pregunta a nuestro log:** ¿nuestro dps por combatiente contesta lo mismo que
 el suyo? **No, y ahora se puede decir en qué se diferencia:** el suyo es una media
 móvil de 5 s por cubo de 1 s, sobre daño saliente separado en cuatro bandas (tú,
@@ -1710,125 +1157,47 @@ mascota, grupo, entrante). El nuestro es un total dividido por una duración —
 `dps`, `dpsOwn` y `dpsActive` como tres respuestas distintas—. **No son el mismo
 número con distinto suavizado: son una serie y un escalar.**
 
-## 15. Los tres detectores de gemelos, medidos sobre nuestro registro
+## 15. Los tres detectores de gemelos
 
-### 15.1 La deducción sobre `nombre#generación`: se sostiene a medias
+> **Medidos sobre nuestro registro y DECIDIDOS: ninguno entra en el suelo.**
+> La medición, el control de mecanismo y el cero del veneno están en
+> [`HALLAZGOS.md` §1](HALLAZGOS.md).
 
-La deducción era: *el ciclo de vida incrementa la generación — muere una
-instancia, se retira, la siguiente línea abre generación nueva*.
+De las tres formas que ellos usan para separar homónimos, sobre 1.504 peleas
+del registro de Miguel: la contradicción del encanto aporta **0** pares que el
+suelo no tuviera, X→X aporta **1** y el tick de veneno repetido **0**.
 
-**Comprobado en `world.ts:224-236`**: `spawn()` lleva un contador por nombre y lo
-incrementa al crear. Pero tiene **cinco puntos de llamada**, y sólo uno es el que
-la deducción describe:
-
-| línea | cuándo nace una generación |
-|---|---|
-| `world.ts:329` | no hay instancia activa de ese nombre — **el camino de la deducción** |
-| `world.ts:415` | un encanto que no puede vincularse a una instancia viva |
-| `world.ts:451` | una mascota invocada que se reclama |
-| `world.ts:526` | **evidencia de gemela, sin ninguna muerte de por medio** |
-| `world.ts:625` | un «fantasma»: se crea y se retira en el acto para no matar a la mascota |
-
-**La deducción se sostiene como uno de cinco caminos, y el que se deja fuera es
-justo el interesante**: la línea 526 abre una generación **porque el log ha
-demostrado que hay dos**, no porque una haya muerto. Eso es el detector, y no
-depende del ciclo de vida en absoluto.
-
-**Y su precondición es mucho más estrecha de lo que parecía** (`world.ts:523-527`):
-
-> *only meaningful while a pet is live*
-
-El detector **sólo actúa mientras hay una mascota encantada viva de ese nombre**.
-Fuera de un encanto no dispara nunca. Lo que buscan no es «hay gemelos» en
-general: es «tu mascota y un hostil comparten nombre», que es el caso que les
-borra el daño de la mascota.
-
-### 15.2 Cuánto dan sobre nuestro registro
-
-Medido sobre 1.579 peleas. La columna que importa es la última: **cuántas veces
-dicen algo que nuestro suelo no supiera ya** —el suelo sabe que hubo dos en
-cuanto ve dos muertes—.
-
-| detector | disparos | ya lo sabía el suelo | **ganancia** |
-|---|---:|---:|---:|
-| contradicción del encanto (pegas a un nombre que tienes encantado) | 6 | 5 | **1** |
-| contradicción del propio nombre (X→X) | 109 | 40 | **69** |
-| tick de veneno repetido (sowoky) | 12 | 12 | **0** |
-
-**El resultado es el contrario del que esperábamos los dos.** El del veneno —la
-idea más bonita del primer estudio— **no aporta nada sobre este registro**: los 12
-casos ya los sabía el suelo por una muerte. Y el de X→X, que era una nota al pie,
-delata **69 nombres** que el suelo no tenía: 52 nombres distintos, encabezados por
-`a shin ghoul knight` (10 peleas), `an ire ghast` (6) y `a dar ghoul knight` (5).
-
-**Y una corrección de método dentro de la propia medición**, que es la undécima
-familia otra vez: el primer recuento de X→X dio **2.077** disparos, de los que
-**1.169 eran `campeon→campeon`** — mi propio personaje, por daño reflejo. Un
-detector de gemelos que cuenta al jugador no detecta gemelos. Acotado a nombres
-con forma de bicho y sin daño propio, quedan 109.
-
-**La pregunta a nuestro log, contestada:** el detector que vale aquí es el que no
-venía del competidor grande sino del pequeño y por otro camino. **Pendiente:** los
-69 son nombres-en-pelea, no individuos; cuánto subiría el suelo en total no está
-medido.
+**Ninguno está refutado: están medidos en un registro donde no hacen falta**,
+porque aquí casi todo lo que se toca acaba muriendo y la muerte —la evidencia
+con la que el suelo ya cuenta— llega antes que ellos.
 
 ## 16. Las diez incidencias de sowoky que faltaban
 
-Son autoauditorías con fichero, línea y entrelazado. Para cada una, si tenemos
-esa forma:
+> **La tabla entera, una a una, en [`ESTUDIO-ARCHIVO.md`, Parte II](ESTUDIO-ARCHIVO.md).**
 
-| # | qué es | ¿la tenemos? |
-|---|---|---|
-| `#1` | el overlay **crece al arrastrarlo** con escalado de pantalla fraccionario (175 %): de 340×240 a 632×524 en un arrastre, y el tamaño se persiste | **pendiente**, y barata: sólo hace falta un monitor al 175 % |
-| `#3` | se puede arrastrar **fuera de la pantalla** (`y: -144` observado), y unos límites guardados mayores que la pantalla se restauran tal cual | **pendiente** — tenemos guardado de posición del overlay |
-| `#6` | al cerrar la aplicación se persiste `overlay.shown=false`, así que **la restauración automática no puede funcionar nunca** | forma conocida: un estado de salida que contradice la intención de arranque |
-| `#8` | **cero `isDestroyed()` en todo el repo**: entre `close()` y el evento `closed` la guarda `if (win)` pasa sobre una ventana muerta | **pendiente y barata de mirar**: tenemos envíos al overlay por evento |
-| `#11` | el overlay **se suelda al cursor**: sin `releasePointerCapture`, el modo atravesable se activa a mitad de arrastre y el `pointerup` no llega nunca | no aplica igual —no tenemos arrastre propio— pero la forma sí: un estado que sólo se limpia con un evento que puede no llegar |
-| `#12` | bloquear con el cursor **quieto** deja la salida de emergencia atravesable: nada se mueve, así que el recálculo no corre | **la forma es nuestra**: cualquier recálculo disparado sólo por movimiento |
-| `#15` | el botín en vivo refresca las misiones y **no** refresca el tablero del cielo: falta una línea | **la forma es nuestra y de las peores**: dos consumidores del mismo suceso, uno actualizado |
-| `#16` | la vista reducida **oculta por defecto lo empezado** y estructuralmente nunca puede enseñar la pista del jefe | forma conocida: dos superficies de «lo mismo» con configuraciones separadas |
+**La lectura de conjunto, que es la que vale: ocho de las diez son de VENTANA, y
+ninguna es de parseo.** Coincide con el primer estudio —diez de las veinticuatro
+incidencias de los dos repos son de ventana— y refuerza la conclusión: **un
+overlay es caro de tener bien, y el coste no está en el contenido**.
 
-**La lectura de conjunto, y es la que vale:** ocho de las diez son de **ventana**,
-y ninguna es de parseo. Coincide con lo que ya decía el primer estudio —diez de
-las veinticuatro incidencias de los dos repos son de ventana— y refuerza la
-conclusión: **un overlay es caro de tener bien, y el coste no está en el
-contenido**.
+**Las tres formas que son nuestras y no dependen de tener overlay:**
 
-**La pregunta a nuestro log:** ninguna de las ocho se contesta con el registro. Se
-contestan **abriendo la aplicación en un monitor escalado**, que es una clase de
-medición que no hacemos.
+- un **recálculo disparado sólo por movimiento** (nada se mueve, nada se
+  recalcula);
+- **dos consumidores del mismo suceso y sólo uno actualizado** — de las peores;
+- **dos superficies de «lo mismo» con configuraciones separadas**.
 
-## 17. Los 469 commits sin clasificar: qué familias aparecen
+**La pregunta a nuestro log: ninguna de las ocho se contesta con el registro.** Se
+contestan abriendo la aplicación en un monitor escalado al 175 %, que es una clase
+de medición que no hacemos.
 
-Muestra de los 45 de asunto más largo. Familias que **no** estaban en nuestra
-lista de once:
+## 17. Los 469 commits sin clasificar
 
-- **La superficie que estorba a lo que explica.** *«the class filter loses its
-  tooltip — a hover box over an input you type into blocks the very dropdown it
-  explains»*. Un elemento de ayuda que tapa aquello que ayuda a usar.
-- **La instrumentación que nadie puede leer.** *«and the digest reads them back —
-  instrumentation nobody can read is not instrumentation»*. Es la alarma muerta
-  girada hacia la telemetría: medir y no tener dónde mirarlo.
-- **La prueba puesta donde el fallo ocurrió, no donde adula.** *«the drag-cost
-  gate is placed where it has been watched fail, not where it flattered»*, y
-  *«the hook is pinned where it broke, by running the real hook across a
-  container swap»*. Nosotros lo hacemos por instinto; ellos lo tienen escrito.
-- **La negación de más.** *«north is north again — one wrong word in the plan,
-  one spurious negation at render»*: una palabra mal en el plan que se convierte
-  en una negación de más al pintar. Es un fallo de **traducción entre el
-  documento y el código**, y no lo teníamos como familia.
-- **Lo que el juego enuncia frente a lo que no.** *«the level graph draws the
-  percentages the game states, and shades the stretches it does not»*: sombrear
-  lo no dicho en vez de interpolarlo. Es nuestra doctrina de procedencia
-  aplicada a un gráfico, que es justo lo que viene ahora.
-- **El colapso periódico de la documentación.** *«The daily collapse, 2026-08-13:
-  AGENTS.md 20,020 → 17,969 words, the histories move to the archive»*. Tienen un
-  **ritual de poda** del documento de leyes, con las historias mudándose a un
-  archivo. Nosotros crecemos y no podamos.
+> **El repaso, en [`ESTUDIO-ARCHIVO.md`, Parte II](ESTUDIO-ARCHIVO.md).**
 
-**La pregunta a nuestro repo, contestada:** la última nos toca hoy. Este documento
-va por `~1.400 líneas` y las once familias de `ui/app.js` por unas 300. Ninguno
-tiene ritual de poda ni archivo al que mudar lo viejo.
+**Lo que aparece y no teníamos como familia: la coherencia entre el documento y el
+código.** Commits cuyo único trabajo es que lo escrito y lo ejecutado vuelvan a
+decir lo mismo. Nosotros lo hacemos y no lo contábamos.
 
 ## 18. Sus trece leyes, enteras
 
@@ -1857,10 +1226,228 @@ sitio.** Las dos que contradecimos —la 2 y la 11— son las dos que ya estaban
 nuestra cola antes de leer esto, lo cual es tranquilizador y no una coincidencia:
 son las que dan síntomas.
 
-## 19. Lo que sigue sin leer
+### 18.1 Las cuatro que no habíamos pensado, enteras
 
-- **`shared/respawn.ts` (1.242 líneas)** y todo el aparato de temporizadores de
-  reaparición. Su ley 13 lo resume, pero el código no se ha abierto.
+**Y ÉSTAS SON LAS QUE IMPORTAN, precisamente por lo contrario.** Las dos que
+contradecimos las vimos solos porque **dan síntomas**: un nombre plegado sale mal
+escrito en pantalla y se ve; un mínimo plano de 8 golpes niega una forma y alguien
+lo nota. **Éstas cuatro no dan ninguno.** Son la décima familia con otro traje —*no
+fallan, no ven*— y por eso llevaban aquí resumidas en una casilla de tabla, que es
+el sitio donde un hallazgo se muere.
+
+Cada una va con lo mismo: **qué dice y de qué cicatriz suya sale**, **la pregunta
+que le hace a nuestro registro** —contestada si era barata— y, si no se puede
+contestar, **qué haría falta para poder**.
+
+---
+
+#### Ley 3 · Los mensajes compartidos son la norma
+
+> **Shared messages are the norm.** *123 families of «has worn off»; a phrase does
+> not name a spell.* — `AGENTS.md:724-870`
+
+**QUÉ DICE.** El texto que el juego escribe cuando algo entra o se cae **no
+identifica el hechizo**. Muchos hechizos distintos comparten la misma frase, así
+que leer la frase y anotar «se cayó X» es inventarse la X. La cicatriz de la que
+sale es de censo: contaron las familias de mensajes de desvanecimiento y salieron
+**123**, no una por hechizo.
+
+**QUÉ NOS TOCA.** Nuestra pista de estados **asume que el mensaje identifica**. El
+comentario de `src/patterns.js:820-837` ya vio la mitad del problema —«el registro
+NO dice qué te entró», y por eso la frase va en `flavor` y no en `ability`— pero lo
+trató como un caso raro que se aparta, no como **la norma**.
+
+**LA PREGUNTA A NUESTRO LOG: ¿cuántas de nuestras líneas de estado no nombran el
+hechizo? CONTESTADA — el 72,9 %.** Medido el 16 de agosto sobre las 985.189 líneas
+con cabecera:
+
+| | líneas | frases distintas |
+|---|---:|---:|
+| caídas que **sí** nombran el hechizo (`Your <X> spell has worn off.`) | 2.485 | 98 hechizos |
+| caídas que **no** lo nombran (`Your <X> fades.`) | 1.072 | **24** |
+| entradas que **no** lo nombran (`You feel <X>.`) | 5.615 | **60** |
+| **total de líneas de estado sin nombre de hechizo** | **6.687 de 9.172** | **84 frases** |
+
+Las más frecuentes son exactamente de la clase que describe la ley: *«an aura of
+protection engulf you»* (1.634), *«torn between life and death»* (875), *«your soul
+being consumed»* (519), *«very dispelled»* (240) frente a *«a bit dispelled»* (194).
+**Casi tres de cada cuatro líneas de estado son prosa que no nombra nada.**
+
+**LO QUE LA MEDICIÓN NO CONTESTA, y hay que decirlo:** sabemos cuántas frases no
+nombran el hechizo; **no sabemos cuántos hechizos comparten cada frase**, que es
+la afirmación fuerte de la ley. Eso **no se puede sacar del registro**: haría falta
+una tabla *frase → hechizos* de fuera, y sería conocimiento **consultado**, con su
+fecha de extracción. Lo que sí se puede afirmar hoy sin salir del log: **84 frases
+distintas para al menos 98 hechizos conocidos**, así que el reparto uno-a-uno es
+imposible por recuento.
+
+---
+
+#### Ley 5 · Los agregados mienten: derívese de identidades
+
+> **Aggregates lie; derive from identities.** *Summing gains double-counts
+> refunds.* — `AGENTS.md:724-870`
+
+**QUÉ DICE.** No sumes un total y lo guardes: **guarda las identidades y suma
+cuando haga falta**. Un total mantenido aparte deja de cuadrar con lo que resume en
+cuanto una de las dos vías cambia, y **el desvío no se ve** porque las dos cifras
+son plausibles. Su cicatriz es de contabilidad de ganancias: los reembolsos se
+contaban dos veces porque el total se llevaba a mano.
+
+**QUÉ NOS TOCA.** Esta casa tiene agregados guardados en tres sitios: la fila por
+combatiente dentro de la pelea, los totales de la pelea, y **el bestiario**, que
+acumula por nombre a lo largo de todo el histórico.
+
+**LA PREGUNTA A NUESTRO LOG: ¿alguna suma nuestra ha dejado de cuadrar con las
+identidades que resume? CONTESTADA, y con las dos caras.** Medido el 16 de agosto
+sobre el almacén de Miguel (1.493 peleas, 440 nombres en el bestiario):
+
+| invariante | resultado |
+|---|---|
+| `total` = suma del daño de los no-enemigos de la pelea | **cuadra en las 1.493** |
+| `enemyTotal` = suma del daño de los enemigos | **cuadra en las 1.493** |
+| `foes[n].kills` del bestiario = muertes de ese nombre sumadas sobre las peleas | **9 nombres de 440 NO cuadran** (peor desvío: 14) |
+| `foes[n].fights` = peleas donde ese nombre sale como enemigo | **3 de 440 no cuadran** |
+
+**Los dos primeros cuadran porque se derivan; el tercero no cuadra porque se
+acumula.** Y falla **siempre por abajo**: `heart harpie` 3 contra 5,
+`orc legionnaire` **29 contra 43**, `dry bones skeleton` **0 contra 1**. El
+bestiario dice menos de lo que sus propias peleas contienen.
+
+#### Y el porqué, contestado el mismo día con la partición diferencial
+
+Se rehízo el bestiario desde el almacén —sobre una copia, sin tocar el de
+Miguel— y se volvió a restar. **De los 9 nombres, 7 se arreglan solos al
+rehacerlo**: las 28 muertes que faltaban se quedan en 3.
+
+**Son datos rancios, y la causa está escrita en el propio código que los
+produce** (`src/foes.js:245-268`). El plegado de la mayúscula inicial se arregló
+**AL LEER y no al escribir**, a propósito: *«así queda bien también el histórico
+que ya está guardado, sin pedirle a nadie que reconstruya»*. Y es cierto **para
+todo lo que se vuelva a plegar** — pero el bestiario **no se vuelve a plegar: se
+acumula**. Las 14 muertes de `orc legionnaire` que aquel arreglo recuperó siguen
+faltando en el fichero de Miguel porque nadie ha ejecutado `npm run enc:rebuild`.
+
+> **UN ARREGLO «AL LEER» NO ALCANZA A UN ACUMULADOR.** Cura la vía, no el
+> depósito. Y el depósito es lo que se enseña.
+
+**Y las 3 muertes que quedaban no eran del bestiario: eran de mi arnés.** El
+almacén tiene **una** pelea repetida —la del 15 de agosto a las 14:34:53, con
+`Cleric of Innoruuk ×2` y `a forsaken revenant` dentro— que `FightStore.load`
+descarta al cargar. Mi comprobación contaba líneas del fichero; el bestiario
+cuenta peleas cargadas. **El bestiario tenía razón y el instrumento no.**
+
+> **CORREGIDO el 16 de agosto por la noche.** Aquí decía **«90 repetidas, el 6 %
+> de las líneas del almacén»**. Falso, y por la misma raíz que todo lo demás de
+> hoy: agrupé por `(at, total, duration)` leyendo `at` **del registro completo de
+> la pelea, donde ese campo no existe** —vive en el índice—, así que todas las
+> claves empezaban por `undefined` y peleas distintas con el mismo total y la
+> misma duración colisionaban. Contado sobre el índice, que es donde `at` está:
+> **1.547 entradas, 1.546 claves únicas, UNA repetida.** El detalle en
+> [`HALLAZGOS.md` §2.6](HALLAZGOS.md).
+
+**Lo que queda dicho, y es la ley 5 entera:** un agregado que se acumula aparte
+**no se cura solo**, ni siquiera cuando el fallo que lo torció ya está arreglado.
+Y **el bestiario es un SUELO, no un censo, y hoy no lo dice en ninguna parte.**
+
+---
+
+#### Ley 9 · Una sola base de tiempo por gráfico
+
+> **One time base per chart.** *A curve's vertices, markers, axis and hover inverse
+> all read ONE `{t0, t1, bucketMs}`; samples anchor at bucket centres.*
+
+**QUÉ DICE.** Todo lo que se dibuja sobre un eje de tiempo —vértices, marcas, eje y
+la inversa del ratón— tiene que leer **el mismo** `{t0, t1, cubo}`. Su cicatriz está
+escrita entera en §14.1: mezclaron un mapeo **por fracción de índice** para los
+vértices con uno **por fracción de tiempo** para las marcas, y las marcas se
+estiraban **un cubo entero en el borde derecho**; y una ventana medida en reloj de
+pared las hacía *nadar* contra una curva quieta en cada tic. La frase que lo cierra
+es suya: *«Canvas is never the answer to arithmetic disagreement.»*
+
+**LA PREGUNTA A NUESTRO LOG: no la tiene — es una pregunta a nuestro DIBUJO, y está
+CONTESTADA leyendo el código.** Hoy tenemos una sola superficie con eje de tiempo,
+la pista de estados del reproductor, y **cumple**: barras (`barrasDePista`), marcas
+(`marcasDePista`) y hallazgos pasan los tres por **`posEnTiempo(s, duracion)` de
+`ui/tiempo.js`**, una función y un sitio.
+
+**LA SALVEDAD QUE SÍ HAY, y es pequeña:** las barras y las marcas convierten esa
+fracción a **píxeles** con el ancho medido (`getBoundingClientRect`), y la fila de
+hallazgos la convierte a **por ciento**. Es la misma base de tiempo en dos
+unidades, y sólo coinciden mientras los dos contenedores midan lo mismo. **No hay
+desacuerdo hoy; hay una segunda unidad que puede crearlo.**
+
+**Y DONDE VA A MORDER ES EN EL GRÁFICO DE DPS QUE NO EXISTE TODAVÍA** — por eso
+esta ley tiene apartado propio en §14.5, con el aviso concreto sobre la maqueta.
+
+---
+
+#### Ley 10 · Los intervalos revisables se unen AL LEER; nada estampa sus identificadores
+
+> **Reviewable intervals merge at READ time; nothing stamps their ids.**
+
+**QUÉ DICE.** Cuando algo tiene una duración —un buff, un encanto, un tramo de
+postura— **no se le pone un identificador y se guarda**: se guardan los sucesos y
+los intervalos se componen **cada vez que se leen**. Un identificador estampado es
+una decisión congelada, y lo que decidió puede cambiar debajo.
+
+**QUÉ NOS TOCA, Y AQUÍ HAY UNA CICATRIZ NUESTRA QUE ENCAJA EXACTA.** Es la de los
+**tramos** de la lista de las once familias: `tramos.ndjson` casaba con la pelea
+**por la HORA**, que es un identificador estampado con otro nombre. El argumento
+era «la hora no se mueve» — y es verdad, pero **la pelea de debajo sí**: sobrevivía
+a las reconstrucciones y seguía estampando lo suyo sobre otra cosa. Salió una pelea
+impecable rotulada como excepción y una entrada huérfana apuntando a un inicio que
+ya no existía. Se cerró **casando también por CONTENIDO**, que es unir al leer.
+
+**LA PREGUNTA A NUESTRO LOG: ¿qué otros intervalos nuestros llevan identificador
+estampado? CONTESTADA A MEDIAS, leyendo.** Los intervalos que hoy calculamos
+—ventanas de encanto (`charmed`), tramos de postura (`stanceSpans`), tramos sin
+control (`sinControl`), tramos de la pista (`tramosDePista`)— **se componen todos
+al leer, ninguno se persiste con identificador propio**. Cumplimos.
+
+**PENDIENTE, y es la parte que sí puede morder:** las **anotaciones a mano** —los
+tríos, las dudas, los tramos— son exactamente lo contrario, y tienen que serlo:
+son declaraciones de Miguel y no se pueden recomponer leyendo. La regla que nos
+falta escribir no es «no estampar» sino **«lo declarado se estampa y se casa por
+contenido; lo derivado no se estampa nunca»**, y hoy eso vive como cicatriz de un
+fallo concreto y no como regla.
+
+## 19. Lo que este pase arregló en nuestro código
+
+> **Las mediciones, en [`HALLAZGOS.md` §2](HALLAZGOS.md).**
+
+- **El reproductor tenía su propia definición de pelea**, más floja que la del
+  motor. Corregido llamando a la misma guarda: el combate ajeno dibujado pasa
+  de 446 peleas a 190, y el combate ENTRE ajenos de 49 a **cero**.
+- **Todas las figuras se apagaban en el segundo cero** por una resta de más que
+  un `Math.max(0, …)` convertía en un dato creíble: 4.310 caídas de 4.573, en
+  el 79,9 % de las peleas.
+- **El plegado de la mayúscula vivía en seis sitios** y ahora en uno
+  (`src/nombres.js`).
+
+De ahí salen tres de las catorce familias de `ui/app.js`: la regla de la
+puerta, el número desnudo y la pinza sobre un imposible.
+
+## 20. Reaparición
+
+> **La medición entera, su código y las tres preguntas, en
+> [`HALLAZGOS.md` §3](HALLAZGOS.md).**
+
+**Lo que hay que saber de ellos:** su `respawn.ts` (1.242 líneas) **no es una
+tabla**. Es una escalera de tres peldaños —tu número, tus muertes, la wiki—,
+con el mínimo y no la media, la wiki como **suelo** contra los puntos de
+aparición duplicados, seguimiento **opt-in por bicho**, y «visto» separado de
+«ha aparecido». **No modela placeholders, ni repoblación de zona, ni varianza.**
+
+**Y su fuente es `eqlwiki.com`, con `scrapedAt`,** granularidad **por nombre y
+sin zona**: cubre **46 de los 441 nombres** que Miguel mata (10,4 %).
+
+## 21. Lo que sigue sin leer
+
+- **Las SUPERFICIES de reaparición** — `RespawnOverlay.tsx` (22.323),
+  `RespawnRowBar.tsx` (21.523), `RespawnEditDialog.tsx` (9.779)— y sus cinco
+  baterías de pruebas. El modelo sí está leído (§20.5): `shared/respawn.ts`,
+  `main/modules/respawn.ts`, `shared/respawnWiki.ts` y `data/respawns.json`.
 - **La telemetría** (`shared/telemetry.ts` 1.037 + `telemetryRollup.ts` 837 +
   `TELEMETRY.md`). Es un asunto entero con implicaciones que no son técnicas.
 - **Su aparato de ventanas** (`main/windows.ts` 1.049) más allá de las cinco

@@ -276,6 +276,8 @@ export class Engine extends EventEmitter {
       self: this.self,
       idleSec: opts.idleSec ?? 20,
       closeOnDeath: opts.closeOnDeath ?? false,
+      // La forma buena del nombre sale del parser, que la aprende leyendo.
+      formaDe: (n) => this.parser?.formaAtestiguada(n) ?? null,
     });
     this.tracker.setCompanions(this.companions);
     this.tracker.on('close', (enc) => {
@@ -1368,6 +1370,25 @@ export class Engine extends EventEmitter {
         return {
           ...this.#row(r), side: enemy ? 'enemy' : 'ally',
           unidentified: desconocido,
+          /**
+           * ── EL NOMBRE QUE SE ENSEÑA, ¿ESTÁ MEDIDO O DEDUCIDO? ───────────
+           *
+           * EQ capitaliza al abrir frase, así que la forma que ves al principio
+           * de una línea NO dice nada: «A gorgon» y «a gorgon» se escriben
+           * igual ahí. Lo único que atestigua la forma buena es haberlo visto
+           * A MITAD DE FRASE, y de 440 nombres del histórico hay **25** que el
+           * registro no escribe nunca fuera del principio: `Guard Philbin`,
+           * `Sergeant Slate`, `Sarawyn Amorfin`…
+           *
+           * De ésos, la forma que enseñamos es una apuesta razonable —bajar el
+           * artículo si lo hay, respetar lo demás— y hasta hoy se presentaba
+           * exactamente igual que las 410 que sí están atestiguadas. **Deducido
+           * presentado como medido**, que es la regla de esta casa al revés.
+           *
+           * Con esta marca, la interfaz puede decirlo donde enseña procedencia.
+           * No cambia ninguna cifra: cambia lo que se afirma sobre una.
+           */
+          nombreDeducido: !this.parser?.formaAtestiguada(r.name),
           pet: !enemy && r.name !== me && petSet.has(r.name),
           // Mascota de otro jugador: se nombra con su dueño y nunca se funde
           // con las tuyas ni se pregunta por ella.

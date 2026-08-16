@@ -16,16 +16,45 @@
  *     ventana. Una ventana de tiempo usada como si fuera una lista de
  *     pertenencia.
  *
- * ── LO QUE COSTABA, MEDIDO ─────────────────────────────────────────────────
+ * ── LO QUE COSTABA, MEDIDO — Y REMEDIDO, PORQUE LA PRIMERA CIFRA ERA MALA ───
  *
- * Sobre las 1.561 peleas con combatientes del registro de referencia:
+ * Aquí decía «1.257 peleas (80,5 %) con actores ajenos y 184 (11,8 %) en las que
+ * esos ajenos se pegan». ESAS DOS CIFRAS NO SON DE ESTE CÓDIGO: salían de un
+ * arnés que contaba NOMBRES EN LA VENTANA, no figuras dibujadas, y la etiqueta
+ * «...y esos ajenos SE PEGAN» estaba puesta sobre un recuento de «algún golpe
+ * que TOCA a un ajeno», que es otra cosa y mucho más frecuente.
  *
- *     con actores AJENOS dentro de la ventana      1.257   (80,5 %)
- *     ...y en las que esos ajenos SE PEGAN            184   (11,8 %)
+ * LA MEDICIÓN BUENA se hace corriendo el mundo con este fichero y sin él: se
+ * ejecuta el `guion.js` anterior al arreglo y el de hoy sobre EL MISMO almacén y
+ * EL MISMO registro, y se cuentan las figuras que cada uno DIBUJA. Es la
+ * partición diferencial aplicada a un dibujo — ver la undécima familia en
+ * `ui/app.js`.
  *
- * La peor —11 de agosto, 17:34:32— es una pelea de 98 segundos con TRES
- * combatientes de verdad, once actores ajenos y 495 golpes entre ellos dentro.
- * El reproductor dibujaba catorce figuras donde hubo tres.
+ * Medido el 16 de agosto de 2026 sobre el almacén de Miguel (1.493 peleas con
+ * combatientes) y `eqlog_Campeon_erudin.txt` (985.189 líneas con cabecera):
+ *
+ *                                            SIN la guarda   CON la guarda
+ *     peleas con alguna figura AJENA           446 (29,9 %)    190 (12,7 %)
+ *     ...con algún golpe que TOCA a un ajeno   156 (10,4 %)          —
+ *     ...con combate ENTRE dos ajenos           49 ( 3,3 %)      0 (0,0 %)
+ *
+ * Y sobre un almacén reconstruido ese mismo día desde ese mismo registro (1.504
+ * peleas): 463 (30,8 %) -> 203 (13,5 %), y 49 -> 0. Las dos cuentas dan lo
+ * mismo, que es lo que se le pide a una medición.
+ *
+ * LAS 190 QUE CONSERVAN UN AJENO SON LAS LEGÍTIMAS: 266 figuras en total,
+ * ninguna de ellas peleando con otro ajeno, todas habiendo tocado a alguien de
+ * la pelea. Es la categoría que este fichero existe para conservar.
+ *
+ * LA PEOR —11 de agosto, 19:34:32, hora local— es una pelea de 99 segundos con
+ * TRES combatientes: `Campeon`, `Vobn` y `a rock golem`. El reproductor dibujaba
+ * TRECE figuras: diez actores de dos combates ajenos —`Matherdon`,
+ * `a flighty fiend`, `Kabartik`, `a ratman warrior` y seis más— con 468 golpes
+ * entre ellos dentro. Hoy dibuja tres.
+ *
+ * (El «17:34:32» que se escribió al principio era esa misma pelea con la hora en
+ * UTC. El registro va en hora local y la lista de peleas también, así que la
+ * hora que se cita tiene que ser la local o no se encuentra la pelea.)
  *
  * Y NO ERA UN FILTRO FLOJO: era una respuesta propia a una pregunta que ya
  * estaba contestada. Por eso el arreglo no es endurecer aquella regla, es

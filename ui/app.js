@@ -5,6 +5,8 @@ import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
+import { mismoNombre } from '../src/nombres.js';
+import { muertesPorNombre } from '../src/suelo.js';
 import { copiarAlPortapapeles } from './clip.js';
 import { pedirDatos, acercaDe } from './dialogo.js';
 import { initTriggers, renderTriggers } from './triggers.js';
@@ -39,9 +41,37 @@ const $ = (id) => document.getElementById(id);
  * puerta: la regla se había arreglado en `foes.js` y no aquí. Ver la nota de
  * deuda en `src/store.js`.
  */
-const cayoEn = (pelea, nombre) => {
-  const baja = (s) => String(s ?? '').charAt(0).toLowerCase() + String(s ?? '').slice(1);
-  return (pelea?.kills ?? []).some((k) => baja(k) === baja(nombre));
+const cayoEn = (pelea, nombre) => (pelea?.kills ?? []).some((k) => mismoNombre(k, nombre));
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EL TÍTULO DE UNA PELEA DICE QUÉ CAYÓ. NO DICE CUÁNTOS HUBO.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Hasta el 16 de agosto ponía «a shin ghoul knight ×2», y ese «×2» se lee como
+ * «había dos». No es lo que cuenta: cuenta ABATIDOS —`muertesPorNombre` sobre
+ * `kills`, o sea lo que el registro escribió que cayó—. El reproductor contesta
+ * la otra pregunta con `suelosDe`, que añade uno cuando el nombre siguió
+ * actuando después de su última muerte.
+ *
+ * LAS DOS RESPUESTAS COINCIDÍAN POR ACCIDENTE hasta que se arregló el suelo:
+ * las dos contaban sólo muertes. Desde entonces difieren en 64 nombres del
+ * histórico, y una pantalla que enseña dos números distintos sin decir que son
+ * dos preguntas es peor que una que enseñaba uno mal.
+ *
+ * SE CONSTRUYE AQUÍ Y NO SE LEE `f.label`, a propósito: `label` es una cadena
+ * guardada con la pelea, así que cambiar la palabra en `engine.js` sólo
+ * arreglaría las peleas futuras y dejaría el histórico con «×2». Rehacerlo al
+ * pintar lo arregla hacia atrás sin reconstruir nada — la misma decisión que la
+ * 1.11.0 y por el mismo motivo. `f.label` se queda de respaldo para las peleas
+ * sin abatidos, que es donde lleva el nombre del que te pegó.
+ */
+const rotuloPelea = (f) => {
+  const m = muertesPorNombre((f?.kills ?? []).map((k) => (typeof k === 'string' ? k : k?.victim)));
+  if (!m.size) return f?.label ?? t('fight.skirmish');
+  return [...m]
+    .map(([n, x]) => (x > 1 ? `${n} · ${t('fight.abatidos', { n: x })}` : n))
+    .join(', ');
 };
 
 // La red de seguridad, montada antes que nada: si algo revienta al arrancar,
@@ -494,6 +524,16 @@ function controlesDeFila(r, filas = []) {
     : r.petOf ? `<span class="hint">${esc(t('pet.ownedBy', { who: r.petOf }))}</span>`
       : yaEs ? `<span class="hint">${esc(t('mate.declared'))}</span>`
         : r.unidentified ? `<span class="hint">${esc(t('side.unknownNote'))}</span>` : ''}
+    <!--
+      LA PROCEDENCIA DEL NOMBRE, donde ya se enseña la de todo lo demás de esta
+      fila. Que sea deducido significa que el registro NUNCA escribe ese nombre
+      a mitad de frase, así que su forma —la mayúscula incluida— es una apuesta
+      nuestra y no una medida. Son 25 de 440 en el histórico.
+
+      Y sin comillas invertidas en este comentario: está DENTRO de una plantilla,
+      así que una comilla invertida aquí la cierra. Se rompió así al escribirlo.
+    -->
+    ${r.nombreDeducido ? `<span class="hint">${esc(t('name.deducido'))}</span>` : ''}
   </div>`;
 }
 
@@ -576,7 +616,7 @@ function fightCard(f, live) {
   const picked = !live && state.picked.has(f.uid);
   return `<div class="fight ${live ? 'live' : ''} ${active ? 'active' : ''} ${
     picked ? 'picked' : ''}" data-uid="${f.uid}" data-live="${live ? 1 : 0}">
-    <div class="fight-name">${esc(f.label ?? t('fight.skirmish'))}</div>
+    <div class="fight-name">${esc(rotuloPelea(f))}</div>
     <div class="fight-sub">
       <span class="num strong foe">${n0(f.enemyDps ?? 0)}</span><span class="u">dps</span>
       <span class="num">${n0(f.raidDps)}</span><span class="u">${esc(t('side.allies').toLowerCase())}</span>
@@ -2549,6 +2589,192 @@ async function renderNarrate(host) {
    * que salga DISTINTO, y la diferencia es exactamente lo que hace la regla. La
    * misma herramienta contestando las dos preguntas que importan de un cambio:
    * «¿esto no cambia nada?» y «¿qué cambia esto?».
+   *
+   * ── LA REGLA DE LA PUERTA, QUE ES LO QUE LE FALTA A LA HERRAMIENTA DE ARRIBA ──
+   *
+   * La partición diferencial es un ARNÉS: se corre a mano, se miran los dos
+   * números y se resta. La tentación evidente —y jmoyers la tuvo— es
+   * automatizarla: dejarla corriendo EN SOMBRA junto a lo que juzga, contar
+   * divergencias, y encender la función cuando el contador lleve tiempo a cero.
+   * Eso es exactamente esta misma herramienta convertida en puerta automática.
+   *
+   * LO QUE LES PASÓ, con su cifra (ver `ESTUDIO-COMPETIDORES.md` §5.1 y §12.1).
+   * Construyeron dieciséis ficheros de persistencia del fold detrás de un
+   * verificador en sombra con esa puerta. El 11 de agosto lo borraron entero:
+   *
+   *     «shadowChecks was ZERO on every build. The counters were the rollout
+   *      gate ("stays off until divergences hold at zero"), and a gate whose
+   *      denominator never moves cannot open.»
+   *
+   * El verificador no corrió NI UNA VEZ. Cero divergencias sobre cero
+   * comprobaciones. La función pasó su vida entera apagada y salió del programa
+   * sin que nadie llegara a saber si servía. No fue una decisión de diseño: fue
+   * una puerta que no podía abrirse.
+   *
+   *     UNA PUERTA QUE SE ABRE CUANDO UN CONTADOR LLEVA TIEMPO A CERO TIENE QUE
+   *     DEMOSTRAR PRIMERO QUE EL CONTADOR SE MUEVE. Un cero de «no ha divergido»
+   *     y un cero de «no se ha medido» SE ESCRIBEN IGUAL.
+   *
+   * Y ES LA UNDÉCIMA FAMILIA EN SU FORMA MÁS CARA, no una familia nueva: el
+   * instrumento vuelve a estar hecho de la misma pieza que lo juzgado —el
+   * contador de divergencias lo alimenta el propio camino que se está evaluando,
+   * así que si el camino no corre, el contador dice «perfecto»—. Y encima es la
+   * alarma muerta con el trabajo hecho en el otro extremo: una salida que nadie
+   * lee Y DE LA QUE DEPENDE QUE UNA FUNCIÓN SE ENCIENDA.
+   *
+   * POR QUÉ LA NUESTRA FUNCIONA HOY, Y CONVIENE SABER POR QUÉ ANTES DE
+   * AUTOMATIZARLA: porque se corre a mano y hay alguien delante. Si la partición
+   * diferencial no da números, se nota en el acto — no hay salida que mirar, hay
+   * una consola vacía delante de una persona que esperaba dos cifras. Es la
+   * misma diferencia que separa un `throw` de un `console.log`: lo que PARA algo
+   * frente a lo que informa a quien mire.
+   *
+   * LA GUARDA CONCRETA, para el día que se automatice: la puerta no mira el
+   * numerador, mira el DENOMINADOR. «Cero divergencias» no autoriza nada;
+   * «cero divergencias sobre N comprobaciones, con N por encima de un suelo
+   * declarado» sí. Y mientras N sea cero, el estado que hay que enseñar no es
+   * «va bien»: es «no se ha medido».
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA DUODÉCIMA: UN NÚMERO DESNUDO NO CRUZA UNA FRONTERA.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     TODA MAGNITUD QUE PASA DE UN MÓDULO A OTRO LLEVA LA UNIDAD EN EL
+   *     NOMBRE. `muertesSeg`, no `instantes`. `anchoPx`, no `ancho`.
+   *
+   * TRES VECES EN UNA SEMANA, y las tres con la misma forma: dos números de la
+   * misma magnitud y distinta escala, que se comparan o se restan sin que nada
+   * chille, porque los dos son `number`.
+   *
+   *   1. SEGUNDOS EPOCH CONTRA SEGUNDOS DE PELEA. `guion.js` le restaba `inicio`
+   *      a `killTimes`, que `engine.js` YA guarda relativo. Salía un negativo
+   *      enorme y un `Math.max(0, …)` lo convertía en cero: TODAS las figuras se
+   *      apagaban en el segundo cero de la reproducción, en el 79,9% de las
+   *      peleas. 4.310 caídas de 4.573.
+   *
+   *   2. PÍXELES CONTRA POR CIENTO. En la pista, las barras y las marcas
+   *      convierten la fracción de tiempo a PÍXELES con el ancho medido, y la
+   *      fila de hallazgos la convierte a POR CIENTO. Es la misma base de tiempo
+   *      en dos unidades: coinciden mientras los dos contenedores midan lo
+   *      mismo. No hay desacuerdo hoy; hay una segunda unidad que puede crearlo.
+   *
+   *   3. INSTANTES DE PELEAS DISTINTAS. El arnés de los huecos apuntaba la hora
+   *      de cada evento tras alimentarlo al rastreador, incluidos los que éste
+   *      RECHAZA: huecos de 35.399 s dentro de peleas de 50 s.
+   *
+   * POR QUÉ ES FAMILIA PROPIA Y NO UNA ERRATA REPETIDA: en las tres, el
+   * lenguaje no puede ayudar —`number` es `number`— y la revisión tampoco,
+   * porque la línea culpable ES CORRECTA leída sola. `Math.round(t - inicio)`
+   * está bien escrito. Lo que está mal es de dónde viene `t`, y eso no se ve
+   * en la línea: se ve en la FRONTERA.
+   *
+   * Y ES LA PRIMERA DE LA LISTA QUE UN `Math.max` EMPEORÓ. La guarda contra
+   * negativos convirtió un disparate —un número de once cifras negativo— en un
+   * cero perfectamente plausible. Un aplanamiento defensivo sobre una magnitud
+   * que no debería poder ser negativa no protege: BORRA LA PRUEBA.
+   *
+   * LAS DOS COSAS QUE SE HACEN, y las dos están puestas:
+   *
+   *   LA UNIDAD EN EL NOMBRE, en el parámetro y en la propiedad, no sólo en un
+   *   comentario. Un comentario no viaja con el argumento.
+   *
+   *   UNA INVARIANTE DE ESCALA EN EL BORDE QUE RECIBE. `src/suelo.js` lanza si
+   *   le llegan «segundos de pelea» mayores que 1.000.000, porque una pelea de
+   *   once días no existe y ese número sólo puede ser un epoch. Es barata, se
+   *   escribe una vez, y es lo único que convierte esta familia en un fallo
+   *   ruidoso en lugar de un número plausible.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA DECIMOTERCERA: EL REGISTRO TE HABLA DE TÚ Y DE LOS DEMÁS EN TERCERA.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     TODA FORMA EN PRIMERA PERSONA TIENE UNA GEMELA EN TERCERA, Y UNA REGLA
+   *     PROBADA SOBRE UNA NO ESTÁ PROBADA SOBRE LA OTRA.
+   *
+   * LA CICATRIZ, del 16 de agosto. Se propuso «X hace daño a X» como prueba de
+   * que hay DOS bichos con ese nombre, y el primer control quitó el daño propio
+   * del jugador mirando el PRONOMBRE: `himself`, `itself`, `yourself`. Funcionó,
+   * y por eso pareció completo.
+   *
+   * Pero el pronombre SÓLO SE ESCRIBE CUANDO EL SUJETO ERES TÚ:
+   *
+   *     You hit yourself for 6 points of magic damage by Lifedraw.
+   *     Kibarer hit Kibarer for 6 points of magic damage by Lifespike.
+   *
+   * Son el mismo mecanismo —una habilidad que cuesta vida— y la regla sólo
+   * cazaba la primera. En el registro de referencia son 301 líneas descartadas
+   * bien y 100 que entraban intactas, con `Cannibalize`, `Life Leech` o
+   * `Specter Lifetap` y con nombre de otro jugador delante. Un detector de
+   * gemelos contando autolesiones ajenas.
+   *
+   * POR QUÉ SE ESCAPA SIEMPRE: la regla de primera persona funciona
+   * PERFECTAMENTE sobre tus líneas, que son la mayoría de lo que uno mira al
+   * escribirla y al probarla. El fallo vive entero en la mitad del registro que
+   * no es tuya, y esa mitad no se lee nunca de un vistazo.
+   *
+   * EL MÉTODO, y es barato: cada regla escrita sobre una línea que empieza por
+   * `You` o `Your`, BUSCAR SU GEMELA con un nombre delante ANTES de darla por
+   * buena. Y la gemela puede vivir en otra familia — el aturdimiento de un bicho
+   * no es «You are stunned!», es `staggers` — así que buscar es buscar de
+   * verdad, no mirar la lista de al lado.
+   *
+   * EL CEPILLO, pasado el 16 de agosto sobre `src/patterns.js`: de 149 reglas,
+   * 85 están ancladas en `You`/`Your`; 39 tienen gemela de tercera persona en su
+   * propia familia y 46 no. La mayoría de esas 46 son legítimamente tuyas —el
+   * juego no te cuenta que otro jugador ha saqueado un cadáver— y unas cuantas
+   * tienen la gemela en otra familia. Lo que no había es la LISTA: nadie la
+   * había recorrido nunca.
+   *
+   * Y LA REGLA NO ES SÓLO DEL PARSER, que es lo que la hace familia. Las dos
+   * reglas de esta casa escritas sobre una forma de primera persona FUERA de
+   * `patterns.js` son justo las dos que hay que vigilar:
+   *
+   *   `REFLEXIVO`          `parser.js` — el pronombre como prueba de daño
+   *                        propio. Ésta es la cicatriz.
+   *   `tuyoPorLaFrase`     `guion.js` — deduce el sujeto de un estado de que la
+   *                        línea empiece por `You`. Hoy no expone nada porque
+   *                        las líneas de estado ajenas no llegan a parsearse,
+   *                        pero es la misma forma esperando.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA CATORCEAVA: UNA PINZA QUE CORRIGE UN IMPOSIBLE LO CONVIERTE EN UN DATO.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     UNA PINZA QUE CORRIGE UN IMPOSIBLE LO CONVIERTE EN UN DATO CREÍBLE.
+   *
+   * LA CICATRIZ, y es la más barata de contar de todas: `guion.js` calculaba el
+   * segundo de cada caída como `Math.max(0, Math.round(kt.t - inicio))` sobre un
+   * `kt.t` QUE YA ERA RELATIVO. La resta daba `107 − 1.786.358.914`, un número
+   * de once cifras y negativo — un grito—, y el `Math.max(0, …)` lo convertía en
+   * **cero**, que es un segundo perfectamente válido.
+   *
+   * Resultado: TODAS las figuras se apagaban en el segundo cero de la
+   * reproducción, en el 79,9 % de las peleas —4.310 caídas de 4.573— y no falló
+   * nada. La escena empezaba con los muertos ya grises y se quedaba así.
+   *
+   * DÓNDE VA UNA PINZA Y DÓNDE NO, que es toda la regla:
+   *
+   *   VA donde el valor fuera de rango es ESPERABLE y significa algo. Un tramo
+   *   que empieza antes de la pelea porque la apertura mueve el inicio: ahí el
+   *   negativo es real y «desde el segundo 0» es la respuesta correcta.
+   *
+   *   NO VA donde el valor fuera de rango es IMPOSIBLE. Ahí se lanza. El
+   *   `RangeError` de `src/suelo.js` es el ejemplo: una pelea de once mil días
+   *   no existe, así que ese número sólo puede ser un epoch mal convertido, y lo
+   *   único útil que se puede hacer con él es parar.
+   *
+   * LA PREGUNTA, para saber en cuál de los dos casos estás: «si este valor sale
+   * fuera de rango, ¿qué ha pasado?». Si la respuesta es un caso del mundo,
+   * pinza. Si la respuesta es «alguien se ha equivocado de unidad», lanza.
+   *
+   * EL CEPILLO, pasado el 16 de agosto sobre `src/`, `ui/` y `bin/`:
+   * **469 pinzas** —280 `?? 0`, 50 `Math.max(0,`, 39 `Math.min(`, 36
+   * `Math.max(1,`, 64 entre `|| 0`, `?? 1` y `|| 1`—. De ellas, **52 pinzan un
+   * INSTANTE o una DURACIÓN**, que es la forma exacta de la cicatriz, y **14
+   * están en `encounter.js` con el patrón literal `Math.max(0, Math.round(t -
+   * this.start))`**. Allí es correcto —`t` es absoluto y `start` también— y
+   * justo por eso es donde hay que mirar el día que alguien pase un `t` ya
+   * relativo: no daría error, daría un cero.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
@@ -3150,7 +3376,7 @@ function renderHead(snap) {
   host.innerHTML = `
     <div class="head-top">
       <div>
-        <div class="head-title">${esc(f.label ?? t('fight.skirmish'))}</div>
+        <div class="head-title">${esc(rotuloPelea(f))}</div>
         <div class="eyebrow">${live ? t('fight.live') : t('fight.closed')} · ${esc(f.zone ?? t('fight.unknownZone'))}${
           f.diff !== null && f.diff !== undefined ? ` · D${f.diff}${f.diffTag ? ' ' + esc(f.diffTag) : ''}` : ''}
           · ${f.level ? esc(t('lvl.level', { n: f.level }))
@@ -3250,7 +3476,7 @@ async function renderReplay(snap) {
   }
 
   host.innerHTML = `<div class="an-head">${back}
-      <h2>${esc(f.label ?? t('fight.skirmish'))}</h2></div>
+      <h2>${esc(rotuloPelea(f))}</h2></div>
     <div class="hint" id="rpCarga">${esc(t('log.loading'))}</div>`;
   host.querySelector('#rpBack').addEventListener('click', volverACombate);
 
@@ -3367,7 +3593,7 @@ function renderAnalysis(snap) {
 
   host.innerHTML = `<div class="analysis">
     <div class="an-head">
-      <div><h2>${esc(f.label ?? t('fight.skirmish'))}</h2>
+      <div><h2>${esc(rotuloPelea(f))}</h2>
         <div class="eyebrow">${secs(f.duration)} · ${n0(f.total)} · ${esc(f.zone ?? '')}</div></div>
       <div class="an-score"><div class="an-score-v num">${a.score}</div>
         <div class="eyebrow">${esc(t('an.score'))}</div></div>
@@ -4138,7 +4364,7 @@ function encHechizos() {
         ${g.top.map((x) => `<div class="foe-det-l">
           <b>${n0(x.dps)}</b>
           <span class="dim">${secs(x.duration)}</span>
-          <span>${esc(x.label ?? t('fight.skirmish'))}</span>
+          <span>${esc(rotuloPelea(x))}</span>
           <span class="dim">${esc(x.zone ?? '')}${x.diff !== null ? ` · D${x.diff}` : ''}</span>
         </div>`).join('')}
       </div>`).join('')}` : ''}

@@ -22,6 +22,9 @@ export const cuboRecibido = (school) => (school === 'melee' ? 'tMelee'
   : (SIN_MITIGACION.has(school) ? 'tUnmit' : 'tSpell'));
 
 import { esRelevante } from './relevancia.js';
+import { claveDeNombre } from './nombres.js';
+// La invariante de escala, en un solo sitio. Ver `src/reloj.js`.
+import { segundosDePelea } from './reloj.js';
 
 /** Compartido: la guarda pide conjuntos y una pelea sin abrir no los tiene. Uno
  *  solo, porque esto corre una vez por cada línea del registro. */
@@ -972,7 +975,7 @@ export class Encounter {
 
   /** Acumula por segundo relativo al inicio. */
   tick(t, field, amount) {
-    const k = Math.max(0, Math.round(t - this.start));
+    const k = segundosDePelea(t, this.start, 'encounter');
     let b = this.series.get(k);
     // `tUnmit` es el tercer cubo del daño que recibes: lo que ninguna postura
     // para. Estaba dentro de `tSpell`, así que todo consumidor de la serie que
@@ -1064,7 +1067,7 @@ export class Encounter {
   }
 
   markStance(t, stance) {
-    const k = Math.max(0, Math.round(t - this.start));
+    const k = segundosDePelea(t, this.start, 'encounter');
     const last = this.stanceSpans[this.stanceSpans.length - 1];
     if (last && last.stance === stance) return;
     if (last) last.to = k;
@@ -1110,29 +1113,70 @@ export class Encounter {
     return c;
   }
 
-  actor(name) {
-    let c = this.combatants.get(name);
-    if (c) return c;
+  /**
+   * ── Y LA FORMA BUENA GANA EN CUANTO APARECE ──────────────────────────────
+   *
+   * Aquí sólo se corregía en UNA dirección: de capitalizado a minúscula. Con
+   * eso, un nombre cuya forma de verdad LLEVA mayúscula —`The Spiroc Guardian`,
+   * donde el «The» es parte del nombre— se quedaba con la minúscula para
+   * siempre, porque la primera línea que lo nombra suele abrir frase y ahí el
+   * parser no tiene con qué saberlo todavía.
+   *
+   * Así que la corrección va en las DOS direcciones y la decide la prueba: la
+   * forma escrita A MITAD DE FRASE, que es la única posición donde la mayúscula
+   * significa algo. `formaDe` la trae del parser, que la va aprendiendo según
+   * lee. Cuando llega, la fila ya abierta se renombra y se vuelve a indexar —el
+   * mismo mecanismo que ya había, con mejor criterio.
+   */
+  #buena(name) {
+    return (name && this.formaDe?.(name)) || name;
+  }
 
-    const baja = name && name.charAt(0).toLowerCase() + name.slice(1);
-    if (baja !== name) {
+  actor(name) {
+    const buena = this.#buena(name);
+    let c = this.combatants.get(buena);
+    if (c) {
+      if (c.name !== buena) c.name = buena;
+      return c;
+    }
+    // Lo mismo con la forma cruda, por si la fila se abrió antes de que el
+    // registro escribiera el nombre fuera del principio de frase.
+    c = this.combatants.get(name);
+    if (c) {
+      if (buena !== name) {
+        c.name = buena;
+        this.combatants.delete(name);
+        this.combatants.set(buena, c);
+      }
+      return c;
+    }
+
+    const baja = buena && claveDeNombre(buena);
+    if (baja !== buena) {
       // Llega capitalizado: si ya está el mismo en minúscula, es ése.
       const yaEsta = this.combatants.get(baja);
-      if (yaEsta) return yaEsta;
+      if (yaEsta) {
+        if (yaEsta.name !== buena) {
+          yaEsta.name = buena;
+          this.combatants.delete(baja);
+          this.combatants.set(buena, yaEsta);
+        }
+        return yaEsta;
+      }
     } else {
       // Llega en minúscula: si estaba guardado capitalizado, se corrige.
-      const alta = name.charAt(0).toUpperCase() + name.slice(1);
+      const alta = buena.charAt(0).toUpperCase() + buena.slice(1);
       const viejo = this.combatants.get(alta);
       if (viejo) {
-        viejo.name = name;
+        viejo.name = buena;
         this.combatants.delete(alta);
-        this.combatants.set(name, viejo);
+        this.combatants.set(buena, viejo);
         return viejo;
       }
     }
 
-    c = new Combatant(name);
-    this.combatants.set(name, c);
+    c = new Combatant(buena);
+    this.combatants.set(buena, c);
     return c;
   }
 
@@ -1239,9 +1283,9 @@ export class Encounter {
     return this.sinControl.map((x) => {
       const fin = x.hasta ?? this.end;
       return {
-        desde: Math.max(0, Math.round(x.desde - this.start)),
-        hasta: Math.max(0, Math.round(fin - this.start)),
-        segundos: Math.max(0, Math.round(fin - x.desde)) + 1,
+        desde: segundosDePelea(x.desde, this.start, 'tramo.desde'),
+        hasta: segundosDePelea(fin, this.start, 'tramo.hasta'),
+        segundos: segundosDePelea(fin, x.desde, 'tramo.duración') + 1,
         acciones: x.acciones,
         aTuyos: x.aTuyos,
         aEnemigo: x.aEnemigo,
@@ -1286,7 +1330,7 @@ export class Encounter {
     let n = 0;
     for (const x of this.sinControl) {
       const fin = x.hasta ?? this.end;
-      n += Math.max(0, Math.round(fin - x.desde)) + 1;
+      n += segundosDePelea(fin, x.desde, 'tramo.duración') + 1;
     }
     return n;
   }
@@ -1308,11 +1352,11 @@ export class Encounter {
       name: e.name,
       golpes: e.golpes,
       daño: e.daño,
-      desde: Math.max(0, Math.round(e.desde - this.start)),
-      hasta: Math.max(0, Math.round(e.hasta - this.start)),
+      desde: segundosDePelea(e.desde, this.start, 'entreTuyos.desde'),
+      hasta: segundosDePelea(e.hasta, this.start, 'entreTuyos.hasta'),
       // Del primer golpe al último, inclusive: la misma convención que la
       // duración de la pelea, para que las dos cifras se puedan comparar.
-      segundos: Math.max(0, Math.round(e.hasta - e.desde)) + 1,
+      segundos: segundosDePelea(e.hasta, e.desde, 'entreTuyos.duración') + 1,
       contra: [...e.contra],
     })).sort((a, b) => b.daño - a.daño);
     return {
@@ -1372,6 +1416,8 @@ export class EncounterTracker extends EventEmitter {
     super();
     this.self = opts.self ?? null;
     this.petNames = new Set();
+    /** La forma atestiguada de un nombre. La pone `engine.js` desde el parser. */
+    this.formaDe = opts.formaDe ?? null;
     /**
      * YA NO ES UN PLAZO: ES EL INTERRUPTOR DE SI ESTE RASTREADOR CIERRA.
      *
@@ -1657,10 +1703,7 @@ export class EncounterTracker extends EventEmitter {
    * les habría quitado el abatido a peleas correctas. Es la misma familia de
    * `actor()`, atacando por la puerta nueva.
    */
-  #clave(nombre) {
-    const s = String(nombre ?? '');
-    return s.charAt(0).toLowerCase() + s.slice(1);
-  }
+  #clave(nombre) { return claveDeNombre(nombre); }
 
   /** Anota que este nombre ha dado señales de vida. Ver `this.ventanas`. */
   #vista(bruto, t, muerta = false) {
@@ -1855,7 +1898,7 @@ export class EncounterTracker extends EventEmitter {
         // El caso normal: el cadáver murió en la pelea que sigue abierta.
         this.current.loot.push({
           ...comun, via: 'cadaver', amb: d.amb, dt: d.dt,
-          t: Math.max(0, Math.round(ev.t - this.current.start)),
+          t: segundosDePelea(ev.t, this.current.start, 'tracker'),
         });
       } else if (d.enc) {
         // ── Botín que llega TARDE ──────────────────────────────────────────
@@ -1906,7 +1949,7 @@ export class EncounterTracker extends EventEmitter {
     // regla del cadáver no se le puede aplicar y se queda con la única que hay.
     // La ficha lo etiqueta distinto porque es una certeza distinta.
     if (ev.kind === 'coin') {
-      if (this.current) this.current.coins.push({ t: Math.max(0, Math.round(ev.t - this.current.start)), cp: ev.cp ?? 0, raw: ev.coin ?? null });
+      if (this.current) this.current.coins.push({ t: segundosDePelea(ev.t, this.current.start, 'tracker'), cp: ev.cp ?? 0, raw: ev.coin ?? null });
       else this.emit('orphanCoin', { cp: ev.cp ?? 0, raw: ev.coin ?? null, t: ev.t, zone: this.zone ?? null });
       return;
     }
@@ -2177,7 +2220,7 @@ export class EncounterTracker extends EventEmitter {
         const antes = this.ultimaLinea.get(this.#clave(ev.victim));
         enc.muertesHuerfanas.push({
           name: ev.victim,
-          t: Math.max(0, Math.round(ev.t - enc.start)),
+          t: segundosDePelea(ev.t, enc.start, 'enc'),
           // A qué distancia quedó la última línea suya, o `null` si no consta
           // ninguna. Es lo único medido de todo esto y viaja con la anotación.
           dt: antes === undefined ? null : Math.round(ev.t - antes),
@@ -2212,7 +2255,7 @@ export class EncounterTracker extends EventEmitter {
         }
       }
       if (ev.victim) {
-        enc.deadAt.set(ev.victim, Math.max(0, Math.round(ev.t - enc.start)));
+        enc.deadAt.set(ev.victim, segundosDePelea(ev.t, enc.start, 'enc'));
         enc.actor(ev.victim).deaths++;
         // Lo que costó ESTA muerte: el daño acumulado contra él menos el que ya
         // llevaba cuando cayó la vez anterior. Sin restar, matar tres veces al

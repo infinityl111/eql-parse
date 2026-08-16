@@ -1,6 +1,8 @@
 import { RANGES } from './ranges.js';
 import { parseZone } from './zones.js';
 import { SIN_MITIGACION } from './stances.js';
+// Una clave con un hueco casa con cualquier otra que tenga el mismo hueco.
+import { claveSegura } from './claves.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -33,6 +35,49 @@ import path from 'node:path';
  * índice como `off`, y por eso los índices antiguos se migran solos sin
  * reescribir nada.
  *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Y POR ESO: `fights.ndjson` NO SE PUEDE REESCRIBIR EN SITIO. NUNCA.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *     LA IDENTIDAD DE UNA PELEA CUELGA DE UN DESPLAZAMIENTO DE BYTES.
+ *     Cambiar UN byte de una línea RENOMBRA todas las peleas que van detrás.
+ *
+ * SI HAS VENIDO A ORDENAR ESTE FICHERO, LEE ESTO ANTES DE EMPEZAR. Las tres
+ * cosas que parecen inofensivas y no lo son:
+ *
+ *   COMPACTARLO —quitar las repetidas que `load` ya descarta—.
+ *   LIMPIAR UN CAMPO de todas las peleas.
+ *   ARREGLAR UNA LÍNEA que se guardó mal.
+ *
+ * Las tres cambian la longitud de alguna línea, y con ella el `off` de todas
+ * las siguientes. Como `uid === off`, **todas las peleas posteriores pasan a
+ * llamarse de otra manera**. Lo que apunta a una pelea por su `uid` —la caché,
+ * lo que enseñe la interfaz, cualquier anotación futura— apunta entonces a la
+ * de al lado. Y no falla: apunta a UNA pelea, sólo que a otra.
+ *
+ * ES NUESTRA FAMILIA MÁS VIEJA —identidad por algo inestable— con el sujeto
+ * cambiado: aquí lo inestable no es un nombre ni una hora, es **la posición**.
+ * La misma que ya nos costó los tríos borrados por índice.
+ *
+ * PASÓ EL 16 DE AGOSTO DE 2026 y por eso está escrito. Se escribió una limpieza
+ * que quitaba una marca de las filas al terminar de reconstruir; `false` ocupa
+ * un byte más que `true`, así que hacía falta reindexar, y reindexar es
+ * renombrar. Se revirtió antes de correrla.
+ *
+ * LO QUE SÍ SE PUEDE HACER, y son las dos únicas puertas:
+ *
+ *   AÑADIR AL FINAL. Es lo único que no mueve nada de lo anterior, y es la
+ *   razón de que este fichero sea NDJSON y sólo crezca.
+ *
+ *   RECONSTRUIRLO ENTERO desde el registro, con `src/rebuild.js`. Ahí todos los
+ *   `uid` cambian **a la vez y a propósito**, lo viejo se aparta con marca de
+ *   tiempo, y lo que casa por `uid` ya sabe que tiene que recomponerse — por eso
+ *   `tramos` y `dudas` casan también POR CONTENIDO.
+ *
+ * Cualquier tercera vía pide antes cambiar la identidad, y eso es otra tarea:
+ * un `uid` que no dependa de la posición. No se ha hecho porque hoy la posición
+ * es única, gratis y ya estaba escrita; el precio es este párrafo.
+ *
  * DUPLICADOS
  *
  * Releer el log entero vuelve a generar las mismas peleas. Como `at` es la hora
@@ -41,8 +86,17 @@ import path from 'node:path';
  * dos veces lo mismo, y `load` descarta las copias que ya hubiera en disco.
  */
 
-/** Identidad lógica de una pelea: estable aunque se reimporte el log. */
-const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
+/**
+ * Identidad lógica de una pelea: estable aunque se reimporte el log.
+ *
+ * SE CONSTRUYE PIDIÉNDOLA, no interpolando, y por un motivo con fecha: la
+ * misma expresión en un arnés —`${s.at}:${s.total}:${s.duration}`— sobre un
+ * objeto en el que `at` NO EXISTE produjo `undefined:46088:126` para peleas
+ * distintas, las hizo colisionar y dio «90 repetidas» donde hay una. Aquí `at`
+ * siempre está porque el resumen lo pone; el día que deje de estar, esto para
+ * en vez de casar cualquier cosa con cualquier cosa. Ver `src/claves.js`.
+ */
+const logicalKey = (s) => claveSegura('logicalKey', s.at, s.total ?? 0, s.duration ?? 0);
 
 /**
  * Generación de los datos guardados. NO es la versión de la aplicación.
@@ -165,7 +219,7 @@ const logicalKey = (s) => `${s.at}:${s.total ?? 0}:${s.duration ?? 0}`;
  * Sube SIEMPRE que cambie lo que se escribe a disco. Sin excepciones y sin
  * ramas de escape: `test/formato.js` no deja publicar sin subirlo.
  */
-export const FORMATO_VERSION = 10;
+export const FORMATO_VERSION = 11;
 
 /**
  * Por debajo de esta generación, lo guardado NO se puede arreglar leyéndolo
@@ -309,7 +363,39 @@ export const FORMATO_VERSION = 10;
  * Y era el turno de esta nota: las tres peleas con un compañero en el bando
  * enemigo se arreglan solas al reconstruir, como decía, sin que nadie haga nada.
  */
-export const RECONSTRUIR_DESDE = 10;
+/**
+ * ═══ SUBE A 11 EN LA 1.15.0: EL NOMBRE QUE SE ENSEÑA ═══
+ *
+ * Se paga aquí la deuda apuntada arriba, y por un motivo que no estaba en la
+ * lista: no era sólo que `kills` guardara el nombre sin normalizar — era que
+ * **la forma que se enseña no siempre es la que el juego escribe**.
+ *
+ * DOS COSAS CAMBIAN Y LAS DOS PIDEN RELEER:
+ *
+ *   1. LA MINÚSCULA SÓLO SI ESTÁ ATESTIGUADA. `Parser` anota, por nombre, la
+ *      forma escrita A MITAD DE FRASE —la única posición donde la mayúscula
+ *      significa algo— y ésa manda sobre bajar el artículo. Sin ella, cinco
+ *      nombres del histórico se guardaron mal: `The Spiroc Guardian`,
+ *      `The Spiroc Lord`, `The Prophet`, `The Mighty Bear Paw` y
+ *      `The Muglwump`. Están **en disco con la forma equivocada** y ninguna
+ *      lectura los arregla: la prueba está en el registro, no en la pelea
+ *      guardada.
+ *
+ *   2. `nombreDeducido` EN CADA FILA. De 440 nombres, 25 no aparecen nunca a
+ *      mitad de frase, así que su forma es una deducción. Sin releer no se
+ *      puede saber cuáles: hace falta el registro entero para contarlo.
+ *
+ * NINGUNA CIFRA SE MUEVE. No cambia daño, ni fronteras, ni abatidos: cambia
+ * qué texto se guarda y qué se afirma sobre él. Y aun así hay que releer,
+ * porque lo escrito no se puede corregir leyéndolo mejor — que es exactamente
+ * el criterio de esta constante.
+ *
+ * LO QUE CUESTA, medido y no estimado: 25,5 s para 74,6 MB (§4.0 del estudio).
+ * Y hay una arista conocida y medida: al reconstruir puede cambiar el
+ * emparejamiento de alguna pelea. Antes de esto había **1 pelea repetida de
+ * 1.547** en el almacén; después tiene que seguir habiendo como mucho una.
+ */
+export const RECONSTRUIR_DESDE = 11;
 
 const META = 'store.json';
 

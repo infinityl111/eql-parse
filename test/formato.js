@@ -304,5 +304,41 @@ todo el que reconstruya, avisa`);
     'y el aviso sale de un texto traducido, no de una cadena suelta');
 }
 
+/**
+ * LO QUE VA DENTRO DEL INSTALADOR, Y LO QUE NO.
+ *
+ * Es de las comprobaciones que sólo se notan cuando ya está publicado: nadie
+ * abre un `.exe` para ver qué lleva dentro, y una vez subido lo tiene todo el
+ * mundo.
+ *
+ * DOS COSAS, Y LAS DOS CON MOTIVO:
+ *
+ *   LA LICENCIA VA DENTRO. Desde la 1.15.0 este programa tiene licencia, y una
+ *   licencia que no viaja con el binario no la ha aceptado nadie. Además la
+ *   pantalla de «Acerca de» la cita, así que sin el fichero la cita miente.
+ *
+ *   LOS PROTOTIPOS DE DISEÑO NO. `diseño/` lleva cifras INVENTADAS —lo dice su
+ *   propio README— y en un proyecto donde cada número viaja con su procedencia,
+ *   un número plausible y falso dentro del paquete es lo peor que puede haber.
+ *   Hoy no entran porque `build.files` lista carpetas concretas; esto es la
+ *   guarda para el día que alguien ponga un comodín.
+ */
+{
+  console.log('\nel instalador lleva la licencia y no lleva los prototipos');
+  const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const files = pkg.build?.files ?? [];
+  ok(files.includes('LICENSE'), 'LICENSE va en el paquete', files.join(', '));
+  ok(fs.existsSync(new URL('../LICENSE', import.meta.url)), 'y el fichero existe');
+  // Un patrón peligroso es el que empieza en la RAÍZ: `**`, `*`, `.` o el
+  // propio nombre. `electron/**` no lo es —está anclado a una carpeta— y por eso
+  // no basta con buscar asteriscos.
+  const cuela = files.filter((f) => /^(?:\*|\.|\*\*|\*\*\/.*|dise.*)$/.test(String(f)));
+  ok(cuela.length === 0, 'ningún patrón se lleva `diseño/` por delante',
+    cuela.length ? cuela.join(', ') : 'ninguno');
+  // Y drilado: si alguien añade `**`, esto tiene que ponerse rojo.
+  ok(/^(?:\*|\.|\*\*|\*\*\/.*|dise.*)$/.test('**'), 'la guarda cazaría un `**` en la raíz');
+  ok(String(pkg.license) === 'FSL-1.1-MIT', 'y la licencia declarada es la que dice la pantalla', String(pkg.license));
+}
+
 console.log(failed ? `\n${failed} mal\n` : '\ntodo bien\n');
 process.exit(failed ? 1 : 0);

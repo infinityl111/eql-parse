@@ -3,11 +3,15 @@
  *
  * ── EL FALLO QUE ESTRENA ESTA BATERÍA, con nombre y hora ──────────────────
  *
- * 11 de agosto de 2026, 17:34:32. Una pelea de 98 segundos con TRES
- * combatientes: tú, `Vobn` y `a rock golem`. El reproductor dibujaba CATORCE
- * figuras, porque además metía once actores de un combate ajeno que ocurría en
- * los mismos segundos —495 golpes entre ellos, ninguno contra nadie de la
+ * 11 de agosto de 2026, 19:34:32 HORA LOCAL. Una pelea de 99 segundos con TRES
+ * combatientes: tú, `Vobn` y `a rock golem`. El reproductor dibujaba TRECE
+ * figuras, porque además metía diez actores de dos combates ajenos que ocurrían
+ * en los mismos segundos —468 golpes entre ellos, ninguno contra nadie de la
  * pelea—.
+ *
+ * (Se escribió primero como «17:34:32, 98 s, catorce figuras, once ajenos, 495
+ * golpes». Era la misma pelea con la hora en UTC y con cifras de un arnés que
+ * contaba nombres en la ventana en vez de figuras dibujadas. Ver `relevancia.js`.)
  *
  * ── POR QUÉ PASABA, Y POR QUÉ NO ERA UN FILTRO FLOJO ──────────────────────
  *
@@ -22,10 +26,11 @@
  * sale de la pelea, no del registro» y que «dos respuestas distintas para la
  * misma pregunta es peor que una imperfecta».
  *
- * ── LO QUE COSTABA, MEDIDO sobre 1.561 peleas con combatientes ────────────
+ * ── LO QUE COSTABA, MEDIDO sobre 1.493 peleas con combatientes ────────────
  *
- *     con actores AJENOS en la ventana      1.257   (80,5 %)
- *     ...y en las que esos ajenos SE PEGAN    184   (11,8 %)
+ *                                          antes          después
+ *     peleas con alguna figura AJENA      446 (29,9 %)    190 (12,7 %)
+ *     ...con combate ENTRE dos ajenos      49 ( 3,3 %)      0 (0,0 %)
  *
  * Después de que el reproductor llame a la guarda: combate entre ajenos, CERO.
  *

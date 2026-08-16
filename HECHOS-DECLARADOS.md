@@ -1,0 +1,292 @@
+# Hechos declarados
+
+**La cuarta categoría, que hasta hoy no tenía dónde vivir.**
+
+Este proyecto etiqueta cada cifra con su procedencia: **medido**, **deducido**,
+**declarado** o **consultado**. Las tres primeras viven en el código, al lado de
+lo que sostienen. **Lo declarado no**: es una frase dicha por una persona un
+martes, no tiene fichero ni línea, y hasta ahora se quedaba en la conversación y
+desaparecía.
+
+**El problema concreto que resuelve este fichero:** dentro de seis meses nadie va
+a recordar si *«en la mayoría de zonas no hay placeholders»* salió de una
+medición, de una wiki o de una frase. Y una afirmación cuya procedencia se ha
+perdido **se comporta exactamente igual que una medida**: se cita, se apoya código
+en ella y nadie la vuelve a comprobar.
+
+## Qué entra aquí, y qué no
+
+**Entra** una afirmación sobre el mundo que **no sale del registro** y que alguien
+sostiene: mecánicas del juego, intenciones de producto, restricciones que Miguel
+impone. **No entra** nada que se pueda medir: si se puede medir, se mide y se
+escribe donde se usa.
+
+## Qué lleva cada entrada
+
+- **quién** lo dijo y **cuándo** — sin eso no es un hecho declarado, es un rumor;
+- **con qué seguridad** lo dijo, con sus palabras si las hubo;
+- **qué lo mediría o lo contradiría**, aunque todavía no se haya hecho;
+- **el estado**: sin comprobar · apoyado por medición · **contradicho**.
+
+**Una entrada contradicha NO se borra.** Se marca y se deja, con lo que la
+contradijo al lado. Es la misma regla que
+[`ESTUDIO-ARCHIVO.md`](ESTUDIO-ARCHIVO.md): la marca se queda.
+
+**Y quién lo dice importa.** Miguel es **el único que juega**, así que para las
+mecánicas del juego es la mejor fuente que tenemos — mejor que una wiki, que
+describe otro EverQuest, y mucho mejor que lo que un modelo de lenguaje crea
+recordar de EverQuest. Eso no lo convierte en medido: lo convierte en **declarado
+por la mejor fuente disponible**, que es una categoría distinta y sigue siendo
+falsable.
+
+---
+
+## D1 · En la mayoría de zonas de EQ Legends no hay placeholders
+
+| | |
+|---|---|
+| **quién** | Miguel |
+| **cuándo** | 16 de agosto de 2026 |
+| **seguridad** | afirmado sin reservas |
+| **estado** | **apoyado por indicios, NO medido — y con excepciones documentadas** |
+
+**Qué dice.** Un *placeholder* es un bicho corriente que ocupa el sitio de uno
+nombrado y que, al morir, tiene alguna probabilidad de ser sustituido por el
+nombrado en vez de por otro corriente. Miguel declara que **en la mayoría de
+zonas de EQ Legends ese mecanismo no existe**: lo que muere vuelve como lo mismo.
+
+**Por qué importa aquí y no es un detalle de lore.** Si hubiera placeholders, el
+tiempo entre la muerte de un bicho corriente y la aparición de un nombrado **no
+sería un tiempo de reaparición**: sería un tiempo de reaparición más una tirada de
+dados. Toda la medición de reaparición (§20.3 del estudio) se apoya en que **el
+mismo nombre vuelve como el mismo nombre**.
+
+**Qué lo mediría.** Desde el registro, indirectamente: si hubiera placeholders,
+un punto de aparición daría **series alternadas de nombres distintos** con el
+mismo intervalo entre muertes consecutivas. Es medible y no está medido.
+
+**Qué lo contradiría.** Encontrar el código de reaparición del competidor
+modelando placeholders para las zonas que Miguel juega.
+
+### Lo que se sabe el 16 de agosto, y no es limpio
+
+**1 · SU CÓDIGO NO LOS MODELA.** Leído `src/shared/respawn.ts` (1.242 líneas) y
+`src/main/modules/respawn.ts`: **no hay modelo de placeholder**. Aparecen sólo
+como **modo de fallo declarado en prosa** —*«a placeholder cycle can put the trash
+mob there instead, and none of that is in the log»*— y como **texto verbatim de la
+wiki en 9 de las 507 filas** de su tabla: `gynok moltor → «16.0 min (PH)»`,
+`ambassador dvinn → «9 mins; orc pawn as PH.»`, `equestrielle the corrupted →
+«60 min (Placeholder: a mist wolf)»`. **No hay contradicción con D1: su código
+tampoco los modela.** Lo que sí dice su wiki es que **existen en algunos sitios**.
+
+**2 · Y HAY UNA QUINTA PROCEDENCIA QUE NO TENÍAMOS: LO OÍDO.** El propio registro
+de Miguel trae conversación del canal General, y en ella hay evidencia directa
+sobre esto — **de jugadores, citando notas de parche**:
+
+```
+[4 ago 13:35] Naamarulla: 'thats what it says. removed placeholders from named
+                           spawns in the city of guk'
+[4 ago 13:35] Thalix:     '* Removed placeholders from named spawns in The City of Guk'
+[4 ago 14:37] Chuggy:     'seems upper guk get PH changed too'
+[11 ago 18:45] Suave:     'woo ghoulbane was quite hard to farm, glad there are
+                           no placeholders...'
+[13 ago 10:11] Shaoladin: 'if u have to kill PH's, charm the ph and make it die
+                           fighting 20 mobs is a way to avoid faction hit'
+[15 ago 11:59] Xorlosch:  'you need Keys from placeholders - i think there where 3'
+```
+
+**Lectura honesta: D1 va en la dirección correcta y no es universal.** El servidor
+**los ha ido quitando** —hay notas de parche citadas para Guk— y a la vez **siguen
+existiendo en otros sitios**, porque hay jugadores hablando de matarlos. Miguel
+dijo «en la MAYORÍA de zonas», y eso es compatible con todo lo anterior.
+
+**ESTO NO ES UNA MEDICIÓN Y NO PUEDE SERLO.** Es chat de terceros dentro de
+nuestro registro: no es medido, no es declarado por Miguel, no es consultado en una
+fuente que podamos citar con fecha. **Es OÍDO**, y es la categoría más débil de
+todas. Se anota porque existe y porque el día que alguien la cite hay que saber de
+dónde salió.
+
+**Lo que seguiría faltando para medirlo:** series alternadas de nombres distintos
+en el mismo punto de aparición. No está medido y es caro: haría falta separar
+puntos de aparición, y **el registro no los distingue**.
+
+---
+
+## D2 · El reloj de reaparición arranca cuando el bicho muere
+
+| | |
+|---|---|
+| **quién** | Miguel |
+| **cuándo** | 16 de agosto de 2026 |
+| **seguridad** | **con reserva, puesta por él**: *«si no me equivoco»* |
+| **estado** | **APOYADA POR MEDICIÓN** — 16 de agosto de 2026 |
+
+**Qué dice.** El temporizador de reaparición de un bicho empieza a contar **en el
+instante de su muerte**, no en un ciclo fijo de la zona.
+
+**Por qué es la declaración más valiosa de las dos: es falsable, y con un dibujo
+distinto para cada respuesta.** El registro **nunca escribe «ha aparecido»**, así
+que lo único observable es la muerte y la primera línea posterior que nombra al
+bicho. Que eso sirva de algo depende enteramente de dónde ancle el reloj del
+juego:
+
+- **si arranca con la muerte** → los intervalos tienen **suelo duro**: ninguno por
+  debajo de *T*, y se desparraman hacia arriba según lo que tardaras en volver a
+  verlo;
+- **si es un ciclo fijo de zona** → los intervalos salen **agrupados en múltiplos**
+  —*T*, *2T*, *3T*— porque a veces pillas la siguiente aparición y a veces se te
+  escapa una entera.
+
+Son dos histogramas distintos y **se distinguen sin saber nada del juego**.
+
+**LA COMPROBACIÓN, hecha el 16 de agosto** — el detalle en
+[`HALLAZGOS.md` §3.1](HALLAZGOS.md).
+
+El histograma solo no bastaba: las dos hipótesis dan lo mismo cuando varios bichos
+mueren a la vez. **Lo que las separa es la pendiente de *vuelve* contra *muere***
+cuando mueren en instantes distintos — 1 si el reloj es del bicho, 0 si es de la
+zona:
+
+| | |
+|---|---:|
+| visitas a una zona con ≥3 nombres distintos | 13 |
+| observaciones | 172 |
+| **pendiente** | **0,976** |
+
+**Sale la primera forma.** Y las series lo confirman: `a ghoul sentinel` en Old Guk
+da 9:29 · 9:30 · 10:45 · 12:15 · 15:20 · 19:49 — **suelo duro y desparrame hacia
+arriba**, sin racimos en 2T ni 3T.
+
+**Miguel tenía razón, y su reserva era prudente y ya no hace falta.** Se deja
+escrita porque la puso él: una declaración con reserva que resulta cierta sigue
+siendo una declaración con reserva el día que se hizo.
+
+**Y la validación cruzada, que es lo más fuerte que hay aquí:** para
+``kahaptra Z`Taj``, la wiki de EQ Legends dice **4:27** y nuestro mínimo medido sale
+**4:27**. Dos caminos independientes —una wiki raspada y 985.189 líneas del
+registro— sobre el mismo número.
+
+**La salvedad que se queda:** el mínimo observado **nunca es «el respawn»**. Entre
+que el bicho vuelve y la primera línea que lo nombra pasa el rato que tardasteis en
+veros, y ese rato no se puede acotar desde el registro. **Es una cota superior.**
+
+---
+
+## D3 · El *consider* es prosa, no un número: el nivel del bicho no está en el registro
+
+| | |
+|---|---|
+| **quién** | medido por **Fable** |
+| **cuándo** | antes del 16 de agosto de 2026 |
+| **seguridad** | **medido sobre el registro** |
+| **estado** | **contradice una afirmación anterior de Claude** |
+
+**Qué dice.** La línea de *consider* del juego describe la dificultad relativa
+**con una frase** —del estilo «parece que te va a costar»— y **no contiene el
+nivel del enemigo**. No hay número que extraer.
+
+**Qué contradice.** Claude afirmó lo contrario: que el nivel del bicho se podía
+sacar del registro. **No se puede.** Todo lo que hoy sabemos de niveles es
+derivado o consultado, nunca leído de una línea de *consider*.
+
+**Por qué está aquí y no sólo en el código.** Porque es del tipo de afirmación que
+vuelve: es plausible, suena a que debería ser cierta, y el día que alguien
+necesite el nivel del enemigo va a proponerla otra vez. **La entrada existe para
+que la próxima vez se lea la medición y no la intuición.**
+
+---
+
+## D4 · Una mascota enemiga despawnea con su dueño y no escribe línea de fin
+
+| | |
+|---|---|
+| **quién** | **deducido** por Claude de la pelea del 11 de agosto |
+| **cuándo** | 16 de agosto de 2026 |
+| **seguridad** | **deducido, NO confirmado por Miguel** |
+| **estado** | **sin confirmar** |
+
+**Qué dice.** Cuando muere el dueño de una mascota enemiga, la mascota
+desaparece **sin que el registro escriba nada**: ni muerte, ni desvanecimiento,
+ni despedida de ninguna clase.
+
+**De dónde sale.** De las tres peleas que un mez sobre una mascota enemiga
+mantiene unidas ([`ESTUDIO-COMPETIDORES.md` §3.1](ESTUDIO-COMPETIDORES.md)). El
+sostén del mez espera un final que **nunca llega**, y sólo lo para el tope. La
+mayor —11 de agosto, 11:26:24— dura 475 s y sin el sostén serían tres peleas.
+
+**Por qué se anota como declarado y no como medido.** Porque lo que está medido es
+**la ausencia**: no hay línea. De ahí a «la mascota despawnea con su dueño» hay un
+paso de mecánica del juego que **el registro no puede dar**. Podría ser que la
+mascota siga viva y se aleje, o que muera en silencio, o que el juego escriba algo
+que no sabemos leer.
+
+**Qué lo confirmaría.** Que Miguel lo diga —es exactamente el tipo de cosa que él
+sabe y el registro no—, o encontrar la línea en el cajón de las no reconocidas.
+
+**Pendiente:** preguntárselo. Está anotado aquí en vez de dado por bueno porque
+hoy hay **código apoyado en ello** —el tope del sostén— y la nota de ese código
+debería citar esta entrada.
+
+---
+
+## D5 · ¿Un nombre propio único puede tener dos individuos a la vez?
+
+| | |
+|---|---|
+| **quién** | pregunta abierta, sin declarar |
+| **cuándo** | surgió el 16 de agosto de 2026 |
+| **seguridad** | **medido que SÍ ocurre; sin explicación** |
+| **estado** | **pendiente de Miguel** |
+
+**De dónde sale.** La primera corrida de `npm run imposibles` llevaba una
+afirmación mía: *«un nombre propio es UN individuo: no cae dos veces en la misma
+pelea»*. Saltó, y uno de los casos es real y no admite lectura suave:
+
+```
+[Fri Aug 14 00:31:12 2026] You have slain Sir Lucan D`Lere!
+[Fri Aug 14 00:31:23 2026] Sir Lucan D`Lere has been slain by Jobn!
+
+[Fri Aug 14 19:30:25 2026] You have slain Sir Lucan D`Lere!
+[Fri Aug 14 19:30:55 2026] Sir Lucan D`Lere has been slain by Gann!
+```
+
+**Dos días distintos, dos matadores distintos, once y treinta segundos de
+separación**, en West Freeport. `Sir Lucan D`Lere` es un named único de la
+ciudad.
+
+**Por qué importa más allá de la anécdota.** Tres cosas nuestras dan por hecho
+que un nombre propio es un individuo:
+
+- **la imposibilidad que se retiró** (ya corregida);
+- **el suelo**, que se apoya en «un muerto no pega» — sigue siendo cierto, pero
+  con dos ejemplares el razonamiento cuenta individuos que no son el mismo;
+- **el detector X→X**, cuyo control descansaba en que un `Cannibalize` de un
+  nombre propio sobre sí mismo es autolesión y no gemelos. **Si un named puede
+  estar duplicado, esa distinción se afloja.**
+
+**Lo que hace falta y no tenemos:** que Miguel diga qué es. Las candidatas son
+instancias del mismo sitio que se solapan en zona abierta, un evento que
+reaparece rápido, o dos versiones del NPC. **El registro no lo puede decidir**:
+escribe el nombre y nada más.
+
+**Hasta que se conteste**, ni el suelo ni ningún detector deben apoyarse en «este
+nombre es único». Ninguno lo hace hoy.
+
+**Y una consecuencia para la reaparición, que hay que dejar escrita donde se
+lea.** Toda la medición de §3 de [`HALLAZGOS.md`](HALLAZGOS.md) se apoya en
+separar **nombres campeables** —los de un solo punto de aparición— de los que
+tienen varios. Si un «único» no es único:
+
+- **el punto de aparición tampoco lo es**, y el intervalo entre una muerte y la
+  siguiente aparición deja de medir una reaparición;
+- **el filtro se resiente por donde menos se ve**: descarta los nombres con dos
+  individuos *probados*, y `Sir Lucan D`Lere` no lo estaba — nunca tuvo dos
+  muertes en una misma pelea hasta que las tuvo;
+- **y los candidatos con racimo apretado son justo los nombres propios**
+  (``kahaptra Z`Taj``, `emperor Crush`, `the ghoul arch magus`), que es la
+  población que esta duda toca de lleno.
+
+**No invalida lo medido** —la pendiente de 0,976 sale de 172 observaciones sobre
+13 visitas— pero sí **acota lo que se puede prometer**: mientras esto no se
+conteste, un temporizador de reaparición no puede decir «éste es el bicho»,
+sólo «un bicho con este nombre».

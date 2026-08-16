@@ -1,0 +1,422 @@
+# La cacería — dónde no hemos mirado
+
+**Los fallos de esta semana los encontramos de refilón.** El del combate ajeno
+salió midiendo otra cosa; el del segundo cero salió midiendo el primero; el de la
+autolesión ajena salió poniéndole un control a un detector que íbamos a adoptar.
+Los tres son buenos hallazgos y ninguno se buscó.
+
+**Este fichero es la búsqueda deliberada.** No es una fase con final: es **un
+cepillo por turno, siempre**, junto a lo que toque construir.
+
+> **EL ENTREGABLE NO SON ARREGLOS: ES COBERTURA.** Un turno que cepilla una
+> familia y no encuentra nada ha entregado lo mismo que uno que encuentra tres.
+> Lo que no puede pasar es que la lista no avance.
+
+## La regla de las imposibilidades
+
+> **UNA IMPOSIBILIDAD ES SOBRE LO QUE ESCRIBIMOS NOSOTROS, NUNCA SOBRE EL JUEGO.**
+
+De nuestros ficheros sabemos la verdad. Del juego sólo sabemos lo que Miguel
+declara — y eso va a [`HECHOS-DECLARADOS.md`](HECHOS-DECLARADOS.md), no a un
+`assert`.
+
+**Las dos cicatrices que la escribieron, las dos del primer día:**
+
+- «un nombre propio es UN individuo» → ``Sir Lucan D`Lere``, named único, **cae
+  dos veces en la misma pelea**, dos días distintos, con dos matadores distintos.
+- «el mismo nombre no cae dos veces en el mismo segundo» → **tres**
+  `A decaying skeleton` a las 11:03:14, por un área.
+
+Las dos saltaron. Las dos eran falsas. **Y una heurística que salta 39 veces no
+enseña nada: entrena a ignorarla.**
+
+## Cómo se clasifica lo que aparece
+
+Cada hallazgo cae en una de tres, **y sólo la primera adelanta cola**:
+
+| | |
+|---|---|
+| **A** | **cambia un número que alguien lee.** Va a la cola, delante. |
+| **B** | **hoy no cambia nada, pero puede.** Se anota con su disparador escrito —«esto se romperá cuando…»— y se queda aquí. |
+| **C** | **muerto.** Se borra, y se dice qué se borró. |
+
+**Y la regla que las sostiene:** clasificar es obligatorio **antes** de tocar
+nada. Un arreglo sin clasificar es un arreglo cuyo valor nadie midió.
+
+---
+
+## EL CONTADOR
+
+| cepillo | estado | encontrado | A | B | C |
+|---|---|---:|---:|---:|---:|
+| **1 · Ramas nunca pisadas** | primera corrida hecha | **1.333 bloques** | 0 | 4 | 1 |
+| **2 · Imposibilidades** | **17 escritas, las 17 en silencio** | 2 afirmaciones falsas mías | 0 | 0 | 2 |
+| **3.1 · Pertenencia** (familia 1) | **cepillado** | 2 primas | 0 | 2 | 0 |
+| **3.2 · Pronombre** (familia 13) | **cepillado** | 46 candidatas, 2 reales | 1 | 1 | 0 |
+| **3.3 · Número desnudo** (familia 12) | **cepillado** | 469 pinzas, 52 de la forma | 1 | **13 cubiertas** | 0 |
+| **3.4 · La medición no era independiente** | *siguiente* | — | — | — | — |
+| **3.5…3.12 · las otras nueve familias** | pendientes | — | — | — | — |
+| **4 · ¿Esta guarda hace algo?** | pendiente | — | — | — | — |
+| **5 · Romper las guardas** | pendiente | — | — | — | — |
+| **6 · El cajón, con otra pregunta** | pendiente | — | — | — | — |
+| **7 · El oráculo tonto** | **3 propiedades corriendo** | **15 fronteras sospechosas** | **1** | 0 | 0 |
+| **8 · El punto ciego del reproductor** | **cerrado**: ejecutable y vigilado | 1 comprobación mal escrita | 0 | 0 | 1 |
+
+**Lo cepillado hasta hoy: 3 de las 14 familias.** Once dianas dibujadas y sin
+disparar.
+
+---
+
+## 1 · Qué ramas no se han pisado nunca
+
+**Medido el 16 de agosto de 2026.** Cobertura de V8 sobre **dos corridas unidas**:
+
+- la **reconstrucción completa** del registro — 941.299 líneas leídas, 1.533
+  peleas, 39,4 s;
+- la **batería entera** (45 ficheros de `test/`).
+
+Un bloque cuenta como no pisado sólo si sigue a cero **en las dos**.
+
+| | |
+|---|---:|
+| ficheros nuestros cargados | 46 |
+| **BLOQUES NO EJECUTADOS NI UNA VEZ** | **1.333** |
+| ...funciones enteras que no se llamaron | **224** |
+| ...ramas dentro de funciones que sí corrieron | **1.109** |
+
+| grupo | bloques | funciones |
+|---|---:|---:|
+| `src/` | 1.186 | 152 |
+| `ui/` | 111 | 54 |
+| `bin/` | 36 | 18 |
+
+| fichero | bloques | fn |
+|---|---:|---:|
+| `src/engine.js` | 210 | 38 |
+| `src/store.js` | 112 | 8 |
+| `src/encyclopedia.js` | 91 | 11 |
+| `src/foes.js` | 90 | 3 |
+| `src/encounter.js` | 85 | 0 |
+| `src/analysis.js` | 84 | 20 |
+| `src/aggregate.js` | 82 | 6 |
+| `src/advisor.js` | 80 | 3 |
+| `src/catalog.js` | 58 | 6 |
+| `ui/reproduccion.js` | 49 | 10 |
+
+### La salvedad, y hay que leerla con el número
+
+**1.333 no es «código muerto».** Es «no ejecutado por estos dos caminos». La
+interfaz viva, el overlay, los disparadores, el lector en directo y el compartir
+**no se ejercitan en ninguna de las dos corridas**, así que buena parte de esos
+bloques simplemente no estaban en el camino.
+
+**Lo que sí es exacto, y es lo que vale:** el camino de la reconstrucción es
+**por donde sale cada número que enseñamos**, y ahora sabemos qué no toca.
+
+### La primera pesca, ya clasificada
+
+| dónde | qué | clase |
+|---|---|:--:|
+| `src/relevancia.js` | **cubierto entero**. La rama del compañero declarado no la ejercita el registro —Miguel no ha declarado a nadie— pero sí `test/companeros.js`. La guarda está probada. | — |
+| `src/suelo.js:108` | el **valor por defecto** `hayActividadDespues = () => false` no lo usa nadie. Un defecto que **contesta «no» en silencio** a la pregunta que decide el «+1»: quien llame sin predicado no verá fallar nada. | **B** |
+| `src/suelo.js:55` | una de las dos ramas de `typeof k === 'string' ? k : k?.victim` nunca corre: hoy `kills` guarda cadenas. La otra es para el encuentro en vivo. | **B** |
+| `src/guion.js` | **32 bloques, y ni uno lo pisa la reconstrucción**: `guion.js` no se carga al reconstruir. Todo lo que sabe el reproductor se ejercita sólo en `test/`. | **B** |
+| `src/nombres.js:1` | el atajo `a === b` de `mismoNombre` no se estrena. | **C** al mirarlo |
+
+**Pendiente:** clasificar las 1.333. Se hará **por cepillo**, no de una sentada —
+una lista de mil trescientas cosas leída de golpe es otra alarma muerta.
+
+---
+
+## 2 · Las imposibilidades
+
+**`npm run imposibles`.** Se corre **después de cada reconstrucción**. No es una
+batería de pruebas: `test/` comprueba que el código hace lo decidido sobre líneas
+escritas a mano; esto comprueba que **lo que hay en el disco pudo ocurrir**.
+
+**Hoy son once y las once callan** sobre las 1.493 peleas del almacén de Miguel:
+
+1. Una pelea no dura menos que nada.
+2. Nadie cae antes de que empiece la pelea ni después de que acabe.
+3. En una pelea larga con varios abatidos no caen todos en el segundo cero.
+4. Un hueco no es mayor que la pelea que lo contiene.
+5. Todo instante de muerte corresponde a una muerte de la lista.
+6. Nadie hace más daño que todo su bando junto.
+7. El total de la pelea es la suma de lo que hizo cada uno.
+8. Nadie está activo más segundos de los que dura la pelea.
+9. No hay más instantes de muerte que muertes.
+10. Nada tiene vida negativa.
+11. Una proporción va entre 0 y 1.
+
+### Lo que dio la primera corrida, que fue tumbar dos afirmaciones mías
+
+**Escribí dos que no eran imposibilidades, eran suposiciones sobre el juego**, y
+las dos saltaron:
+
+| lo que escribí | saltó en | qué era |
+|---|---:|---|
+| «Un nombre propio es UN individuo: no cae dos veces en la misma pelea» | 20 peleas | **falsa.** ``Sir Lucan D`Lere`` —named único— cae **dos veces en la misma pelea**, dos días distintos, con dos matadores distintos. Las cuatro líneas están en el registro. |
+| «El mismo nombre no cae dos veces en el mismo segundo» | 39 peleas | **falsa.** El registro sella al segundo y un área mata varios a la vez: tres `A decaying skeleton` a las 11:03:14. |
+
+**Las dos retiradas (C).** Y de la primera sale una pregunta para Miguel, ya
+apuntada en [`HECHOS-DECLARADOS.md`](HECHOS-DECLARADOS.md): **en EQ Legends un
+nombre propio no garantiza un individuo**, lo cual toca también al detector X→X.
+
+> **LA REGLA QUE SALIÓ DE AHÍ:** una imposibilidad tiene que serlo sobre el
+> **mundo** o sobre **nuestra propia escritura**. Las de en medio —«esto no suele
+> pasar»— son heurísticas disfrazadas, y una heurística que salta 39 veces no
+> enseña nada: entrena a ignorarla.
+
+**El hueco conocido:** las once miran **el almacén**. Ninguna mira lo que el
+reproductor calcula a partir de él — y el fallo del segundo cero vivía justo ahí.
+La número 3 lo habría cazado corriendo sobre la salida de `guion()`. **Es la
+próxima que hay que añadir**, y pide el registro además del almacén.
+
+---
+
+## 3 · Las familias sin cepillar
+
+Catorce escritas en `ui/app.js`. **Tres cepilladas**, once no.
+
+**El orden: las que más veces han disparado.**
+
+| | familia | veces | estado |
+|--:|---|--:|---|
+| 11 | la medición no era independiente de lo medido | **5** | **siguiente** |
+| 12 | un número desnudo no cruza una frontera | 3 | cepillada |
+| 1–6 | dejar que un dato inestable mande sobre una identidad | 6 | pendiente |
+| 7 | salida muerta · alarma muerta | 2 | pendiente |
+| 8 | la regla aplicada en un sitio y no en el otro | 2 | pendiente |
+| 9 | el filtro busca el nombre y no la cosa | 1 | pendiente |
+| 10 | una taxonomía inventada no falla, no ve | 1 | pendiente |
+| 13 | toda forma en primera persona tiene una gemela en tercera | 1 | cepillada |
+| 14 | una pinza que corrige un imposible lo vuelve creíble | 1 | cepillada |
+
+### Lo cepillado, con sus números
+
+**Pertenencia (familia 1, `esRelevante`).** Ningún otro sitio decide pertenencia
+desde una ventana de tiempo. Dos primas: `analysis.js:143-149` **vuelve a
+deducir** quién es enemigo cuando la fila no trae `side` (**B**, sólo peleas
+antiguas), y el plegado de la mayúscula estaba en **seis** sitios (**B**,
+unificado en `src/nombres.js`).
+
+**Pronombre (familia 13).** De 149 reglas de `patterns.js`, **85 ancladas en
+`You`/`Your`** y **46 sin gemela en su familia** — la mayoría legítimamente
+tuyas. Lo que muerde no está ahí: **dos** reglas escritas **encima** de una forma
+de primera persona. `REFLEXIVO` en `parser.js` (**A**, dejaba entrar 100 líneas
+de autolesión ajena) y `tuyoPorLaFrase` en `guion.js` (**B**, con su disparador ya
+escrito al lado).
+
+**Número desnudo (familia 12).** **469 pinzas** en el árbol —280 `?? 0`, 50
+`Math.max(0,`, 39 `Math.min(`, 36 `Math.max(1,`, 64 más— de las que **52 pinzan
+un instante o una duración**. Una era **A** (la de las caídas, ya arreglada) y
+**14 están en `encounter.js` con el patrón literal `Math.max(0, Math.round(t -
+this.start))`**: correctas hoy porque `t` es absoluto, y **B** para siempre,
+porque el día que alguien pase un `t` relativo no habrá error, habrá un cero.
+
+---
+
+## 4 · ¿Esta guarda hace algo? *(pendiente)*
+
+La partición diferencial aplicada a **todas**: correr con y sin cada guarda y
+contar la diferencia sobre el registro.
+
+- **diferencia CERO** → la guarda está muerta y **engaña al que la lea**.
+- **diferencia GRANDE que nadie conocía** → mirar qué es.
+
+**Lo que ya se sabe de las tres medidas así:** el sostén del mez cambia **44
+fronteras de 1.571**; la guarda de pertenencia del reproductor cambia **446
+peleas a 190** y el combate entre ajenos **de 49 a 0**; la regla del sujeto en el
+suelo quita **8 figuras de 72**. Ninguna es cero.
+
+---
+
+## 5 · Romper las guardas a propósito *(pendiente)*
+
+Romper cada guarda y comprobar que **algo se cae**. La que se puede romper sin
+que nada proteste no está protegida.
+
+**Ya hecho en una:** `test/figuras.js`, drilada en rojo contra los tres fallos que
+cubre —la escala, las caídas y la regla del sujeto—. **Las tres se pusieron
+rojas.** Antes de reescribirla, sustituía el predicado por `() => true` y
+`() => false`: se podía romper el código sin que la prueba se enterara.
+
+---
+
+## 6 · El cajón, con la otra pregunta *(pendiente)*
+
+**57.814 líneas y 6.612 formas.** Está medido **por familias grandes** —cuánto es
+adorno, cuánto es interfaz, cuánto es combate sin regla— y esa medición contestaba
+*«¿cuánto nos falta por leer?»*.
+
+**La pregunta nueva es otra:** ¿hay ahí dentro una forma que **deberíamos**
+reconocer, o alguna que revele que **una regla nuestra se está quedando corta**?
+No es lo mismo: la primera busca huecos, la segunda busca **desmentidos**.
+
+---
+
+## 7 · Un segundo cálculo tonto — el presupuesto
+
+Una versión **lenta, ingenua y obviamente correcta**, comparada con la buena
+sobre el registro real. Es lo que hace sowoky con su parser escrito dos veces.
+
+| cálculo | coste | por qué |
+|---|---|---|
+| **El suelo** | **bajo** | Recorrer las líneas de cada pelea y contar muertes y actividad posterior por nombre, sin compartir un solo módulo. Unas 80 líneas, minutos de ejecución. **Ya está medio escrito**: los arneses de esta semana lo hacen. |
+| **El DPS** | **bajo** | Sumar el daño por segundo desde las líneas crudas y dividir. Unas 40 líneas. **Salvedad**: hoy sólo validaría `total`, `duration` y el daño por fila — la serie del gráfico **no existe todavía**, así que la mitad del valor llega cuando se construya. |
+| **La frontera de pelea** | **alto, y el coste no es el código** | El grafo de interacciones con componentes conexos y una ventana simple son 150 líneas. **Lo caro es decidir qué significa «obviamente correcto»**: si la versión tonta reimplementa el sostén del mez, las mascotas y el encanto, deja de ser independiente —es la undécima familia otra vez—; y si no los implementa, **va a diferir por motivos legítimos** y habrá que separar a mano las diferencias buenas de las malas sobre ~1.500 peleas. Ese triaje es el trabajo. |
+
+**Recomendación:** el suelo primero —barato y con el cálculo recién tocado—, el
+dps cuando exista la serie, y la frontera **sólo con un criterio de divergencia
+escrito ANTES** de correrla. Si no, la comparación producirá una lista de
+diferencias que nadie sabrá leer.
+
+---
+
+## 8 · El punto ciego: el reproductor — **cerrado**
+
+**Dos caminos independientes lo dijeron el mismo día:** las once imposibilidades
+miraban el almacén y ninguna miraba lo que el reproductor calcula; y la
+cobertura de la reconstrucción **no pisa ni un bloque de `src/guion.js`**. Los
+dos peores fallos de la semana vivían justo ahí, y es la función que ningún
+competidor tiene, así que tampoco hay de quién copiar la vigilancia.
+
+**(a) Ejecutable sin ventana: `npm run reproductor`.** `bin/reproductor.js`
+recorre el registro una vez repartiendo líneas por ventana y llama a `guion()`
+con **exactamente lo que recibe en la aplicación**. Sobre el almacén de Miguel:
+
+| | |
+|---|---:|
+| escenas reproducidas | **1.578 de 1.578** |
+| sucesos | **741.864** |
+| actores · figuras | 6.590 · 9.042 |
+| con alguna figura ajena | 182 (11,5 %) |
+| ha tardado | **10,0 s** |
+
+**(b) Seis imposibilidades sobre esa salida**, dentro de la misma lista
+(`npm run imposibles -- --log <registro>`):
+
+1. Ninguna figura cae fuera del intervalo de su pelea.
+2. Ninguna figura se apaga antes de su primera acción.
+3. El número de figuras es las muertes del nombre, o una más.
+4. Toda figura ajena que no sea tuya ha tocado a alguien de la pelea.
+5. Ningún suceso cae fuera de los segundos de la pelea.
+6. Quien no entró en la escena no tiene sucesos.
+
+**(c) Saltó una, y era mía.** La cuarta, en **2 peleas**, las dos por
+**`Campeon`**: peleas en las que Miguel lanzó un hechizo sin llegar a pegar a
+nadie, así que el motor no le abre fila y el reproductor lo dibuja igual —y hace
+bien, estaba allí—. Además **un `lanza` no lleva destino**, así que por
+construcción nunca podía «tocar» a nadie. Corregida para exceptuar al personaje y
+sus mascotas: **son de la escena por definición, no por haber tocado a alguien**.
+**Clase C.**
+
+**Con eso, las 17 en silencio.** No es un aprobado: es la primera vez que hay algo
+que pueda suspender.
+
+## 7 bis · El oráculo tonto: tres propiedades para la frontera
+
+**No se implementa una segunda frontera** — no puede ser independiente. Se
+afirman **propiedades**: más débiles que la respuesta completa y por eso
+comprobables.
+
+| propiedad | salta |
+|---|---:|
+| Una pelea no contiene dos grupos de enemigos disjuntos separados por más de 30 s | **0** de 1.578 |
+| Dos peleas seguidas con menos de 12 s de hueco no comparten un enemigo **vivo** | **15** (1,0 %) |
+| Dentro de una pelea no hay un silencio mayor que el mayor sostén posible (226 s) | **0** de 1.578 |
+
+**La segunda encontró algo en su primera corrida, y es clase A.** Quince pares de
+peleas consecutivas separadas por segundos que **comparten un enemigo que no
+murió en la primera**:
+
+```
+6/8  21:16:32 y 21:16:48 ·  1s de hueco · comparten King Tranix
+8/8   1:20:41 y  1:22:13 ·  6s de hueco · comparten a shin ghoul knight pet
+11/8 11:17:12 y 11:19:45 · 10s de hueco · comparten a ghoulish ancille
+```
+
+**`King Tranix` es un named único partido en dos peleas por un hueco de un
+segundo.** Si son la misma pelea, el dps y los totales de las dos están mal.
+
+### La regla que salió de escribirlas
+
+> **UNA PROPIEDAD DEMASIADO FUERTE NO ENCUENTRA MÁS: ENCUENTRA RUIDO.**
+
+**La cicatriz, del mismo día.** La primera versión de la segunda propiedad decía
+«dos peleas seguidas no comparten enemigo», sin más. **Saltó 125 veces.**
+
+Y 125 saltos no son 125 hallazgos: son **una lista que nadie va a mirar**. El
+fallo estaba en la propiedad, no en el código — el mismo NOMBRE no es el mismo
+individuo, y si murió en la primera pelea, el de la segunda es otro. Añadiendo
+«**vivo**», quedaron **15**, y las 15 son casos de verdad.
+
+**Ocho veces menos ruido y el mismo poder de detección.** Una propiedad que salta
+demasiado no es más exigente: **entrena a ignorarla**, que es exactamente lo que
+le pasó a la alarma muerta por el otro extremo. Es la misma lección que dieron
+las dos imposibilidades falsas del primer día, y por eso van juntas:
+
+|  | de más | de menos |
+|---|---|---|
+| **imposibilidad falsa** | salta con datos correctos | te acostumbras a verla roja |
+| **propiedad demasiado fuerte** | 125 saltos donde hay 15 | nadie los abre |
+| **guarda demasiado floja** | no salta nunca | parece que protege |
+
+**Antes de añadir una comprobación hay que preguntarse cuántas veces va a saltar
+si todo está bien.** Si la respuesta no es «ninguna», no está terminada.
+
+**Pendiente:** mirar las 15 una a una. No se toca nada hasta clasificarlas.
+
+## LO QUE NO ENTRA EN LA 1.15.0, con su clase
+
+**En un sitio y no repartido por los informes.** Cada uno con lo que se sabe, lo
+que costaría y por qué se queda fuera.
+
+| # | qué | clase | por qué no entra |
+|--:|---|:--:|---|
+| 1 | **Los 15 pares de peleas partidas** que comparten un enemigo vivo | **A** | Sin clasificar. Uno está explicado —`King Tranix`, ver abajo— y catorce no. Tocar la frontera mueve **todas** las cifras del histórico. |
+| 2 | **`King Tranix`: el mecanismo, no el umbral** | **A** | Explicado y medido (abajo). El arreglo toca el cierre por ausencia. |
+| 3 | **La marca de «nombre deducido» sale en 50 nombres y sólo 25 son permanentes** | **B** | Se pone al cerrar cada pelea y la prueba llega después. Limpiarlo al final de la reconstrucción **exige reescribir `fights.ndjson`, y eso renombra todas las peleas** (ver `src/store.js`). Pide persistir el conjunto de formas atestiguadas. |
+| 4 | **La separación clave / presentación en dos campos** | **B** | Cambio de formato del almacén. Va con la interfaz, en la **1.16.0**. |
+| 5 | **`npm run ui:check` falla en `Page.captureScreenshot` a los 30 s** | **B** | **Preexistente**: falla igual con los cambios guardados en el `stash`. La parte de medición del DOM pasa antes de romperse. |
+| 6 | **El valor por defecto `() => false` de `suelosDe`** | **B** | Ningún llamador de producción lo alcanza. Sigue siendo una trampa para el siguiente. |
+| 7 | **`catalog.js` hace `f.uid ?? f.id`** | **B** | No se alcanza: `engine.spellCatalog` pone el `uid` antes. Pero `id` reinicia en cada arranque —1.430 distintos para 1.578 peleas— así que el día que alguien llame sin pasar por ahí, el número de peleas por hechizo sale corto. |
+| 8 | **Las 1.333 ramas nunca pisadas, sin clasificar** | — | Se clasifican **por cepillo**, no de una sentada. |
+| 9 | **Cepillos 4, 5 y 6 de la cacería** | — | ¿Esta guarda hace algo? · Romper las guardas · El cajón con la otra pregunta. |
+
+### `King Tranix`, media hora de reloj: por qué se cerró la primera pelea
+
+**No es un umbral mal puesto. Es un mecanismo del juego que no conocíamos.**
+
+Trazado el momento exacto, línea a línea:
+
+```
+21:16:32  King Tranix hits YOU for 73 points of damage.
+21:16:32  You begin casting Feign Death.
+21:16:33 … 21:16:45   NADA. Ni un golpe, ni un fallo, ni un lanzamiento.
+21:16:46  King Tranix begins casting Shadow Vortex.
+```
+
+**Miguel fingió muerte.** El jefe perdió el objetivo y estuvo **catorce segundos
+sin escribir una sola línea**. `PLAZO_ENEMIGO` son **12**: a los 12 s de silencio
+su ventana se cierra, y con la única ventana cerrada la pelea se cierra. Un
+segundo después vuelve a pegar y empieza otra.
+
+**No es que los lanzamientos no cuenten como presencia** —sí cuentan, se
+comprobó—: es que **no hubo ninguna línea que contar**.
+
+**Y no explica los otros catorce.** Buscando `feign` alrededor de las quince
+fronteras: **2 de 15**. Los otros trece tienen otra causa, sin mirar todavía.
+
+**Por qué no entra hoy:** el arreglo es una regla nueva de cierre —«mientras
+finges muerte, la ausencia del enemigo no cuenta»— y eso **mueve fronteras en
+todo el histórico**, o sea el dps, los totales y el recuento de peleas de todo el
+mundo. Eso no se mete el día que se publica. **Va a la 1.16.0 con esta cifra
+delante.**
+
+## Lo que este fichero no es
+
+**No es una lista de tareas.** Es el registro de **dónde hemos mirado y dónde
+no**. Un cepillo que no encuentra nada se apunta igual: la próxima vez que
+alguien se pregunte si esa familia está barrida, la respuesta tiene que estar
+escrita y con fecha.

@@ -1,6 +1,8 @@
 // El suelo de individuos por nombre, compartido con el «×N» del título.
 import { suelosDe } from './suelo.js';
 import { esRelevante } from './relevancia.js';
+// ¿Son el mismo nombre? Una pregunta, un sitio. Ver `src/nombres.js`.
+import { claveDeNombre } from './nombres.js';
 /**
  * El guion de una pelea: sus sucesos, segundo a segundo, para reproducirla.
  *
@@ -30,6 +32,13 @@ import { esRelevante } from './relevancia.js';
  * contra ti, 11.471 no entraron — el 46,6%. Una reproducción donde todo conecta
  * no se parece a la pelea, se parece a otro juego.
  */
+
+/**
+ * La clave de un nombre: sin la mayúscula inicial. EQ escribe «A shin ghoul
+ * knight has been slain» al abrir frase y «a shin ghoul knight» a mitad, y las
+ * dos formas conviven en la misma pelea. Mismo plegado que `src/suelo.js`.
+ */
+const plegar = claveDeNombre;
 
 /** Lo que se dibuja. Todo lo demás del registro no llega aquí. */
 const DAÑO = new Set(['melee', 'spell', 'dot', 'ds']);
@@ -147,14 +156,18 @@ export function guion(f, lineas, Parser, self = null) {
    * misma pregunta es peor que una imperfecta». Y luego daba la segunda
    * respuesta: metía como actor a cualquiera que apareciera en la ventana.
    *
-   * MEDIDO ANTES DE ARREGLARLO, sobre las 1.561 peleas con combatientes:
+   * MEDIDO CORRIENDO LOS DOS: este fichero antes del arreglo y después, sobre
+   * el mismo almacén (1.493 peleas con combatientes) y el mismo registro, el 16
+   * de agosto de 2026. La cifra es de FIGURAS DIBUJADAS, no de nombres en la
+   * ventana — ver el detalle y la cifra mala que sustituye en `relevancia.js`:
    *
-   *     con actores AJENOS en la ventana      1.257   (80,5 %)
-   *     ...y en las que esos ajenos SE PEGAN    184   (11,8 %)
+   *                                          antes          después
+   *     peleas con alguna figura AJENA      446 (29,9 %)    190 (12,7 %)
+   *     ...con combate ENTRE dos ajenos      49 ( 3,3 %)      0 (0,0 %)
    *
-   * La peor —11 de agosto, 17:34:32— es una pelea de 98 s con TRES
-   * combatientes de verdad, once ajenos y 495 golpes entre ellos dentro. El
-   * reproductor dibujaba catorce figuras donde hubo tres.
+   * La peor —11 de agosto, 19:34:32 hora local— es una pelea de 99 s con TRES
+   * combatientes de verdad. El reproductor dibujaba TRECE figuras: diez ajenas,
+   * con 468 golpes entre ellas dentro. Hoy dibuja tres.
    *
    * LA REGLA, que es la del componente conexo aplicada al dibujo:
    *
@@ -230,6 +243,36 @@ export function guion(f, lineas, Parser, self = null) {
        * lo dice, con la primera palabra, y es lo que se mira. Es la misma
        * trampa de siempre con otro traje: identificar por algo que puede NO
        * ESTAR.
+       */
+      /**
+       * ── ESTO SE ROMPERÁ CUANDO… ─────────────────────────────────────────
+       *
+       * NO ESTÁ ARREGLADO A PROPÓSITO. Es la decimotercera familia —«toda forma
+       * en primera persona tiene una gemela en tercera»— y hoy NO expone nada,
+       * porque las familias de estado de `src/patterns.js` están todas ancladas
+       * en `You`/`Your` y una línea de estado de OTRO no llega a parsearse: no
+       * hay evento, así que no hay `destino` que deducir mal.
+       *
+       * SE ROMPERÁ EL DÍA QUE SE AÑADA LA PRIMERA REGLA DE ESTADO EN TERCERA
+       * PERSONA. En ese momento llegará aquí un `ev` de `stun`, `root` o
+       * `survival` cuya línea empieza por un NOMBRE, este test dará `false`, y
+       * si además el evento viene sin `target` ni `source` —que es justo el
+       * caso para el que se escribió esta línea— el estado se anotará con
+       * `destino: null`. No dará error: dará una marca en la pista sin dueño,
+       * que es un dato plausible y silencioso.
+       *
+       * Y HAY UNA SEGUNDA PUERTA, más estrecha: si algún día `self` puede ser
+       * `null` —una sesión sin personaje resuelto— esto ya devuelve `null` hoy
+       * y el resultado es el mismo.
+       *
+       * QUÉ LO ARREGLARÁ, para no tener que volver a pensarlo: el sujeto sale
+       * de la PRIMERA PALABRA de la línea, no de que esa palabra sea `You`.
+       * Con `You` se resuelve a `self` y con un nombre se resuelve al nombre.
+       * No se hace hoy porque no hay ni una línea que lo ejercite y un arreglo
+       * sin caso que lo pruebe es una suposición con forma de código.
+       *
+       * Un peligro con su disparador escrito vale más que un arreglo
+       * especulativo. Éste es el disparador.
        */
       const tuyoPorLaFrase = /^(?:You|Your)\b/.test(l.texto ?? '') ? self : null;
       mete(s, {
@@ -312,29 +355,71 @@ export function guion(f, lineas, Parser, self = null) {
    * cayó uno de ellos, no cuál. Ver `rp.fig.cualCae`.
    */
   const kills = (f?.kills ?? []).map((k) => (typeof k === 'string' ? k : k?.victim));
-  const instantes = new Map();
+  /**
+   * ── EL RESTADO DE MÁS, QUE APAGABA TODAS LAS FIGURAS EN EL SEGUNDO 0 ───
+   *
+   * `killTimes` YA VIENE EN SEGUNDOS DE PELEA: `src/engine.js:1251` lo escribe
+   * como `Math.round(k.t - enc.start)`, y `ui/grafica.js` lo usa tal cual para
+   * colocar las marcas de muerte. Aquí se le volvía a restar `inicio`:
+   *
+   *     caidas = killTimes.map((t) => Math.max(0, Math.round(t - inicio)))
+   *
+   * o sea `107 - 1.786.358.914`, un número enorme y negativo que el `Math.max`
+   * convertía en **0**. Resultado: TODAS las figuras se apagaban en el segundo
+   * cero de la reproducción, en todas las peleas. Y no se notaba porque cero es
+   * un segundo válido: no había excepción, ni hueco, ni cifra absurda — la
+   * escena empezaba con los muertos ya grises.
+   *
+   * La unidad va ahora en el nombre —`muertesSeg`— porque un número desnudo no
+   * puede cruzar una frontera sin que alguien se equivoque de escala. Ver la
+   * regla del número desnudo en `ui/app.js`.
+   */
+  const muertesSeg = new Map();
   for (const kt of f?.killTimes ?? []) {
-    const n = String(kt.name ?? '').charAt(0).toLowerCase() + String(kt.name ?? '').slice(1);
-    if (!instantes.has(n)) instantes.set(n, []);
-    instantes.get(n).push(kt.t);
+    const n = plegar(kt.name);
+    if (!muertesSeg.has(n)) muertesSeg.set(n, []);
+    muertesSeg.get(n).push(Math.max(0, Math.round(kt.t ?? 0)));
   }
-  // ¿Hay líneas de ese nombre después de su última muerte? Se mira sobre los
-  // segundos ya recorridos, que es donde está la actividad de verdad.
-  const ultimaLinea = new Map();
+  for (const lista of muertesSeg.values()) lista.sort((a, b) => a - b);
+
+  /**
+   * ── QUÉ CUENTA COMO ACTIVIDAD: SER SUJETO, NO QUE TE NOMBREN ───────────
+   *
+   * El suelo dice «si un nombre muere y DESPUÉS sigue habiendo actividad suya,
+   * había al menos dos», y el razonamiento entero se apoya en que UN MUERTO NO
+   * PEGA. Así que la evidencia tiene que ser una acción SUYA.
+   *
+   * Aquí se miraba `origen` y `destino`, o sea que valía con que lo nombraran.
+   * Y a un cadáver lo nombran constantemente: le siguen pegando —el combate
+   * contra cadáveres es una familia entera de esta casa—, le entra un tick
+   * retardado, lo saquean. Con eso, casi cualquier nombre muerto «tenía
+   * actividad después» y el suelo habría subido en casi todas las peleas.
+   *
+   * SÓLO `origen`, entonces:
+   *   pega        `daño` — y el escudo de daño también, que su emisor es quien
+   *               lo lleva puesto y un cadáver no lleva escudo
+   *   falla       `evitado` — el que intenta el golpe, no el que lo esquiva
+   *   cura        `cura`
+   *   castea      `lanza`
+   *   mata        `muere` — ahí `origen` es el MATADOR; la víctima es `destino`
+   *   resiste     `estado`, cuando el registro pone al bicho como origen
+   *
+   * Es conservador a propósito, igual que el resto del suelo: preferimos decir
+   * «al menos uno» de menos que inventarnos un individuo.
+   */
+  const actividadSeg = new Map();
   for (const [seg, xs] of porSegundo) {
     for (const x of xs) {
-      for (const n of [x.origen, x.destino]) {
-        if (!n) continue;
-        const k = String(n).charAt(0).toLowerCase() + String(n).slice(1);
-        if ((ultimaLinea.get(k) ?? -1) < seg) ultimaLinea.set(k, seg);
-      }
+      if (!x.origen) continue;
+      const k = plegar(x.origen);
+      if ((actividadSeg.get(k) ?? -1) < seg) actividadSeg.set(k, seg);
     }
   }
   const suelos = suelosDe(kills,
-    (nombre, ultMuerte) => (ultimaLinea.get(nombre) ?? -1) > ultMuerte,
-    instantes);
+    (nombre, ultimaMuerteSeg) => (actividadSeg.get(nombre) ?? -1) > ultimaMuerteSeg,
+    muertesSeg);
   for (const a of actores.values()) {
-    const clave = a.nombre.charAt(0).toLowerCase() + a.nombre.slice(1);
+    const clave = plegar(a.nombre);
     a.figuras = suelos.get(clave) ?? 1;
     /**
      * DE QUÉ SE APOYA EL SUELO, porque no todas las N valen lo mismo.
@@ -350,12 +435,11 @@ export function guion(f, lineas, Parser, self = null) {
      * de una segunda muerte escrita. Sigue siendo cierto —un muerto no pega—
      * pero es una inferencia y la interfaz lo dice.
      */
-    const nMuertes = (instantes.get(clave) ?? []).length;
+    const nMuertes = (muertesSeg.get(clave) ?? []).length;
     a.suelo = { muertes: nMuertes, porActividad: a.figuras > Math.max(1, nMuertes) };
-    // Los instantes en que cae una de las suyas, en orden. Una por muerte; si el
+    // Los segundos en que cae una de las suyas, en orden. Una por muerte; si el
     // suelo es mayor que las muertes, la de más no cae en toda la pelea.
-    a.caidas = (instantes.get(clave) ?? []).slice().sort((x, y) => x - y)
-      .map((t) => Math.max(0, Math.round(t - inicio)));
+    a.caidas = (muertesSeg.get(clave) ?? []).slice();
   }
 
   return {

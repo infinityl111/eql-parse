@@ -29,6 +29,7 @@
  */
 
 import { parseZone, diffKey, SIN_ZONA } from './zones.js';
+import { mismoNombre } from './nombres.js';
 
 /** Ficha en crudo, recién abierta. */
 function nuevaFicha(name) {
@@ -263,8 +264,6 @@ export class FoeLedger {
        * el histórico que ya está guardado, sin pedirle a nadie que reconstruya.
        * Es la misma decisión que la 1.11.0 y por el mismo motivo.
        */
-      const mismoNombre = (a, b) => a === b
-        || a.charAt(0).toLowerCase() + a.slice(1) === b.charAt(0).toLowerCase() + b.slice(1);
       const caidas = (f.kills ?? []).filter((x) => mismoNombre(x, r.name)).length;
       if (caidas > 0) {
         e.kills += caidas;

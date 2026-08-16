@@ -753,8 +753,31 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
   const rotuloSuelo = (a, n) => [
     t('rp.fig.alMenos', { n }),
     a.suelo?.porActividad ? t('rp.fig.porActividad') : null,
+    a.suelo?.muertes ? t('rp.fig.dosPreguntas') : null,
     t('rp.fig.cualCae'),
   ].filter(Boolean).join(' ');
+
+  /**
+   * ── LOS DOS NÚMEROS JUNTOS, Y DICIENDO CUÁL ES CUÁL ─────────────────────
+   *
+   * El título de la pelea contesta «QUÉ CAYÓ» —lo escribe `muertesPorNombre`,
+   * y son los abatidos— y esta columna contesta «CUÁNTOS HUBO» —lo escribe
+   * `suelosDe`, y es el suelo, que incluye al que no llegó a caer—.
+   *
+   * Son dos preguntas distintas sobre el mismo nombre y desde el 16 de agosto
+   * pueden dar números distintos: en 64 nombres del histórico el reproductor
+   * dibuja uno más de los que el título nombra. Antes coincidían por accidente
+   * —los dos contaban sólo muertes— y ese accidente escondía la diferencia.
+   *
+   * Así que cuando hay abatidos, se enseñan los dos y con su palabra:
+   *
+   *     2 abatidos · al menos 3 presentes
+   *
+   * Sin abatidos escritos, sólo el suelo: «al menos 2 presentes».
+   */
+  const cifraSuelo = (a, n) => (a.suelo?.muertes
+    ? `${t(a.suelo.muertes === 1 ? 'fight.abatido' : 'fight.abatidos', { n: a.suelo.muertes })} · ${t('rp.fig.presentes', { n })}`
+    : t('rp.fig.presentes', { n }));
 
   const columna = (lista, lado) => `<div class="rp-col rp-${lado}">
     ${lista.map((a) => {
@@ -776,7 +799,7 @@ export function montarReproduccion(host, { f, self, lineas, retratos = new Map()
           bat AL …» y en el de al lado no salía nada. Un rótulo que la mitad de
           las veces desaparece es peor que no ponerlo.
         -->
-        ${n > 1 ? `<div class="rp-suelo" title="${esc(rotuloSuelo(a, n))}">${esc(t('rp.fig.alMenosCorto', { n }))}</div>` : ''}
+        ${n > 1 ? `<div class="rp-suelo" title="${esc(rotuloSuelo(a, n))}">${esc(cifraSuelo(a, n))}</div>` : ''}
         <!--
           EL DPS VA UNA VEZ POR NOMBRE, NO UNA POR FIGURA.
           Con dos figuras, un «47 dps» debajo de cada una se leería como que

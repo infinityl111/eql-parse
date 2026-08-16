@@ -35,6 +35,8 @@
  * Y CUÁL DE LAS FIGURAS CAE EN CADA MUERTE ES ARBITRARIO. El registro dice que
  * cayó uno, no cuál. Se apaga una cualquiera y la interfaz lo dice donde se lee.
  */
+// ¿Son el mismo nombre? Una pregunta, un sitio. Ver `src/nombres.js`.
+import { claveDeNombre } from './nombres.js';
 
 /**
  * Muertes por nombre. `kills` es la lista de la pelea guardada —un nombre por
@@ -52,7 +54,7 @@ export function muertesPorNombre(kills = []) {
   for (const k of kills) {
     const bruto = typeof k === 'string' ? k : k?.victim;
     if (!bruto) continue;
-    const n = String(bruto).charAt(0).toLowerCase() + String(bruto).slice(1);
+    const n = claveDeNombre(bruto);
     out.set(n, (out.get(n) ?? 0) + 1);
   }
   return out;
@@ -72,19 +74,55 @@ export function sueloDeNombre(muertes = 0, actividadDespues = false) {
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA UNIDAD VA EN EL NOMBRE, Y AQUÍ ES OBLIGATORIA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Este módulo compara DOS instantes que vienen de sitios distintos: la última
+ * muerte de un nombre y su última actividad. Los dos tienen que estar en
+ * SEGUNDOS DE PELEA, y no hay nada en la firma que lo obligue: son dos números.
+ *
+ * Al lado, en `src/guion.js`, esos mismos instantes se restaban DOS VECES —una
+ * en `engine.js` al guardarlos y otra al leerlos— y el resultado, enorme y
+ * negativo, lo aplanaba un `Math.max(0, …)`: todas las figuras se apagaban en el
+ * segundo cero. No falló nada. Cero es un segundo válido.
+ *
+ * Por eso los parámetros llevan la unidad pegada al nombre —`muertesSeg`,
+ * `ultimaMuerteSeg`— y por eso hay una guarda que PARA. Ver la regla del número
+ * desnudo en `ui/app.js`.
+ */
+
+// La invariante de escala vive en un solo sitio. Ver `src/reloj.js`.
+import { SEG_IMPOSIBLE } from './reloj.js';
+
+/**
  * El suelo de cada nombre de una pelea, con la actividad ya resuelta por quien
  * llama —que es quien tiene los segundos, no este módulo.
  *
  * @param {Iterable} kills
- * @param {(nombre: string, ultimaMuerte: number) => boolean} hayActividadDespues
- * @param {Map<string, number[]>} [instantes] nombre -> instantes de sus muertes
+ * @param {(nombre: string, ultimaMuerteSeg: number) => boolean} hayActividadDespues
+ *   SEGUNDOS DE PELEA, no epoch. Y «actividad» es ser SUJETO: pegar, castear,
+ *   fallar, matar. Que a uno lo nombren no es actividad suya.
+ * @param {Map<string, number[]>} [muertesSeg] nombre -> SEGUNDOS DE PELEA de sus muertes
  */
-export function suelosDe(kills, hayActividadDespues = () => false, instantes = null) {
+export function suelosDe(kills, hayActividadDespues = () => false, muertesSeg = null) {
   const muertes = muertesPorNombre(kills);
   const out = new Map();
   for (const [nombre, n] of muertes) {
-    const ult = instantes?.get(nombre)?.slice().sort((a, b) => a - b).at(-1) ?? Infinity;
-    out.set(nombre, sueloDeNombre(n, hayActividadDespues(nombre, ult)));
+    const lista = muertesSeg?.get(nombre);
+    /**
+     * LA INVARIANTE QUE HABRÍA CAZADO EL FALLO EN EL SITIO, y por eso lanza en
+     * vez de avisar: una alarma que no PARA nada no la lee nadie. Una pelea de
+     * 1.785.835.073 segundos no existe, así que ese número es una hora epoch
+     * que alguien no convirtió.
+     */
+    if (lista?.some((s) => !Number.isFinite(s) || Math.abs(s) > SEG_IMPOSIBLE)) {
+      throw new RangeError(
+        `suelosDe: «${nombre}» trae muertes fuera de escala (${lista.join(', ')}). ` +
+        'Se esperan SEGUNDOS DE PELEA y esto parece epoch.');
+    }
+    const ultimaMuerteSeg = lista?.slice().sort((a, b) => a - b).at(-1) ?? Infinity;
+    out.set(nombre, sueloDeNombre(n, hayActividadDespues(nombre, ultimaMuerteSeg)));
   }
   return out;
 }
