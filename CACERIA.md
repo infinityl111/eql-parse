@@ -59,7 +59,7 @@ nada. Un arreglo sin clasificar es un arreglo cuyo valor nadie midió.
 | **4 · ¿Esta guarda hace algo?** | pendiente | — | — | — | — |
 | **5 · Romper las guardas** | pendiente | — | — | — | — |
 | **6 · El cajón, con otra pregunta** | pendiente | — | — | — | — |
-| **7 · El oráculo tonto** | **3 propiedades corriendo** | **15 fronteras: 2 explicadas, 13 abiertas** | 0 | **2** | 0 |
+| **7 · El oráculo tonto** | **3 propiedades corriendo** | **15 peleas cortadas en mitad del combate** | **15** | 0 | 0 |
 | **8 · El punto ciego del reproductor** | **cerrado**: ejecutable y vigilado | 1 comprobación mal escrita | 0 | 0 | 1 |
 | **9 · Tramos sin ninguna muerte** | **población medida** | **134 de 1.578** (8,5 %) | 0 | **1** | 0 |
 
@@ -395,9 +395,46 @@ tienen una sola muerte dentro** (8,5 %), y pesan **2,80 % de lo recibido** contr
 **`King Tranix` sigue sin causa**, y no es esto: sus enemigos **vuelven** catorce
 segundos después, los mismos. No se fueron.
 
-**Y quedan 13 sin mirar.**
+### Y las quince no son lo que suponíamos: cuatro cosas medidas
 
-**Pendiente:** mirar las 13 una a una. No se toca nada hasta clasificarlas.
+**Buscando qué tienen en común, las cuatro hipótesis se caen:**
+
+| hipótesis | medido |
+|---|---|
+| «son jefes o nombrados» | **4 de 15**. No. |
+| «el hueco ronda los 12-15 s, o sea la ventana recién expirada» | **13 de 15 tienen ≤ 6 s**, y uno tiene **0 s**. Los huecos son 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 10, 12. No. |
+| «son arranques de la aplicación» —el caso conocido, con rastreador nuevo— | **0 de 15**. Los `id` son consecutivos dentro de la misma sesión: 323→324, 551→552, 1507→1508… No. |
+| «son la categoría del tramo sin muertes» | **11 de 15 SÍ matan algo en la primera pelea.** No. |
+
+**Lo que sí aparece: 8 de 15 comparten una MASCOTA** (`… pet`).
+
+**Y el caso de 0 segundos, abierto:** 16 de agosto, dos peleas de 67 s seguidas
+—`a fire giant warrior` y su mascota— con 0 abatidos en la primera y 5 en la
+segunda. Ocho segundos antes del corte el registro tiene un intercambio completo:
+
+```
+13:07:50  A fire giant warrior hits YOU for 101 points of damage.
+13:07:50  Konarn slashes a fire giant warrior for 72 points of damage.
+13:07:50  A fire giant warrior is pierced by YOUR thorns for 40 points…
+   ...
+13:07:58  ← aquí se corta la pelea
+```
+
+**No hay silencio en la frontera. La pelea se parte en mitad del combate.**
+
+> **Eso las saca de esta categoría y las sube de clase.** No es un tramo de
+> preparación, no es un umbral, no es un arranque: es **una pelea cortada
+> mientras se peleaba**. **Clase A**, y sin causa.
+
+**La siguiente prueba, escrita para no volver a pensarla:** instrumentar
+`#sigueAbierta` sobre uno de los quince y ver **qué ventana da por cerrada y por
+qué** — es la única pregunta que queda, y sólo se contesta desde dentro. La pista
+que hay: `esFoe` sólo mira `current.foesSeen` y prueba **dos** grafías; una
+ventana cuyo nombre no case ahí se salta entera, y con ella la pelea se cierra
+aunque el bicho siga pegando.
+
+**Pendiente:** las quince siguen abiertas, y ahora son más graves de lo que
+parecían. No se toca nada hasta clasificarlas.
 
 ## LO QUE NO ENTRA EN LA 1.15.0, con su clase
 
@@ -406,7 +443,7 @@ que costaría y por qué se queda fuera.
 
 | # | qué | clase | por qué no entra |
 |--:|---|:--:|---|
-| 1 | **Los 15 pares de peleas partidas** que comparten un enemigo vivo | **A** | **Dos son la categoría nueva** —tramo de preparación, no fallo de frontera— y **trece siguen sin causa**. Tocar la frontera mueve **todas** las cifras del histórico. |
+| 1 | **Los 15 pares de peleas partidas** que comparten un enemigo vivo | **A** | **Sin causa, y peor de lo que parecían**: no son jefes (4/15), ni el plazo (13/15 con hueco ≤6 s), ni arranques (0/15), ni tramos sin muertes (11/15 matan algo). En el que se abrió, **el combate es continuo en la frontera**. |
 | 2 | **Los 134 tramos sin ninguna muerte** (8,5 % de las peleas) | **B** | Categoría de tramo que no teníamos, no un fallo. No se fusionan, no se borran, y la regla no se inventa: **32,1 % no tiene causa detectable** y el registro no dice si un *feign* funcionó. [`HALLAZGOS.md` §2.7](HALLAZGOS.md). |
 | 3 | **La marca de «nombre deducido» sale en 50 nombres y sólo 25 son permanentes** | **B** | Se pone al cerrar cada pelea y la prueba llega después. Limpiarlo al final de la reconstrucción **exige reescribir `fights.ndjson`, y eso renombra todas las peleas** (ver `src/store.js`). Pide persistir el conjunto de formas atestiguadas. |
 | 4 | **La separación clave / presentación en dos campos** | **B** | Cambio de formato del almacén. Va con la interfaz, en la **1.16.0**. |

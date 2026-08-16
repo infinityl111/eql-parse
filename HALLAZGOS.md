@@ -728,6 +728,152 @@ encaja en la categoría**:
 el registro **no dice si el fingimiento funcionó**. Así que el caso sigue sin
 causa escrita: lo único medido es el silencio.
 
+#### Las 40 líneas de éxito: es una TASA, no un ajuste del juego
+
+**La pregunta importaba porque sólo una de las dos se puede contar.** Si las 40
+estuvieran apelotonadas en unos días, sería un filtro de mensajes que cambió; si
+están repartidas, es una tasa.
+
+**Están repartidas, y con una regularidad que no deja duda:**
+
+| día | racimos | con éxito | % |
+|---|---:|---:|---:|
+| 04 ago | 45 | 6 | 13 % |
+| 05 ago | 36 | 2 | 6 % |
+| 06 ago | 75 | 10 | 13 % |
+| 07 ago | 49 | 4 | 8 % |
+| 09 ago | 32 | 4 | 13 % |
+| 10 ago | 41 | 5 | 12 % |
+| 11 ago | 29 | 4 | 14 % |
+| 13 ago | 20 | 2 | 10 % |
+| 16 ago | 5 | 1 | 20 % |
+
+**Hay éxitos en 12 de los 13 días con intentos** —el que falta tiene dos
+intentos—, del primer día al último. Y el contraste que lo cierra: **los 5 días
+con más éxitos suman 29, y con una tasa uniforme se esperarían 28,1**. Clavado.
+
+**Es una tasa constante del 11,6 %.** Y hay un detalle que descarta la otra
+explicación fácil: **no mejora con el tiempo** —13 % el primer día, 14 % el
+undécimo—, así que tampoco es una habilidad que suba con la práctica.
+
+**Lo que la medición NO decide** es si ese 11,6 % es la tasa de éxito del
+fingimiento o la tasa con la que el juego escribe la línea. Para eso hace falta
+Miguel, y está preguntado en [D6](HECHOS-DECLARADOS.md).
+
+#### Los 134 no son una población: son tres
+
+**Partidos por duración, con los 12 splits marcados encima:**
+
+| duración | tramos | recibido | splits |
+|---|---:|---:|---:|
+| ≤ 2 s | 34 | 4.099 | 1 |
+| 3–5 s | 20 | 5.354 | 1 |
+| 6–10 s | 16 | 8.144 | 1 |
+| **11–20 s** | **27** | 19.929 | **8** |
+| 21–45 s | 17 | 22.866 | 1 |
+| 46–90 s | 14 | **77.657** | 0 |
+| 91–180 s | 4 | 28.559 | 0 |
+| > 180 s | 2 | 7.690 | 0 |
+
+| daño recibido | tramos | duración mediana | splits |
+|---|---:|---:|---:|
+| ≤ 100 | **44** | 1–5 s | **1** |
+| 101–300 | 23 | 5 s | 1 |
+| **301–3.000** | **49** | 11–21 s | **10** |
+| > 3.000 | 18 | 67–78 s | **0** |
+
+**Se separan solas, y en tres montones:**
+
+1. **CONTACTOS BREVES** — **44 de 134 (32,8 %) reciben menos de 100 puntos**, con
+   duración mediana de 1 a 5 segundos. Tres reciben **cero**. Son el roce de un
+   bicho que pasa. **Contienen 1 split.**
+2. **LOS SPLITS** — 11–20 s y 300–3.000 recibidos. **8 de los 12 caen en una
+   sola casilla de duración** y 10 de 12 en una sola de daño.
+3. **PELEAS LARGAS SIN MUERTE** — **20 tramos de más de 45 s** que se llevan
+   **113.906 de los 174.298 puntos recibidos: el 65 %**. Y **no contienen ni un
+   split.** Son peleas de verdad: te pegaron mucho y no mataste nada.
+
+> **Y EL PELIGRO ESTÁ AL REVÉS DE COMO LO DIJIMOS.** Una regla que trate a los
+> 134 igual no barre «cien que no le importan a nadie»: **barre veinte peleas
+> reales que se llevan dos tercios del daño recibido de todo el grupo.**
+
+#### Los 12 splits, uno a uno
+
+| cuándo | dur | recibido | FD antes del final | queda |
+|---|---:|---:|---:|---|
+| 4 ago 23:43 | 17 s | 2.744 | 1 s | `a blade storm` |
+| 5 ago 00:21 | 15 s | 2.606 | 12 s | `Noble Dojorn` |
+| 7 ago 23:16 | 16 s | 1.537 | 0 s | `a thought bleeder` |
+| 7 ago 23:58 | 12 s | 1.066 | −9 s | `a phantasm` |
+| 4 ago 12:45 | 11 s | 778 | 1 s | `a fire giant warrior` |
+| 5 ago 21:48 | 12 s | 760 | 1 s | `a frightfinger` |
+| 6 ago 00:14 | 28 s | 479 | 1 s | `a wan ghoul knight` (**de 5 enemigos**) |
+| 7 ago 11:34 | 1 s | 377 | −6 s | `heart harpie` |
+| 16 ago 11:01 | 11 s | 340 | 0 s | `an elemental crusader` |
+| 4 ago 19:01 | 12 s | 312 | 0 s | `heart harpie` |
+| 6 ago 20:45 | 7 s | 285 | 1 s | `a fire giant wizard` |
+| 6 ago 20:46 | 5 s | 81 | 0 s | `a fire giant wizard` |
+
+**El *feign* cae entre 0 y 1 segundo del final en 8 de los 12.** El de cinco
+enemigos —6 de agosto— es la maniobra que describe Campeón, entera y con
+`hecho 0`: no llegó a pegar a ninguno.
+
+#### La salida: un INTERRUPTOR, no una taxonomía
+
+**No hay que decidir si un tramo «es una pelea».** Un selector —**todas** /
+**sólo con muertes**— sobre la lista y sobre los totales sirve lo que se pide
+sin reclasificar nada, sin categoría nueva y **sin tener que saber nunca si el
+feign funcionó**. Es el movimiento que le admiramos al competidor: **el usuario
+elige el denominador**.
+
+**QUÉ COSTARÍA.** Poco, y es lo que lo hace la salida buena:
+
+- **Una línea en `FightStore.filter`**: el índice ya guarda `kills` y `losses` en
+  cada resumen, así que el predicado es `(s.kills?.length ?? 0) > 0 ||
+  (s.losses?.length ?? 0) > 0`.
+- **Una bandera hasta las cuatro consultas** que alimentan la lista y los
+  agregados (`engine.js:398`, `:1535`, `:1591`, `:1646`).
+- **El selector y su rótulo** en cinco idiomas.
+- **NI CAMBIO DE FORMATO NI RECONSTRUCCIÓN.** Los dos campos ya están en disco.
+
+**QUÉ CIFRAS CAMBIAN AL MOVERLO** — y ésta es la lista que hay que enseñar al
+lado del selector, porque un denominador que se mueve sin decirlo es peor que no
+tener selector:
+
+| cifra | todas | sólo con muertes | cambio |
+|---|---:|---:|---:|
+| peleas | 1.578 | 1.444 | **−8,49 %** |
+| tiempo total | 111.226 s | 108.087 s | −2,82 % |
+| daño hecho | 24.528.689 | 24.346.138 | **−0,74 %** |
+| daño recibido | 6.219.960 | 6.045.662 | **−2,80 %** |
+| curación | 5.118.536 | 5.057.288 | −1,20 % |
+| abatidos | 4.649 | 4.649 | **0,00 %** |
+| dps global | 220,5 | 225,2 | +2,14 % |
+| **dps mediano por pelea** | **158,3** | **188,5** | **+19,08 %** |
+| duración mediana | 46 s | 51 s | +10,87 % |
+
+**La cifra que de verdad se mueve es el dps mediano por pelea: +19 %.** Es
+exactamente la que se ensucia con tramos de nueve segundos en los que no llegaste
+a pegar, y es la razón de ser del selector. **El daño total apenas se mueve
+(−0,74 %)** y los abatidos **no se mueven nada**, que es lo que hace que el
+interruptor sea seguro: no esconde nada de lo que se cuenta.
+
+#### Y la etiqueta dice la evidencia, nunca la conclusión
+
+Si se pone, dice **dos hechos y ninguna inferencia**:
+
+> **Este tramo acabó sin ninguna muerte.**
+> **Hubo un intento de *feign death* 3 s antes del final.**
+
+**Nunca «funcionó». Nunca «se fueron».** Eso no lo sabemos, y con el **89 % de
+los intentos sin línea** no lo vamos a saber leyendo. Decirlo sería exactamente
+lo que este proyecto lleva catorce familias persiguiendo: **presentar una
+deducción con la cara de una medida**.
+
+Y donde no hubo *feign* —los 43 sin causa detectable— la etiqueta se queda con el
+primer hecho y calla el segundo. **Un hecho menos es una etiqueta correcta; un
+hecho inventado, no.**
+
 #### Lo que NO se hace con estos tramos
 
 - **No se fusionan.** Los que se fueron no participaron en la muerte de después,
