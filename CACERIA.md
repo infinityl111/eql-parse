@@ -27,8 +27,13 @@ declara — y eso va a [`HECHOS-DECLARADOS.md`](HECHOS-DECLARADOS.md), no a un
 - «el mismo nombre no cae dos veces en el mismo segundo» → **tres**
   `A decaying skeleton` a las 11:03:14, por un área.
 
-Las dos saltaron. Las dos eran falsas. **Y una heurística que salta 39 veces no
-enseña nada: entrena a ignorarla.**
+Las dos saltaron. **La segunda era falsa. La primera no: estaba MAL ESCRITA**, y
+volvió con filo en cuanto Campeón dio la afirmación buena — más abajo. Y una
+heurística que salta 39 veces no enseña nada: **entrena a ignorarla**.
+
+> **Corolario, que costó retirar una buena:** antes de retirar una imposibilidad
+> que salta hay que preguntarse **si lo que está mal es la afirmación o la
+> población a la que se aplica**. La retiré sin hacerlo.
 
 ## Cómo se clasifica lo que aparece
 
@@ -159,9 +164,10 @@ las dos saltaron:
 | «Un nombre propio es UN individuo: no cae dos veces en la misma pelea» | 20 peleas | **falsa.** ``Sir Lucan D`Lere`` —named único— cae **dos veces en la misma pelea**, dos días distintos, con dos matadores distintos. Las cuatro líneas están en el registro. |
 | «El mismo nombre no cae dos veces en el mismo segundo» | 39 peleas | **falsa.** El registro sella al segundo y un área mata varios a la vez: tres `A decaying skeleton` a las 11:03:14. |
 
-**Las dos retiradas (C).** Y de la primera sale una pregunta para Miguel, ya
-apuntada en [`HECHOS-DECLARADOS.md`](HECHOS-DECLARADOS.md): **en EQ Legends un
-nombre propio no garantiza un individuo**, lo cual toca también al detector X→X.
+**La segunda, retirada (C). La primera, RECUPERADA**: Campeón dio la afirmación
+buena —nunca hay dos nameds a la vez, [D7](HECHOS-DECLARADOS.md)— y con ella la
+imposibilidad se reescribe con filo y encuentra el fallo de la población. Ver más
+abajo.
 
 > **LA REGLA QUE SALIÓ DE AHÍ:** una imposibilidad tiene que serlo sobre el
 > **mundo** o sobre **nuestra propia escritura**. Las de en medio —«esto no suele
