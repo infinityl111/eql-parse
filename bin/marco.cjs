@@ -193,6 +193,24 @@ app.whenReady().then(async () => {
     di(n > 0, `«${id}» enseña lo suyo (${n} × ${sel})`);
   }
 
+  /**
+   * ── 6 · EL TITULAR DEL REGISTRO (D4) ─────────────────────────────────────
+   *
+   * Al sacar el Registro de la barra de documentos, lo primero que se cae es su
+   * TITULAR: «12:36:35–12:38:06», la línea que contesta de qué tramo estamos
+   * hablando sin abrir nada. Era lo que distinguía esa pestaña de un cajón, es
+   * un elemento del inventario (D4), y una captura del registro sale igual de
+   * bien con él y sin él.
+   */
+  const hayRegistro = await ejec(`!!document.querySelector(${JSON.stringify('[data-sec="registro"]')})`);
+  if (hayRegistro) {
+    await ejec(pulsa('[data-sec="registro"]'));
+    await espera(3000);
+    const titular = await ejec("document.querySelector('#secPane .sec-title')?.textContent.trim() ?? null");
+    const horas = /\d{1,2}[:.]\d{2}[:.]\d{2}\s*[–-]\s*\d{1,2}[:.]\d{2}[:.]\d{2}/;
+    di(!!titular && horas.test(titular), `el Registro conserva su titular (D4): «${titular ?? 'ninguno'}»`);
+  }
+
   console.log(mal ? `\n  ${mal} comprobación(es) MAL\n` : '\n  el marco aguanta el ir y venir\n');
   app.exit(mal ? 1 : 0);
 }).catch((e) => { console.error(`\n  MAL  ${e.message}\n`); app.exit(2); });

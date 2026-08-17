@@ -1671,31 +1671,48 @@ const DOCS = [
     },
     body: uptimeHTML,
   },
-  {
-    /**
-     * EL REGISTRO: de dónde sale todo lo demás.
-     *
-     * No es un dato más. Todo lo que enseña esta aplicación es una cuenta sobre
-     * estas líneas, así que la última pregunta que se puede hacer de cualquier
-     * cifra es ésta, y aquí está la respuesta entera.
-     *
-     * Es el único documento que no sale de la pelea guardada: las líneas se
-     * leen del fichero cuando lo abres, por hora. Por eso su cuerpo es asíncrono
-     * y los otros tres no — se pinta un aviso de espera y se rellena al llegar.
-     */
-    id: 'log',
-    label: () => t('log.title'),
-    head: (f) => {
-      const at = f?.at ?? (f?.start ? f.start * 1000 : null);
-      if (!at) return null;
-      const h = (ms) => new Date(ms).toLocaleTimeString(langInfo().code,
-        { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      return `${h(at)}–${h(at + (f.duration ?? 0) * 1000)}`;
-    },
-    body: registroHTML,
-    async: true,
-  },
 ];
+
+/**
+ * EL REGISTRO: de dónde sale todo lo demás. Extracción 11.
+ *
+ * No es un dato más. Todo lo que enseña esta aplicación es una cuenta sobre
+ * estas líneas, así que la última pregunta que se puede hacer de cualquier cifra
+ * es ésta, y aquí está la respuesta entera.
+ *
+ * Es el único que no sale de la pelea guardada: las líneas se leen del fichero
+ * cuando lo abres, por hora. Por eso su cuerpo es asíncrono y los otros no — se
+ * pinta un aviso de espera y se rellena al llegar.
+ *
+ * ── POR QUÉ SALE DEL ARRAY Y NO SE QUEDA COMO PESTAÑA ─────────────────────
+ *
+ * Ha cambiado de categoría: era uno de varios documentos y ahora es una sección.
+ * **Lo que deja su categoría no conserva la maquinaria de la que abandonó** — una
+ * barra de una sola pestaña se siente mal porque el control pertenece a un
+ * problema que ya no tiene: elegir entre varios.
+ *
+ * LA DEFINICIÓN SE QUEDA ÚNICA. Rótulo, titular y cuerpo salen de aquí, y la
+ * sección los usa; no hay copia que pueda divergir en su contenido.
+ *
+ * Y EL RIESGO DE ESTE CAMINO, escrito para poder cazarlo: **el día que cambie
+ * cómo se pintan los documentos, el Registro puede no seguirlo; eso es la
+ * divergencia que hay que cazar.** No comparte el `renderDocs` que decide qué
+ * pestaña está abierta, cómo se repinta y cuándo se pide lo asíncrono: eso lo
+ * hace ahora `renderRegistro` por su cuenta.
+ */
+const DOC_REGISTRO = {
+  id: 'log',
+  label: () => t('log.title'),
+  head: (f) => {
+    const at = f?.at ?? (f?.start ? f.start * 1000 : null);
+    if (!at) return null;
+    const h = (ms) => new Date(ms).toLocaleTimeString(langInfo().code,
+      { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `${h(at)}–${h(at + (f.duration ?? 0) * 1000)}`;
+  },
+  body: registroHTML,
+  async: true,
+};
 
 /**
  * El registro de una pelea, leído del fichero.
@@ -4121,6 +4138,45 @@ function renderAnalisis(snap) {
 }
 
 /**
+ * SECCIÓN · REGISTRO. La extracción 11.
+ *
+ * Conserva las dos cosas que lo distinguían de un cajón: **su titular** —la hora
+ * de inicio y fin de la pelea, que contesta «¿de qué tramo estamos hablando?»
+ * sin abrir nada— y el aviso de espera mientras se lee el disco, que no es lo
+ * mismo que un registro vacío.
+ */
+function renderRegistro(snap) {
+  const host = $('secPane');
+  if (!host) return;
+  const f = withPets(fightFor(snap));
+  const listo = f && registroCache.has(f.uid ?? 'live') ? 1 : 0;
+  const sig = `${getLang()}|${f?.uid ?? 'live'}|${listo}`;
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+
+  if (!f) {
+    const hayPeleas = (state.fights?.length ?? 0) > 0;
+    host.innerHTML = `<div class="empty">
+      <h2>${esc(hayPeleas ? t('fight.pick') : t('fight.none'))}</h2>
+      <p>${esc(hayPeleas ? t('fight.pickHint') : t('fight.noneHint'))}</p></div>`;
+    return;
+  }
+
+  const titular = DOC_REGISTRO.head(f);
+  host.innerHTML = (titular
+    ? `<div class="sec-title eyebrow">${esc(DOC_REGISTRO.label())} · ${esc(titular)}</div>`
+    : '') + DOC_REGISTRO.body(f);
+
+  // Se pide DESPUÉS de pintar el aviso de espera, igual que hacía la pestaña.
+  if (!listo) {
+    pedirRegistro(f, () => {
+      const h2 = $('secPane');
+      if (h2 && state.seccion === 'registro') { h2.dataset.sig = ''; renderRegistro(state.snap); }
+    });
+  }
+}
+
+/**
  * SECCIÓN · POR HABILIDAD. La tercera mudanza: de dónde sale el daño.
  *
  * El reparto entero —las filas con su barra, su desglose y sus controles— y los
@@ -6394,6 +6450,8 @@ const SECCIONES = [
   // `an.tab` —«Análisis»— existía traducida a los cinco idiomas y no la pintaba
   // nadie: la destapó `npm run vacios`. Es el rótulo corto que pide una barra
   // lateral; `an.title` es «Análisis del combate», que es el título de la vista.
+  { id: 'registro', grupo: 'pelea', ico: '☰', rotulo: () => t('log.title'),
+    listo: true, lista: true, pinta: renderRegistro },
   { id: 'analisis', grupo: 'pelea', ico: '◑', rotulo: () => t('an.tab'),
     listo: true, lista: true, pinta: renderAnalisis },
   // `sum.title` es «Resumen del tramo», que es el título de la vista; en una

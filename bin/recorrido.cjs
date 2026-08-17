@@ -89,6 +89,8 @@ const VISTAS = [
     pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="habilidad"]'),
       '[...document.querySelectorAll(".doctab")].at(-1)?.click()'],
   },
+  { nombre: 'registro', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="registro"]')],
+    espera: 3000 },
   // Las secciones del armazón nuevo se abren por la barra lateral. `data-sec`
   // no se traduce, igual que los identificadores de las pestañas viejas.
   { nombre: 'escena', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="escena"]')] },
