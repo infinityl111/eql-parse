@@ -166,6 +166,33 @@ app.whenReady().then(async () => {
     di(vuelto > 0, `la miga devuelve a la rejilla (${vuelto} fichas)`);
   }
 
+  /**
+   * ── 5 · CADA SECCIÓN ENSEÑA LO SUYO ──────────────────────────────────────
+   *
+   * Parece de perogrullo y es el fallo que más cerca estuvo de colarse: al
+   * repartir las páginas de la enciclopedia en secciones, entrar en Progreso
+   * viniendo de Botín rebotaba a Botín. La barra marcaba una cosa y la pantalla
+   * enseñaba otra, las capturas salían perfectas y la cobertura cuadraba — sólo
+   * que eran las MISMAS 29.284 px fotografiadas dos veces con dos nombres.
+   *
+   * Lo delató comparar los altos, no mirar las fotos. Así que aquí se exige que
+   * cada sección traiga un elemento que sólo tiene ella: si el rebote vuelve, no
+   * hace falta que nadie se fije.
+   */
+  const propios = [
+    ['enemigos', '.encrow.foe'],
+    ['botin-h', '.lootcard'],
+    ['progreso', '.periodos'],
+  ];
+  for (const [id, sel] of propios) {
+    const existe = await ejec(`!!document.querySelector(${JSON.stringify(`[data-sec="${id}"]`)})`);
+    if (!existe) continue;
+    await ejec(pulsa(`[data-sec="${id}"]`));
+    await espera(3000);
+    const n = await ejec(`document.querySelectorAll(${JSON.stringify(sel)}).length`);
+    di(n > 0, `«${id}» enseña lo suyo (${n} × ${sel})`);
+  }
+
   console.log(mal ? `\n  ${mal} comprobación(es) MAL\n` : '\n  el marco aguanta el ir y venir\n');
   app.exit(mal ? 1 : 0);
 }).catch((e) => { console.error(`\n  MAL  ${e.message}\n`); app.exit(2); });

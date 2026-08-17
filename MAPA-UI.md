@@ -206,8 +206,8 @@ que el armazón estaba bien.
 | **4 ✔** | **Análisis** | N1–N8, A3–A7, A9–A11 y D1 | `renderAnalysis`, `renderAdvice`, `entreTuyosHTML`, `sinControlHTML`, `dpsMandoHTML`, `DOC_AGUANTAR` |
 | **5 ✔** | **Resumen** | U1–U13 | `renderSummary` |
 | **6 ✔** | **Enemigos** | E6–E11 | páginas `enemigos`, `foe`, `foeDif` — **es una extracción**, ver abajo |
-| 7 | **Botín (histórico)** | U12, E12 | página `botin` |
-| 8 | **Progreso** | E19–E21 | página `progreso` |
+| **7 ✔** | **Botín (histórico)** | E12 | página `botin` · U12 se queda en Resumen |
+| **8 ✔** | **Progreso** | E19–E21 | página `progreso` |
 | 9 | **Avisos** | G1–G7 | `renderTriggers` |
 | 10 | **Preferencias** | V1–V15, E2 | `renderNarrate`, `encEstado` |
 
@@ -257,6 +257,13 @@ no choquen con `--s1/--s2/--s3`.
    construido DENTRO de `renderAdvice`, en la misma plantilla que el resto del
    consejo. Sacarlo de ahí no es mover un panel: es partir una función en dos, y
    este cambio no toca funciones. Viaja con su panel a Análisis (mudanza 4).
+3. **U12, el botín del tramo, se queda en Resumen.** El mapa lo mandaba a Botín
+   (histórico) y al llegar se ve que son dos alcances distintos: U12 es lo que
+   cayó EN EL TRAMO que estás resumiendo y E12 es todo lo que has recogido
+   nunca, con sus fuentes y sus dificultades. Sacarlo dejaría el resumen del
+   tramo sin una de sus respuestas, y la sección de Botín mezclando dos
+   preguntas. Se queda donde está.
+
 2. **M24, los temporizadores, aparecen en el inventario después de empezar.** No
    estaban en la primera versión; los destapó tocar el esqueleto de Combate. Van
    al MARCO —un reloj que se apaga al cambiar de sección no sirve— y es una

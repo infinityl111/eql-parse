@@ -3842,22 +3842,66 @@ function renderEscena(snap) {
  * pierde es el escalón de más arriba —«Enciclopedia»—, que era el índice y ya
  * no existe como sitio.
  */
-const PAGINAS_ENEMIGOS = ['enemigos', 'foe', 'foeDif'];
+/**
+ * DE QUÉ SECCIÓN ES CADA PÁGINA DE LA ENCICLOPEDIA.
+ *
+ * Hace falta porque las páginas se enlazan ENTRE SÍ y esos enlaces cruzan
+ * secciones: desde una tarjeta de botín se salta al enemigo que lo suelta, y
+ * desde una zona a uno de sus bichos. Sin esta tabla, el salto pintaría el
+ * expediente de un enemigo DENTRO de la sección de Botín — con la barra lateral
+ * marcando Botín y la pantalla enseñando otra cosa, que es la contradicción que
+ * el armazón viene a quitar.
+ *
+ * Con ella, el salto cambia de sección solo y la barra sigue diciendo la verdad.
+ */
+const SECCION_DE_PAGINA = {
+  enemigos: 'enemigos', foe: 'enemigos', foeDif: 'enemigos',
+  botin: 'botin-h',
+  progreso: 'progreso',
+};
 
-function renderEnemigos() {
+/**
+ * El cuerpo compartido de las secciones que salen de la enciclopedia.
+ *
+ * Las tres —y las tres que faltan— hacen exactamente lo mismo: exigir que la
+ * página del enrutador sea una de las suyas, pedirla si no lo es, mandar a otra
+ * sección si la página es de ella, y dejar pintar a `renderEncyclopedia`.
+ * Escrito una vez, porque tres copias de esto se separan en cuanto una necesite
+ * un arreglo.
+ */
+function pintaPaginaEnc(id, paginas) {
   const host = $('secPane');
   if (!host) return;
-  if (!PAGINAS_ENEMIGOS.includes(state.enc.page)) {
+  const page = state.enc.page;
+  if (!paginas.includes(page)) {
+    const otra = SECCION_DE_PAGINA[page];
+    if (otra && otra !== id && SECCIONES.some((x) => x.id === otra && x.listo)) {
+      abrirSeccion(otra);
+      return;
+    }
     // Pedir la página es asíncrono y repinta al llegar; mientras, se dice que
     // está cargando en vez de dejar el hueco, que se lee como «no hay nada».
-    if (state.cargandoEnemigos) return;
-    state.cargandoEnemigos = true;
+    if (state.cargandoEnc === id) return;
+    state.cargandoEnc = id;
     host.innerHTML = `<div class="hint">${esc(t('log.loading'))}</div>`;
-    encGo('enemigos').finally(() => { state.cargandoEnemigos = false; });
+    encGo(paginas[0]).finally(() => { state.cargandoEnc = null; });
     return;
   }
   if (!$('encRoot')) renderEncyclopedia();
 }
+
+const renderEnemigos = () => pintaPaginaEnc('enemigos', ['enemigos', 'foe', 'foeDif']);
+
+/**
+ * SECCIÓN · BOTÍN DEL HISTÓRICO. La séptima.
+ *
+ * Es la misma obra que la sexta: una página del enrutador con su buscador, sus
+ * pestañas de dificultad y sus saltos al enemigo que suelta cada cosa.
+ */
+const renderBotinHistorico = () => pintaPaginaEnc('botin-h', ['botin']);
+
+/** SECCIÓN · PROGRESO. La octava, y la tercera con la misma forma. */
+const renderProgreso = () => pintaPaginaEnc('progreso', ['progreso']);
 
 /**
  * SECCIÓN · RESUMEN. La quinta mudanza, y la primera de «todo el histórico».
@@ -6187,6 +6231,12 @@ const SECCIONES = [
     listo: true, lista: false, pinta: renderResumen },
   { id: 'enemigos', grupo: 'historico', ico: '✦', rotulo: () => t('enc.enemigos'),
     listo: true, lista: false, pinta: renderEnemigos },
+  { id: 'botin-h', grupo: 'historico', ico: '◇', rotulo: () => t('enc.botin'),
+    listo: true, lista: false, pinta: renderBotinHistorico },
+  // `enc.progreso` es «Mi progresión» / «A minha progressão», que en 176 px se
+  // parte en dos líneas. Rótulo corto propio, con sus cinco.
+  { id: 'progreso', grupo: 'historico', ico: '▲', rotulo: () => t('sec.progreso'),
+    listo: true, lista: false, pinta: renderProgreso },
 ];
 
 function renderLateral() {
@@ -6223,6 +6273,20 @@ function renderLateral() {
 function abrirSeccion(id) {
   state.view = 'sec';
   state.seccion = id;
+  /**
+   * Y LA PÁGINA DE LA ENCICLOPEDIA SE OLVIDA AL CAMBIAR DE SECCIÓN A MANO.
+   *
+   * Sin esto, pulsar «Progreso» viniendo de «Botín» rebotaba: la sección nueva
+   * veía que la página puesta —`botin`— es de OTRA sección y saltaba de vuelta,
+   * así que la barra marcaba Progreso y la pantalla enseñaba el botín. Y las dos
+   * capturas salían idénticas, con su cobertura cuadrada y todo: 29.284 px de
+   * botín fotografiados dos veces con dos nombres.
+   *
+   * La regla de reenvío es para los SALTOS ENTRE PÁGINAS —de una tarjeta de
+   * botín al enemigo que la suelta—, no para un clic en la barra: ahí el usuario
+   * ya ha dicho a dónde quiere ir.
+   */
+  state.enc.page = null;
   ['tabCombat', 'tabTriggers', 'tabEnc'].forEach((x) => $(x)?.classList.remove('active'));
   $('bodyGrid').innerHTML = '';
   state.rowNodes.clear();

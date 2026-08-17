@@ -93,9 +93,9 @@ const VISTAS = [
   { nombre: 'enciclopedia', pasos: [pulsa('#tabEnc')] },
   { nombre: 'enc-zonas', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="zonas"]')] },
   { nombre: 'enemigos', pasos: [pulsa('[data-sec="enemigos"]')], espera: 3000 },
-  { nombre: 'enc-botin', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="botin"]')] },
+  { nombre: 'botin-h', pasos: [pulsa('[data-sec="botin-h"]')], espera: 3000 },
   { nombre: 'enc-hechizos', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="hechizos"]')] },
-  { nombre: 'enc-progreso', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="progreso"]')] },
+  { nombre: 'progreso', pasos: [pulsa('[data-sec="progreso"]')], espera: 3000 },
   { nombre: 'enc-muertes', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="muertes"]')] },
   {
     nombre: 'enc-hechizo',
