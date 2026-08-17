@@ -43,9 +43,19 @@
     -->
     <div class="cuerpo">
       <nav class="lateral" id="lateral" aria-label="Secciones"></nav>
-      <div class="body" id="bodyGrid">
-        <aside id="fightList"></aside>
-        <main id="mainPane"></main>
+      <!--
+        LOS TEMPORIZADORES, FUERA DE LA VISTA Y NO DENTRO.
+        Vivían dentro de la pantalla de Combate, así que al entrar en una
+        sección del armazón se apagaban. Un reloj que se apaga al cambiar de
+        sitio no avisa de nada: son del marco, como la cabecera, y por eso
+        cuelgan aquí — encima de todo el cuerpo y visibles en cualquier sección.
+      -->
+      <div class="panel">
+        <div id="timers"></div>
+        <div class="body" id="bodyGrid">
+          <aside id="fightList"></aside>
+          <main id="mainPane"></main>
+        </div>
       </div>
     </div>
 

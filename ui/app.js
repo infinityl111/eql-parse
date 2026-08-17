@@ -5883,7 +5883,7 @@ function renderApp() {
   }
   if (!$('rows')) {
     $('bodyGrid').innerHTML = `<aside id="fightList"></aside>
-      <main><div id="timers"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div>
+      <main><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div>
       <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div>
       <div class="docbar" id="docBar"></div><div class="docpane" id="docPane"></div></main>`;
     state.rowNodes.clear();
@@ -5897,9 +5897,9 @@ function renderApp() {
     });
   }
   renderFightList(state.snap);
-  renderTimers(state.snap);
   // La cabecera, los dos avisos y «lo que esta pelea no sabe» se han mudado a la
-  // sección Escena (mudanza 2). Aquí queda lo que todavía no tiene sección.
+  // sección Escena (mudanza 2); los temporizadores, al marco. Aquí queda lo que
+  // todavía no tiene sección.
   renderAdvice(state.snap);
   renderRows(state.snap);
 }
@@ -5909,6 +5909,10 @@ function renderChrome(snap) {
   // `renderApp`, que reescribe `#bodyGrid` y no la toca. Tiene su guarda de
   // firma, así que pasar por aquí cuatro veces por segundo no cuesta nada.
   renderLateral();
+  // Los temporizadores son del marco desde que hay secciones: dentro de la vista
+  // de Combate se apagaban al entrar en cualquier otra, que es un reloj que deja
+  // de avisar justo cuando te has ido a mirar otra cosa.
+  renderTimers(snap);
   $('dot').className = `dot ${snap.status}`;
   $('statusText').textContent = snap.error ?? t(`status.${snap.status}`);
   $('mChar').textContent = snap.self ?? '—';

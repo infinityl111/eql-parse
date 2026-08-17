@@ -125,7 +125,11 @@ input, select {
    sección vacía es una promesa. Mientras esté a medias, la navegación vieja
    —las tres pestañas de la cabecera— sigue funcionando al lado. */
 .cuerpo { display: grid; grid-template-columns: auto 1fr; min-height: 0; }
-.cuerpo > .body { min-height: 0; }
+/* Los temporizadores encima del cuerpo entero y el cuerpo debajo ocupando lo
+   que quede. Con `#timers` vacío la fila mide cero, así que sin avisos puestos
+   no se nota que está. */
+.panel { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+.panel > .body { min-height: 0; }
 
 .lateral {
   width: 176px; background: var(--slate-850); border-right: 1px solid var(--slate-700);
