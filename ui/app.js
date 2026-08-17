@@ -1624,19 +1624,33 @@ function renderRows(snap) {
  * `head(f)` devuelve null cuando esa pelea no tiene ese dato. Entonces la
  * pestaña no se pinta: una pestaña vacía es una promesa incumplida.
  */
-const DOCS = [
-  {
-    id: 'tank',
-    label: () => t('tank.title'),
-    head: (f) => {
-      const filas = (f?.rows ?? []).filter((r) => r.taken > 0 || r.absorbed > 0)
-        .sort((a, b) => b.taken - a.taken);
-      if (!filas.length) return null;
-      const total = filas.reduce((a, r) => a + r.taken, 0) || 1;
-      return `${filas[0].name} ${pct(filas[0].taken / total)}`;
-    },
-    body: tanqueoHTML,
+/**
+ * AGUANTAR DEJA DE SER PESTAÑA Y PASA A SER BLOQUE, en la mudanza 4.
+ *
+ * Se va a Análisis —quién aguantó es cómo fue la pelea, no qué pasó— y allí no
+ * hay barra de documentos: sería una barra de una sola pestaña.
+ *
+ * PERO NO PIERDE SU TITULAR, que es lo que lo distinguía de un cajón: «Aguantar
+ * · Notarino 62%» contesta la pregunta sin abrir nada, y esa línea es un
+ * elemento del inventario (D1), no un adorno. El bloque la lleva de subtítulo, y
+ * conserva la otra regla de las pestañas: si `head()` devuelve null —esa pelea
+ * no tiene a nadie que aguantara— el bloque no se pinta. Sale de aquí y no de
+ * una copia, para que no puedan divergir.
+ */
+const DOC_AGUANTAR = {
+  id: 'tank',
+  label: () => t('tank.title'),
+  head: (f) => {
+    const filas = (f?.rows ?? []).filter((r) => r.taken > 0 || r.absorbed > 0)
+      .sort((a, b) => b.taken - a.taken);
+    if (!filas.length) return null;
+    const total = filas.reduce((a, r) => a + r.taken, 0) || 1;
+    return `${filas[0].name} ${pct(filas[0].taken / total)}`;
   },
+  body: tanqueoHTML,
+};
+
+const DOCS = [
   {
     id: 'casts',
     label: () => t('casts.title'),
@@ -3005,6 +3019,57 @@ async function renderNarrate(host) {
    * Decidido: la franja de posturas pierde el color y se queda con tinta y
    * rótulo. Es CONTENIDO, así que va con la dieciseisava y la diecisieteava,
    * después del armazón — no ahora.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA DIECINUEVEAVA, QUE ES LA QUE ORDENA A LAS DEMÁS: GANA LA FORMA.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     CUANDO SE PUEDE ELEGIR ENTRE UNA REGLA SOBRE EL CONTENIDO Y UNA REGLA
+   *     SOBRE LA FORMA, GANA LA FORMA.
+   *
+   * Una regla de CONTENIDO pregunta qué dice algo —«¿este nombre lleva
+   * artículo?», «¿esta frase está en español?», «¿hemos visto este nombre en
+   * minúscula?»—. Una de FORMA pregunta dónde está y cómo está puesto —«¿en qué
+   * posición de la frase aparece?», «¿en qué campo vive este literal?»—. La
+   * primera necesita entender; la segunda sólo necesita mirar. Y entender es
+   * justo lo que se hace mal.
+   *
+   * CINCO VECES EN ESTE PROYECTO, Y LAS CINCO GANÓ LA FORMA:
+   *
+   *   la mayúscula     LA POSICIÓN EN LA FRASE contra «¿hemos visto alguna vez
+   *                    la minúscula?». EverQuest capitaliza al abrir línea, así
+   *                    que la forma buena de un nombre se lee a MITAD DE FRASE
+   *                    — da igual cuántas veces lo hayas visto al principio.
+   *   el individuo     EL HUECO MÍNIMO MEDIDO contra la gramática del nombre.
+   *                    «Sin artículo es un named» metía dentro títulos, razas y
+   *                    mascotas de otros jugadores; el hueco entre dos muertes
+   *                    no opina sobre el idioma.
+   *   el golpe         LA CADENCIA contra el máximo. El máximo es una muestra de
+   *                    uno disfrazada de dato; la mediana y el p10–p90 dicen la
+   *                    forma del golpe y no se las lleva un crítico.
+   *   la pertenencia   LLAMAR A LA GUARDA contra reconocer nombres. Los nombres
+   *                    de EQL se reciclan —una mascota tuya se llama igual que
+   *                    un bicho salvaje—, así que quien decide es la función que
+   *                    ya decide, no una lista de nombres.
+   *   el idioma        EL SITIO DEL LITERAL contra su idioma. Es la de hoy.
+   *
+   * Y ÉSTA ÚLTIMA TRAE EL NÚMERO QUE SOSTIENE LA REGLA. Para encontrar el texto
+   * sin traducir se escribieron los dos detectores, uno de cada clase
+   * (`bin/espanol.js`):
+   *
+   *   el de CONTENIDO   «¿esta frase parece española?» — acentos, eñes,
+   *                     palabras funcionales. Encontró 6 de 21: el 26%.
+   *   el de FORMA       «¿este valor está en un campo que llega al usuario y no
+   *                     pasa por `t()`?». Encontró el resto.
+   *
+   * Y no es sólo que encuentre menos: el de contenido se pierde LO MÁS VISIBLE
+   * —«Cambia a», «Guardar pelea», «aturdido»— porque las frases cortas no
+   * llevan marcas de idioma. Falla justo donde más caro sale.
+   *
+   * POR QUÉ PASA SIEMPRE ESTO: la forma la fija quien escribió el código y no
+   * cambia sola; el contenido lo fija el mundo —el juego, el idioma, el
+   * jugador— y cambia sin avisar. Una regla sobre algo que cambia solo hay que
+   * volver a comprobarla cada vez, y nadie lo hace.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
@@ -3620,6 +3685,47 @@ function renderEscena(snap) {
   renderPetHint(snap);
   const f = withPets(fightFor(snap));
   pinta($('escenaNota'), [charmHTML(f), incertidumbreHTML(f)]);
+}
+
+/**
+ * SECCIÓN · ANÁLISIS. La cuarta mudanza: qué dice de cómo lo hiciste.
+ *
+ * Recoge las cuatro piezas que estaban de paso y la vista de análisis entera:
+ * el consejo de postura con su procedencia y sus desplegables, el fuego amigo,
+ * los tramos sin mando con el dps sobre el tiempo que manejabas, «Aguantar», y
+ * la nota, los roles, los hallazgos y las fases de `renderAnalysis`.
+ *
+ * CON ESTA SE VACÍA LA PANTALLA VIEJA. Lo que queda en Combate después de esto
+ * es literalmente nada: por eso las tres pestañas se pueden quitar en la
+ * mudanza 10 sin que se caiga nada por el camino.
+ *
+ * El botón «← Combate» que pinta `renderAnalysis` se esconde por CSS dentro de
+ * la sección: es de la navegación vieja y se va con ella. Esconderlo es
+ * reversible; quitarlo sería tocar la función, y esto sólo mueve.
+ */
+function renderAnalisis(snap) {
+  const host = $('secPane');
+  if (!host) return;
+  if (!$('anView')) {
+    host.innerHTML = '<div id="advice"></div>'
+      + '<div class="charm-note" id="anNota" style="display:none"></div>'
+      + '<div id="anTank"></div><div id="anView"></div>';
+  }
+  renderAdvice(snap);
+  const f = withPets(fightFor(snap));
+  pinta($('anNota'), [entreTuyosHTML(f), sinControlHTML(f)]);
+
+  const caja = $('anTank');
+  const titular = f ? DOC_AGUANTAR.head(f) : null;
+  const sig = `${getLang()}|${f?.uid ?? 'live'}|${titular ?? ''}`;
+  if (caja && caja.dataset.sig !== sig) {
+    caja.dataset.sig = sig;
+    caja.innerHTML = titular
+      ? `<div class="sec-title eyebrow">${esc(DOC_AGUANTAR.label())} · ${esc(titular)}</div>`
+        + DOC_AGUANTAR.body(f)
+      : '';
+  }
+  renderAnalysis(snap);
 }
 
 /**
@@ -5844,6 +5950,11 @@ const SECCIONES = [
     listo: true, lista: true, pinta: renderPorHabilidad },
   { id: 'botin', grupo: 'pelea', ico: '◈', rotulo: () => t('loot.title'),
     listo: true, lista: true, pinta: renderBotinPelea },
+  // `an.tab` —«Análisis»— existía traducida a los cinco idiomas y no la pintaba
+  // nadie: la destapó `npm run vacios`. Es el rótulo corto que pide una barra
+  // lateral; `an.title` es «Análisis del combate», que es el título de la vista.
+  { id: 'analisis', grupo: 'pelea', ico: '◑', rotulo: () => t('an.tab'),
+    listo: true, lista: true, pinta: renderAnalisis },
 ];
 
 function renderLateral() {
@@ -5953,15 +6064,19 @@ function renderApp() {
     }
     return;
   }
-  // Lo que le queda a la vista vieja después de tres mudanzas: el consejo de
-  // postura, que se va a Análisis en la cuarta. La navegación vieja sigue
-  // funcionando hasta que no quede nada en ella, y ya casi no queda.
-  if (!$('advice')) {
-    $('bodyGrid').innerHTML = '<aside id="fightList"></aside><main><div id="advice"></div></main>';
+  /**
+   * Y AQUÍ NO QUEDA NADA, que es el resultado de la mudanza 4.
+   *
+   * Las cuatro secciones de «esta pelea» se han llevado todo lo que pintaba
+   * esta vista. Se deja el `<main>` vacío a propósito y no se le pone un texto:
+   * la pestaña se quita en la mudanza 10 y un cartel aquí sería escribir algo
+   * para borrarlo dentro de seis pasos.
+   */
+  if (!$('vacioCombate')) {
+    $('bodyGrid').innerHTML = '<aside id="fightList"></aside><main id="vacioCombate"></main>';
     state.rowNodes.clear();
   }
   renderFightList(state.snap);
-  renderAdvice(state.snap);
 }
 
 function renderChrome(snap) {

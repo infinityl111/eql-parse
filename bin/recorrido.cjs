@@ -62,7 +62,11 @@ const pulsa = (sel) => `document.querySelector(${JSON.stringify(sel)})?.click()`
 const PELEA = '.fight[data-live="0"]';
 
 const VISTAS = [
-  { nombre: 'combate', pasos: [pulsa('#tabCombat'), pulsa(PELEA)] },
+  // La vista vieja de Combate ya no pinta nada —las cuatro secciones de «esta
+  // pelea» se lo han llevado todo— así que sale del recorrido: dejarla daría un
+  // «el panel salió vacío» en rojo en cada tanda, y un rojo permanente que es
+  // correcto entrena a ignorar los rojos. Vuelve si alguna vez vuelve a tener
+  // contenido; se quita del todo con las pestañas, en la mudanza 10.
   {
     // Los documentos viven dentro de «Por habilidad» desde la mudanza 3: se
     // entra por la sección y se abre la última pestaña, que es la que nunca
@@ -76,7 +80,7 @@ const VISTAS = [
   { nombre: 'escena', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="escena"]')] },
   { nombre: 'habilidad', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="habilidad"]')] },
   { nombre: 'botin', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="botin"]')] },
-  { nombre: 'analisis', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('#btnAnalyse')] },
+  { nombre: 'analisis', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="analisis"]')] },
   { nombre: 'resumen', pasos: [pulsa('#tabCombat'), pulsa('#btnSummary')] },
   { nombre: 'reproduccion', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('#btnReplay')], espera: 2500 },
   { nombre: 'avisos', pasos: [pulsa('#tabTriggers')] },

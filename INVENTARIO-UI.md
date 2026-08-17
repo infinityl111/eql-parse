@@ -143,6 +143,7 @@ puede reabrir con M10.
 | mudanza | elementos | sección nueva | comprobado |
 |--:|---|---|---|
 | 1 | C17, C18 | Esta pelea › **Botín** | mismas cifras en la misma pelea · 10 capturas (5 idiomas × 2 temas) en `tmp/capturas-despues-botin/` · `npm test` en verde |
+| 4 | N1–N8, A3–A7, A9–A11, D1 | Esta pelea › **Análisis** | «Aguantar» deja de ser pestaña y pasa a bloque **conservando su titular** · con esta mudanza la vista vieja de Combate queda en **0 hijos y 0 caracteres**, medido · 10 capturas en `tmp/capturas-despues-analisis/` · `npm test` en verde |
 | 3 | R1–R17, D1–D4, A9, A10 | Esta pelea › **Por habilidad** | `renderRows` y `renderDocs` sin tocar; A9, A10, D1 y D4 van **de paso** hasta Análisis (4) y Registro (11) · 30 capturas en `tmp/capturas-despues-habilidad/` · `npm test` en verde |
 | 2 | C1–C16, C19, C20, A1, A2, A8, A12 | Esta pelea › **Escena** | la misma pelea —«a zol ghoul knight · 3 abatidos»— da 281 / 18.555 / 1m 6s / 39 / 1355 / 5 y pico 879/s, idéntico al antes · 10 capturas en `tmp/capturas-despues-escena/` · `npm test` en verde |
 

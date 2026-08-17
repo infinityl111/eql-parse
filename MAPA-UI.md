@@ -203,7 +203,7 @@ que el armazón estaba bien.
 | **1 ✔** | **Botín (esta pelea)** | C17, C18 | `lootHTML`, que estaba dentro de `renderHead` |
 | **2 ✔** | **Escena** (sin figuras todavía) | C1–C16, C19, C20, A1, A2, A8, A12 | `renderHead`, `renderClassPrompt`, `renderPetHint`, `charmHTML`, `incertidumbreHTML` |
 | **3 ✔** | **Por habilidad** | R1–R17, y de paso D1–D4, A9 y A10 | `renderRows` y `renderDocs` |
-| 4 | **Análisis** | N1–N8 + A3–A6, A9–A11 | `renderAnalysis`, `renderAdvice`, `entreTuyosHTML`, `sinControlHTML`, `dpsMandoHTML` |
+| **4 ✔** | **Análisis** | N1–N8, A3–A7, A9–A11 y D1 | `renderAnalysis`, `renderAdvice`, `entreTuyosHTML`, `sinControlHTML`, `dpsMandoHTML`, `DOC_AGUANTAR` |
 | 5 | **Resumen** | U1–U13 | `renderSummary` |
 | 6 | **Enemigos** | E6–E11 | páginas `enemigos`, `foe`, `foeDif` |
 | 7 | **Botín (histórico)** | U12, E12 | página `botin` |
@@ -261,6 +261,39 @@ no choquen con `--s1/--s2/--s3`.
    estaban en la primera versión; los destapó tocar el esqueleto de Combate. Van
    al MARCO —un reloj que se apaga al cambiar de sección no sirve— y es una
    mudanza más, pendiente de meter en el orden.
+
+### La vista vieja, medida
+
+Después de la mudanza 4, el `<main>` de Combate tiene **0 hijos, 0 caracteres y
+el HTML vacío**; lo único que queda al lado es la lista de peleas, que no es de
+la vista. Medido en la aplicación, no deducido.
+
+Eso cierra la pregunta de la pestaña de Combate: se puede quitar sin que se caiga
+nada. Las otras dos **no**: Avisos y Enciclopedia siguen teniéndolo todo hasta
+las mudanzas 6–10, así que la 10 sigue siendo la última y no se adelanta.
+
+### Lo que la mudanza 4 deja escrito de los 21 textos en español
+
+Antes de arreglarlos —que es contenido y va después— quedan contestadas las tres
+preguntas que decidían si hacía falta formato nuevo:
+
+- **Un disparador de fábrica guarda el TEXTO, no la plantilla.** Medido sobre el
+  `triggers.json` real: `"name": "Te han aturdido"`, `"speak": "aturdido"`. Es
+  identidad y presentación en el mismo objeto — la mayúscula otra vez.
+- **NO hace falta `FORMATO_VERSION` ni reconstrucción.** `triggers.json` es
+  configuración, no el almacén. La identidad ya está guardada (`id: 'stunned'`)
+  y `load()` ya la usa dos veces para preferir la plantilla sobre lo guardado.
+  El arreglo se hace al cargar y el fichero no se toca.
+- **Queda una decisión**: qué pasa con una plantilla que el usuario renombró sin
+  tocarle el patrón. Se distingue midiendo —si el nombre guardado coincide con
+  el de fábrica en cualquiera de los cinco idiomas, es el de fábrica— y tampoco
+  necesita campo nuevo.
+
+Las dos notas largas están escritas donde se van a leer: en `src/triggers.js`
+(una plantilla es un objeto de tres idiomas, y el patrón no se traduce nunca) y
+en `electron/main.cjs` (**el proceso principal no sabe el idioma: el idioma vive
+en la ventana**, así que el arreglo es hacer llegar el idioma, no sustituir
+literales).
 
 ### Lo encontrado por el camino, que se hace APARTE
 

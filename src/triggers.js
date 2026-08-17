@@ -302,6 +302,44 @@ export class TriggerEngine extends EventEmitter {
  * Es el mismo vocabulario que ya usan `raid.src.*`, `mate.src.*` y `adv.src.*`:
  * lo que has dicho tú, lo que consta y lo que se ha supuesto no pueden verse
  * iguales. Los disparadores eran lo único del proyecto sin esa distinción.
+ *
+ * ── UNA PLANTILLA ES UN OBJETO DE TRES IDIOMAS ──────────────────────────────
+ *
+ * ESCRITO ANTES DE TOCARLO, porque al arreglarlo la tentación va a ser traducir
+ * el objeto entero y eso lo rompe:
+ *
+ *   EL PATRÓN VA EN INGLÉS, SIEMPRE Y EN LOS CINCO IDIOMAS. Lo que compara es
+ *   la línea que escribe el juego, y el juego escribe en inglés — es la misma
+ *   regla de la jerga que ya rige `src/jerga.js`. Un patrón traducido no casa
+ *   nunca, y falla en silencio: el disparador simplemente no salta.
+ *
+ *   EL NOMBRE Y LA VOZ VAN EN EL IDIOMA DE QUIEN LO USA. Son lo único de aquí
+ *   que un alemán lee y oye, y hoy los quince están escritos en español.
+ *
+ * ── Y LO QUE HAY GUARDADO ES EL TEXTO, NO LA PLANTILLA ──────────────────────
+ *
+ * Medido sobre el `triggers.json` de Campeón: cada disparador guarda
+ * `"name": "Te han aturdido"`, `"speak": "aturdido"`, `"text": "ATURDIDO"`.
+ * El texto español, congelado en disco desde el día que se guardó. Es LA
+ * MAYÚSCULA OTRA VEZ —identidad y presentación en el mismo campo— con el
+ * agravante de que la presentación es la que se lee.
+ *
+ * La identidad SÍ está: `id: 'stunned'`. Y el mecanismo para preferirla ya
+ * existe y está probado dos veces en `load()` —así se deduce `origen` y así se
+ * retiró el temporizador inventado—: si el patrón sigue siendo el de fábrica,
+ * la plantilla manda sobre lo guardado.
+ *
+ * POR ESO NO HACE FALTA NI FORMATO NUEVO NI RECONSTRUCCIÓN. `triggers.json` es
+ * configuración, no el almacén: `FORMATO_VERSION` y la relectura del registro
+ * son de las peleas y aquí no pintan nada. El arreglo se hace al cargar y el
+ * fichero no se toca.
+ *
+ * LA ÚNICA DECISIÓN QUE QUEDA, y hay que tomarla antes de escribir el código:
+ * qué pasa si alguien RENOMBRÓ una plantilla sin tocarle el patrón. Preferir la
+ * traducción le pisaría su nombre. Se distingue midiendo: si el nombre guardado
+ * coincide con el de fábrica en CUALQUIERA de los cinco idiomas, es el de
+ * fábrica y se traduce; si no coincide con ninguno, lo escribió él y se
+ * respeta. Eso no necesita ningún campo nuevo.
  */
 export const STARTER_TRIGGERS = [
   {

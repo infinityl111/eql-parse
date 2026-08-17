@@ -399,6 +399,26 @@ ipcMain.handle('triggers:test', async (_e, { def, line }) => {
 
 ipcMain.handle('triggers:clearTimers', () => { engine.triggers.clearTimers(); return true; });
 
+/**
+ * LOS CINCO DIÁLOGOS NATIVOS ESTÁN EN ESPAÑOL, Y NO ES PEREZA.
+ *
+ * «Importar disparadores», «Exportar disparadores», «Elige tu fichero de log»,
+ * «Guardar pelea» y el rótulo del filtro «Log de EverQuest» los lee cualquiera
+ * en español, tenga la interfaz en el idioma que tenga.
+ *
+ *     EL PROCESO PRINCIPAL NO SABE EL IDIOMA: EL IDIOMA VIVE EN LA VENTANA.
+ *
+ * `t()` es un módulo del lado del renderizador y `cfg.lang` está aquí, pero el
+ * diccionario no: este fichero es CommonJS y `src/i18n.js` es ESM, y se carga
+ * con `import()` dinámico sólo donde hace falta. Por eso el que escribió estas
+ * cinco líneas puso el texto a mano — no había con qué traducirlo.
+ *
+ * ASÍ QUE EL ARREGLO ES HACER LLEGAR EL IDIOMA, NO SUSTITUIR LITERALES. Poner
+ * cinco `t()` aquí sin resolver eso sería cambiar cinco literales por cinco
+ * huecos. Las dos salidas, y la decisión va antes del código: traerse el
+ * diccionario a este lado, o que la ventana mande el rótulo ya traducido con la
+ * orden —que es lo que ya hace `log:attach` con media configuración—.
+ */
 ipcMain.handle('triggers:import', async () => {
   const r = await dialog.showOpenDialog(mainWin, {
     title: 'Importar disparadores', properties: ['openFile'],
