@@ -1477,6 +1477,36 @@ function dudaHTML(f) {
   </div>`;
 }
 
+/**
+ * Enseña una caja de notas, o la esconde si no hay ninguna.
+ *
+ * El «o la esconde» no es un detalle: una caja con borde y sin contenido se lee
+ * como algo que se cargó a medias. Lo hacía `renderRows` para su bloque; ahora
+ * lo necesitan dos secciones y vive aquí para que no se separen.
+ */
+function pinta(caja, trozos) {
+  if (!caja) return;
+  const html = trozos.filter(Boolean).join('');
+  caja.style.display = html ? 'block' : 'none';
+  if (html) caja.innerHTML = html;
+}
+
+/**
+ * Lo que el encanto dejó sin poder atribuir, dicho y no escondido.
+ *
+ * Sale sólo cuando dos bichos del MISMO nombre se pegaron entre ellos y uno
+ * estaba encantado: ahí el registro no dice cuál era cuál. Todo lo demás se
+ * reparte por el objetivo y es medido. La cifra estimada va aparte y no está
+ * sumada al daño de nadie.
+ */
+function charmHTML(f) {
+  const c = f?.charm;
+  if (!c) return '';
+  return `<div>${esc(t('charm.amb', { n: c.golpes, d: n0(c.daño) }))}`
+    + (c.estimadoTuyo !== null ? ` ${esc(t('charm.est', { d: n0(c.estimadoTuyo) }))}` : '')
+    + '</div>';
+}
+
 function renderRows(snap) {
   const f = withPets(fightFor(snap));
   const host = $('rows');
@@ -1484,26 +1514,14 @@ function renderRows(snap) {
   const live = isLive(f);
   const seen = new Set();
 
-  // Lo que el encanto dejó sin poder atribuir, dicho y no escondido.
+  // LA NOTA, PARTIDA EN DOS POR EL ARMAZÓN.
   //
-  // Sale sólo cuando dos bichos del MISMO nombre se pegaron entre ellos y
-  // uno estaba encantado: ahí el registro no dice cuál era cuál. Todo lo
-  // demás se reparte por el objetivo y es medido. La cifra estimada va
-  // aparte y no está sumada al daño de nadie.
-  const notaCharm = $('charmNote');
-  if (notaCharm) {
-    const c = f.charm;
-    const trozos = [];
-    if (c) {
-      trozos.push(`<div>${esc(t('charm.amb', { n: c.golpes, d: n0(c.daño) }))}` +
-        (c.estimadoTuyo !== null
-          ? ` ${esc(t('charm.est', { d: n0(c.estimadoTuyo) }))}` : '') + '</div>');
-    }
-    trozos.push(entreTuyosHTML(f), sinControlHTML(f), incertidumbreHTML(f));
-    const html = trozos.filter(Boolean).join('');
-    notaCharm.style.display = html ? 'block' : 'none';
-    if (html) notaCharm.innerHTML = html;
-  }
+  // Las cuatro cosas que vivían aquí juntas contestan dos preguntas distintas y
+  // se van a dos secciones: lo que la pelea NO SABE —el encanto ambiguo y los
+  // contadores de incertidumbre— es qué pasó, y va a Escena; el fuego amigo y
+  // los tramos sin mando son cómo fue la pelea, y van a Análisis. Aquí se queda
+  // lo segundo hasta que Análisis exista (mudanza 4).
+  pinta($('charmNote'), [entreTuyosHTML(f), sinControlHTML(f)]);
 
   // Cabecera al pasar de los tuyos a los enemigos: sin ella parecen el mismo
   // reparto, que es justo lo que confundía en el resumen.
@@ -3537,6 +3555,40 @@ function cablearBotin(host) {
     el.addEventListener('mouseenter', () => showItemTip(el.dataset.item));
     el.addEventListener('mouseleave', hideItemTip);
   });
+}
+
+/**
+ * SECCIÓN · ESCENA. La segunda mudanza: qué pasó en esta pelea.
+ *
+ * Se lleva la cabecera entera —título por abatidos, zona, dificultad, nivel,
+ * los cuatro botones, el aviso de pelea dudosa, las siete tarjetas y la
+ * gráfica—, los dos avisos que interrumpen lo que estás mirando —el trío que no
+ * cuadra y la mascota sin identificar— y «lo que esta pelea no sabe».
+ *
+ * NADA DE ESTO SE HA TOCADO POR DENTRO: son `renderHead`, `renderClassPrompt`,
+ * `renderPetHint`, `charmHTML` e `incertidumbreHTML` tal cual, pintando en los
+ * mismos identificadores de siempre. Por eso el esqueleto los repite: mientras
+ * la sección exista, esos nodos viven aquí y no en la vista vieja, así que no
+ * hay dos con el mismo `id` — hay uno, mudado.
+ *
+ * EL CRITERIO QUE DECIDE QUÉ ENTRA, escrito en `MAPA-UI.md`: Escena es QUÉ
+ * PASÓ; Análisis es QUÉ DICE DE CÓMO LO HICISTE. Por eso el consejo de postura,
+ * el fuego amigo y los tramos sin mando no están aquí, y sí está el aviso de la
+ * pelea dudosa: uno juzga tu actuación, el otro dice que estas cifras no valen.
+ */
+function renderEscena(snap) {
+  const host = $('secPane');
+  if (!host) return;
+  if (!$('fightHead')) {
+    host.innerHTML = '<div id="fightHead"></div><div id="clsPrompt"></div>'
+      + '<div id="petHint"></div>'
+      + '<div class="charm-note" id="escenaNota" style="display:none"></div>';
+  }
+  renderHead(snap);
+  renderClassPrompt(snap);
+  renderPetHint(snap);
+  const f = withPets(fightFor(snap));
+  pinta($('escenaNota'), [charmHTML(f), incertidumbreHTML(f)]);
 }
 
 /**
@@ -5716,6 +5768,8 @@ function foeDetail(a, f) {
  * «esta pelea» sí: elegir otra pelea es el gesto que las cambia.
  */
 const SECCIONES = [
+  { id: 'escena', grupo: 'pelea', ico: '▮', rotulo: () => t('sec.escena'),
+    listo: true, lista: true, pinta: renderEscena },
   { id: 'botin', grupo: 'pelea', ico: '◈', rotulo: () => t('loot.title'),
     listo: true, lista: true, pinta: renderBotinPelea },
 ];
@@ -5829,7 +5883,7 @@ function renderApp() {
   }
   if (!$('rows')) {
     $('bodyGrid').innerHTML = `<aside id="fightList"></aside>
-      <main><div id="timers"></div><div id="fightHead"></div><div id="clsPrompt"></div><div id="petHint"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div>
+      <main><div id="timers"></div><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div>
       <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div>
       <div class="docbar" id="docBar"></div><div class="docpane" id="docPane"></div></main>`;
     state.rowNodes.clear();
@@ -5844,10 +5898,8 @@ function renderApp() {
   }
   renderFightList(state.snap);
   renderTimers(state.snap);
-  renderHead(state.snap);
-  renderPetHint(state.snap);
-
-  renderClassPrompt(state.snap);
+  // La cabecera, los dos avisos y «lo que esta pelea no sabe» se han mudado a la
+  // sección Escena (mudanza 2). Aquí queda lo que todavía no tiene sección.
   renderAdvice(state.snap);
   renderRows(state.snap);
 }

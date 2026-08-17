@@ -70,6 +70,7 @@ const VISTAS = [
   },
   // Las secciones del armazón nuevo se abren por la barra lateral. `data-sec`
   // no se traduce, igual que los identificadores de las pestañas viejas.
+  { nombre: 'escena', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="escena"]')] },
   { nombre: 'botin', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="botin"]')] },
   { nombre: 'analisis', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('#btnAnalyse')] },
   { nombre: 'resumen', pasos: [pulsa('#tabCombat'), pulsa('#btnSummary')] },

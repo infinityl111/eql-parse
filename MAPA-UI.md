@@ -57,6 +57,7 @@ caben en ninguna de las once del prototipo.
 | M21 | Aviso de fps del overlay | MARCO (barra) |
 | M22 | Caja de fallo | MARCO |
 | M23 | Banner de disparadores | MARCO |
+| M24 | Temporizadores en pantalla | MARCO · **pendiente**: hoy viven dentro de la vista de Combate y se apagan al entrar en una sección |
 | L1–L12 | Toda la columna de peleas | LISTA · no se toca en este cambio |
 
 ## Esta pelea
@@ -82,7 +83,7 @@ caben en ninguna de las once del prototipo.
 | A4 | Procedencia del trío (`adv.src.*`) | Análisis · con A3 | |
 | A5 | Desplegables de clase y «cambié de trío» | Análisis · con A3 | |
 | A6 | Conflicto de clases | Análisis | |
-| A7 | Consejo en vivo | Escena | es de la pelea en curso |
+| A7 | Consejo en vivo | **Análisis** (cambiado) | va dentro de `renderAdvice`; ver la desviación 1 |
 | A8 | Nota de encanto ambiguo | Escena · dentro de A12 | qué pasó y no se sabe |
 | A9 | Fuego amigo entre los tuyos | **Análisis** | cómo fue la pelea |
 | A10 | Tramos sin mando | **Análisis** | |
@@ -200,7 +201,7 @@ que el armazón estaba bien.
 | orden | sección | qué se mueve | de dónde |
 |--:|---|---|---|
 | **1 ✔** | **Botín (esta pelea)** | C17, C18 | `lootHTML`, que estaba dentro de `renderHead` |
-| 2 | **Escena** (sin figuras todavía) | C1–C16, C19–C20, A1, A2, A7, A8, A12 | `renderHead`, `renderClassPrompt`, `renderPetHint`, `incertidumbreHTML` |
+| **2 ✔** | **Escena** (sin figuras todavía) | C1–C16, C19, C20, A1, A2, A8, A12 | `renderHead`, `renderClassPrompt`, `renderPetHint`, `charmHTML`, `incertidumbreHTML` |
 | 3 | **Por habilidad** | R1–R17 | `renderRows` |
 | 4 | **Análisis** | N1–N8 + A3–A6, A9–A11 | `renderAnalysis`, `renderAdvice`, `entreTuyosHTML`, `sinControlHTML`, `dpsMandoHTML` |
 | 5 | **Resumen** | U1–U13 | `renderSummary` |
@@ -238,6 +239,18 @@ Enchufarlos cambia el color de todas las gráficas, así que va **con la mudanza
 2 (Escena)**, que es donde vive la gráfica, y no antes: hacerlo hoy metería un
 cambio visible en todas las capturas del resto de mudanzas y no sabríamos cuál
 de los dos cambios estamos mirando.
+
+### Desviaciones del mapa, y por qué
+
+1. **A7, el consejo en vivo, se va a Análisis y no a Escena.** El mapa lo mandaba
+   a Escena por ser de la pelea en curso, y al ir a moverlo se vio que está
+   construido DENTRO de `renderAdvice`, en la misma plantilla que el resto del
+   consejo. Sacarlo de ahí no es mover un panel: es partir una función en dos, y
+   este cambio no toca funciones. Viaja con su panel a Análisis (mudanza 4).
+2. **M24, los temporizadores, aparecen en el inventario después de empezar.** No
+   estaban en la primera versión; los destapó tocar el esqueleto de Combate. Van
+   al MARCO —un reloj que se apaga al cambiar de sección no sirve— y es una
+   mudanza más, pendiente de meter en el orden.
 
 ### Lo encontrado por el camino, que se hace APARTE
 

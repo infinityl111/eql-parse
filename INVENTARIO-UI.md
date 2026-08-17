@@ -68,6 +68,15 @@ segundo).
 | M21 | Aviso de fps del overlay | una sola vez, al abrir el overlay | `#updBar` (reutilizado) |
 | M22 | Caja de fallo | si algo revienta al pintar, con botón de copiar y la versión | `ui/fallo.js` · `#crashBox` |
 | M23 | Banner de disparadores | el aviso grande en pantalla, con su color y sus segundos | `ui/alerts.js` · `mountBanner` |
+| M24 | **Temporizadores en pantalla** | los relojes de los disparadores, con su barra, su rótulo y los segundos que quedan | `renderTimers` · `#timers`, `.timer` |
+
+> **M24 faltaba en la primera versión de este inventario**, y lo destapó la
+> mudanza 2 al tocar el esqueleto donde vive. Es exactamente lo que este
+> documento existe para evitar, así que queda anotado en vez de arreglado en
+> silencio: hoy `#timers` sólo existe dentro de la vista de Combate, así que al
+> entrar en una sección desaparece. Su destino es el MARCO —un temporizador que
+> se apaga al cambiar de sección no sirve para nada—, y eso es un cambio de
+> sitio más, pendiente.
 
 ---
 
@@ -126,10 +135,12 @@ puede reabrir con M10.
 | mudanza | elementos | sección nueva | comprobado |
 |--:|---|---|---|
 | 1 | C17, C18 | Esta pelea › **Botín** | mismas cifras en la misma pelea · 10 capturas (5 idiomas × 2 temas) en `tmp/capturas-despues-botin/` · `npm test` en verde |
+| 2 | C1–C16, C19, C20, A1, A2, A8, A12 | Esta pelea › **Escena** | la misma pelea —«a zol ghoul knight · 3 abatidos»— da 281 / 18.555 / 1m 6s / 39 / 1355 / 5 y pico 879/s, idéntico al antes · 10 capturas en `tmp/capturas-despues-escena/` · `npm test` en verde |
 
 ## 4 · Vista **Combate** — la cabecera de la pelea
 
-`renderHead()` · `#fightHead`.
+`renderHead()` · `#fightHead`. **MUDADA ENTERA** a Esta pelea › Escena en la
+mudanza 2, salvo C17 y C18, que se fueron a Botín en la 1.
 
 | # | elemento | qué enseña | dónde vive |
 |---|---|---|---|
@@ -158,18 +169,18 @@ puede reabrir con M10.
 
 | # | elemento | qué enseña | dónde vive |
 |---|---|---|---|
-| A1 | **Aviso de clases que no cuadran** | el hechizo que lo delata, el trío deducido, `/who`, y hasta tres formas: el log corrige, tu tabla manda (con candidatos y cuándo se vio cada uno), o el `/who` gana | `renderClassPrompt` · `#clsPrompt` |
-| A2 | **Aviso de mascota sin identificar** | candidatos, `/pet who leader`, «es mía» / «no es mía» | `renderPetHint` · `#petHint` |
+| ~~A1~~ | **Aviso de clases que no cuadran** · MUDADO a Escena | el hechizo que lo delata, el trío deducido, `/who`, y hasta tres formas: el log corrige, tu tabla manda (con candidatos y cuándo se vio cada uno), o el `/who` gana | `renderClassPrompt` · `#clsPrompt` |
+| ~~A2~~ | **Aviso de mascota sin identificar** · MUDADO a Escena | candidatos, `/pet who leader`, «es mía» / «no es mía» | `renderPetHint` · `#petHint` |
 | A3 | **Consejo de postura** | veredicto, daño recibido/entrante, reparto melé-mágico, **lo que ninguna postura para**, postura actual, tabla de candidatas (evitaría, del total, vigor, maná), tramos si bailaste, «si prefieres pegar», invocaciones, y las notas de cota | `renderAdvice` · `#advice` |
 | A4 | Procedencia del trío | **`adv.src.*`**: de tu tabla, del `/who`, deducido, o **el de la pelea** cuando no es el de hoy | `.adv-head .src` |
 | A5 | Tres desplegables de clase + «cambié de trío» | | `.cls`, `#trioNow` |
 | A6 | Conflicto de clases | lo que dice el log contra lo que llevas, y descartar | `.conflict`, `#cfDismiss` |
 | A7 | Consejo en vivo | «cambia a X» / «X es la correcta», con segundos y reparto | `.live` |
-| A8 | Nota de encanto ambiguo | golpes y daño que no se pueden repartir, y lo estimado tuyo aparte | `renderRows` · `#charmNote` |
+| ~~A8~~ | Nota de encanto ambiguo · MUDADO a Escena (`charmHTML`) | golpes y daño que no se pueden repartir, y lo estimado tuyo aparte | `renderRows` · `#charmNote` |
 | A9 | **Fuego amigo entre los tuyos** | quién, cuántos segundos, golpes, daño, contra quién, y **el hecho vecino** (lo último que lanzó el enemigo) | `entreTuyosHTML` |
 | A10 | **Tramos sin mando** | miedo / encanto / ninguna de las dos, con su ventana, si sigue abierto al acabar, el vecino, y que ese tiempo no cuenta | `sinControlHTML` |
 | A11 | **dps sobre el tiempo que manejabas** | al lado del de siempre | `dpsMandoHTML` |
-| A12 | **«Lo que esta pelea no sabe»** | daño sin dueño, daño soltado por encanto (**marcado como deducido**), botín de asignación ambigua | `incertidumbreHTML` |
+| ~~A12~~ | **«Lo que esta pelea no sabe»** · MUDADO a Escena | daño sin dueño, daño soltado por encanto (**marcado como deducido**), botín de asignación ambigua | `incertidumbreHTML` |
 
 ## 6 · Vista **Combate** — el reparto (filas)
 
