@@ -2775,6 +2775,22 @@ async function renderNarrate(host) {
    * this.start))`**. Allí es correcto —`t` es absoluto y `start` también— y
    * justo por eso es donde hay que mirar el día que alguien pase un `t` ya
    * relativo: no daría error, daría un cero.
+   *
+   * LA MISMA FORMA FUERA DEL CÓDIGO, y por eso se anota aquí: al publicar la
+   * 1.15.0, `gh release upload dist/*.exe` recogió los cuatro instaladores que
+   * quedaban en la carpeta —1.12.0, 1.14.0, 1.14.1 y 1.15.0—. No falló nada:
+   * `latest.yml` apuntaba al bueno y el actualizador siguió correcto. Pero
+   * `web/build.mjs` se queda con el PRIMER adjunto acabado en `.exe`, y el
+   * primero era el de la 1.12.0: el botón de descarga de la versión nueva
+   * ofrecía el instalador viejo, con su tamaño correcto al lado.
+   *
+   *     UN COMODÍN QUE RECOGE DE MÁS NO FALLA: ENTREGA ALGO PLAUSIBLE.
+   *
+   * Una pinza convierte un imposible en un dato creíble; un comodín convierte
+   * «no sé cuál» en un fichero creíble. Los dos cierran el hueco por el que
+   * habría salido el aviso. El arreglo es el mismo que la regla de arriba: si
+   * el conjunto tiene que tener exactamente un elemento, nómbralo — y si el
+   * nombre no está, que pare. Ver `PUBLICAR.md`, paso 8.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {

@@ -154,6 +154,52 @@ Y sube a la release el `.exe` y el `latest.yml` que produce: el actualizador
 busca los dos en los adjuntos (`src/actualizar.js`), y sin `latest.yml` no
 detecta la versión nueva.
 
+#### El instalador se sube POR SU NOMBRE, nunca con comodín
+
+```
+gh release upload v<versión> "dist/EQL-Parse-<versión>-setup.exe" dist/latest.yml
+```
+
+**`dist/` no se vacía entre versiones**: guarda todos los instaladores que has
+construido. Así que `dist/*.exe` no significa «el de ahora», significa «todos los
+que quedan ahí». En la 1.15.0 el comodín subió **cuatro** —1.12.0, 1.14.0, 1.14.1
+y 1.15.0— y **no falló nada**: `latest.yml` apuntaba al bueno, así que el
+actualizador siguió correcto y nadie se enteró por ahí.
+
+Lo que sí se rompió fue la web. `web/build.mjs` se queda con **el primer adjunto
+que acaba en `.exe`** —`find((a) => /\.exe$/i.test(a.name))`, línea 123— y el
+primero era el de la 1.12.0. El botón de descarga de la versión nueva ofrecía el
+instalador viejo, con su tamaño correcto al lado y sin nada raro a la vista.
+
+La otra salida era limpiar `dist/` antes de construir. **El nombre exacto es
+mejor**: no puede recoger nada que no sea de esta versión y no depende de que
+nadie se acuerde de nada. Lo único que escribes a mano es el número de versión, y
+si te equivocas, `gh` no encuentra el fichero y **para**. Un comodín no para
+nunca: siempre encuentra algo.
+
+Es la forma de la pinza —la catorceava familia de `ui/app.js`—: no falla,
+entrega algo plausible. Un `.exe` de 78 MB con nombre de instalador es un
+resultado creíble hasta que miras cuál.
+
+#### La comprobación, antes de anunciar: exactamente un `.exe`
+
+```
+gh release view v<versión> --json assets --jq '[.assets[].name | select(endswith(".exe"))]'
+```
+
+Tiene que salir una lista de **un** elemento y con el número de esta versión. Si
+salen dos o más, la web ofrecerá uno cualquiera de ellos —el primero, no el
+nuevo—. El sobrante se quita con:
+
+```
+gh release delete-asset v<versión> <nombre del que sobra>
+```
+
+Y después hay que **volver a construir y desplegar la web**: `web/releases.json`
+se rellena desde la API en cada construcción, así que la página sigue ofreciendo
+el instalador equivocado hasta que se reconstruye — quitarlo de la release no
+basta.
+
 **Si la versión fuerza una reconstrucción** —`RECONSTRUIR_DESDE` ha subido—
 compruébalo con los ojos:
 
