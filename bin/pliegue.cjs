@@ -49,20 +49,38 @@ app.whenReady().then(async () => {
     const r = await ejec(`(() => {
       ${PANEL}
       const caja = panel.getBoundingClientRect();
-      const notas = [...panel.querySelectorAll('.hint, .hallazgo')].map((el) => {
+      /**
+       * LOS DATOS VESTIDOS DE NOTA NO SE CUENTAN COMO NOTAS.
+       *
+       * En \`periodosHTML\` hay doce renglones con clase \`.hint\` que no son
+       * notas: son las comparaciones entre periodos —«Nivel 50, 10 periodos:
+       * mediana 129 → 122 → …»—, y llevan esa clase sólo porque querían verse
+       * en gris. Contándolas, Progreso salía como la peor sección del programa
+       * en notas escondidas, y es falso: es la peor en datos disfrazados.
+       *
+       * Se reconocen por un rasgo del contenido —llevan un \`<b>\` y una flecha
+       * de serie— y ESO ES UN PARCHE CON FECHA: el arreglo de verdad es darles
+       * su propia clase, que es contenido y va con las familias 16 y 17. En
+       * cuanto la tengan, esta condición se cambia por la clase y se acabó.
+       */
+      const disfrazado = (el) => !!el.querySelector('b') && el.textContent.includes('→');
+      const todas = [...panel.querySelectorAll('.hint, .hallazgo')];
+      const notas = todas.filter((el) => !disfrazado(el)).map((el) => {
         const b = el.getBoundingClientRect();
         return {
           y: Math.round(b.top - caja.top + panel.scrollTop),
           texto: el.textContent.replace(/\\s+/g, ' ').trim().slice(0, 120),
         };
       }).filter((x) => x.texto);
-      return { visible: panel.clientHeight, alto: panel.scrollHeight, notas };
+      return { visible: panel.clientHeight, alto: panel.scrollHeight, notas,
+               disfrazados: todas.filter(disfrazado).length };
     })()`);
 
     const bajo = r.notas.filter((n) => n.y >= r.visible);
     todo.push({ seccion: v.nombre, ...r, bajo: bajo.length });
     console.log(`\n== ${v.nombre} · ${r.alto} px de alto, ${r.visible} visibles `
-      + `· ${r.notas.length} notas, ${bajo.length} bajo el pliegue`);
+      + `· ${r.notas.length} notas, ${bajo.length} bajo el pliegue`
+      + (r.disfrazados ? ` · ${r.disfrazados} datos con clase de nota, fuera de la cuenta` : ''));
     for (const n of bajo) console.log(`   ${String(n.y).padStart(6)} px  ${n.texto}`);
   }
 

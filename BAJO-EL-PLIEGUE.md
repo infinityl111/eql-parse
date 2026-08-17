@@ -15,8 +15,9 @@ del alto visible del panel (815 px con la ventana de 1400×900) y lista las que
 quedan fuera de la primera pantalla. Detalle completo en `tmp/pliegue.json`.
 
 Medido el 17 de agosto de 2026, en español y tema oscuro, sobre 88 peleas.
-**Total: 72 notas bajo el pliegue.** Pero no son 72 problemas, y separarlas es
-justamente el trabajo:
+**Total: 61 notas bajo el pliegue** —72 en la primera pasada, antes de que el
+medidor descontara los datos disfrazados de nota—. Pero no son 61 problemas, y
+separarlas es justamente el trabajo:
 
 ---
 
@@ -65,19 +66,24 @@ sección larga, el problema vuelve.
 - **Ajustes/Avisos · 12 notas.** Explican **controles**, no cifras: «se aplican
   a todo el histórico», «vacío por defecto», «quitados: no se volverán a
   proponer». Su sitio es al lado de su interruptor y ahí siguen.
-- **Progreso · 12 líneas de comparables.** «Nivel 50, 10 periodos: mediana
-  129 → 122 → …» no son notas: son **datos** pintados con la clase `.hint`. El
-  medidor no puede distinguirlos, así que los cuenta; esta lista los descuenta.
-  Y deja una pregunta de paso: un dato vestido de nota se lee como un comentario
-  y no como una medida.
+- **Progreso · 11 líneas de comparables.** «Nivel 50, 10 periodos: mediana
+  129 → 122 → …» no son notas: son **datos** pintados con la clase `.hint`.
+  Desde esta pasada el medidor los excluye y los cuenta aparte —«11 datos con
+  clase de nota, fuera de la cuenta»—, por un rasgo del texto y con fecha de
+  caducidad: el arreglo de verdad es darles su propia clase. Y deja una pregunta
+  de paso: un dato vestido de nota se lee como un comentario y no como una
+  medida.
 
 ## 4 · Lo que se decide después, no aquí
 
-1. **Las tres graves**: ¿la nota sube a la cabecera de la sección, junto al
-   título, o se convierte en algo pegado a la propia rejilla (una fila de
-   leyenda bajo la cabecera de columnas)?
-2. **La regla general**, si se quiere una: *una nota que matiza una cifra no
+1. **Las tres graves: DECIDIDO.** Suben a la **cabecera de su rejilla**, debajo
+   del título y antes de la primera fila. Es la familia 16 de `ui/app.js`:
+   *una nota que dice cómo se lee una tabla va en su cabecera, no en su pie; un
+   pie es para ampliar, y una advertencia no es un pie de página.* Es CONTENIDO,
+   así que va después del armazón — y es **lo primero** que va después.
+2. **Los datos vestidos de `.hint`: DECIDIDO**, y van en ese mismo cambio. Les
+   toca su propia clase; hoy el medidor los aparta por un rasgo del texto, que
+   es un parche con fecha. Familia 17.
+3. **La regla general**, que queda por decidir: *una nota que matiza una cifra no
    puede estar más abajo que la última cifra que matiza*. Sería comprobable con
    `npm run pliegue` en cada tanda, igual que las capturas.
-3. **Los datos vestidos de `.hint`** en Progreso: o son datos y llevan su
-   formato, o son notas y no deberían traer doce cifras dentro.

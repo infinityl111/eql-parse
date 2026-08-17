@@ -2934,7 +2934,7 @@ async function renderNarrate(host) {
    *
    * En esta casa `.hint` no es «texto pequeño y gris»: es LA NOTA QUE MATIZA UN
    * DATO, y por eso se puede contar, buscar y auditar. En `periodosHTML` hay
-   * doce renglones que la llevan puesta y no son notas — son datos:
+   * once renglones que la llevan puesta y no son notas — son datos:
    *
    *     Nivel 50, 10 periodos: mediana 129 → 122 → 136 → … · mejor 210 → 253 →
    *
@@ -2942,10 +2942,13 @@ async function renderNarrate(host) {
    * exactamente la razón que no vale.
    *
    * LA CONSECUENCIA, MEDIDA, y es lo que la convierte en familia: el medidor de
-   * pliegue cuenta `.hint`. De las diecisiete que encontró en Progreso, DOCE no
-   * eran notas — el 71% de esa sección. La primera lectura decía que Progreso
+   * pliegue cuenta `.hint`. De las diecisiete que encontró en Progreso, ONCE no
+   * eran notas — el 65% de esa sección. La primera lectura decía que Progreso
    * era la peor sección del programa en notas escondidas, y es falso: es la
-   * peor en datos vestidos de nota. Una clase usada por su aspecto no rompe la
+   * peor en datos vestidos de nota. (Y el «doce» de la primera versión de esta
+   * nota lo conté a ojo sobre la lista; el once lo dio el medidor al excluirlos.
+   * Contar a ojo lo que hay una herramienta para contar es la misma pereza que
+   * dictar un comando de memoria.) Una clase usada por su aspecto no rompe la
    * pantalla; rompe TODAS LAS HERRAMIENTAS QUE PREGUNTAN POR ELLA, que es la
    * forma de la salida muerta al revés — aquí el instrumento sí lee, y lee mal.
    *
