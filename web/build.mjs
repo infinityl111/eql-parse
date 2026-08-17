@@ -25,7 +25,8 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { IDIOMAS, CON_PROSA, NOMBRE_IDIOMA, T, FUNCIONES } from './textos.js';
 import { setLang, t } from '../src/i18n.js';
 import { sustituirRotulos } from './rotulos.mjs';
@@ -138,11 +139,55 @@ const CAPTURAS = [
  *     release y `bytes` sale 0. Pasa de verdad entre crear la release y subir
  *     el .exe, y desde fuera se ve como una descarga que no descarga.
  */
+/**
+ * EL TOKEN DE GITHUB, Y SIN ÉL NO SE CONSTRUYE.
+ *
+ * Sin autenticar, la API da 60 peticiones por hora POR IP. Publicar hace dos
+ * construcciones, cada una pregunta, y esa misma IP la comparten el navegador,
+ * el actualizador y cualquier otra cosa que mire GitHub: 44 de 60 restantes un
+ * martes cualquiera. Autenticado son 5.000.
+ *
+ * Y NO SE CAE AL MODO ANÓNIMO SI FALTA. Sería el mismo cero de dos significados
+ * de siempre: la construcción funcionaría hoy, se agotaría el cupo un día de
+ * publicación, la API contestaría con su objeto de «rate limit exceeded», y el
+ * motivo real —«nadie puso el token»— estaría a dos capas de distancia. Mejor
+ * parar aquí, donde la frase cabe en una línea.
+ *
+ * De dónde sale, en este orden: `GITHUB_TOKEN`, `GH_TOKEN`, y lo que dé
+ * `gh auth token` — que es lo que ya hay en la máquina de quien publica.
+ *
+ * @returns {{ token: string, de: string }}
+ */
+function tokenGitHub() {
+  for (const nombre of ['GITHUB_TOKEN', 'GH_TOKEN']) {
+    const v = process.env[nombre];
+    if (v && v.trim()) return { token: v.trim(), de: nombre };
+  }
+  try {
+    // stdio sin heredar: si `gh` pide iniciar sesión, que falle en vez de
+    // quedarse esperando a alguien que no está mirando.
+    const t = execFileSync('gh', ['auth', 'token'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (t) return { token: t, de: 'gh auth token' };
+  } catch { /* gh no está instalado, o no ha iniciado sesión */ }
+  throw new Error('no hay token de GitHub y sin él la API da 60 peticiones por hora'
+    + ' para toda la máquina, que se agotan justo el día que se publica.'
+    + ' Pon GITHUB_TOKEN, o inicia sesión con `gh auth login`.'
+    + ' No se construye en modo anónimo a propósito: el día que fallara, el motivo'
+    + ' no se distinguiría de «GitHub no contesta».');
+}
+
 async function releases() {
+  const { token, de } = tokenGitHub();
+  console.log(`  API de GitHub: autenticada (${de})`);
   let j;
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`,
-      { headers: { 'User-Agent': 'eqlparse-web', Accept: 'application/vnd.github+json' } });
+      { headers: {
+        'User-Agent': 'eqlparse-web',
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+      } });
     if (!r.ok) throw new Error(`GitHub devolvió ${r.status}`);
     j = await r.json();
   } catch (err) {
@@ -958,4 +1003,24 @@ async function main() {
  * se lee como «orden no encontrada», no como «falló la construcción». Marcando
  * `exitCode` el bucle termina de cerrar lo suyo y sale con el 1 que dijimos.
  */
-main().catch((err) => { console.error('\nMAL ', err.message, '\n'); process.exitCode = 1; });
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ESTO SÓLO CONSTRUYE SI SE EJECUTA. IMPORTARLO NO HACE NADA.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Antes `main()` se llamaba al cargar el módulo, así que un `import` para mirar
+ * una función —comprobar la sintaxis, probar algo desde otro guion— arrancaba
+ * una construcción entera: borró `dist/` y sobrescribió `releases.json` con una
+ * lista vacía, en una máquina donde nadie había pedido construir nada.
+ *
+ *     UN MÓDULO QUE HACE ALGO AL IMPORTARSE NO SE PUEDE MIRAR SIN DISPARARLO.
+ *
+ * Y no es sólo el susto: mientras esto fuera así, `main()` no se podía probar
+ * desde `test/` ni llamar dos veces, porque cargar el fichero YA era correrlo.
+ */
+const ejecutadoDirecto = !!process.argv[1]
+  && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (ejecutadoDirecto) {
+  main().catch((err) => { console.error('\nMAL ', err.message, '\n'); process.exitCode = 1; });
+}

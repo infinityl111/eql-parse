@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline';
+import { pathToFileURL } from 'node:url';
 import { Parser, parseHeader } from '../src/parser.js';
 import { guion } from '../src/guion.js';
 
@@ -87,8 +88,10 @@ export async function reproducirTodo({ dir, logPath, self = null, cada } = {}) {
 //
 // Y NO CUANDO ALGUIEN LO IMPORTA. `bin/imposibles.js` importa `reproducirTodo`,
 // y la guarda de «los módulos no hacen nada al importarse» lo importa también
-// sin argumentos: mirar `process.argv[1]` sin comprobarlo reventaba ahí.
-if (process.argv[1]?.replace(/\\/g, '/').endsWith('bin/reproductor.js')) {
+// sin argumentos: mirar `process.argv[1]` sin comprobarlo reventaba ahí. Se
+// compara la URL del módulo con la del fichero ejecutado, que es exacto: un
+// `endsWith` sobre la ruta acierta casi siempre, y «casi» es la palabra mala.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const dir = flag('--dir') ?? CANDIDATOS.find((d) => fs.existsSync(path.join(d, 'fights.ndjson')));
   if (!dir) { console.error('No encuentro el almacén. Pásalo con --dir'); process.exit(1); }
   let logPath = flag('--log');
