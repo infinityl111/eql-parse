@@ -143,6 +143,10 @@ puede reabrir con M10.
 | mudanza | elementos | sección nueva | comprobado |
 |--:|---|---|---|
 | 1 | C17, C18 | Esta pelea › **Botín** | mismas cifras en la misma pelea · 10 capturas (5 idiomas × 2 temas) en `tmp/capturas-despues-botin/` · `npm test` en verde |
+| 15 | P1–P10 | Esta pelea › **Escena** | el reproductor se monta DENTRO de Escena al pulsar, y la gráfica de la cabecera se esconde: es la misma con cursor |
+| 14 | E22 | Histórico › **Muertes** | extracción · misma forma que la 6 |
+| 13 | E13–E18 | Histórico › **Hechizos** | extracción · misma forma que la 6 |
+| 12 | E4–E5 | Histórico › **Zonas** | extracción · misma forma que la 6 |
 | 10 | V1–V15 | Ajustes › **Preferencias** | `renderNarrate` · 10 capturas, cobertura 100 % |
 | 9 | G1–G7 | Ajustes › **Avisos** | `renderTriggers` con su `initTriggers` · 10 capturas |
 | 8 | E19–E21 | Histórico › **Progreso** | misma forma que la 6 y la 7 · 10 capturas |

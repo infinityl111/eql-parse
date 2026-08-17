@@ -3895,10 +3895,26 @@ function cablearBotin(host) {
 function renderEscena(snap) {
   const host = $('secPane');
   if (!host) return;
+  /**
+   * AL CAMBIAR DE PELEA, EL REPRODUCTOR SE VA CON LA ANTERIOR.
+   *
+   * Sin esto, la escena montada seguiría abajo enseñando figuras de la pelea que
+   * ya no está abierta — con las cifras de arriba de una pelea y los muñecos de
+   * otra, que es peor que no tener muñecos.
+   */
+  const abierta = withPets(fightFor(snap))?.uid ?? 'live';
+  if (host.dataset.pelea !== undefined && host.dataset.pelea !== String(abierta)) {
+    repro?.destruir();
+    repro = null;
+    if ($('rpView')) { $('rpView').innerHTML = ''; $('rpView').dataset.sig = ''; }
+    host.classList.remove('con-reproductor');
+  }
+  host.dataset.pelea = String(abierta);
   if (!$('fightHead')) {
     host.innerHTML = '<div id="fightHead"></div><div id="clsPrompt"></div>'
       + '<div id="petHint"></div>'
-      + '<div class="charm-note" id="escenaNota" style="display:none"></div>';
+      + '<div class="charm-note" id="escenaNota" style="display:none"></div>'
+      + '<div id="rpView"></div>';
   }
   renderHead(snap);
   renderClassPrompt(snap);
@@ -3974,6 +3990,9 @@ const SECCION_DE_PAGINA = {
   enemigos: 'enemigos', foe: 'enemigos', foeDif: 'enemigos',
   botin: 'botin-h',
   progreso: 'progreso',
+  zonas: 'zonas', zona: 'zonas',
+  hechizos: 'hechizos', hechizo: 'hechizos',
+  muertes: 'muertes',
 };
 
 /**
@@ -4018,6 +4037,20 @@ const renderBotinHistorico = () => pintaPaginaEnc('botin-h', ['botin']);
 
 /** SECCIÓN · PROGRESO. La octava, y la tercera con la misma forma. */
 const renderProgreso = () => pintaPaginaEnc('progreso', ['progreso']);
+
+/**
+ * SECCIONES · ZONAS, HECHIZOS y MUERTES. Extracciones 12, 13 y 14.
+ *
+ * Las tres últimas páginas del enrutador de la enciclopedia, y las tres con la
+ * misma forma que la sexta: lista, ficha y migas. Que sean tres líneas y no
+ * trescientas es el resultado de haber escrito `pintaPaginaEnc` una vez.
+ *
+ * Con esto el enrutador `state.enc.page` queda repartido entero y el índice de
+ * tarjetas se queda sin nada que indexar.
+ */
+const renderZonas = () => pintaPaginaEnc('zonas', ['zonas', 'zona']);
+const renderHechizos = () => pintaPaginaEnc('hechizos', ['hechizos', 'hechizo']);
+const renderMuertes = () => pintaPaginaEnc('muertes', ['muertes']);
 
 /**
  * SECCIÓN · RESUMEN. La quinta mudanza, y la primera de «todo el histórico».
@@ -4244,8 +4277,31 @@ function renderHead(snap) {
     b._t = setTimeout(() => { b.textContent = t('share.copy'); b.classList.remove('ok', 'bad'); }, 1600);
   });
   $('btnAnalyse')?.addEventListener('click', (e) => { e.stopPropagation(); state.view = 'analysis'; $('bodyGrid').innerHTML = ''; renderApp(); });
+  /**
+   * EL REPRODUCTOR SE MONTA DENTRO DE ESCENA, no en otra pantalla.
+   *
+   * Es la extracción 15 y la decisión (a) del mapa: la Escena del prototipo
+   * dibuja las figuras y los cambios de estado, y esas dos cosas sólo existen
+   * dentro del reproductor. Escena ES el reproductor parado.
+   *
+   * Y SE MONTA AL PULSAR, no al abrir la pelea: el reproductor lee el registro
+   * del disco y puede fallar, así que montarlo siempre cambiaría el coste y el
+   * modo de fallo de abrir una pelea — que es lo que más se hace en toda la
+   * aplicación. Pulsar es barato; abrir no puede serlo menos que ahora.
+   *
+   * Fuera de la sección —mientras la pestaña vieja siga viva— hace lo de antes.
+   */
   $('btnReplay')?.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (state.seccion === 'escena' && $('rpView')) {
+      // Y la gráfica de la cabecera se esconde: la del reproductor es la misma
+      // de `ui/grafica.js` con el cursor encima, así que enseñar las dos es
+      // enseñar dos veces lo mismo y dejar al lector eligiendo cuál mirar.
+      $('secPane').classList.add('con-reproductor');
+      $('rpView').dataset.sig = '';
+      renderReplay(state.snap);
+      return;
+    }
     state.view = 'replay';
     $('bodyGrid').innerHTML = '';
     renderApp();
@@ -6353,6 +6409,12 @@ const SECCIONES = [
   // parte en dos líneas. Rótulo corto propio, con sus cinco.
   { id: 'progreso', grupo: 'historico', ico: '▲', rotulo: () => t('sec.progreso'),
     listo: true, lista: false, pinta: renderProgreso },
+  { id: 'zonas', grupo: 'historico', ico: '◆', rotulo: () => t('enc.zonas'),
+    listo: true, lista: false, pinta: renderZonas },
+  { id: 'hechizos', grupo: 'historico', ico: '✧', rotulo: () => t('sec.hechizos'),
+    listo: true, lista: false, pinta: renderHechizos },
+  { id: 'muertes', grupo: 'historico', ico: '†', rotulo: () => t('sec.muertes'),
+    listo: true, lista: false, pinta: renderMuertes },
   { id: 'avisos', grupo: 'ajustes', ico: '◉', rotulo: () => t('tab.alerts'),
     listo: true, lista: false, pinta: renderAvisos },
   { id: 'preferencias', grupo: 'ajustes', ico: '⚙', rotulo: () => t('sec.preferencias'),

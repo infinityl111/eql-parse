@@ -219,10 +219,10 @@ existe. Si el armazón está mal pensado, se ve ahí y no en la cuarta.
 | orden | sección | qué hay que sacar |
 |--:|---|---|
 | 11 | **Registro** | D4, hoy una pestaña de `DOCS` en `renderDocs` |
-| 12 | **Zonas** | E4, E5, hoy páginas del enrutador de la enciclopedia |
-| 13 | **Hechizos** | E13–E18, ídem |
-| 14 | **Muertes** | E22, ídem |
-| 15 | **Escena + reproductor** | P1–P10, hoy una vista propia (`#rpView`) con su montaje asíncrono |
+| **12 ✔** | **Zonas** | E4, E5 |
+| **13 ✔** | **Hechizos** | E13–E18 |
+| **14 ✔** | **Muertes** | E22 |
+| **15 ✔** | **Escena + reproductor** | P1–P10 · se monta al pulsar, no al abrir |
 
 Las 12, 13 y 14 son la misma obra hecha tres veces: disolver el enrutador
 `state.enc.page` en secciones de la barra, conservando las migas **dentro** de

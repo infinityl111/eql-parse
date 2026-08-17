@@ -158,7 +158,12 @@ input, select {
    una sección no lleva a ningún sitio que tenga sentido. Se esconde en vez de
    quitarse porque quitarlo sería tocar `renderAnalysis`, y esta tanda sólo
    mueve; se va del todo con las pestañas, en la mudanza 10. */
-#secPane #anBack, #secPane #sumBack { display: none; }
+#secPane #anBack, #secPane #sumBack, #secPane #rpBack { display: none; }
+/* Con el reproductor montado, la gráfica de la cabecera sobra: la línea de
+   tiempo de abajo es la misma con el cursor puesto. */
+#secPane.con-reproductor #fightHead .chart { display: none; }
+/* El reproductor, montado dentro de Escena, se separa de lo de arriba. */
+#secPane #rpView:not(:empty) { margin-top: 14px; border-top: 1px solid var(--slate-700); padding-top: 12px; }
 
 /* ── Cuerpo ───────────────────────────────────────────── */
 .body { display: grid; grid-template-columns: 272px 1fr; min-height: 0; }

@@ -48,7 +48,7 @@ const ES = {
   // Los grupos de la barra lateral. Van POR ALCANCE —esta pelea, todo el
   // histórico, ajustes— y no por tipo de dato: es lo que contesta «¿de qué me
   // está hablando este número?» antes de leerlo. Ver `SECCIONES` en ui/app.js.
-  'sec.escena': 'Escena', 'sec.habilidad': 'Por habilidad', 'sec.resumen': 'Resumen', 'sec.progreso': 'Progreso', 'sec.preferencias': 'Preferencias', 'sec.g.pelea': 'Esta pelea', 'sec.g.historico': 'Todo el histórico', 'sec.g.ajustes': 'Ajustes',
+  'sec.escena': 'Escena', 'sec.habilidad': 'Por habilidad', 'sec.resumen': 'Resumen', 'sec.progreso': 'Progreso', 'sec.preferencias': 'Preferencias', 'sec.hechizos': 'Hechizos', 'sec.muertes': 'Muertes', 'sec.g.pelea': 'Esta pelea', 'sec.g.historico': 'Todo el histórico', 'sec.g.ajustes': 'Ajustes',
   'ov.fpsTitle': 'Si el juego se entrecorta al usar el overlay', 'ov.fpsBody': 'En EQ, Options → Display → Max Background FPS. Si está en «Min CPU», el juego baja a unos pocos fotogramas cuando deja de ser la ventana activa. Ponlo en 30 o 60 y desaparece el tirón.', 'ov.fpsOk': 'Entendido',
   'foe.withInv': 'con {inv}', 'foe.noInv': 'sin invocación',
   'foe.hpFrom_1': 'de una muerte',
@@ -913,7 +913,7 @@ const ES = {
 };
 
 const EN = {
-  'sec.escena': 'Scene', 'sec.habilidad': 'By ability', 'sec.resumen': 'Summary', 'sec.progreso': 'Progress', 'sec.preferencias': 'Preferences', 'sec.g.pelea': 'This fight', 'sec.g.historico': 'All history', 'sec.g.ajustes': 'Settings',
+  'sec.escena': 'Scene', 'sec.habilidad': 'By ability', 'sec.resumen': 'Summary', 'sec.progreso': 'Progress', 'sec.preferencias': 'Preferences', 'sec.hechizos': 'Spells', 'sec.muertes': 'Deaths', 'sec.g.pelea': 'This fight', 'sec.g.historico': 'All history', 'sec.g.ajustes': 'Settings',
   'ov.fpsTitle': 'If the game stutters while using the overlay', 'ov.fpsBody': 'In EQ, Options → Display → Max Background FPS. On «Min CPU» the game drops to a few frames whenever it stops being the active window. Set it to 30 or 60 and the stutter goes away.', 'ov.fpsOk': 'Got it',
   'foe.withInv': 'with {inv}', 'foe.noInv': 'no invocation',
   'foe.hpFrom_1': 'from one kill',
@@ -1752,7 +1752,7 @@ const EN = {
 
 
 const FR = {
-  'sec.escena': 'Scène', 'sec.habilidad': 'Par capacité', 'sec.resumen': 'Résumé', 'sec.progreso': 'Progression', 'sec.preferencias': 'Préférences', 'sec.g.pelea': 'Ce combat', 'sec.g.historico': 'Tout l’historique', 'sec.g.ajustes': 'Réglages',
+  'sec.escena': 'Scène', 'sec.habilidad': 'Par capacité', 'sec.resumen': 'Résumé', 'sec.progreso': 'Progression', 'sec.preferencias': 'Préférences', 'sec.hechizos': 'Sorts', 'sec.muertes': 'Morts', 'sec.g.pelea': 'Ce combat', 'sec.g.historico': 'Tout l’historique', 'sec.g.ajustes': 'Réglages',
   'ov.fpsTitle': 'Si le jeu saccade en utilisant l\u2019overlay', 'ov.fpsBody': 'Dans EQ, Options → Display → Max Background FPS. Sur « Min CPU », le jeu tombe à quelques images dès qu\u2019il n\u2019est plus la fenêtre active. Mets 30 ou 60 et la saccade disparaît.', 'ov.fpsOk': 'Compris',
   'foe.withInv': 'avec {inv}', 'foe.noInv': 'sans invocation',
   'foe.hpFrom_1': 'sur une mort',
@@ -2678,7 +2678,7 @@ const FR = {
 };
 
 const DE = {
-  'sec.escena': 'Szene', 'sec.habilidad': 'Nach Fähigkeit', 'sec.resumen': 'Übersicht', 'sec.progreso': 'Fortschritt', 'sec.preferencias': 'Einstellungen', 'sec.g.pelea': 'Dieser Kampf', 'sec.g.historico': 'Gesamter Verlauf', 'sec.g.ajustes': 'Einstellungen',
+  'sec.escena': 'Szene', 'sec.habilidad': 'Nach Fähigkeit', 'sec.resumen': 'Übersicht', 'sec.progreso': 'Fortschritt', 'sec.preferencias': 'Einstellungen', 'sec.hechizos': 'Zauber', 'sec.muertes': 'Tode', 'sec.g.pelea': 'Dieser Kampf', 'sec.g.historico': 'Gesamter Verlauf', 'sec.g.ajustes': 'Einstellungen',
   'ov.fpsTitle': 'Wenn das Spiel beim Overlay stockt', 'ov.fpsBody': 'In EQ: Options → Display → Max Background FPS. Bei «Min CPU» fällt das Spiel auf wenige Bilder, sobald es nicht mehr das aktive Fenster ist. Stell 30 oder 60 ein und das Stocken verschwindet.', 'ov.fpsOk': 'Verstanden',
   'foe.withInv': 'mit {inv}', 'foe.noInv': 'ohne Invokation',
   'foe.hpFrom_1': 'aus einem Kill',
@@ -3604,7 +3604,7 @@ const DE = {
 };
 
 const PT = {
-  'sec.escena': 'Cena', 'sec.habilidad': 'Por habilidade', 'sec.resumen': 'Resumo', 'sec.progreso': 'Progresso', 'sec.preferencias': 'Preferências', 'sec.g.pelea': 'Este combate', 'sec.g.historico': 'Todo o histórico', 'sec.g.ajustes': 'Definições',
+  'sec.escena': 'Cena', 'sec.habilidad': 'Por habilidade', 'sec.resumen': 'Resumo', 'sec.progreso': 'Progresso', 'sec.preferencias': 'Preferências', 'sec.hechizos': 'Feitiços', 'sec.muertes': 'Mortes', 'sec.g.pelea': 'Este combate', 'sec.g.historico': 'Todo o histórico', 'sec.g.ajustes': 'Definições',
   'ov.fpsTitle': 'Se o jogo engasga ao usar o overlay', 'ov.fpsBody': 'No EQ, Options → Display → Max Background FPS. Em «Min CPU» o jogo desce a poucos fotogramas quando deixa de ser a janela ativa. Põe 30 ou 60 e o engasgo desaparece.', 'ov.fpsOk': 'Entendido',
   'foe.withInv': 'com {inv}', 'foe.noInv': 'sem invocação',
   'foe.hpFrom_1': 'de uma morte',
