@@ -2791,6 +2791,165 @@ async function renderNarrate(host) {
    * habría salido el aviso. El arreglo es el mismo que la regla de arriba: si
    * el conjunto tiene que tener exactamente un elemento, nómbralo — y si el
    * nombre no está, que pare. Ver `PUBLICAR.md`, paso 8.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA QUINCEAVA: UNA HERRAMIENTA DE VERIFICACIÓN QUE MIENTE ES PEOR QUE NO
+   * TENERLA.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     UNA HERRAMIENTA DE VERIFICACIÓN QUE MIENTE CONVIERTE «SIN COMPROBAR»
+   *     EN «COMPROBADO Y BIEN».
+   *
+   * Sin herramienta, lo que no se ha mirado se sabe no mirado, y eso ya es un
+   * dato: se mira a mano, o se decide no mirarlo y se anota la deuda. Con una
+   * herramienta que miente, lo no mirado pasa a la columna de lo verificado y
+   * sale de la lista de pendientes para siempre. Por eso es PEOR que no
+   * tenerla: no deja el hueco donde estaba, lo tapa.
+   *
+   * NO ES NUEVA DEL TODO — llevaba escrita sin nombre en `bin/cdp.js`, en el
+   * comentario de `capturaComprobada`: el recorte de una animación se decidió
+   * una vez, Electron restauró por su cuenta el tamaño de la ventana, y la
+   * herramienta siguió produciendo fotogramas «correctos» de los personajes
+   * peleando contra un enemigo fuera de cuadro. Allí ya está dicho que el
+   * patrón es «el de siempre, un nivel más arriba». Esto le pone nombre y le
+   * añade tres cicatrices, las tres del mismo día y las tres del capturador que
+   * se hizo para verificar este armazón de secciones (`bin/capturas.cjs`).
+   *
+   *   LA CARPETA VACÍA. `electron bin/capturas.cjs` no lee el `package.json` de
+   *   la raíz, así que Electron habría llamado «Electron» a la aplicación y le
+   *   habría dado OTRA carpeta de configuración: sin log, sin histórico y sin
+   *   una sola pelea. Habría escrito ciento cincuenta capturas impecables de
+   *   una instalación recién hecha. Cerrado exigiendo el DATO antes de empezar:
+   *   si la lista de peleas sigue vacía a los sesenta segundos, revienta.
+   *
+   *   EL PNG DE CERO BYTES. De las noventa y seis de la primera tanda, una
+   *   salió vacía —la primera, antes del primer fotograma— y `writeFileSync` la
+   *   escribió sin chistar. En una carpeta con noventa y seis ficheros, el de
+   *   cero bytes no se distingue de los demás hasta que lo abres. Cerrado
+   *   midiendo el PRODUCTO antes de escribirlo: una imagen vacía es un error,
+   *   no un resultado.
+   *
+   *   EL FOTOGRAMA VIEJO, Y ES LA QUE HAY QUE SUBRAYAR. Con la ventana tapada
+   *   por otra, Chromium deja de componer y `capturePage()` NO FALLA: contesta
+   *   rápido, con una imagen de 130 KB, válida y bien formada — de lo último
+   *   que se pintó. Salió así `es-claro/combate.png`: la enciclopedia del paso
+   *   anterior, en tema oscuro, guardada con el nombre de la sección de Combate
+   *   en claro. Las tres capas encajaban: nombre de fichero, tamaño y contenido
+   *   plausible.
+   *
+   *       NO DEVOLVIÓ UN ERROR. DEVOLVIÓ UNA IMAGEN CREÍBLE.
+   *
+   *   Y una imagen creíble de la sección equivocada es exactamente lo que hace
+   *   falta para dar por bueno un panel que se perdió por el camino. Cerrado
+   *   con un ACUSE DE RECIBO: `requestAnimationFrame` sólo se ejecuta si el
+   *   compositor produce fotogramas, así que se espera uno antes de disparar y,
+   *   si no llega dentro del plazo, la línea sale en rojo diciendo que la
+   *   ventana estaba tapada.
+   *
+   * LAS TRES SON LA MISMA GUARDA EN TRES SITIOS: exigir el DATO antes de
+   * empezar, medir el PRODUCTO antes de escribirlo, y exigir un ACUSE de que el
+   * mundo cambió antes de creerse la medida. Una herramienta de verificación
+   * sin las tres no está verificando: está llenando una carpeta.
+   *
+   * Y LA PREGUNTA QUE LAS TRES CONTESTAN es la de esta casa otra vez: «si esto
+   * que mido estuviera mal, ¿qué vería?». Si la respuesta es «lo mismo que si
+   * estuviera bien», no hay medición.
+   *
+   * ── EL MATIZ, QUE ES EL QUE MÁS CUESTA VER: UNA CIFRA CIERTA TAMBIÉN TAPA ──
+   *
+   * La cuarta cicatriz no fue una mentira. La tanda del ANTES imprimió, por
+   * cada sección larga:
+   *
+   *     enc-botin · 4 trozos · 24.234 px SIN CAPTURAR
+   *
+   * y las dos cifras eran EXACTAS. Cuatro trozos había, y 24.234 px se quedaban
+   * fuera. El problema es que contestaban a «¿cuánto se ha fotografiado?», y la
+   * pregunta que tenía delante quien iba a usar esa foto como red de seguridad
+   * era otra: «¿está en ella todo lo que tengo que comparar después?». Contra
+   * esa pregunta, «24.234 px» se lee como «más filas de lo mismo» — y lo que
+   * faltaba no eran sólo filas: era EL PIE, donde viven las notas que matizan
+   * cada sección. `enc.lootNote`, la que explica que «2 en 9 caídas» son dos
+   * cifras medidas juntas y no una probabilidad, estaba fuera de la foto y la
+   * foto no lo decía.
+   *
+   *     UNA CIFRA CIERTA QUE CONTESTA A UNA PREGUNTA QUE NADIE HA HECHO TAPA
+   *     IGUAL QUE UNA CIFRA FALSA.
+   *
+   * Y LA CORRECCIÓN NO FUE MÁS PRECISIÓN, que es lo que se hace por reflejo.
+   * Los 24.234 px no necesitaban decimales, ni un porcentaje, ni un cálculo
+   * mejor: necesitaban UN NÚMERO MÁS AL LADO —el del final, disparado aparte— y
+   * que el que ya estaba dijera de qué trozo habla («px DEL MEDIO sin
+   * capturar»). Afinar una cifra que mide lo que no se pregunta sólo la hace
+   * más convincente.
+   *
+   * Es la misma forma que «todo número lleva su medición al lado», una vuelta
+   * más arriba: el número tiene que decir además QUÉ PREGUNTA contesta, porque
+   * si no, el que lo lee le atribuye la suya.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA DIECISEISAVA: UNA ADVERTENCIA NO ES UN PIE DE PÁGINA.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     UNA NOTA QUE DICE CÓMO SE LEE UNA TABLA VA EN SU CABECERA, NO EN SU
+   *     PIE. UN PIE ES PARA AMPLIAR; UNA ADVERTENCIA NO ES UN PIE DE PÁGINA.
+   *
+   * Medido con `npm run pliegue` sobre las quince secciones: 72 notas caen por
+   * debajo de la primera pantalla, y TRES son el mismo caso —la frase que dice
+   * cómo se lee una rejilla, escrita al final de la lista que esa rejilla
+   * encabeza—:
+   *
+   *   Botín      «"2 en 9 caídas" son dos cifras medidas juntas, no una
+   *              probabilidad de caída»                          a 27.422 px
+   *   Enemigos   «la celda vacía dice que en esa dificultad no te lo has
+   *              encontrado»                                     a 19.895 px
+   *   Zonas      «cada celda cuenta los enemigos de los que tienes datos por
+   *              haber peleado»                                  a  1.781 px
+   *
+   * Las tres dicen lo mismo en el fondo: ESTA CIFRA NO ES LO QUE PARECE. Y las
+   * tres están a un scroll de la cifra que corrigen, así que quien lee la tabla
+   * —todo el mundo— no las lee nunca. La rejilla se ve entera sin bajar; la
+   * advertencia, sólo si alguien llega al final de novecientas filas.
+   *
+   * POR QUÉ SE ESCRIBIERON ABAJO, que es lo que hay que ver para no repetirlo:
+   * porque al escribir el bloque, la nota es lo último que se piensa. El orden
+   * en que se redacta un panel se cuela como orden de lectura, y no son el
+   * mismo. El lector empieza por la tabla.
+   *
+   * La distinción, para no subirlas todas: un PIE amplía —«y otras 40», «medido
+   * en 14 peleas»— y puede esperar a que lo busques. Una ADVERTENCIA cambia lo
+   * que significa lo que estás viendo, y llega tarde después del dato.
+   *
+   * Decidido y pendiente: las tres suben a la cabecera de su rejilla, debajo
+   * del título y antes de la primera fila. Es CONTENIDO, así que va después del
+   * armazón y es lo primero que va después. Ver `BAJO-EL-PLIEGUE.md`.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA DIECISIETEAVA: UNA CLASE QUE SIGNIFICA ALGO NO SE USA POR CÓMO SE VE.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     UNA CLASE QUE SIGNIFICA ALGO NO SE USA POR CÓMO SE VE.
+   *
+   * En esta casa `.hint` no es «texto pequeño y gris»: es LA NOTA QUE MATIZA UN
+   * DATO, y por eso se puede contar, buscar y auditar. En `periodosHTML` hay
+   * doce renglones que la llevan puesta y no son notas — son datos:
+   *
+   *     Nivel 50, 10 periodos: mediana 129 → 122 → 136 → … · mejor 210 → 253 →
+   *
+   * Se les puso `.hint` porque querían verse en gris y pequeños, que es
+   * exactamente la razón que no vale.
+   *
+   * LA CONSECUENCIA, MEDIDA, y es lo que la convierte en familia: el medidor de
+   * pliegue cuenta `.hint`. De las diecisiete que encontró en Progreso, DOCE no
+   * eran notas — el 71% de esa sección. La primera lectura decía que Progreso
+   * era la peor sección del programa en notas escondidas, y es falso: es la
+   * peor en datos vestidos de nota. Una clase usada por su aspecto no rompe la
+   * pantalla; rompe TODAS LAS HERRAMIENTAS QUE PREGUNTAN POR ELLA, que es la
+   * forma de la salida muerta al revés — aquí el instrumento sí lee, y lee mal.
+   *
+   * Y no se arregla en el medidor: el medidor los excluye hoy por un rasgo del
+   * texto (llevan `<b>` y una flecha), que es un parche con fecha de caducidad
+   * escrita. Se arregla dándoles su propia clase, y eso es contenido: va con la
+   * dieciseisava, en el mismo cambio.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {

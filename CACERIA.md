@@ -264,13 +264,16 @@ próxima que hay que añadir**, y pide el registro además del almacén.
 
 ## 3 · Las familias sin cepillar
 
-Catorce escritas en `ui/app.js`. **Tres cepilladas**, once no.
+Diecisiete escritas en `ui/app.js`. **Tres cepilladas**, catorce no.
 
 **El orden: las que más veces han disparado.**
 
 | | familia | veces | estado |
 |--:|---|--:|---|
 | 11 | la medición no era independiente de lo medido | **5** | **siguiente** |
+| 15 | una herramienta de verificación que miente | 4 | pendiente |
+| 16 | una advertencia no es un pie de página | **3** | pendiente · *lo primero tras el armazón* |
+| 17 | una clase que significa algo no se usa por cómo se ve | 1 | pendiente · va con la 16 |
 | 12 | un número desnudo no cruza una frontera | 3 | cepillada |
 | 1–6 | dejar que un dato inestable mande sobre una identidad | 6 | pendiente |
 | 7 | salida muerta · alarma muerta | 2 | pendiente |
