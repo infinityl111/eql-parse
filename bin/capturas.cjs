@@ -106,6 +106,26 @@ async function disparoNoVacio(win, quien, veces = 4) {
 }
 
 /**
+ * CÓMO SE ENCUENTRA EL CONTENEDOR QUE SCROLLEA, cada vez que hace falta.
+ *
+ * Es una expresión, no un nodo guardado: el que se guarda puede quedarse fuera
+ * del documento en el siguiente repintado, y entonces se le da scroll a algo que
+ * ya nadie ve. Se resuelve donde se usa.
+ */
+const SCROLLER = `(() => {
+  ${PANEL}
+  if (panel.scrollHeight - panel.clientHeight > 8) return panel;
+  let cap = panel; let dif = 8;
+  for (const el of panel.querySelectorAll('*')) {
+    const ov = getComputedStyle(el).overflowY;
+    if (ov !== 'auto' && ov !== 'scroll') continue;
+    const d = el.scrollHeight - el.clientHeight;
+    if (d > dif) { cap = el; dif = d; }
+  }
+  return cap;
+})()`;
+
+/**
  * Dispara, y si la vista no cabe en la ventana la parte en trozos.
  *
  * Una captura recortada por abajo es la trampa de siempre: sale el fichero, el
@@ -144,24 +164,59 @@ async function dispara(win, ejec, destino) {
         if (d > dif) { cap = el; dif = d; }
       }
     }
-    window.__cap = cap;
     cap.scrollTop = 0;
     return { alto: cap.scrollHeight, visible: cap.clientHeight,
              largo: panel.textContent.trim().length,
+             // «No pude capturarlo» y «no había nada que capturar» son dos cosas
+             // distintas y hasta ahora salían las dos en rojo. Una sección que
+             // dice que está vacía —con su bloque de vacío o su nota— ES un
+             // estado y se fotografía igual de bien; lo que no puede pasar es un
+             // panel en blanco, sin un nodo ni una letra, que es la señal de que
+             // el recorrido no llegó. Familia 22.
+             declara: !!panel.querySelector('.empty, .hint, .hallazgo'),
+             nodos: panel.children.length,
              dentro: cap !== panel };
   })()`);
 
   const quieren = Math.max(1, Math.ceil(m.alto / Math.max(1, m.visible)));
   const trozos = Math.min(quieren, TOPE_TROZOS);
   let viejos = 0;
+  /**
+   * DÓNDE ESTABA CADA DISPARO DE VERDAD, leído después de mover el scroll.
+   *
+   * No se apunta `i * visible` —lo que se PIDIÓ— sino el `scrollTop` que el
+   * navegador dejó puesto. No es lo mismo: `scrollTop` se recorta solo al máximo
+   * del contenedor, así que pedir 3.260 en un panel que sólo baja 2.100 deja el
+   * disparo donde ya estaba y produce una foto repetida. Contando lo pedido, la
+   * cobertura salía perfecta; contando lo que pasó, salen las repeticiones.
+   */
+  const vistos = [];
+  /**
+   * EL CONTENEDOR SE VUELVE A BUSCAR EN CADA PASO, no se guarda.
+   *
+   * Guardarlo en `window.__cap` parecía razonable hasta que la comprobación de
+   * cobertura destapó lo que hacía: la enciclopedia se repinta sola cuando llega
+   * la wiki, el nodo guardado deja de estar en el documento, y a partir de ahí
+   * `scrollTop` se escribe en un elemento que ya no existe. Los cuatro trozos
+   * salieron los cuatro de la primera pantalla y la línea decía «4 trozos».
+   * Cuarto caso de la misma familia, y el primero que caza una cuenta y no un
+   * ojo.
+   */
+  const posiciona = (y) => ejec(`(() => { const c = ${SCROLLER}; c.scrollTop = ${y};`
+    + ' return { y: Math.round(c.scrollTop), h: c.clientHeight, alto: c.scrollHeight }; })()');
+  const donde = () => ejec(`(() => { const c = ${SCROLLER};`
+    + ' return { y: Math.round(c.scrollTop), h: c.clientHeight, alto: c.scrollHeight }; })()');
+
   for (let i = 0; i < trozos; i++) {
     if (i) {
-      await ejec(`window.__cap.scrollTop = ${i * m.visible}`);
+      await posiciona(i * m.visible);
       await espera(350);
     }
     if (!(await esperaFotograma(ejec))) viejos++;
+    const pos = await donde();
     const png = await disparoNoVacio(win, destino);
     fs.writeFileSync(i ? destino.replace(/\.png$/, `-${i + 1}.png`) : destino, png);
+    vistos.push([pos.y, pos.y + pos.h]);
   }
 
   /**
@@ -178,25 +233,96 @@ async function dispara(win, ejec, destino) {
    */
   let fin = false;
   if (quieren > TOPE_TROZOS) {
-    await ejec('window.__cap.scrollTop = window.__cap.scrollHeight');
+    await posiciona(m.alto);
     await espera(350);
     if (!(await esperaFotograma(ejec))) viejos++;
+    const pos = await donde();
     const png = await disparoNoVacio(win, destino);
     fs.writeFileSync(destino.replace(/\.png$/, '-fin.png'), png);
+    vistos.push([pos.y, pos.y + pos.h]);
     fin = true;
   }
 
-  await ejec('window.__cap.scrollTop = 0');
+  const fin2 = await donde();
+  await posiciona(0);
+
+  /**
+   * ═══ LA COBERTURA SE DEMUESTRA, NO SE AFIRMA ═══
+   *
+   * Tres veces seguidas esta herramienta dijo haber cubierto más de lo que
+   * cubrió: la carpeta vacía, el fotograma viejo y el resumen que scrollea por
+   * dentro. Tres fallos distintos y los tres en la MISMA dirección — nunca
+   * «capturé menos de lo que digo». Eso ya no es mala suerte, es un sesgo: quien
+   * escribe la herramienta quiere que la tanda salga.
+   *
+   * Contra un sesgo no vale otra comprobación puntual, hace falta una CUENTA QUE
+   * TENGA QUE CUADRAR. Se unen los intervalos realmente fotografiados y se
+   * comparan con el alto del panel:
+   *
+   *     lo capturado + lo declarado sin capturar = el alto total, EXACTO
+   *
+   * Si no cuadra, la tanda no se entrega. Y el alto se vuelve a medir al final:
+   * si el panel creció mientras se fotografiaba —el registro sigue vivo—, la
+   * cuenta habla de una página que ya no existe y eso también es no cuadrar.
+   */
+  const orden = vistos.slice().sort((a2, b2) => a2[0] - b2[0]);
+  const union = [];
+  for (const [a2, b2] of orden) {
+    const u = union.at(-1);
+    if (u && a2 <= u[1]) u[1] = Math.max(u[1], b2);
+    else union.push([a2, b2]);
+  }
+  const alto = Math.max(m.alto, fin2.alto);
+  const cubierto = union.reduce((n, [a2, b2]) => n + (Math.min(b2, alto) - Math.max(0, a2)), 0);
+  const fuera = alto - cubierto;
+
+  /**
+   * Y LA CUENTA SE CIERRA CONTRA LO PREVISTO, no contra sí misma.
+   *
+   * La primera versión de esta comprobación restaba: `fuera = alto - cubierto`,
+   * y luego comprobaba que `cubierto + fuera === alto`. Eso no puede fallar
+   * nunca — es la misma cifra dicha dos veces, una cuenta cierta que contesta a
+   * una pregunta que nadie hizo. Exactamente el matiz de la familia quince, y
+   * escrita por la misma mano que lo escribió.
+   *
+   * Lo que sí puede fallar, y es lo que hay que preguntar: ¿coincide lo que el
+   * algoritmo CREE que cubrió con lo que las posiciones dicen que cubrió? Ahí
+   * salen las repeticiones por `scrollTop` recortado, un trozo que se quedó
+   * donde estaba y un panel que cambió de alto a media tanda.
+   */
+  const previstoArriba = Math.min(trozos * m.visible, m.alto);
+  const previstoCola = fin ? Math.max(0, m.alto - Math.max(previstoArriba, m.alto - m.visible)) : 0;
+  const previsto = previstoArriba + previstoCola;
+  /**
+   * DOS PÍXELES DE HOLGURA, Y SE DICE POR QUÉ.
+   *
+   * El alto de un panel no es entero —815,33 px— y `scrollTop` tampoco. Al
+   * redondear para poder sumar intervalos aparece una diferencia de un píxel
+   * entre lo previsto y lo medido que no es un hueco: es el redondeo. La primera
+   * corrida con la comprobación puesta dio exactamente eso, 3.915 contra 3.914.
+   *
+   * La holgura es de DOS y no de veinte a propósito: un trozo perdido son
+   * ochocientos, así que dos píxeles no pueden esconder ninguno.
+   */
+  const cuadra = Math.abs(previsto - cubierto) <= 2 && fin2.alto === m.alto;
+
   return {
     trozos,
     largo: m.largo,
     viejos,
     fin,
-    fuera: quieren > TOPE_TROZOS ? m.alto - TOPE_TROZOS * m.visible : 0,
+    fuera,
+    cubierto,
+    alto,
+    creció: fin2.alto !== m.alto ? { antes: m.alto, despues: fin2.alto } : null,
+    previsto,
+    cuadra,
   };
 }
 
 let mal = 0;
+// La cuenta de cobertura de cada captura, para que la tanda la lleve encima.
+const cobertura = [];
 
 app.whenReady().then(async () => {
   const { win, ejec, peleas, idiomaPrevio } = await arranque(app, { ancho: ANCHO, alto: ALTO });
@@ -220,15 +346,24 @@ app.whenReady().then(async () => {
           // Que la sección haya llegado a pintar algo. Una captura de un panel
           // vacío es indistinguible de una captura correcta de una sección que
           // hoy no tiene datos, y esa diferencia es justo la que hay que ver.
-          const { trozos, fuera, largo, viejos, fin } = await dispara(win, ejec, destino);
-          const flojo = largo < 40;
-          if (flojo || viejos) mal++;
-          console.log(`  ${flojo || viejos ? 'MAL' : 'ok '}  ${idioma}-${tema} ${v.nombre.padEnd(14)}`
-            + `${trozos > 1 ? ` · ${trozos} trozos` : ''}`
-            + `${fin ? ' + el final' : ''}`
-            + `${fuera ? ` · ${fuera} px del medio sin capturar` : ''}`
-            + `${viejos ? ` · ${viejos} SIN FOTOGRAMA NUEVO (la ventana estaba tapada)` : ''}`
-            + `${flojo ? ' · el panel salió vacío' : ''}`);
+          const r = await dispara(win, ejec, destino);
+          // Vacío DECLARADO: la sección dice que no hay nada, y eso es una foto
+          // buena de un estado. En blanco: no llegó el recorrido, y eso invalida.
+          const enBlanco = r.largo < 40 && !r.declara;
+          const vacio = r.largo < 40 && r.declara;
+          const bien = !enBlanco && !r.viejos && r.cuadra;
+          if (!bien) mal++;
+          cobertura.push({ idioma, tema, seccion: v.nombre, ...r });
+          console.log(`  ${bien ? 'ok ' : 'MAL'}  ${idioma}-${tema} ${v.nombre.padEnd(14)}`
+            + ` · ${r.cubierto}/${r.alto} px`
+            + `${r.trozos > 1 ? ` en ${r.trozos} trozos` : ''}`
+            + `${r.fin ? ' + el final' : ''}`
+            + `${r.fuera ? ` · ${r.fuera} px del medio sin capturar` : ''}`
+            + `${r.viejos ? ` · ${r.viejos} SIN FOTOGRAMA NUEVO (la ventana estaba tapada)` : ''}`
+            + `${r.creció ? ` · EL PANEL CRECIÓ MIENTRAS (${r.creció.antes} → ${r.creció.despues})` : ''}`
+            + `${!r.cuadra && !r.creció ? ` · LA CUENTA NO CUADRA: previstos ${r.previsto}, medidos ${r.cubierto}` : ''}`
+            + `${vacio ? ' · vacío declarado (es un estado, no un fallo)' : ''}`
+            + `${enBlanco ? ` · EN BLANCO: ${r.nodos} nodos, el recorrido no llegó` : ''}`);
         }
       }
     }
@@ -244,7 +379,25 @@ app.whenReady().then(async () => {
     }
   }
 
-  console.log(`\n  capturas en ${SALIDA}\n`);
+  /**
+   * LA TANDA LLEVA SU PROPIA CUENTA ENCIMA.
+   *
+   * Un fichero al lado de las fotos con cuánto se cubrió de cada panel y cuánto
+   * se declaró fuera. Sin él, la cobertura vive en una consola que se cierra y
+   * la carpeta vuelve a parecer completa dentro de tres semanas.
+   */
+  fs.writeFileSync(path.join(SALIDA, 'cobertura.json'), JSON.stringify(cobertura, null, 1));
+  const px = cobertura.reduce((n, c) => n + c.cubierto, 0);
+  const total = cobertura.reduce((n, c) => n + c.alto, 0);
+  console.log(`\n  ${cobertura.length} capturas · ${px} de ${total} px cubiertos`
+    + ` (${total ? Math.round(px / total * 100) : 0}%) · cuenta en cobertura.json`);
+
+  if (mal) {
+    console.error(`\n  ${mal} captura(s) SIN CUADRAR: la tanda NO se entrega.`);
+    console.error('  Lo capturado más lo declarado fuera tiene que dar el alto del panel.\n');
+  } else {
+    console.log(`\n  capturas en ${SALIDA}\n`);
+  }
   app.exit(mal ? 1 : 0);
 }).catch((e) => {
   console.error(`\n  MAL  ${e.message}\n`);

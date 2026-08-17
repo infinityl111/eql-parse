@@ -19,6 +19,23 @@
  *   3. Al volver, ¿sigue abierta la misma pelea — el mismo título, las mismas
  *      cifras— o se ha reseteado a la primera?
  *
+ * ── LAS DOS HERRAMIENTAS, Y NINGUNA CUBRE A LA OTRA ───────────────────────
+ *
+ *   `npm run capturas`  ve PINTURA. Qué hay en cada sección, en cinco idiomas y
+ *                       dos temas, y cuánto de cada panel entró en la foto.
+ *   `npm run marco`     ve ESTADO. Qué sobrevive al ir y volver: la selección,
+ *                       la pelea abierta, el ancho, y las migas.
+ *
+ * NO SE SOLAPAN, y conviene saberlo antes de confiar en una sola. Una miga rota
+ * da una imagen IDÉNTICA a una buena —el expediente se pinta igual— y sólo se
+ * cae al intentar volver; eso no lo caza ninguna captura por muchas que se
+ * hagan. Y al revés: un rótulo sin traducir en portugués o un panel cortado por
+ * abajo no los caza esto, que no mira lo que dice la pantalla sino lo que le
+ * pasa a la aplicación cuando la usas.
+ *
+ * La regla, para el que venga: si el fallo se ve en una foto, es de capturas; si
+ * hay que HACER ALGO y luego mirar, es de aquí.
+ *
  * Uso:  npm run marco
  */
 const path = require('node:path');
@@ -113,6 +130,41 @@ app.whenReady().then(async () => {
   di(vuelta.titulo === antes.titulo, `sigue abierta la misma pelea: «${vuelta.titulo}»`);
   di(JSON.stringify(vuelta.cifras) === JSON.stringify(antes.cifras),
     `y con las mismas cifras (${vuelta.cifras.length} tarjetas)`);
+
+  /**
+   * ── 4 · LAS MIGAS DE UNA EXTRACCIÓN ──────────────────────────────────────
+   *
+   * Lo que más fácil se pierde al sacar unas páginas de un enrutador son las
+   * migas: son NAVEGACIÓN y no contenido, así que no las echa de menos nadie
+   * hasta que intenta volver del expediente a la rejilla y descubre que no
+   * puede. Una captura del expediente sale perfecta con las migas rotas.
+   *
+   * Se comprueba el viaje entero y de vuelta, que es el único camino que
+   * quedará cuando la pestaña vieja se haya ido.
+   */
+  const haySeccion = await ejec(`!!document.querySelector(${JSON.stringify('[data-sec="enemigos"]')})`);
+  if (haySeccion) {
+    await ejec(pulsa('[data-sec="enemigos"]'));
+    await espera(3000);
+    const rejilla = await ejec('document.querySelectorAll(".encrow.foe").length');
+    di(rejilla > 0, `la rejilla de enemigos pinta ${rejilla} fichas`);
+
+    await ejec(pulsa('.encrow.foe .nm'));
+    await espera(2500);
+    const ficha = await ejec(`(() => ({
+      titulo: document.querySelector('.dos-head h3')?.textContent.trim() ?? null,
+      migas: [...document.querySelectorAll('.enc-crumb > *')].map((x) => x.textContent.trim()),
+      volver: !!document.querySelector('[data-crumb]'),
+    }))()`);
+    di(!!ficha.titulo, `se abre el expediente de «${ficha.titulo}»`);
+    di(ficha.volver && ficha.migas.length >= 2,
+      `con migas para volver: ${ficha.migas.join(' › ') || '(ninguna)'}`);
+
+    await ejec(pulsa('[data-crumb]'));
+    await espera(2500);
+    const vuelto = await ejec('document.querySelectorAll(".encrow.foe").length');
+    di(vuelto > 0, `la miga devuelve a la rejilla (${vuelto} fichas)`);
+  }
 
   console.log(mal ? `\n  ${mal} comprobación(es) MAL\n` : '\n  el marco aguanta el ir y venir\n');
   app.exit(mal ? 1 : 0);

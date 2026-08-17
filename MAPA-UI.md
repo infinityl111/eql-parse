@@ -205,7 +205,7 @@ que el armazón estaba bien.
 | **3 ✔** | **Por habilidad** | R1–R17, y de paso D1–D4, A9 y A10 | `renderRows` y `renderDocs` |
 | **4 ✔** | **Análisis** | N1–N8, A3–A7, A9–A11 y D1 | `renderAnalysis`, `renderAdvice`, `entreTuyosHTML`, `sinControlHTML`, `dpsMandoHTML`, `DOC_AGUANTAR` |
 | **5 ✔** | **Resumen** | U1–U13 | `renderSummary` |
-| 6 | **Enemigos** | E6–E11 | páginas `enemigos`, `foe`, `foeDif` |
+| **6 ✔** | **Enemigos** | E6–E11 | páginas `enemigos`, `foe`, `foeDif` — **es una extracción**, ver abajo |
 | 7 | **Botín (histórico)** | U12, E12 | página `botin` |
 | 8 | **Progreso** | E19–E21 | página `progreso` |
 | 9 | **Avisos** | G1–G7 | `renderTriggers` |
@@ -295,6 +295,33 @@ en `electron/main.cjs` (**el proceso principal no sabe el idioma: el idioma vive
 en la ventana**, así que el arreglo es hacer llegar el idioma, no sustituir
 literales).
 
+### Lo que ha costado la primera extracción (mudanza 6)
+
+Porque de aquí sale lo que van a costar las otras cuatro —Zonas, Hechizos,
+Muertes y Registro— y conviene saberlo antes de empujarlas.
+
+**Lo que NO hizo falta:** partir `renderEncyclopedia`, tocar `encGo`, ni duplicar
+el enrutador. Sigue habiendo una sola función que pinta cualquier página y una
+sola que engancha los clics.
+
+**Lo que sí, y son tres cosas pequeñas:**
+
+1. que `renderEncyclopedia` pinte en la sección cuando hay una abierta — la
+   misma línea que ya necesitó el resumen;
+2. que la sección exija que la página sea una de las suyas y la pida si no,
+   con su estado de «cargando» mientras llega;
+3. **la miga de más**, que es lo único que no se veía venir: dentro de la
+   sección la ruta seguía empezando por «Enciclopedia», y ese escalón lleva al
+   índice de tarjetas — que dentro de una sección de la barra no es un sitio.
+   Lo cazó `npm run marco` haciendo el viaje de vuelta, no una captura: el
+   expediente sale idéntico con la miga rota.
+
+**Coste: bajo, y las otras tres de la enciclopedia son la misma obra.** Zonas y
+Hechizos tienen exactamente la misma forma —una lista, una ficha y migas—, así
+que se pueden hacer seguidas. La que no se parece es **Registro** (extracción
+11): allí hay que sacar una pestaña de `renderDocs`, que construye la barra
+entera, y ésa sí toca una función.
+
 ### Rótulos ya traducidos esperando en el diccionario
 
 `npm run vacios -- --rotulos` busca claves sin camino con forma de rótulo —tres
@@ -318,6 +345,13 @@ van con las familias 16 a 18, no en una mudanza.
 
 Se anota aquí y no se toca dentro de este cambio, que sólo mueve cosas de sitio.
 
+0. **Enemigos confunde «no hay» con «no coincide».** Comprobando los tres
+   estados de la familia 22 en la mudanza 6: la sección tiene *cargando* y *con
+   datos*, pero su vacío es `enc.noMatch` —«sin coincidencias»—, que es la
+   respuesta al BUSCADOR. Con la ficha recién hecha y cero enemigos diría que no
+   coincide nada con una búsqueda que nadie ha escrito. Es contenido y ya estaba
+   así antes de mover nada, así que se anota: le falta su vacío propio, como el
+   que sí tienen Zonas (`enc.emptyZones`) y Hechizos (`enc.emptySpells`).
 1. **`adv.liveOk` y `adv.liveSwitch` están traducidos a los cinco idiomas y no
    los pinta nadie.** El consejo en vivo (A7) lleva el texto **escrito a mano en
    español** dentro de `ui/app.js` —«Cambia a X» / «X es la correcta ahora
@@ -331,12 +365,22 @@ Se anota aquí y no se toca dentro de este cambio, que sólo mueve cosas de siti
    advertencias al pie** (familia 16): van juntos y son lo primero después del
    armazón.
 
-### Después de cada sección, las tres cosas de siempre
+### Después de cada sección, la lista de comprobación
 
 1. la misma pelea abierta antes y después enseña **las mismas cifras**;
 2. `npm run capturas -- --salida=despues-<sección>` y comparación contra
-   `tmp/capturas-antes/`;
-3. el inventario tachado por donde va.
+   `tmp/capturas-antes/` — y que la tanda **cuadre**: lo capturado más lo
+   declarado fuera tiene que dar el alto del panel, o no se entrega;
+3. `npm run marco`, que comprueba lo que una captura no ve: que la lista se va y
+   vuelve con su selección, que no queda hueco fantasma, que la pelea sigue
+   abierta y que las migas devuelven a donde dicen. **Las dos herramientas no se
+   solapan**: las capturas ven pintura y el marco ve estado. Una miga rota da una
+   imagen idéntica a una buena y sólo se cae al intentar volver; un rótulo sin
+   traducir no lo ve el marco. Si el fallo se ve en una foto es de capturas; si
+   hay que hacer algo y luego mirar, es del marco;
+4. **los tres estados de la sección, diferenciables**: cargando, vacío y con
+   datos —y el cuarto, falló, que no puede verse como vacío—. Es la familia 22;
+5. el inventario tachado por donde va.
 
 Y la navegación vieja **sigue funcionando hasta el final**: se quita en el paso
 16, cuando no quede nada en ella.

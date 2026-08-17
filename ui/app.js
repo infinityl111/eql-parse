@@ -3107,6 +3107,102 @@ async function renderNarrate(host) {
    * Es la misma raíz que las respuestas ad hoc de pertenencia, una vuelta más
    * arriba: allí el problema era dejar que un dato inestable mandara sobre una
    * identidad; aquí es dejar que la mande una CUENTA que se rehace sola.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA VEINTIUNAVA: QUE EL FALLO NO SE PAREZCA AL ACIERTO.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     ELIGE EL CASO DE PRUEBA DE FORMA QUE EL FALLO NO SE PAREZCA AL ACIERTO.
+   *
+   * `bin/marco.cjs` comprueba que al ir a una sección del histórico y volver
+   * sigue abierta la misma pelea. La primera versión abría LA PRIMERA de la
+   * lista — y si el armazón perdiera la selección, lo que hace al repintar es
+   * caer en la primera. El caso de prueba y el fallo dan el mismo resultado: la
+   * comprobación habría salido verde con la selección rota.
+   *
+   * Se abre la SEGUNDA. Cuesta un carácter y separa las dos respuestas.
+   *
+   * ES LA MISMA FORMA QUE «UN TEST DE BLOQUEO DEBE PROBAR EL CASO SIN BLOQUEO»,
+   * y que el test de la pinza que se ponía verde con un cero: una prueba cuyo
+   * verde también sale cuando la cosa está rota no es una prueba, es una
+   * ceremonia. Y no se detecta leyéndola —parece correcta— sino preguntándose
+   * qué vería si el código estuviera mal.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA VEINTIDOSAVA: LA AUSENCIA TIENE QUE DISTINGUIRSE DEL FALLO.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     TODA SECCIÓN NECESITA TRES ESTADOS DIFERENCIABLES: CARGANDO, VACÍO Y
+   *     CON DATOS. SI DOS DE LOS TRES SE VEN IGUAL, UNO ESTÁ MINTIENDO.
+   *
+   * La sección de Resumen pide sus datos al abrirse, y mientras llegan enseñaba
+   * lo mismo que un tramo sin peleas: nada. «Todavía no ha llegado» y «no hay»
+   * son dos respuestas distintas y una de ellas invita a cerrar la aplicación
+   * pensando que no funciona.
+   *
+   * Y HAY UN CUARTO ESTADO QUE NO SE PUEDE PINTAR IGUAL: falló. Si la consulta
+   * revienta, el vacío es mentira — dice «no hay nada» de algo que no se ha
+   * podido mirar. Es la regla de `registroHTML`, que ya distingue «no hay
+   * líneas» de «no se pudieron leer, y por esto».
+   *
+   * A la lista de comprobación de cada mudanza que queda, junto a las cifras y
+   * las capturas.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA VEINTITRESAVA: UNA IGUALDAD ENTRE DOS CARAS DE LA MISMA MONEDA.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     SI UN LADO DE LA IGUALDAD SE PUEDE DEDUCIR DEL OTRO, LA IGUALDAD NO
+   *     PRUEBA NADA.
+   *
+   * El capturador tenía que demostrar su cobertura, y la primera versión hacía
+   * esto:
+   *
+   *     const fuera  = alto - cubierto;          // se deduce
+   *     const cuadra = cubierto + fuera === alto; // y se «comprueba»
+   *
+   * Siempre verde. No porque el cálculo estuviera bien, sino porque los dos
+   * lados del `===` salen del mismo sitio: es la misma cifra dicha dos veces,
+   * con la cara de una comprobación. Se arregló midiendo un lado de verdad —los
+   * `scrollTop` que quedaron puestos— y comparándolo con lo que el algoritmo
+   * PREVEÍA cubrir, que son dos caminos independientes.
+   *
+   * EL TEST MECÁNICO, y por eso esta familia es útil y no una advertencia: ante
+   * cualquier `assert`, seguir de dónde sale cada lado. Si uno se calcula a
+   * partir del otro —o los dos de la misma variable— la línea no comprueba, sólo
+   * tranquiliza.
+   *
+   * Es la familia once vista desde el otro lado: allí la medición no era
+   * independiente de lo medido; aquí la comprobación no es independiente de lo
+   * comprobado. Misma raíz, y ésta se detecta leyendo.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA VEINTICUATROAVA: SE GUARDA UNA CONCLUSIÓN, NUNCA UN ASIDERO.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     SE GUARDA UNA CONCLUSIÓN, NUNCA UN ASIDERO.
+   *
+   * Parece contradecir a la veinteava —«se deduce una vez y se anota»— y no: es
+   * la que dice QUÉ se puede anotar.
+   *
+   *   UNA CONCLUSIÓN es un veredicto sobre algo que ya pasó y no va a cambiar:
+   *   «este disparador lo renombró el usuario». El mundo puede moverse debajo
+   *   —mejoramos la traducción, cambia la plantilla— y el veredicto sigue siendo
+   *   verdad, porque hablaba del pasado. Se anota, y no se vuelve a deducir.
+   *
+   *   UN ASIDERO es una referencia a algo vivo: un nodo del DOM, una ventana, un
+   *   índice de un array, el elemento que scrollea. Sigue existiendo mientras
+   *   nadie repinte, y cuando alguien repinta no falla — apunta a algo que ya no
+   *   está en el documento. `window.__cap` guardaba el contenedor y la
+   *   enciclopedia lo cambiaba al llegar la wiki: cuatro capturas de la misma
+   *   pantalla, sin un solo error. Los asideros se buscan cada vez.
+   *
+   * LA PREGUNTA QUE LAS SEPARA: «si esto que guardo cambiara debajo, ¿mi copia
+   * seguiría siendo cierta?». Un veredicto sobre el pasado, sí. Una referencia a
+   * algo presente, no — y encima no se entera.
+   *
+   * Y es la familia de los tríos borrados por índice, la del botín colgado de la
+   * ventana y la de los tramos casados por hora: todas guardaban asideros.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
@@ -3722,6 +3818,45 @@ function renderEscena(snap) {
   renderPetHint(snap);
   const f = withPets(fightFor(snap));
   pinta($('escenaNota'), [charmHTML(f), incertidumbreHTML(f)]);
+}
+
+/**
+ * SECCIÓN · ENEMIGOS. La sexta, y la primera EXTRACCIÓN disfrazada de mudanza.
+ *
+ * Las otras cinco movían un panel que ya era suyo. Aquí no hay panel: hay tres
+ * páginas —la rejilla, el expediente y la ficha de una dificultad— que viven
+ * dentro de un enrutador, `state.enc.page`, al que se entra por una tarjeta del
+ * índice de la enciclopedia. Sacarlas es desmontar ese camino sin romper el que
+ * queda para las otras seis páginas.
+ *
+ * QUÉ SE HACE Y QUÉ NO: no se parte `renderEncyclopedia`. Sigue siendo la que
+ * pinta cualquier página y la que engancha todos los clics; lo único que cambia
+ * es DÓNDE pinta —en la sección si hay una abierta— y quién decide en qué
+ * página estás. La sección se limita a exigir que la página sea una de las
+ * suyas y a pedirla si no lo es.
+ *
+ * LAS MIGAS SE QUEDAN DENTRO, y son lo que más fácil se pierde en una
+ * extracción: son navegación, no contenido, así que no las echa de menos nadie
+ * hasta que intenta volver del expediente a la rejilla y no puede. `encCrumb`
+ * ya las construye para estas tres páginas y aquí siguen funcionando: lo que se
+ * pierde es el escalón de más arriba —«Enciclopedia»—, que era el índice y ya
+ * no existe como sitio.
+ */
+const PAGINAS_ENEMIGOS = ['enemigos', 'foe', 'foeDif'];
+
+function renderEnemigos() {
+  const host = $('secPane');
+  if (!host) return;
+  if (!PAGINAS_ENEMIGOS.includes(state.enc.page)) {
+    // Pedir la página es asíncrono y repinta al llegar; mientras, se dice que
+    // está cargando en vez de dejar el hueco, que se lee como «no hay nada».
+    if (state.cargandoEnemigos) return;
+    state.cargandoEnemigos = true;
+    host.innerHTML = `<div class="hint">${esc(t('log.loading'))}</div>`;
+    encGo('enemigos').finally(() => { state.cargandoEnemigos = false; });
+    return;
+  }
+  if (!$('encRoot')) renderEncyclopedia();
 }
 
 /**
@@ -5156,7 +5291,20 @@ async function encGo(page, args = {}) {
 function encCrumb() {
   const e = state.enc;
   const desde = e.from ?? 'zonas';
-  const partes = [{ label: t('tab.encyclopedia'), page: 'index' }];
+  /**
+   * EL ESCALÓN DE «ENCICLOPEDIA» SÓLO EXISTE DENTRO DE LA PESTAÑA VIEJA.
+   *
+   * Lo destapó `npm run marco` al comprobar el viaje de ida y vuelta de la
+   * mudanza 6: dentro de la sección de Enemigos la miga seguía empezando por
+   * «Enciclopedia › Enemigos › a zol ghoul knight», y ese primer escalón lleva
+   * al ÍNDICE de tarjetas, que en una sección de la barra no es un sitio — lo
+   * habría pintado dentro de Enemigos, que es una sección enseñando otra cosa.
+   *
+   * Dentro de una sección la miga empieza en la propia sección, que es lo que
+   * la barra ya está diciendo a la izquierda. Cuando la pestaña se vaya en la
+   * mudanza 10, esta condición se queda sola y la línea de arriba se borra.
+   */
+  const partes = state.seccion ? [] : [{ label: t('tab.encyclopedia'), page: 'index' }];
   if (e.page !== 'index') partes.push({ label: t(`enc.${desde}`), page: desde });
   if (e.page === 'zona' || (e.page === 'foe' && desde === 'zonas')) {
     partes.push({ label: e.base, page: 'zona' });
@@ -5785,7 +5933,10 @@ function encFoe() {
 }
 
 function renderEncyclopedia() {
-  const host = $('bodyGrid');
+  // Igual que el resumen desde la mudanza 5: las páginas de la enciclopedia se
+  // están repartiendo en secciones y `#secPane` sólo existe cuando hay una
+  // abierta. Mientras queden páginas en la pestaña vieja, las dos conviven.
+  const host = $('secPane') ?? $('bodyGrid');
   const e = state.enc;
   // El título de la vista lo pone la pestaña, que está justo encima y marcada.
   // Repetirlo aquí costaba una línea de las que hacen falta para que las siete
@@ -6034,6 +6185,8 @@ const SECCIONES = [
   // propio, con sus cinco idiomas.
   { id: 'resumen', grupo: 'historico', ico: '▤', rotulo: () => t('sec.resumen'),
     listo: true, lista: false, pinta: renderResumen },
+  { id: 'enemigos', grupo: 'historico', ico: '✦', rotulo: () => t('enc.enemigos'),
+    listo: true, lista: false, pinta: renderEnemigos },
 ];
 
 function renderLateral() {

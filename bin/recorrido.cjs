@@ -82,11 +82,17 @@ const VISTAS = [
   { nombre: 'botin', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="botin"]')] },
   { nombre: 'analisis', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="analisis"]')] },
   { nombre: 'resumen', pasos: [pulsa('[data-sec="resumen"]')], espera: 2500 },
-  { nombre: 'reproduccion', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('#btnReplay')], espera: 2500 },
+  // El botón de reproducir vive en la cabecera de la pelea, que se mudó a la
+  // sección Escena en la mudanza 2: entrando por la pestaña vieja ya no hay
+  // botón que pulsar, y la tanda salía fotografiando el Combate vacío. Lo cazó
+  // la comprobación de «el panel salió vacío», diez veces seguidas.
+  { nombre: 'reproduccion',
+    pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="escena"]'), pulsa('#btnReplay')],
+    espera: 2500 },
   { nombre: 'avisos', pasos: [pulsa('#tabTriggers')] },
   { nombre: 'enciclopedia', pasos: [pulsa('#tabEnc')] },
   { nombre: 'enc-zonas', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="zonas"]')] },
-  { nombre: 'enc-enemigos', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="enemigos"]')] },
+  { nombre: 'enemigos', pasos: [pulsa('[data-sec="enemigos"]')], espera: 3000 },
   { nombre: 'enc-botin', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="botin"]')] },
   { nombre: 'enc-hechizos', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="hechizos"]')] },
   { nombre: 'enc-progreso', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="progreso"]')] },
@@ -96,8 +102,9 @@ const VISTAS = [
     pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="hechizos"]'), pulsa('.cat-row.abre')],
   },
   {
-    nombre: 'enc-enemigo',
-    pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="enemigos"]'), pulsa('.encrow.foe .nm')],
+    nombre: 'enemigo',
+    pasos: [pulsa('[data-sec="enemigos"]'), pulsa('.encrow.foe .nm')],
+    espera: 3000,
   },
 ];
 

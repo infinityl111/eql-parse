@@ -143,6 +143,7 @@ puede reabrir con M10.
 | mudanza | elementos | sección nueva | comprobado |
 |--:|---|---|---|
 | 1 | C17, C18 | Esta pelea › **Botín** | mismas cifras en la misma pelea · 10 capturas (5 idiomas × 2 temas) en `tmp/capturas-despues-botin/` · `npm test` en verde |
+| 6 | E6–E11 | Histórico › **Enemigos** | primera EXTRACCIÓN: tres páginas sacadas del enrutador `state.enc.page` sin partir `renderEncyclopedia` · migas comprobadas de ida y vuelta con `npm run marco` |
 | 5 | U1–U13 | Histórico › **Resumen** | primera sección SIN lista · `npm run marco` en verde: la lista se va y vuelve con la misma pelea marcada y abierta, y la sección ocupa 1.224 px con hueco 0 · 10 capturas en `tmp/capturas-despues-resumen/` |
 | 4 | N1–N8, A3–A7, A9–A11, D1 | Esta pelea › **Análisis** | «Aguantar» deja de ser pestaña y pasa a bloque **conservando su titular** · con esta mudanza la vista vieja de Combate queda en **0 hijos y 0 caracteres**, medido · 10 capturas en `tmp/capturas-despues-analisis/` · `npm test` en verde |
 | 3 | R1–R17, D1–D4, A9, A10 | Esta pelea › **Por habilidad** | `renderRows` y `renderDocs` sin tocar; A9, A10, D1 y D4 van **de paso** hasta Análisis (4) y Registro (11) · 30 capturas en `tmp/capturas-despues-habilidad/` · `npm test` en verde |
