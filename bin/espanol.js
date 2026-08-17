@@ -80,10 +80,23 @@ const cajon = (rel, linea) => {
   return 'PANTALLA';
 };
 
+/**
+ * LAS EXCLUSIONES SE COMPARAN ENTERAS, no por el final de la ruta.
+ *
+ * Excluir es la dirección peligrosa: un sufijo que casa de más quita un fichero
+ * del censo y no se nota, porque lo que sale es un número más BAJO. `src/i18n.js`
+ * hoy es único, pero `endsWith` casaría con cualquier otro `src/i18n.js` que
+ * apareciera bajo otra carpeta. Y «casi siempre acierta» es donde vive el caso
+ * que nadie ha visto.
+ */
+const FUERA_DEL_CENSO = new Set([
+  path.join('src', 'i18n.js'),    // el diccionario ES el español
+  path.join('src', 'jerga.js'),   // jerga del juego, a propósito
+]);
+
 const hallazgos = [];
 for (const rel of ficheros) {
-  if (rel.endsWith(path.join('src', 'i18n.js'))) continue;          // el diccionario ES el español
-  if (rel.endsWith(path.join('src', 'jerga.js'))) continue;         // jerga del juego, a propósito
+  if (FUERA_DEL_CENSO.has(rel)) continue;
   const txt = fs.readFileSync(path.join(RAIZ, rel), 'utf8');
   const limpio = sinComentarios(txt);
   const lineas = limpio.split('\n');
@@ -122,7 +135,7 @@ const CAMPOS = /(?:^|[\s{,(])(name|speak|text|title|label|timerLabel|timerEndSpe
 const literales = [];
 for (const rel of ficheros) {
   if (/^(bin|web|test)[\\/]/.test(rel)) continue;
-  if (rel.endsWith(path.join('src', 'i18n.js'))) continue;
+  if (rel === path.join('src', 'i18n.js')) continue;
   const limpio = sinComentarios(fs.readFileSync(path.join(RAIZ, rel), 'utf8'));
   limpio.split('\n').forEach((l, i) => {
     for (const m of l.matchAll(CAMPOS)) {

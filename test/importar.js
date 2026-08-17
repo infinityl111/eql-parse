@@ -7,10 +7,24 @@
  * al arrancar, sin que nadie lo pidiera. Se vio porque imprime; si sólo hubiera
  * borrado la carpeta, no se habría visto.
  *
- * LA REGLA NO ES «ningún fichero se ejecuta»: `bin/*.js`, `test/*.js` y el
- * propio `build.mjs` son puntos de entrada y ejecutar es su trabajo. La regla es
- * la que dijo quien lo encontró: una función que quieren dos sitios no puede
- * vivir en un fichero que se ejecuta al mirarlo.
+ * LA REGLA NO ES «ningún fichero se ejecuta»: `bin/*.js` y `test/*.js` son
+ * puntos de entrada y ejecutar es su trabajo. La regla es la que dijo quien lo
+ * encontró: una función que quieren dos sitios no puede vivir en un fichero que
+ * se ejecuta al mirarlo.
+ *
+ * ── Y EL CENSO ESTABA ESCRITO A LA MEDIDA DE LO QUE YA SABÍAMOS MIRAR ──────
+ *
+ *     UNA GUARDA DEFINE MAL SU POBLACIÓN CUANDO EXCLUYE EL CASO QUE LA TRAJO.
+ *
+ * Esta población es «los módulos que alguien importa», y `build.mjs` —el fallo
+ * que trajo esta prueba, nombrado aquí arriba— NO estaba dentro: no lo importa
+ * ningún fichero del repositorio. La guarda existía por él y no lo cubría.
+ *
+ * Volvió a pasar el 18 de agosto: un `import` desde una consola para comprobar
+ * la sintaxis borró `web/dist` y dejó `releases.json` en cero. La población
+ * buena no era «los que alguien importa» sino «los que destruyen estado», y por
+ * eso `build.mjs` lleva ahora su propia comprobación de ejecución directa —lo
+ * que además lo devuelve a esta lista el día que alguien lo importe—.
  *
  * POR ESO LA LISTA SE DERIVA, NO SE ESCRIBE. Se leen todos los fuentes, se mira
  * QUIÉN IMPORTA A QUIÉN, y se comprueban sólo los que alguien importa. Dos
@@ -97,11 +111,18 @@ ok(ruidosos.length === 0, 'ninguno escribe por la salida al importarse',
 ok(lentos.length === 0, `ninguno tarda más de ${TOPE_MS} ms en importarse`,
   lentos.length ? lentos.join(' · ') : 'ninguno');
 
-// Y la guarda de la guarda: que esto esté mirando de verdad los módulos que
-// importan los demás, y no una lista vacía por un cambio en la forma de
-// importar. Si `src/store.js` no está, el detector se ha roto.
-ok([...importados].some((f) => f.endsWith(`store.js`)) && [...importados].some((f) => f.endsWith('i18n.js')),
-  'la lista incluye los módulos centrales: el detector sigue viendo');
+/**
+ * Y LA GUARDA DE LA GUARDA: que esto esté mirando de verdad los módulos que
+ * importan los demás, y no una lista vacía por un cambio en la forma de
+ * importar. Si `src/store.js` no está, el detector se ha roto.
+ *
+ * Se comparan las RUTAS ENTERAS y no el final: `endsWith('store.js')` casaría
+ * con un `bin/algo-store.js` cualquiera y daría por bueno un detector roto.
+ */
+const centrales = [path.join(RAIZ, 'src', 'store.js'), path.join(RAIZ, 'src', 'i18n.js')];
+const faltan = centrales.filter((f) => !importados.has(f));
+ok(faltan.length === 0, 'la lista incluye los módulos centrales: el detector sigue viendo',
+  faltan.length ? `faltan ${faltan.map((f) => path.relative(RAIZ, f)).join(', ')}` : 'src/store.js y src/i18n.js');
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');
 process.exit(failed ? 1 : 0);

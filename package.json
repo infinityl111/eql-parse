@@ -26,7 +26,8 @@
     "web:webp": "node bin/webp.js",
     "web:peso": "node bin/web-peso.js",
     "imposibles": "node bin/imposibles.js",
-    "reproductor": "node bin/reproductor.js"
+    "reproductor": "node bin/reproductor.js",
+    "estado": "node bin/estado.js"
   },
   "build": {
     "appId": "dev.miguelangelfernandez.eqlparse",
