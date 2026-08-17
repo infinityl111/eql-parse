@@ -27,6 +27,14 @@ cinco idiomas × dos temas. La del después irá a `--salida=despues-<sección>`
 en otra carpeta y a propósito: escribiéndose las dos en la misma, la segunda
 pisa a la primera y al terminar no hay con qué comparar.
 
+**Y NO sirve para comparar cifras**, que es la salvedad que faltaba cuando se
+presentó como red de seguridad: Campeón juega entre tandas, así que el registro
+crece y la pelea que abre el recorrido no es la misma de una tanda a otra. Dos
+capturas del mismo sitio con números distintos probablemente sean dos peleas.
+Para las cifras, el método es abrir **a mano la misma pelea** antes y después,
+que es lo que se hace en cada mudanza. Está escrito también en
+`tmp/capturas-antes/LEEME.md`, junto a las propias capturas.
+
 **Lo que la foto cubre, y lo que no.** Cada sección son cuatro trozos de 815 px
 desde arriba (`seccion.png`, `-2`, `-3`, `-4`) **más el final** (`-fin.png`)
 cuando no cabe. En las seis secciones largas —botín, enemigos, hechizos,
@@ -135,6 +143,7 @@ puede reabrir con M10.
 | mudanza | elementos | sección nueva | comprobado |
 |--:|---|---|---|
 | 1 | C17, C18 | Esta pelea › **Botín** | mismas cifras en la misma pelea · 10 capturas (5 idiomas × 2 temas) en `tmp/capturas-despues-botin/` · `npm test` en verde |
+| 3 | R1–R17, D1–D4, A9, A10 | Esta pelea › **Por habilidad** | `renderRows` y `renderDocs` sin tocar; A9, A10, D1 y D4 van **de paso** hasta Análisis (4) y Registro (11) · 30 capturas en `tmp/capturas-despues-habilidad/` · `npm test` en verde |
 | 2 | C1–C16, C19, C20, A1, A2, A8, A12 | Esta pelea › **Escena** | la misma pelea —«a zol ghoul knight · 3 abatidos»— da 281 / 18.555 / 1m 6s / 39 / 1355 / 5 y pico 879/s, idéntico al antes · 10 capturas en `tmp/capturas-despues-escena/` · `npm test` en verde |
 
 ## 4 · Vista **Combate** — la cabecera de la pelea

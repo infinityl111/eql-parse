@@ -202,7 +202,7 @@ que el armazón estaba bien.
 |--:|---|---|---|
 | **1 ✔** | **Botín (esta pelea)** | C17, C18 | `lootHTML`, que estaba dentro de `renderHead` |
 | **2 ✔** | **Escena** (sin figuras todavía) | C1–C16, C19, C20, A1, A2, A8, A12 | `renderHead`, `renderClassPrompt`, `renderPetHint`, `charmHTML`, `incertidumbreHTML` |
-| 3 | **Por habilidad** | R1–R17 | `renderRows` |
+| **3 ✔** | **Por habilidad** | R1–R17, y de paso D1–D4, A9 y A10 | `renderRows` y `renderDocs` |
 | 4 | **Análisis** | N1–N8 + A3–A6, A9–A11 | `renderAnalysis`, `renderAdvice`, `entreTuyosHTML`, `sinControlHTML`, `dpsMandoHTML` |
 | 5 | **Resumen** | U1–U13 | `renderSummary` |
 | 6 | **Enemigos** | E6–E11 | páginas `enemigos`, `foe`, `foeDif` |

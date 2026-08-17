@@ -2974,6 +2974,37 @@ async function renderNarrate(host) {
    * texto (llevan `<b>` y una flecha), que es un parche con fecha de caducidad
    * escrita. Se arregla dándoles su propia clase, y eso es contenido: va con la
    * dieciseisava, en el mismo cambio.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA DIECIOCHOAVA: EN UNA MISMA VISTA, SÓLO UNA PREGUNTA PUEDE USAR EL COLOR.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     EN UNA MISMA VISTA, SÓLO UNA PREGUNTA PUEDE USAR EL COLOR. LAS DEMÁS
+   *     USAN TINTA, GROSOR, FORMA O RÓTULO.
+   *
+   * La gráfica de una pelea tenía tres preguntas pintadas con tres paletas a la
+   * vez: QUIÉN —las series, `--s1` y `--s2`—, DE QUÉ TIPO —los nueve colores de
+   * daño del juego— y EN QUÉ POSTURA —la franja de arriba, que se servía de los
+   * colores de daño porque hacían juego—. Tres categorías peleándose por los
+   * mismos tonos, y al enchufar la paleta de series salió la factura: en tema
+   * claro, el azul de `defensive` y el `--s2` de «lo que recibes» quedaron casi
+   * idénticos y EN LA MISMA FILA DE LEYENDA.
+   *
+   * NO SE ARREGLA BUSCANDO SEIS TONOS MÁS. Ése es el reflejo —«que las posturas
+   * tengan su paleta»— y garantiza que la siguiente categoría vuelva a chocar:
+   * los colores que se distinguen bien en los dos temas son pocos y ya están
+   * todos repartidos. Se arregla preguntando cuál de las tres NECESITA color:
+   *
+   *   quién      varias series a la vez, hay que distinguirlas   -> COLOR
+   *   tipo       varios trozos dentro de la misma barra          -> COLOR
+   *   postura    UNA a la vez, y su nombre ya está escrito allí  -> NO
+   *
+   *     UN VALOR QUE SÓLO PUEDE SER UNO A LA VEZ NO NECESITA COLOR: NO HAY NADA
+   *     DE LO QUE DISTINGUIRLO.
+   *
+   * Decidido: la franja de posturas pierde el color y se queda con tinta y
+   * rótulo. Es CONTENIDO, así que va con la dieciseisava y la diecisieteava,
+   * después del armazón — no ahora.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
@@ -3589,6 +3620,45 @@ function renderEscena(snap) {
   renderPetHint(snap);
   const f = withPets(fightFor(snap));
   pinta($('escenaNota'), [charmHTML(f), incertidumbreHTML(f)]);
+}
+
+/**
+ * SECCIÓN · POR HABILIDAD. La tercera mudanza: de dónde sale el daño.
+ *
+ * El reparto entero —las filas con su barra, su desglose y sus controles— y los
+ * documentos de la pelea. `renderRows` y `renderDocs` sin tocar; lo único que
+ * cambia es dónde cuelgan sus nodos.
+ *
+ * DOS COSAS ESTÁN AQUÍ DE PASO Y ESTÁ ESCRITO PARA QUE NO SE OLVIDE:
+ *
+ *   `#charmNote` con el fuego amigo y los tramos sin mando (A9, A10). Los pinta
+ *   `renderRows`, así que se mudan con él o dejan de verse — y una mudanza que
+ *   apaga algo no es una mudanza. Su sitio es Análisis, en la cuarta.
+ *
+ *   Los documentos de Aguantar y Registro. La barra de documentos se mueve
+ *   entera porque `renderDocs` la construye entera: partirla sería cirugía sobre
+ *   una función, no un cambio de sitio. Aguantar se va a Análisis en la cuarta y
+ *   Registro a su propia sección en la extracción once.
+ */
+function renderPorHabilidad(snap) {
+  const host = $('secPane');
+  if (!host) return;
+  if (!$('rows')) {
+    host.innerHTML = `<div class="charm-note" id="charmNote" style="display:none"></div>
+      <div id="rows"></div>
+      <div class="legend eyebrow">${TYPES.map((x) => `<span><i class="seg ${x}"></i>${x}</span>`).join('')}</div>
+      <div class="docbar" id="docBar"></div><div class="docpane" id="docPane"></div>`;
+    state.rowNodes.clear();
+    // La barra no se repinta en cada snapshot, así que el clic se atiende por
+    // delegación en el contenedor, que sí es estable.
+    $('docBar').addEventListener('click', (e) => {
+      const b = e.target.closest?.('.doctab');
+      if (!b) return;
+      state.doc = b.dataset.doc;
+      renderDocs(withPets(fightFor(state.snap)));
+    });
+  }
+  renderRows(snap);
 }
 
 /**
@@ -5770,6 +5840,8 @@ function foeDetail(a, f) {
 const SECCIONES = [
   { id: 'escena', grupo: 'pelea', ico: '▮', rotulo: () => t('sec.escena'),
     listo: true, lista: true, pinta: renderEscena },
+  { id: 'habilidad', grupo: 'pelea', ico: '≡', rotulo: () => t('sec.habilidad'),
+    listo: true, lista: true, pinta: renderPorHabilidad },
   { id: 'botin', grupo: 'pelea', ico: '◈', rotulo: () => t('loot.title'),
     listo: true, lista: true, pinta: renderBotinPelea },
 ];
@@ -5881,27 +5953,15 @@ function renderApp() {
     }
     return;
   }
-  if (!$('rows')) {
-    $('bodyGrid').innerHTML = `<aside id="fightList"></aside>
-      <main><div id="advice"></div><div class="charm-note" id="charmNote" style="display:none"></div><div id="rows"></div>
-      <div class="legend eyebrow">${TYPES.map((t) => `<span><i class="seg ${t}"></i>${t}</span>`).join('')}</div>
-      <div class="docbar" id="docBar"></div><div class="docpane" id="docPane"></div></main>`;
+  // Lo que le queda a la vista vieja después de tres mudanzas: el consejo de
+  // postura, que se va a Análisis en la cuarta. La navegación vieja sigue
+  // funcionando hasta que no quede nada en ella, y ya casi no queda.
+  if (!$('advice')) {
+    $('bodyGrid').innerHTML = '<aside id="fightList"></aside><main><div id="advice"></div></main>';
     state.rowNodes.clear();
-    // La barra no se repinta en cada snapshot, así que el clic se atiende por
-    // delegación en el contenedor, que sí es estable.
-    $('docBar').addEventListener('click', (e) => {
-      const b = e.target.closest?.('.doctab');
-      if (!b) return;
-      state.doc = b.dataset.doc;
-      renderDocs(withPets(fightFor(state.snap)));
-    });
   }
   renderFightList(state.snap);
-  // La cabecera, los dos avisos y «lo que esta pelea no sabe» se han mudado a la
-  // sección Escena (mudanza 2); los temporizadores, al marco. Aquí queda lo que
-  // todavía no tiene sección.
   renderAdvice(state.snap);
-  renderRows(state.snap);
 }
 
 function renderChrome(snap) {

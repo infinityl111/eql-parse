@@ -64,13 +64,17 @@ const PELEA = '.fight[data-live="0"]';
 const VISTAS = [
   { nombre: 'combate', pasos: [pulsa('#tabCombat'), pulsa(PELEA)] },
   {
+    // Los documentos viven dentro de «Por habilidad» desde la mudanza 3: se
+    // entra por la sección y se abre la última pestaña, que es la que nunca
+    // está abierta por defecto.
     nombre: 'documentos',
-    pasos: [pulsa('#tabCombat'), pulsa(PELEA),
+    pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="habilidad"]'),
       '[...document.querySelectorAll(".doctab")].at(-1)?.click()'],
   },
   // Las secciones del armazón nuevo se abren por la barra lateral. `data-sec`
   // no se traduce, igual que los identificadores de las pestañas viejas.
   { nombre: 'escena', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="escena"]')] },
+  { nombre: 'habilidad', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="habilidad"]')] },
   { nombre: 'botin', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="botin"]')] },
   { nombre: 'analisis', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('#btnAnalyse')] },
   { nombre: 'resumen', pasos: [pulsa('#tabCombat'), pulsa('#btnSummary')] },
