@@ -4,6 +4,15 @@
  * LAS IMPOSIBILIDADES: cosas que NO PUEDEN SER, sobre el dato real.
  * ═══════════════════════════════════════════════════════════════════════════
  *
+ *     TODA ETIQUETA QUE SIRVA PARA JUZGAR UN MECANISMO TIENE QUE PODER
+ *     CONSTRUIRSE SIN ESE MECANISMO.
+ *
+ * Es la regla que ordena este fichero. Un instrumento hecho de la misma pieza
+ * que lo juzgado no puede contradecirlo: contesta lo que el acusado cree. Por
+ * eso lo de aquí son INVARIANTES sobre el dato en disco —un hueco no puede ser
+ * mayor que la pelea que lo contiene—, que se pueden comprobar sin preguntarle
+ * nada al código que las produjo.
+ *
  * NO ES UNA BATERÍA DE PRUEBAS, y la diferencia es el motivo de que exista.
  * `test/` comprueba que el código hace lo que se decidió que hiciera, sobre
  * líneas escritas a mano. Esto comprueba que **lo que hay en el disco puede

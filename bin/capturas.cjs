@@ -264,6 +264,18 @@ async function dispara(win, ejec, destino) {
    * Si no cuadra, la tanda no se entrega. Y el alto se vuelve a medir al final:
    * si el panel creció mientras se fotografiaba —el registro sigue vivo—, la
    * cuenta habla de una página que ya no existe y eso también es no cuadrar.
+   *
+   * DOS REGLAS QUE HAY QUE TENER DELANTE PARA QUE ESTA CUENTA SIRVA:
+   *
+   *   SI UN LADO DE LA IGUALDAD SE DEDUCE DEL OTRO, LA IGUALDAD NO PRUEBA
+   *   NADA. Aquí lo capturado se MIDE (el `scrollTop` real de cada disparo) y
+   *   el alto se MIDE aparte: son dos medidas independientes que se comparan.
+   *   Restar una de la otra y comprobar que suman sería una tautología verde.
+   *
+   *   Y LA COBERTURA CONTESTA «¿LO HE COGIDO ENTERO?», NUNCA «¿ES ESTO LO QUE
+   *   PEDÍ?». Esta cuenta puede cuadrar al 100 % sobre la pantalla equivocada.
+   *   Lo que demuestra que es la pantalla pedida es otra cosa —que cada sección
+   *   traiga algo que sólo tiene ella—, y vive en `bin/marco.cjs`.
    */
   const orden = vistos.slice().sort((a2, b2) => a2[0] - b2[0]);
   const union = [];

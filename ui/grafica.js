@@ -105,6 +105,11 @@ export function grafica(f, { marcas = false } = {}) {
      * de daño: colores del vocabulario del juego usados aquí por cómo se ven.
      * Leído al pie de la letra, esta gráfica decía que tu daño es de frío.
      *
+     * EN UNA MISMA VISTA, SÓLO UNA PREGUNTA PUEDE USAR EL COLOR; las demás usan
+     * tinta, grosor, forma o rótulo. Aquí la pregunta del color es QUIÉN. El
+     * tipo de daño y la postura tienen sus propios sitios y no entran por aquí:
+     * tres categorías compartiendo paleta no se leen, se adivinan.
+     *
      * `--s1` y `--s2` son dos de los seis colores calculados del prototipo, y
      * son los mismos que usará el dps por combatiente cuando llegue: una línea
      * tuya será del mismo color en las dos gráficas, que es justo lo que hace

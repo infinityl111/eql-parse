@@ -23,8 +23,9 @@
  * veredicto de postura.
  *
  * Y ES EL MISMO FALLO QUE YA HABÍA APARECIDO CUATRO VECES: dejar que un dato
- * inestable mande sobre una identidad declarada. Ver el bloque de `ui/app.js`
- * donde están las cinco escritas juntas.
+ * inestable mande sobre una identidad declarada: el nombre, la posición en una
+ * lista, la ventana abierta, un golpe suelto. Cinco funciones distintas, cinco
+ * fallos distintos, y la misma raíz.
  *
  * LO QUE ESTA PRUEBA FIJA:
  *

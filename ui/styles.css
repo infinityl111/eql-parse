@@ -534,6 +534,10 @@ footer .path:hover { color: var(--bone-dim); }
 .cand { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--slate-800); margin-bottom: 3px; cursor: pointer; font-family: var(--mono); font-size: 11.5px; }
 .cand:hover { background: var(--slate-700); }
 .cand small { color: var(--bone-faint); margin-left: auto; }
+/* `.hint` NO es «texto pequeño y gris»: es LA NOTA QUE MATIZA UN DATO, y por eso
+   se puede contar, buscar y auditar. Una clase que significa algo no se usa por
+   cómo se ve — el día que se ponga a un dato porque queda bien pequeño, el
+   recuento de notas deja de valer y nadie se entera. */
 .hint { font-size: 11.5px; color: var(--bone-faint); line-height: 1.5; }
 .actions { display: flex; gap: 10px; margin-top: 24px; }
 

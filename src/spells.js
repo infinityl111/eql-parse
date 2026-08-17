@@ -17,6 +17,12 @@ import { t } from './i18n.js';
  * LO QUE NO ES UNA CATEGORÍA, Y POR QUÉ NO. Léelo antes de añadir una.
  * ═══════════════════════════════════════════════════════════════════════════
  *
+ * Y ANTES DE NADA, LO QUE ESTA LISTA NO TIENE: las diez categorías salen de una
+ * idea razonable de qué categorías debería haber, no de medir el registro. Todos
+ * los umbrales del programa están medidos y éstas no. UNA TAXONOMÍA INVENTADA NO
+ * FALLA: NO VE. Lo que no tiene casilla no aparece en ninguna cuenta, y no deja
+ * hueco donde se note que falta.
+ *
  * Aquí es donde alguien va a llegar con «falta la categoría X». Es razonable
  * llegar: el residuo del registro —los lanzamientos que ninguna clave atrapa—
  * tiene cuatro montones grandes y con nombre. Se midieron los cuatro, y
