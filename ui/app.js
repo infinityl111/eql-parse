@@ -91,6 +91,9 @@ const state = {
   hover: null,
   setup: false,
   view: 'combat',
+  // La sección abierta de la barra lateral, cuando `view` es 'sec'. Vive aparte
+  // de `view` porque las secciones son una lista que crece, no un estado más.
+  seccion: null,
   cfg: {},
   rowNodes: new Map(),
   sideHeads: new Map(),
@@ -3517,6 +3520,56 @@ function lootHTML(f) {
   </div>`;
 }
 
+/**
+ * Los objetos de una lista de botín, enganchados.
+ *
+ * Vivía suelto dentro de `renderHead`, que es de donde el botín se ha mudado.
+ * Se saca a su propia función porque ahora hace falta en la sección de Botín y
+ * porque el mismo trío —abrir la wiki, enseñar la ficha, quitarla— se repite en
+ * el resumen y en la enciclopedia: el día que cambie, que se cambie una vez.
+ */
+function cablearBotin(host) {
+  host?.querySelectorAll('.loot-item').forEach((el) => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); window.eql.openWiki(el.dataset.item); });
+    el.addEventListener('mouseenter', () => showItemTip(el.dataset.item));
+    el.addEventListener('mouseleave', hideItemTip);
+  });
+}
+
+/**
+ * SECCIÓN · BOTÍN DE ESTA PELEA. La primera mudanza del armazón.
+ *
+ * No hay nada nuevo aquí dentro: es `lootHTML`, el mismo que llevaba dentro de
+ * la cabecera de la pelea, con los mismos objetos, la misma procedencia y la
+ * misma nota. Lo único que cambia es que ahora tiene sitio propio en vez de ir
+ * colgando debajo de la gráfica.
+ *
+ * Y ESTRENA UN VACÍO QUE YA ESTABA ESCRITO: `loot.none` —«Sin botín en esta
+ * pelea»— existe en los cinco diccionarios desde hace versiones y no lo pintaba
+ * nadie, porque dentro de la cabecera un botín vacío simplemente no se dibujaba.
+ * Una sección sí tiene que decir que está vacía: si no, no se distingue de una
+ * que falló al cargar.
+ */
+function renderBotinPelea(snap) {
+  const host = $('secPane');
+  if (!host) return;
+  const f = withPets(fightFor(snap));
+  const sig = `${getLang()}|${f?.uid ?? 'live'}|${(f?.loot ?? []).length}`;
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+  if (!f) {
+    const hayPeleas = (state.fights?.length ?? 0) > 0;
+    host.innerHTML = `<div class="empty">
+      <h2>${esc(hayPeleas ? t('fight.pick') : t('fight.none'))}</h2>
+      <p>${esc(hayPeleas ? t('fight.pickHint') : t('fight.noneHint'))}</p></div>`;
+    return;
+  }
+  const html = lootHTML(f);
+  host.innerHTML = html || `<div class="empty"><h2>${esc(t('loot.title'))}</h2>
+    <p>${esc(t('loot.none'))}</p></div>`;
+  cablearBotin(host);
+}
+
 function renderHead(snap) {
   const f = withPets(fightFor(snap));
   const host = $('fightHead');
@@ -3578,13 +3631,7 @@ function renderHead(snap) {
       ${f.kills.length ? card(f.kills.length, t('metric.kills', { n: f.kills.length })) : ''}
       ${f.losses?.length ? card(f.losses.length, t('metric.losses', { n: f.losses.length }), 'bad') : ''}
     </div>
-    ${chartHTML(f)}
-    ${lootHTML(f)}`;
-  host.querySelectorAll('.loot-item').forEach((el) => {
-    el.addEventListener('click', (e) => { e.stopPropagation(); window.eql.openWiki(el.dataset.item); });
-    el.addEventListener('mouseenter', () => showItemTip(el.dataset.item));
-    el.addEventListener('mouseleave', hideItemTip);
-  });
+    ${chartHTML(f)}`;
   $('btnExport')?.addEventListener('click', (e) => { e.stopPropagation(); window.eql.exportEncounter(f); });
   // Copiar para el chat. Mismo texto que el botón del overlay —sale del mismo
   // sitio, `src/share.js`— para que no acaben divergiendo dos formatos que
@@ -5645,7 +5692,87 @@ function foeDetail(a, f) {
     </div>`).join('')}${weak}</div>`;
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EL ARMAZÓN: LAS SECCIONES DE LA BARRA LATERAL, AGRUPADAS POR ALCANCE.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Esta pelea · Todo el histórico · Ajustes. Por ALCANCE y no por tipo de dato,
+ * que es lo que nos separa del competidor: lo primero que hay que saber de un
+ * número es de qué está hablando. «Botín» dentro de «esta pelea» y «Botín»
+ * dentro de «todo el histórico» son dos preguntas distintas, y agrupados por
+ * tipo se leerían como la misma con dos vistas.
+ *
+ * SÓLO SE PINTA LO QUE YA EXISTE (`listo`). Una sección dibujada y vacía es una
+ * promesa, y el prototipo trae varias que hoy no tienen datos. Mientras el
+ * armazón esté a medias, la lista crece de una en una y LA NAVEGACIÓN VIEJA
+ * —las tres pestañas de la cabecera— sigue funcionando al lado: se quita cuando
+ * no quede nada en ella, no antes.
+ *
+ * `lista` dice si esa sección se ve con la columna de peleas al lado. Las de
+ * «esta pelea» sí: elegir otra pelea es el gesto que las cambia.
+ */
+const SECCIONES = [
+  { id: 'botin', grupo: 'pelea', ico: '◈', rotulo: () => t('loot.title'),
+    listo: true, lista: true, pinta: renderBotinPelea },
+];
+
+function renderLateral() {
+  const host = $('lateral');
+  if (!host) return;
+  // Durante la introducción y la configuración del log no hay secciones a las
+  // que ir: la barra se quita en vez de ofrecer un sitio al que no se puede
+  // entrar todavía. `.lateral:empty` se encarga de que no quede el carril.
+  const hay = state.setup || state.wizard ? [] : SECCIONES.filter((s) => s.listo);
+  const activa = state.view === 'sec' ? state.seccion : null;
+  const sig = `${getLang()}|${activa ?? ''}|${hay.map((s) => s.id).join(',')}`;
+  if (host.dataset.sig === sig) return;
+  host.dataset.sig = sig;
+
+  host.innerHTML = ['pelea', 'historico', 'ajustes'].map((g) => {
+    const items = hay.filter((s) => s.grupo === g);
+    if (!items.length) return '';
+    return `<div class="lat-g">${esc(t(`sec.g.${g}`))}</div>${items.map((s) => `
+      <button class="lat-item${s.id === activa ? ' on' : ''}" data-sec="${s.id}">
+        <span class="ico">${s.ico}</span>${esc(s.rotulo())}</button>`).join('')}`;
+  }).join('');
+
+  host.querySelectorAll('[data-sec]').forEach((el) =>
+    el.addEventListener('click', () => abrirSeccion(el.dataset.sec)));
+}
+
+/**
+ * Entrar en una sección.
+ *
+ * Y APAGA LAS PESTAÑAS VIEJAS, que es lo que evita que las dos navegaciones se
+ * contradigan mientras conviven: si «Combate» sigue encendida mientras miras
+ * Botín, la cabecera está diciendo que estás en otro sitio.
+ */
+function abrirSeccion(id) {
+  state.view = 'sec';
+  state.seccion = id;
+  ['tabCombat', 'tabTriggers', 'tabEnc'].forEach((x) => $(x)?.classList.remove('active'));
+  $('bodyGrid').innerHTML = '';
+  state.rowNodes.clear();
+  renderApp();
+}
+
 function renderApp() {
+  if (state.view === 'sec' && !state.setup && !state.wizard) {
+    const s = SECCIONES.find((x) => x.id === state.seccion);
+    if (s) {
+      if (!$('secPane')) {
+        $('bodyGrid').innerHTML = `${s.lista ? '<aside id="fightList"></aside>' : ''}<main id="secPane"></main>`;
+        $('bodyGrid').classList.toggle('solo', !s.lista);
+      }
+      if (s.lista) renderFightList(state.snap);
+      s.pinta(state.snap);
+      return;
+    }
+    // Una sección que ya no existe no deja la pantalla en blanco: se vuelve.
+    state.view = 'combat';
+    state.seccion = null;
+  }
   if (state.view === 'summary') {
     // Sólo se monta una vez. Sin esta guarda el snapshot de 250 ms reconstruye
     // la vista entera y el scroll vuelve arriba en cuanto lo mueves.
@@ -5723,6 +5850,10 @@ function renderApp() {
 }
 
 function renderChrome(snap) {
+  // La barra lateral es marco, como la cabecera: se pinta aquí y no en
+  // `renderApp`, que reescribe `#bodyGrid` y no la toca. Tiene su guarda de
+  // firma, así que pasar por aquí cuatro veces por segundo no cuesta nada.
+  renderLateral();
   $('dot').className = `dot ${snap.status}`;
   $('statusText').textContent = snap.error ?? t(`status.${snap.status}`);
   $('mChar').textContent = snap.self ?? '—';
@@ -5924,6 +6055,9 @@ window.eql.onAlert((a) => {
 
 function setView(v) {
   state.view = v;
+  // Volver por una pestaña vieja apaga la sección de la barra: mientras las dos
+  // navegaciones conviven, sólo una puede estar diciendo dónde estás.
+  state.seccion = null;
   $('tabCombat').classList.toggle('active', v === 'combat');
   $('tabTriggers').classList.toggle('active', v === 'triggers');
   $('tabEnc').classList.toggle('active', v === 'encyclopedia');

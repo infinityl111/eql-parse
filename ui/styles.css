@@ -37,6 +37,26 @@
   --line: var(--slate-600);
   --dim:  var(--bone-dim);
 
+  /* ── Las seis series ────────────────────────────────────────────────────
+     La paleta de `diseño/ui-secciones.html`, seis colores CALCULADOS y no
+     elegidos: pasan la banda de luminosidad, el suelo de croma y el contraste
+     en los dos temas. Sirven para distinguir COMBATIENTES en una gráfica —una
+     línea por cada uno— y no tienen nada que ver con los `--t-*` de arriba,
+     que son los tipos de daño del juego y son vocabulario, no decoración.
+
+     Del séptimo en adelante se funden en `--resto`: nunca se inventa un color
+     más. Y en daltonismo el peor par queda en el filo, así que cada línea
+     lleva su nombre escrito al final; con la etiqueta la paleta es admisible,
+     sin ella no lo sería.
+
+     `--s1/--s2/--s3` son las tres series de la gráfica de una pelea —lo tuyo,
+     lo que recibes, el resto del grupo— y son TRES DE ESTOS SEIS, no colores
+     aparte: dos paletas conviviendo es lo que hay que evitar. */
+  --c1: #bd8a1f;  --c2: #9a5169;  --c3: #786500;
+  --c4: #499e64;  --c5: #007c99;  --c6: #7b87db;
+  --resto: var(--bone-dim);
+  --s1: var(--c1); --s2: var(--c6); --s3: var(--c2);
+
   --display: 'Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
   --mono: 'Cascadia Mono', 'Consolas', ui-monospace, monospace;
   --body: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
@@ -97,8 +117,44 @@ input, select {
   padding: 6px 8px; font-family: var(--mono); font-size: 12px; border-radius: 2px;
 }
 
+/* ── Barra lateral: las secciones, agrupadas POR ALCANCE ──────────────────
+   Esta pelea · Todo el histórico · Ajustes. No por tipo de dato: lo primero
+   que hay que saber de un número es de qué está hablando, y eso es su alcance.
+
+   Se pinta desde `renderLateral()` y SÓLO con las secciones que ya existen: una
+   sección vacía es una promesa. Mientras esté a medias, la navegación vieja
+   —las tres pestañas de la cabecera— sigue funcionando al lado. */
+.cuerpo { display: grid; grid-template-columns: auto 1fr; min-height: 0; }
+.cuerpo > .body { min-height: 0; }
+
+.lateral {
+  width: 176px; background: var(--slate-850); border-right: 1px solid var(--slate-700);
+  overflow-y: auto; padding: 6px 0 10px;
+}
+/* Sin secciones no hay columna: un carril vacío de 176 px al lado de la lista
+   sería un hueco que promete algo. */
+.lateral:empty { display: none; }
+.lat-g {
+  font-family: var(--display); font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em;
+  color: var(--bone-faint); padding: 12px 14px 5px; font-weight: 600;
+}
+.lat-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 7px 14px; cursor: pointer; text-align: left;
+  background: transparent; color: var(--bone);
+  border: 0; border-left: 2px solid transparent; border-radius: 0;
+  font-family: var(--body); font-size: 12.5px; letter-spacing: normal; text-transform: none;
+}
+.lat-item:hover { background: var(--slate-800); }
+.lat-item.on { background: var(--slate-800); border-left-color: var(--t-cold); font-weight: 600; }
+.lat-item .ico { width: 13px; text-align: center; color: var(--bone-faint); font-size: 11px; }
+.lat-item.on .ico { color: var(--t-cold); }
+
 /* ── Cuerpo ───────────────────────────────────────────── */
 .body { display: grid; grid-template-columns: 272px 1fr; min-height: 0; }
+/* Las secciones que no van con la lista de peleas al lado —las del histórico y
+   las de ajustes— ocupan el ancho entero. */
+.body.solo { grid-template-columns: 1fr; }
 
 aside {
   background: var(--slate-850); border-right: 1px solid var(--slate-700);
@@ -606,6 +662,11 @@ code { font-family: var(--mono); font-size: 11px; background: var(--slate-800); 
   --t-dot:     #9A4874;
   --t-spell:   #47535F;
   --t-other:   #7C8590;
+
+  /* Las seis series, en su versión clara. No son las mismas oscurecidas: cada
+     tema tiene las suyas medidas contra su propio fondo. */
+  --c1: #a56a05;  --c2: #843d56;  --c3: #c26e89;
+  --c4: #505901;  --c5: #539953;  --c6: #0096b8;
 }
 :root[data-theme="light"] .fight.active,
 :root[data-theme="light"] .row.me { background: #FFFDF8; }

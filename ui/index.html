@@ -36,9 +36,17 @@
 
     <div class="updbar" id="updBar" style="display:none"></div>
     <div class="migbar" id="migBar" style="display:none"></div>
-  <div class="body" id="bodyGrid">
-      <aside id="fightList"></aside>
-      <main id="mainPane"></main>
+  <!--
+      LA BARRA LATERAL VA FUERA DE `#bodyGrid`, y no es colocación: `renderApp()`
+      reescribe el `innerHTML` de `#bodyGrid` entero en cada vista, así que una
+      barra puesta dentro se borraría sola en el primer repintado.
+    -->
+    <div class="cuerpo">
+      <nav class="lateral" id="lateral" aria-label="Secciones"></nav>
+      <div class="body" id="bodyGrid">
+        <aside id="fightList"></aside>
+        <main id="mainPane"></main>
+      </div>
     </div>
 
     <footer>
