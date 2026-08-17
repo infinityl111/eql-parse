@@ -422,7 +422,15 @@ Se anota aquí y no se toca dentro de este cambio, que sólo mueve cosas de siti
    capturador para llegar a la reproducción, y la tanda siguió saliendo verde
    fotografiando otra pantalla. Cada vez que se mueve un botón, un identificador
    o una pestaña, hay que mirar `bin/recorrido.cjs` **antes** de fotografiar;
-5. el inventario tachado por donde va.
+6. el inventario tachado por donde va;
+7. **un `git status` al cerrar el turno, y leerlo.** Lo que aparezca ahí que no
+   sea del cambio hay que nombrarlo en voz alta: un fichero suelto, un `tmp/`
+   que crece, un `web/releases.json` tocado por otra cosa. No es burocracia:
+   **el riesgo que nadie mira es el que no se parece a los que sí miramos.** Las
+   otras seis comprobaciones vigilan la pantalla y el estado, que es donde
+   sabemos que hay fallos; ninguna mira el árbol de trabajo, y por eso un
+   fichero a medio escribir puede viajar dentro de un commit ajeno sin que
+   ninguna se ponga roja.
 
 Y la navegación vieja **sigue funcionando hasta el final**: se quita en el paso
 16, cuando no quede nada en ella.
