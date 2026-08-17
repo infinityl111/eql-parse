@@ -111,31 +111,76 @@ const CAPTURAS = [
 
 // ── Las novedades ───────────────────────────────────────────────────────────
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SI NO SE PUEDE PREGUNTAR POR LAS VERSIONES, NO SE CONSTRUYE.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *     UN CERO DE «NO HAY NOVEDADES» Y UN CERO DE «NO HE PODIDO PREGUNTAR» SE
+ *     ESCRIBEN IGUAL. Aquí el que se lo come es quien entra a descargar.
+ *
+ * Esto devolvía la copia guardada cuando la API fallaba, y una lista VACÍA
+ * cuando no había copia — y la construcción seguía y escribía las veinte
+ * páginas. Con la API en 503 eso es un sitio publicado sin lista de versiones y
+ * sin enlaces de descarga, en silencio y con salida 0 detrás.
+ *
+ * Ahora se para. La copia de `releases.json` se sigue escribiendo porque es un
+ * registro útil, pero NO sirve de respaldo para construir: unos datos viejos y
+ * unos buenos se ven igual en la página, que es la razón de todo esto. Y se
+ * escribe SÓLO después de las comprobaciones, para que una respuesta mala no se
+ * lleve por delante la copia buena.
+ *
+ * SE COMPRUEBAN TRES CEROS, no uno:
+ *
+ *   · no se pudo preguntar — red caída, 503, lo que sea;
+ *   · cero versiones — la API contestó, pero con la lista vacía;
+ *   · la más nueva sin instalador — el botón de descarga cae a la página de la
+ *     release y `bytes` sale 0. Pasa de verdad entre crear la release y subir
+ *     el .exe, y desde fuera se ve como una descarga que no descarga.
+ */
 async function releases() {
+  let j;
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`,
       { headers: { 'User-Agent': 'eqlparse-web', Accept: 'application/vnd.github+json' } });
     if (!r.ok) throw new Error(`GitHub devolvió ${r.status}`);
-    const j = await r.json();
-    const limpio = j.map((x) => ({
-      tag: x.tag_name, nombre: x.name ?? x.tag_name, fecha: x.published_at,
-      cuerpo: (x.body ?? '').slice(0, 6000), url: x.html_url,
-      exe: (x.assets ?? []).find((a) => /\.exe$/i.test(a.name)) ?? null,
-    })).map((x) => ({ ...x, bytes: x.exe?.size ?? 0, descarga: x.exe?.browser_download_url ?? x.url }));
-    await fsp.writeFile(CACHE, JSON.stringify(limpio, null, 1));
-    console.log(`  novedades: ${limpio.length} versiones desde la API`);
-    return limpio;
+    j = await r.json();
   } catch (err) {
-    // La copia de la última vez. Se avisa: una web construida con datos viejos
-    // y sin decirlo es peor que una que lo dice.
-    if (fs.existsSync(CACHE)) {
-      const c = JSON.parse(fs.readFileSync(CACHE, 'utf8'));
-      console.log(`  novedades: GitHub no respondió (${err.message}); se usa la copia de ${c.length} versiones`);
-      return c;
-    }
-    console.log(`  novedades: sin API y sin copia (${err.message}) — la página saldrá vacía y lo dirá`);
-    return [];
+    throw new Error(`no se pudo preguntar por las versiones: ${err.message}.`
+      + ' La construcción se para aquí: un sitio sin lista de versiones y sin'
+      + ' enlaces de descarga es peor que no desplegar. Inténtalo más tarde.');
   }
+  if (!Array.isArray(j)) {
+    // Cuando GitHub limita por peticiones contesta 200 con un objeto y su
+    // motivo dentro. Sin enseñarlo, esto se lee como «no hay releases».
+    throw new Error(`la API no devolvió una lista de versiones: ${j?.message ?? JSON.stringify(j).slice(0, 200)}`);
+  }
+  if (!j.length) {
+    throw new Error('la API contestó con CERO versiones. O el repositorio no tiene'
+      + ' releases, o la respuesta no es la que esperamos; en los dos casos la'
+      + ' portada saldría sin descargas.');
+  }
+  const limpio = j.map((x) => ({
+    tag: x.tag_name, nombre: x.name ?? x.tag_name, fecha: x.published_at,
+    cuerpo: (x.body ?? '').slice(0, 6000), url: x.html_url,
+    exe: (x.assets ?? []).find((a) => /\.exe$/i.test(a.name)) ?? null,
+  })).map((x) => ({ ...x, bytes: x.exe?.size ?? 0, descarga: x.exe?.browser_download_url ?? x.url }));
+
+  if (!limpio[0].exe) {
+    throw new Error(`la versión más nueva (${limpio[0].tag}) no trae instalador.`
+      + ' El botón de descarga llevaría a la página de la release y el tamaño'
+      + ' saldría en 0 bytes. Si estás publicando, sube el .exe y vuelve.');
+  }
+  // Un cuerpo recortado no se nota en la página: se corta a mitad de frase y
+  // parece que la nota acababa ahí.
+  for (const x of j) {
+    if ((x.body ?? '').length > 6000) {
+      console.log(`  AVISO: las notas de ${x.tag_name} pasan de 6.000 caracteres y salen recortadas`);
+    }
+  }
+  await fsp.writeFile(CACHE, JSON.stringify(limpio, null, 1));
+  console.log(`  novedades: ${limpio.length} versiones desde la API, la más nueva ${limpio[0].tag}`);
+  return limpio;
 }
 
 /**
@@ -704,8 +749,15 @@ async function copiar(origen, destino) {
 
 async function main() {
   console.log('\nConstruyendo eqlparse.com…');
-  await fsp.rm(DIST, { recursive: true, force: true });
-  await fsp.mkdir(DIST, { recursive: true });
+
+  /**
+   * TODO LO QUE PUEDE PARAR LA CONSTRUCCIÓN VA ANTES DE BORRAR NADA.
+   *
+   * `dist/` es lo último que se desplegó, así que borrarlo lo primero y fallar
+   * después deja al proyecto sin la construcción anterior y sin la nueva: si el
+   * despliegue tenía que salir hoy, ya no hay de dónde. Las claves, los textos
+   * y las versiones se comprueban con el disco intacto.
+   */
 
   // LAS CLAVES SE COMPRUEBAN ANTES DE NADA. Si una función se renombra en la
   // aplicación, aquí saldría su clave en crudo —«tank.title»— en cinco
@@ -726,6 +778,10 @@ async function main() {
 
   const rels = await releases();
   exigirNotasPublicadas(rels, JSON.parse(fs.readFileSync(path.join(PROY, 'package.json'), 'utf8')).version);
+
+  // Y AHORA sí: lo anterior se va porque ya hay con qué sustituirlo.
+  await fsp.rm(DIST, { recursive: true, force: true });
+  await fsp.mkdir(DIST, { recursive: true });
 
   // Imágenes: las capturas de los README y la muestra del reproductor.
   // Una copia por cada ruta distinta que pidan las cinco páginas. Si sólo hay
@@ -894,4 +950,12 @@ async function main() {
   console.log(`  salida: ${DIST}\n`);
 }
 
-main().catch((err) => { console.error('\nMAL ', err.message, '\n'); process.exit(1); });
+/**
+ * SE MARCA EL CÓDIGO DE SALIDA, NO SE MATA EL PROCESO.
+ *
+ * Con `process.exit(1)` a mitad de un fallo de red, libuv aborta con su propia
+ * aserción y el proceso sale con 127 en vez de con 1 — un código que en un guion
+ * se lee como «orden no encontrada», no como «falló la construcción». Marcando
+ * `exitCode` el bucle termina de cerrar lo suyo y sale con el 1 que dijimos.
+ */
+main().catch((err) => { console.error('\nMAL ', err.message, '\n'); process.exitCode = 1; });

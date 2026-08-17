@@ -53,8 +53,21 @@ export function notasHuerfanas(rels, versionHoy, dir = path.join(RAIZ, 'notas'))
   return [...conNotas].filter((v) => !publicadas.has(v)).sort();
 }
 
-/** La misma regla, pero parando la construcción. Ver arriba. */
+/**
+ * La misma regla, pero parando la construcción. Ver arriba.
+ *
+ * Y CON UNA LISTA VACÍA NO CALLA, SE PARA. `notasHuerfanas` devuelve «ninguna»
+ * cuando la versión de hoy no está publicada, que es lo correcto en la primera
+ * de las dos construcciones — pero una lista vacía porque no se pudo preguntar
+ * entra por esa misma puerta y apaga la guarda entera sin decir nada. Dos ceros
+ * que se escriben igual, otra vez.
+ */
 export function exigirNotasPublicadas(rels, versionHoy, dir) {
+  if (!Array.isArray(rels) || !rels.length) {
+    throw new Error('no hay lista de versiones publicadas, así que esta guarda no'
+      + ' ha comprobado nada. Con cero releases no se distingue «la de hoy aún no'
+      + ' existe» de «no se pudo preguntar».');
+  }
   const huerfanas = notasHuerfanas(rels, versionHoy, dir);
   if (!huerfanas.length) return;
   throw new Error(`versiones con notas escritas y SIN release: ${huerfanas.join(', ')}.`
