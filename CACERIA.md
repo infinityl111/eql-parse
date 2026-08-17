@@ -264,7 +264,7 @@ próxima que hay que añadir**, y pide el registro además del almacén.
 
 ## 3 · Las familias sin cepillar
 
-Veinticuatro escritas en `ui/app.js`. **Tres cepilladas**, veintiuna no.
+Veinticinco escritas en `ui/app.js`. **Tres cepilladas**, veintidós no.
 
 **El orden: las que más veces han disparado.**
 
@@ -281,6 +281,7 @@ Veinticuatro escritas en `ui/app.js`. **Tres cepilladas**, veintiuna no.
 | 22 | la ausencia tiene que distinguirse del fallo | 2 | en la lista de cada mudanza |
 | 23 | si un lado se deduce del otro, la igualdad no prueba nada | 1 | *método* · test mecánico |
 | 24 | se guarda una conclusión, nunca un asidero | **4** | pendiente · agrupa a las de identidad |
+| 25 | la cobertura no contesta «¿es esto lo que pedí?» | 1 | *método* · cuarta del capturador |
 | 12 | un número desnudo no cruza una frontera | 3 | cepillada |
 | 1–6 | dejar que un dato inestable mande sobre una identidad | 6 | pendiente |
 | 7 | salida muerta · alarma muerta | 2 | pendiente |

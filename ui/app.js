@@ -3203,6 +3203,41 @@ async function renderNarrate(host) {
    *
    * Y es la familia de los tríos borrados por índice, la del botín colgado de la
    * ventana y la de los tramos casados por hora: todas guardaban asideros.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA VEINTICINCOAVA: LA COBERTURA NO CONTESTA «¿ES ESTO LO QUE PEDÍ?».
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     LA COBERTURA CONTESTA «¿LO HE COGIDO ENTERO?», NUNCA «¿ES ESTO LO QUE
+   *     PEDÍ?». UNA HERRAMIENTA DE VERIFICACIÓN TIENE QUE DEMOSTRAR QUÉ MIRA, NO
+   *     SÓLO CUÁNTO.
+   *
+   * El capturador aprendió a demostrar su cobertura —lo capturado más lo
+   * declarado fuera tiene que dar el alto del panel, y si no cuadra la tanda no
+   * se entrega—. Y con esa cuenta en verde, al 100 %, sin un solo rojo, fotografió
+   * **29.284 px de la sección de Botín dos veces, con dos nombres**: al pulsar
+   * «Progreso» viniendo de «Botín», el reenvío rebotaba y la barra decía una cosa
+   * mientras la pantalla enseñaba otra.
+   *
+   * La cobertura era CIERTA. Cubría entero… el panel equivocado.
+   *
+   * LO QUE LO DELATÓ fue comparar los ALTOS de dos secciones distintas, no mirar
+   * las imágenes: dos secciones que miden exactamente lo mismo hasta el píxel son
+   * la misma pantalla. Por eso la comprobación que se añadió no es «mira mejor»
+   * sino **cada sección tiene que traer un elemento que sólo tiene ella**.
+   *
+   * Y ES LA CUARTA GENERACIÓN DE LA MISMA HERRAMIENTA CAYENDO EN LA MISMA
+   * FAMILIA, cada vez un escalón más arriba:
+   *
+   *   1. la carpeta vacía          fotografiaba una aplicación sin datos
+   *   2. el fotograma viejo        fotografiaba la pantalla anterior
+   *   3. el contenedor equivocado  fotografiaba una pantalla de las cinco
+   *   4. el SITIO equivocado       fotografiaba la sección de al lado
+   *
+   * Las tres primeras se arreglaron mirando la foto; la cuarta no se ve mirando
+   * fotos, porque cada una es perfecta. **Cuanto mejor es la herramienta, más
+   * arriba está el sitio donde miente**, y por eso la pregunta tiene que subir
+   * con ella: de «¿salió la foto?» a «¿está entera?» a «¿es de lo que pedí?».
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {

@@ -174,12 +174,51 @@ veros, y ese rato no se puede acotar desde el registro. **Es una cota superior.*
 
 ## D3 · El *consider* es prosa, no un número: el nivel del bicho no está en el registro
 
+> ## ❌ CORREGIDA EL 17 DE AGOSTO DE 2026: EL NIVEL SÍ ESTÁ
+>
+> Campeón enseñó una captura con «(Lvl: 50)» dentro de la línea del *consider*, y
+> un grep lo confirma. **La línea es prosa Y trae el número al final:**
+>
+> ```
+> A boogeyman scowls at you, ready to attack -- looks like it would wipe the
+> floor with you! (Lvl: 52)
+> ```
+>
+> **Medido sobre el registro entero (4–17 de agosto, 93 MB):**
+>
+> | | |
+> |---|---:|
+> | líneas con `(Lvl: N)` | **750** |
+> | nombres distintos con nivel | **320** |
+> | de ésos, con MÁS DE UN nivel visto | **26** |
+>
+> Los 26 con varios niveles no son un fallo: `a fire giant warrior` sale 47, 48,
+> 49 y 50 —el nivel varía por individuo— y `Notarino` sale 39, 40, 41, 46 y 50
+> porque **es un jugador, y sube**. El *consider* funciona sobre jugadores igual
+> que sobre bichos, así que quien lo lea tiene que separar las dos cosas antes de
+> meter nada en el bestiario.
+>
+> **Lo que sigue siendo cierto de D3:** el nivel sólo consta de lo que Campeón
+> haya *considerado* a mano, y eso son 320 nombres de los cientos que hay.
+>
+> **Y NO SE CONSTRUYE NADA CON ESTO.** La función que propuse encima —rellenar el
+> nivel del bestiario con los *consider*— queda **retirada**: el nivel no alimenta
+> ningún cálculo nuestro, el *consider* lo hace Campeón a mano y a pocos bichos, y
+> pedirle que considere para rellenar una columna **es pedirle que juegue para la
+> herramienta**.
+>
+> **Lo que la gente busca con el *consider* es LA FACCIÓN, no el nivel** — y las
+> **10.769** líneas de «Your faction standing with … has been adjusted» siguen
+> enteras en el cajón de lo no reconocido (eran 9.965 cuando se contaron; el
+> registro ha seguido creciendo). Ésa es la pareja que contesta algo que un
+> jugador se pregunta de verdad. Anotado, sin hacer nada.
+
 | | |
 |---|---|
 | **quién** | medido por **Fable** |
 | **cuándo** | antes del 16 de agosto de 2026 |
 | **seguridad** | **medido sobre el registro** |
-| **estado** | **contradice una afirmación anterior de Claude** |
+| **estado** | **CORREGIDA** — ver el recuadro de arriba |
 
 **Qué dice.** La línea de *consider* del juego describe la dificultad relativa
 **con una frase** —del estilo «parece que te va a costar»— y **no contiene el
@@ -593,3 +632,61 @@ centro y su forma de tirar era independiente de la hipótesis.
 **A partir de hoy deja de serlo.** Quien sepa esto y quiera comprobarlo tiene que
 anotar antes cuál mata primero, o los episodios nuevos valdrán menos que estos
 siete. Se anota aquí para que dentro de dos meses se sepa cuáles son cuáles.
+
+---
+
+## D10 · RETIRADA · «la abeja del centro es la que lleva al named»
+
+| | |
+|---|---|
+| **quién** | Campeón |
+| **declarada** | 17 de agosto de 2026 |
+| **RETIRADA** | **17 de agosto de 2026**, el mismo día |
+| **por qué** | ha mirado, y la abeja del centro **no es distinta**: de cualquiera de las tres puede salir la cadena buena |
+
+**Se queda escrita, no se borra.** Una creencia que se comprueba y se retira el
+mismo día es exactamente lo que este fichero existe para poder hacer: sin la
+entrada, dentro de dos meses alguien volvería a proponerlo.
+
+**Y tiene una consecuencia que la mejora todo:** si no hay pista visual —ni el
+centro, ni el tamaño de la wiki, que ya era dudoso— **la cadencia vuelve a ser la
+única forma de saber en qué rama estás**. Lo que en [HALLAZGOS.md
+§4.3](HALLAZGOS.md) se había reescrito como «de detector a árbitro» vuelve a ser
+detector, y la función recupera todo su sentido: sin ella no hay nada.
+
+El rastro indirecto que se midió con la creencia puesta —el orden de muerte de
+las madres— sigue valiendo como dato y sigue diciendo lo mismo: **el jefe salió
+de la segunda madre, de la tercera y de la primera**, así que el orden no
+identifica nada. Sólo que ahora no hace falta que lo haga.
+
+---
+
+## D11 · Una zona instanciada SÍ tiene reaparición, y el tiempo se elige al crearla
+
+| | |
+|---|---|
+| **quién** | Campeón |
+| **cuándo** | 17 de agosto de 2026 |
+| **seguridad** | afirmado, sin duda declarada |
+| **estado** | **declarado** · el mecanismo no está en el registro; la unidad, sí |
+
+**Qué dice.** Al crear una instancia se elige su tiempo de reaparición, y en Sky
+es mucho más largo que en otras zonas.
+
+**Corrige una deducción mía**, no una medición: yo había dado por hecho que una
+instancia no reaparece, y eso era conocimiento de otros juegos aplicado a éste.
+**No salió de ningún dato nuestro** — es la clase de error que este fichero
+existe para atrapar.
+
+**Lo que cambia, y es grande: la unidad de estimación.** Los mínimos de
+reaparición se venían agrupando por zona o por par (zona, nombre). Si el ajuste
+se elige al crear la instancia, **la unidad es la instancia** — y dos instancias
+de la misma Befallen pueden tener tiempos distintos sin que ninguna esté mal
+medida.
+
+**Lo medido a raíz de esto está en
+[REAPARICION-INSTANCIA.md](REAPARICION-INSTANCIA.md)**, con lo bueno y lo malo:
+la instancia se puede identificar en el registro, el tiempo elegido no aparece,
+las instancias se reentran —así que visita ≠ instancia— y el racimo de 4:27 de
+Befallen **no se ha podido reproducir**, lo cual hay que resolver antes de
+renombrarlo.
