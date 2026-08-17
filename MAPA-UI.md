@@ -228,17 +228,27 @@ Las 12, 13 y 14 son la misma obra hecha tres veces: disolver el enrutador
 `state.enc.page` en secciones de la barra, conservando las migas **dentro** de
 cada una. La 15 es la más delicada y por eso va la última.
 
-### La paleta: puesta, y sin enchufar todavía
+### La paleta: enchufada en la mudanza 2, y lo que ha destapado
 
-Los seis colores del prototipo ya están en `ui/styles.css` como `--c1…--c6`
-—medidos para cada tema, no los mismos oscurecidos— con `--resto` y con
-`--s1/--s2/--s3` apuntando a tres de ellos, como en el prototipo. **Todavía no
-los usa nadie**: la gráfica sigue pintando con `--t-cold` y `--t-ds`.
+Los seis colores del prototipo están en `ui/styles.css` como `--c1…--c6`
+—medidos para cada tema, no los mismos oscurecidos—, con `--resto` y con
+`--s1/--s2/--s3` apuntando a tres de ellos. **Ya los usa la gráfica**: tu daño
+es `--s1` y lo que recibes `--s2`, en el trazo, en la leyenda y en el rótulo.
 
-Enchufarlos cambia el color de todas las gráficas, así que va **con la mudanza
-2 (Escena)**, que es donde vive la gráfica, y no antes: hacerlo hoy metería un
-cambio visible en todas las capturas del resto de mudanzas y no sabríamos cuál
-de los dos cambios estamos mirando.
+Estaban pintados con `--t-cold` y `--t-ds`, que son el frío y el escudo de daño:
+leída al pie de la letra, la gráfica decía que tu daño es de frío.
+
+Se enchufó **después** de la mudanza y con su propia tanda de capturas
+(`tmp/capturas-despues-paleta/`), para tener dos comparaciones en vez de una: si
+algo se ve raro, se sabe si fue el movimiento o el color.
+
+**Y queda una tercera paleta en la misma leyenda, que hay que decidir.** La
+franja de posturas sigue usando los tipos de daño (`STANCE_COLOR` en
+`ui/grafica.js`): `defensive` es `--t-cold`. En tema claro, ese azul y el
+`--s2` de «recibido» quedan **casi idénticos y en la misma fila de leyenda**.
+No lo he tocado porque cambiar los colores de las posturas es una decisión de
+diseño, no una mudanza. Las salidas: darles tres de los seis, o elegir tipos que
+no choquen con `--s1/--s2/--s3`.
 
 ### Desviaciones del mapa, y por qué
 

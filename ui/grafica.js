@@ -98,9 +98,23 @@ export function grafica(f, { marcas = false } = {}) {
 
   return {
     dur, pts, peak, legend, band, taken,
-    svg: `<path d="${area}" fill="var(--t-cold)" opacity=".16"/>
-      <path d="${line}" fill="none" stroke="var(--t-cold)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
-      ${taken ? `<path d="${taken}" fill="none" stroke="var(--t-ds)" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ''}`,
+    /**
+     * LAS DOS SERIES VAN CON LA PALETA DE SERIES, no con la de tipos de daño.
+     *
+     * Estaban pintadas con `--t-cold` y `--t-ds`, que son el frío y el escudo
+     * de daño: colores del vocabulario del juego usados aquí por cómo se ven.
+     * Leído al pie de la letra, esta gráfica decía que tu daño es de frío.
+     *
+     * `--s1` y `--s2` son dos de los seis colores calculados del prototipo, y
+     * son los mismos que usará el dps por combatiente cuando llegue: una línea
+     * tuya será del mismo color en las dos gráficas, que es justo lo que hace
+     * que dos gráficas se puedan leer juntas.
+     *
+     * `--s3` —el resto del grupo— todavía no tiene línea que pintar aquí.
+     */
+    svg: `<path d="${area}" fill="var(--s1)" opacity=".16"/>
+      <path d="${line}" fill="none" stroke="var(--s1)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+      ${taken ? `<path d="${taken}" fill="none" stroke="var(--s2)" stroke-width="1.2" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : ''}`,
     /**
      * Las marcas con instante propio. Sólo entran las que lo tienen medido:
      * muertes y lanzamientos. Nada colocado por proporción — una marca en el

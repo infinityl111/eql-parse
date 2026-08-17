@@ -714,14 +714,17 @@ code { font-family: var(--mono); font-size: 11px; background: var(--slate-800); 
   font-family: var(--mono); font-size: 11px; color: var(--bone-dim); }
 .chart-tip b { color: var(--bone); }
 .chart-tip span { margin-left: 10px; }
-.chart-tip .tk b { color: var(--t-ds); }
+/* El rótulo y la leyenda van con la serie que describen, no con el tipo de
+   daño: la línea de «recibido» es `--s2`, así que su cifra y su guion también.
+   Si no, la leyenda dice un color y la gráfica pinta otro. */
+.chart-tip .tk b { color: var(--s2); }
 .chart-tip .hl b { color: var(--t-poison); }
 .chart-band { display: block; width: 100%; height: 11px; margin-bottom: 2px; }
 .chart-svg { display: block; width: 100%; height: 96px; background: var(--slate-850); border-radius: 3px; }
 .chart-foot { display: flex; align-items: center; gap: 14px; margin-top: 5px; }
 .chart-legend { margin-left: auto; margin-right: auto; display: flex; gap: 12px; }
 .chart-legend i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; vertical-align: -1px; }
-.chart-legend i.dash { background: none; border-top: 2px dashed var(--t-ds); height: 0; width: 12px; vertical-align: 2px; }
+.chart-legend i.dash { background: none; border-top: 2px dashed var(--s2); height: 0; width: 12px; vertical-align: 2px; }
 
 /* ══ Filas ══════════════════════════════════════════════ */
 .rank { width: 18px; font-size: 11px; color: var(--bone-faint); flex: none; }
