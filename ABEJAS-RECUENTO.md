@@ -33,8 +33,9 @@ no ha habido son episodios de la cadena:
 empezando ahora mismo. Lo demás son visitas a Sky sin tocar la isla de las
 abejas, o sin matar a ninguna madre.
 
-**Conclusión práctica: el recuento hay que repetirlo cuando termine la sesión de
-hoy.** Con lo que hay a las 14:28 no hay nada nuevo que contar.
+**Conclusión práctica: el recuento se repite dentro de unos días, no hoy.** No es
+que no haya datos: es que **aún no están escritos**. Campeón entró a Sky un minuto
+antes del final del registro, y a las 14:58 seguía sin matar ninguna madre.
 
 *(Y de paso: `Sky.txt`, que aparece en la carpeta de logs con fecha de hoy, no es
 un registro de chat — es el fichero de errores del cliente. No contiene ni una

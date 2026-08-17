@@ -688,5 +688,5 @@ medida.
 [REAPARICION-INSTANCIA.md](REAPARICION-INSTANCIA.md)**, con lo bueno y lo malo:
 la instancia se puede identificar en el registro, el tiempo elegido no aparece,
 las instancias se reentran —así que visita ≠ instancia— y el racimo de 4:27 de
-Befallen **no se ha podido reproducir**, lo cual hay que resolver antes de
-renombrarlo.
+Befallen **sí se reproduce**, pero sólo con el método escrito: de la muerte a la
+primera reaparición en combate, no de muerte a muerte.

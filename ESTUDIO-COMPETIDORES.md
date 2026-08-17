@@ -11,6 +11,42 @@ haga con esto lo decide Miguel, con el documento delante.
 citar, no se afirma. Donde una medición es nuestra, se dice sobre qué registro y
 con qué método.
 
+---
+
+## EL PROTOCOLO DE LECTURA — cinco preguntas antes de mirarles nada
+
+Va **antes** de implementar o de dar por buena una decisión de diseño, y está
+aquí porque este documento es el que invita a leerlos.
+
+**1 · ¿EXISTE ESTO EN SU PRODUCTO?**
+Si **no**: no se lee nada. No hay experiencia ajena que importar, y buscarla sólo
+trae un marco que no es del problema. Si **sí**, siguen la 2 y la 3.
+
+**2 · ¿QUÉ HACEN, Y CON QUÉ CONSTANTES?** Comportamiento y valores, con fichero y
+línea, sin pegar código.
+
+**3 · SI DIFIERE, ¿POR QUÉ?** Y la respuesta útil casi nunca es «uno está mal»:
+suele ser que **contestan a otra pregunta**. sowoky mide por bicho y nosotros por
+grupo, y eso explicaba todo lo demás sin que nadie tuviera razón.
+
+**4 · LO SUYO ES UNA PREGUNTA PARA NUESTRO REGISTRO, NUNCA UNA RESPUESTA.** Un
+hallazgo ajeno llega con una autoridad que no se ha ganado en nuestra casa. Se
+mide contra nuestro log antes de creerlo.
+*Cicatriz:* su cicatriz del sostén de mez costó un día y **no nos aplicaba, por
+razón estructural**. Venía con fichero y línea, y aun así era una hipótesis.
+
+**5 · Y LA SIMÉTRICA, QUE ES LA QUE MÁS VALE: si la respuesta a la 1 es «no lo
+tienen», ESO SE ESCRIBE** — porque significa que **nadie está vigilando esto**:
+ni su experiencia, ni sus errores, ni sus pruebas. Y entonces la pregunta que
+sigue no es «cómo lo hago» sino **«¿qué mira esto?»**. Si la respuesta es «nada»,
+**el instrumento va ANTES que la función**.
+*Cicatriz:* los cuatro fallos peores del proyecto —las peleas ajenas dibujadas,
+todas las figuras apagadas en el segundo cero, el suelo que nunca sumaba y el
+divisor que sigue bajando para los muertos— están **los cuatro en territorio que
+ninguno de los dos competidores tiene**.
+
+---
+
 **CINCO FICHEROS, Y SE REPARTEN POR LA PREGUNTA QUE CONTESTAN, no por la fecha.**
 
 | fichero | contesta |

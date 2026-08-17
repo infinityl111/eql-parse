@@ -1162,10 +1162,14 @@ Crushbone (8:04), igual. **Con n=3 no se decide, y no se va a decidir aquí.**
 > distintos sin que ninguna esté mal medida, así que «un valor por zona» no
 > podía sostenerse por un motivo que no era el que se midió aquí.
 >
-> Y hay un bloqueo que hay que resolver antes de tocar nada de este apartado:
-> **el racimo de 4:27 no se ha podido reproducir** con muerte→muerte sobre el
-> registro de hoy. Todo, con sus cifras, en
-> [REAPARICION-INSTANCIA.md](REAPARICION-INSTANCIA.md).
+> **Y EL MÉTODO DEL RACIMO, ESCRITO POR FIN**, porque estuvo a punto de perderse:
+> reaparición es **de la muerte a la primera línea de combate posterior donde ese
+> nombre vuelve a aparecer, dentro de la misma visita**, descartando lo que baje
+> de un minuto (eso es otro individuo del mismo nombre). Medido así vuelve a
+> salir: ``Kahaptra Z`Taj`` 4:27, `an elf skeleton` 4:27, `the thaumaturgist`
+> 4:29, `Gynok Moltor` 4:31 — y de paso `marrowbane` 8:04 y `a ghoul sentinel`
+> 9:29. Midiendo muerte→muerte, que es lo que probé primero, NO sale.
+> Detalle en [REAPARICION-INSTANCIA.md](REAPARICION-INSTANCIA.md).
 
 > **CORREGIDO el 16 de agosto por la noche.** Una versión anterior de §3.3 decía
 > que los mínimos caen **«±2 s entre nombres distintos de la misma zona»** y lo
@@ -1817,8 +1821,9 @@ directa sobre un valor que ya tiene tres o cuatro.**
 > [D11](HECHOS-DECLARADOS.md) —el tiempo se elige al crear la instancia— lo más
 > que puede llegar a decir es «el tiempo de las instancias que Campeón crea en
 > Befallen», y **no se generaliza a otro jugador**, porque otro elegiría otro
-> ajuste. Antes de renombrarlo hay que poder volver a medirlo: hoy no se
-> reproduce ([REAPARICION-INSTANCIA.md](REAPARICION-INSTANCIA.md)).
+> ajuste. La cifra sí se reproduce —con el método escrito en
+> [REAPARICION-INSTANCIA.md](REAPARICION-INSTANCIA.md)—; lo que se cae es el
+> nombre, no el número.
 >
 > **Sky sale de esta cuenta igual que antes, pero por el motivo bueno**: no
 > porque una instancia no reaparezca —eso era una deducción mía y era falsa—

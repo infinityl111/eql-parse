@@ -3238,6 +3238,58 @@ async function renderNarrate(host) {
    * fotos, porque cada una es perfecta. **Cuanto mejor es la herramienta, más
    * arriba está el sitio donde miente**, y por eso la pregunta tiene que subir
    * con ella: de «¿salió la foto?» a «¿está entera?» a «¿es de lo que pedí?».
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA VEINTISEISAVA: UNA CIFRA SIN SU MÉTODO ES IRRECUPERABLE.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     UNA CIFRA PUBLICADA SIN EL MÉTODO QUE LA PRODUJO ES IRRECUPERABLE. EL
+   *     GUION QUE LA SACÓ VIAJA CON ELLA.
+   *
+   * DOS CASOS EL MISMO DÍA, y los dos con la misma forma. La cadencia de las
+   * abejas —«media de golpes por segundo»— y el racimo de reaparición de
+   * Befallen —4:27—. Las dos publicadas, las dos con su población escrita, y las
+   * dos imposibles de repetir leyendo lo que había escrito.
+   *
+   * Y AQUÍ ESTÁ EL MATIZ QUE LA SEPARA DE LA FAMILIA ONCE: la población SÍ
+   * estaba. Sabíamos sobre qué peleas, sobre qué nombres y en qué fechas. Lo que
+   * faltaba era la operación —qué línea cuenta como golpe, dónde se cierra la
+   * ventana, si se mide de muerte a muerte o de muerte a reaparición— y sin eso
+   * la población no sirve de nada: son dos cuentas distintas sobre los mismos
+   * datos que dan números distintos.
+   *
+   * LO QUE PASÓ CUANDO SE ESCRIBIÓ EL MÉTODO PRIMERO, que es la mitad buena: a la
+   * segunda salió exacto. `Kahaptra Z`Taj` 4:27, `an elf skeleton` 4:27, el
+   * racimo entero de 4:27–4:31, y de propina el 8:04 de Crushbone y el 9:29 de
+   * Old Guk. La cifra era buena; lo que estaba perdido era cómo se sacó.
+   *
+   * En el primer intento medí muerte→muerte, que incluye lo que tardas en volver
+   * a encontrarlo, y da siempre de más. Una diferencia de una frase entre dos
+   * métodos, y la diferencia entre reproducir y no.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA VEINTISIETEAVA: SI NADIE MÁS LO TIENE, NADIE MÁS LO VIGILA.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     CUANDO UN COMPETIDOR NO TIENE ALGO, ESO NO ES UNA VENTAJA: ES UN AVISO.
+   *     SIGNIFICA QUE NADIE ESTÁ VIGILANDO ESE TERRENO — NI SU EXPERIENCIA, NI
+   *     SUS ERRORES, NI SUS PRUEBAS. AHÍ EL INSTRUMENTO VA ANTES QUE LA FUNCIÓN.
+   *
+   * LA PRUEBA, y es de las que no se pueden discutir: los cuatro peores fallos
+   * de este proyecto —las peleas ajenas dibujadas en el reproductor, todas las
+   * figuras apagadas en el segundo cero, el suelo que nunca sumaba el que no
+   * llegó a caer, y el divisor que sigue bajando para los muertos— están LOS
+   * CUATRO en territorio que ninguno de los dos competidores tiene.
+   *
+   * No es casualidad: donde hay competidor hay alguien que ya se dio el golpe, y
+   * su código lleva la cicatriz puesta. Donde no lo hay, el golpe nos toca
+   * entero — y encima sin nadie que lo haya nombrado.
+   *
+   * POR ESO LA PREGUNTA CAMBIA. Donde ellos tienen algo, la pregunta es «¿qué
+   * hacen y con qué constantes?». Donde no lo tienen, la pregunta es **«¿qué
+   * mira esto?»**, y si la respuesta es «nada», lo primero que se construye no es
+   * la función: es lo que la vigila. El protocolo entero, con sus cinco
+   * preguntas, en `ESTUDIO-COMPETIDORES.md`.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {

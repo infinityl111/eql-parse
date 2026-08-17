@@ -354,6 +354,30 @@ GRUPO: «Esta pelea», «Todo el histórico» y «Ajustes» hubo que escribirlos
 Y las dos últimas son contenido —hoy esos bloques no llevan encabezado—, así que
 van con las familias 16 a 18, no en una mudanza.
 
+### Las versiones: el armazón y el divisor NO comparten versión
+
+| versión | qué lleva |
+|---|---|
+| **1.16.0** | el armazón entero: quince secciones, la barra por alcance, la paleta. **Mueve sin cambiar cifras.** |
+| **1.16.1** | el divisor del dps. **Cambia cifras sin mover.** |
+
+Van separadas a propósito: juntas, un resultado raro no se podría atribuir. El
+divisor es el número más equivocado que tenemos —×2,04 de mediana en el 45,9 % de
+las peleas— y aun así **espera a que el armazón esté fusionado**, porque terminar
+lo empezado va antes.
+
+### La foto del ANTES de «documentos», y la red que sí aguantó
+
+Se perdieron siete de diez y **no se pueden repetir**: esa pantalla dejó de
+existir en la mudanza 3. Quedan tres.
+
+**Pero la red tenía dos capas y sólo cayó una.** El inventario elemento a
+elemento —D1 a D4, con sus titulares y su regla de «si no hay dato, no hay
+pestaña»— sigue tachado y comprobado para ese contenido: los cuatro documentos
+existen, se abren y pintan lo suyo dentro de «Por habilidad». Lo que falta es la
+imagen de cómo se veían antes en siete combinaciones de idioma y tema, no la
+constancia de que estén.
+
 ### Lo encontrado por el camino, que se hace APARTE
 
 Se anota aquí y no se toca dentro de este cambio, que sólo mueve cosas de sitio.

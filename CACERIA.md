@@ -264,7 +264,7 @@ próxima que hay que añadir**, y pide el registro además del almacén.
 
 ## 3 · Las familias sin cepillar
 
-Veinticinco escritas en `ui/app.js`. **Tres cepilladas**, veintidós no.
+Veintisiete escritas en `ui/app.js`. **Tres cepilladas**, veinticuatro no.
 
 **El orden: las que más veces han disparado.**
 
@@ -282,6 +282,8 @@ Veinticinco escritas en `ui/app.js`. **Tres cepilladas**, veintidós no.
 | 23 | si un lado se deduce del otro, la igualdad no prueba nada | 1 | *método* · test mecánico |
 | 24 | se guarda una conclusión, nunca un asidero | **4** | pendiente · agrupa a las de identidad |
 | 25 | la cobertura no contesta «¿es esto lo que pedí?» | 1 | *método* · cuarta del capturador |
+| 26 | una cifra sin su método es irrecuperable | 2 | *método* · las dos del 17 de agosto |
+| 27 | si nadie más lo tiene, nadie más lo vigila | **4** | *método* · los cuatro fallos peores |
 | 12 | un número desnudo no cruza una frontera | 3 | cepillada |
 | 1–6 | dejar que un dato inestable mande sobre una identidad | 6 | pendiente |
 | 7 | salida muerta · alarma muerta | 2 | pendiente |

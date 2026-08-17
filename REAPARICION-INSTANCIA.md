@@ -56,45 +56,54 @@ escoger la mitad que apoya la idea.
 medición de §3.3 salen de **dentro de una sola visita** (345 de 486 pares), así
 que no son huecos de «me fui y volví». Eso era una duda razonable y ya no lo es.
 
+**Y el matiz que hay que llevarse de aquí, escrito para que no se pierda:**
+
+> **INSTANCIA ≠ VISITA.** Las instancias se reentran, y las cuatro visitas a
+> Befallen 2 no llevan línea de creación, así que no se sabe si son cuatro
+> instancias o una reabierta cuatro veces. **Con cuatro no se separa «ajuste de
+> la instancia» de «ese día campó otra sala»**, y decir lo contrario sería
+> escoger la mitad que apoya la idea — el error que ya se corrigió una vez en
+> §3.7.
+
 ---
 
-## Y EL BLOQUEO, que es lo más importante de esta página
+## EL BLOQUEO, RESUELTO AL SEGUNDO INTENTO — y la lección es el método
 
-**No he podido reproducir el racimo de 4:27 de Befallen.** Los cuatro nombres que
-lo forman, muerte a muerte en el registro de hoy:
+**Primera versión de esta página: «no he podido reproducir el racimo de 4:27».**
+Era verdad y la culpa era mía: medí **muerte → muerte**, que no es lo que mide una
+reaparición. Muerte→muerte incluye el rato que tardas en volver a encontrarlo y en
+matarlo, así que da siempre de más — 5:28, 6:00— y nunca el valor limpio.
 
-| nombre | muertes | mínimo dentro de una visita |
-|---|---:|---|
-| ``Kahaptra Z`Taj`` | 2 | **ninguno** — sus dos muertes están a 55 h, en visitas distintas |
-| `an elf skeleton` | 5 | **5:28** |
-| `Gynok Moltor` | 6 | **6:00** |
-| `the thaumaturgist` | 29 | **1:17** en Befallen |
+**Escrito el método ANTES de contar, sale a la primera:**
 
-Ninguno da 4:27, y el mínimo de ``Kahaptra Z`Taj`` **no existe** con este método.
+> **Reaparición = desde la muerte de un nombre hasta la PRIMERA línea de combate
+> posterior, dentro de la misma visita, en la que ese nombre vuelve a aparecer.**
+> No cuentan el chat ni el saqueo del cadáver. Se descartan los intervalos por
+> debajo de un minuto: ésos son otro individuo del mismo nombre que seguía vivo,
+> no una reaparición — el filtro de siempre.
 
-**Dos lecturas posibles, y no se puede elegir sin la nota:**
+| nombre | reapariciones medidas | mínimo ≥1 min |
+|---|---|---:|
+| ``Kahaptra Z`Taj`` | 4:27 · 4:28 | **4:27** |
+| `an elf skeleton` | 4:27 · 9:18 · 34:48 | **4:27** |
+| `the thaumaturgist` | 0:06 ×3 · **4:29** | **4:29** |
+| `Gynok Moltor` | 0:06 ×4 · **4:31** · 6:16 · 23:03 | **4:31** |
+| `marrowbane` (Crushbone) | 0:07 · **8:04 · 8:04** | **8:04** |
+| `a ghoul sentinel` (Old Guk) | 0:06 · **9:29 · 9:30 · 9:30** · 9:43 · 10:45… | **9:29** |
 
-1. La medición publicada no contaba muerte→muerte sino **muerte→siguiente
-   combate**, que es menor y encaja: 4:27 de reaparición más el rato de volver a
-   matarlo dan los 5:28 y 6:00 que salen aquí.
-2. La medición se hizo sobre otra población.
+**El racimo de 4:27–4:31 de Befallen está ahí, y los otros dos también.** §3.6
+—que coincidimos con la wiki al segundo en ``Kahaptra Z`Taj``— **se sostiene**.
 
-**Es el mismo problema que las abejas**, dos veces el mismo día: la cifra está
-publicada y el método con el que se sacó no está escrito, así que no se puede
-repetir. Y aquí importa más, porque §3.6 usa el 4:27 de ``Kahaptra Z`Taj`` para
-decir que **coincidimos con la wiki al segundo**, y ese 4:27 no se puede
-re-derivar con lo que hay escrito.
-
-> **Antes de renombrar el racimo —de «el tiempo de Befallen» a «el tiempo de las
-> instancias que Campeón crea en Befallen»— hay que poder volver a medirlo.**
-> Renombrar una cifra que no se sabe reproducir es cambiarle la etiqueta a algo
-> que no se ha vuelto a ver.
+**Lo que faltaba no era la población, que sí estaba escrita: era el método.** Y
+por eso esto se queda escrito en el sitio donde vive la cifra, no en la
+conversación donde se sacó.
 
 ## Lo que sí se puede decir ya, y va a §3.7 y §4.8
 
 - **«El tiempo de Befallen» no se puede sostener como nombre.** Si el ajuste se
   elige al crear la instancia, dos instancias de la misma zona pueden tener
-  tiempos distintos, y el racimo —exista donde exista— describe **una** de ellas.
+  tiempos distintos, y el racimo —que existe, y ahora se sabe reproducir—
+  describe **una** de ellas.
 - **Y no se puede generalizar a otro jugador**: otro elegiría otro ajuste. Lo que
   midamos aquí vale para las instancias de Campeón y para nadie más.
 - **Sky sale de la medición igual que antes, pero por el motivo bueno**: no
