@@ -1,37 +1,12 @@
 #!/usr/bin/env node
 /**
- * TEXTO EN ESPAÑOL ESCRITO A MANO QUE LLEGA A LA PANTALLA.
+ * Cuánto texto en español escrito a mano llega a la pantalla: mide la
+ * afirmación «cinco idiomas» en vez de repetirla.
  *
- * Sale de un caso concreto: `adv.liveOk` y `adv.liveSwitch` están traducidas a
- * los cinco idiomas y no las usa nadie, porque el consejo en vivo lleva la
- * frase escrita en español dentro de `ui/app.js`. Un alemán la lee en español
- * desde que existe.
- *
- * Y lo que eso destapa es más grande que las dos frases: **«cinco idiomas» es
- * una afirmación sin medir**, y está escrita en el README y en las notas de la
- * 1.15.0. Esto la mide.
- *
- * ── QUÉ CUENTA Y QUÉ NO, QUE ES DONDE ESTÁ TODO EL TRABAJO ────────────────
- *
- * Se quitan primero los COMENTARIOS, que en esta casa son la mitad del fichero
- * y están todos en español: contarlos daría un número enorme y falso, y un
- * número falso sobre «cuánto está sin traducir» es peor que no tenerlo.
- *
- * De lo que queda se busca literal con pinta de FRASE en español: acentos, eñe,
- * o dos o más palabras funcionales seguidas —«de la», «que no», «sin que»—. Un
- * identificador como `sinControlHTML` o una clase CSS no pasan ese filtro.
- *
- * Y se separa en tres cajones, porque no son el mismo problema:
- *
- *   PANTALLA      lo pinta la interfaz o lo dice la voz. Es lo que un alemán ve
- *                 en español, y es lo que hay que arreglar.
- *   DIAGNÓSTICO   `throw`, `console.*`. Lo lee quien depura — y, ojo, también
- *                 la caja de fallo, que enseña el mensaje tal cual.
- *   HERRAMIENTA   `bin/`, `web/`, pruebas: no entran en la aplicación.
- *
- * NO ES UNA MEDIDA EXACTA y no debe leerse como tal: una frase puede llegar a
- * la pantalla desde un sitio que esto clasifica como diagnóstico, y al revés.
- * Es una cota inferior con su criterio escrito, que es lo que hoy no hay.
+ * Reparte lo que encuentra en PANTALLA —lo que un alemán ve en español—,
+ * DIAGNÓSTICO y HERRAMIENTA, y es una COTA INFERIOR con su criterio escrito, no
+ * un censo: una frase puede llegar a la pantalla desde algo clasificado como
+ * diagnóstico, y al revés.
  *
  * Uso:  npm run espanol           el recuento por cajón
  *       npm run espanol -- --ver  con cada frase y su línea

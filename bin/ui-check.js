@@ -1,26 +1,11 @@
 /**
- * Abre la aplicación de verdad, recorre las vistas y mide el DOM.
+ * Abre la aplicación de verdad, recorre las vistas y mide el DOM: avisa si una
+ * caja se solapa con la anterior o si saltó la caja de fallo, y deja una
+ * captura por vista. Caza la clase de fallo que las otras pruebas no ven — el
+ * cálculo bien y el dibujo mal—, que sólo aparece al pintar.
  *
- * POR QUÉ HACE FALTA. Hay una clase de fallo que ninguna prueba de las otras
- * ve: el cálculo está bien y lo que falla es dibujarlo. Pasó dos veces
- * seguidas. Primero un ReferenceError a mitad de construir la cadena, que
- * dejaba la pantalla anterior intacta —pulsabas y no pasaba nada—. Después
- * una clase de CSS con dos dueños, `.serie`, que clavaba los seis tramos de
- * la ficha de un hechizo a 34 píxeles de alto y los apilaba unos encima de
- * otros. Los dos con los datos perfectos detrás.
- *
- * Y NO SE PUEDE MIRAR EN EL FICHERO. Se intentó: un chequeo estático de
- * colisiones de clase o no caza el caso o saca siete falsos por cada bueno,
- * porque «base compartida más refinamiento» y «un nombre con dos dueños» se
- * escriben igual. La diferencia sólo aparece al pintar.
- *
- * Así que esto pinta. Levanta la aplicación con depuración remota, navega,
- * mide las cajas y avisa si alguna se solapa con la anterior o si saltó la
- * caja de fallo. Deja además una captura por vista para mirarla.
- *
- * NO ESTÁ EN `npm test` a propósito: necesita pantalla, un histórico con
- * datos y unos veinte segundos. Es para antes de publicar, no para cada
- * cambio.
+ * NO ESTÁ EN `npm test` a propósito: necesita pantalla, un histórico con datos
+ * y unos veinte segundos. Es para antes de publicar, no para cada cambio.
  *
  * Uso:  npm run ui:check
  */

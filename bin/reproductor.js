@@ -1,32 +1,12 @@
 #!/usr/bin/env node
 /**
- * ═══════════════════════════════════════════════════════════════════════════
- * EL REPRODUCTOR, SIN VENTANA: correrlo sobre TODAS las peleas y quedarse con
- * lo que devuelve.
- * ═══════════════════════════════════════════════════════════════════════════
+ * El reproductor sin ventana: recorre el registro repartiendo las líneas por la
+ * ventana de cada pelea, llama a `guion()` con exactamente lo que le llega en
+ * la aplicación y devuelve la escena. `guion()` es puro, así que no hace falta
+ * navegador.
  *
- * POR QUÉ EXISTE, y es el hallazgo que lo pidió. Dos caminos independientes
- * dijeron lo mismo el 16 de agosto de 2026:
- *
- *   1. Las once imposibilidades de `bin/imposibles.js` miran EL ALMACÉN, y
- *      ninguna mira lo que el reproductor calcula a partir de él.
- *   2. La cobertura de la reconstrucción completa —941.299 líneas— no pisa NI
- *      UN BLOQUE de `src/guion.js`: 32 bloques sin ejecutar, porque el
- *      reproductor no está en ese camino.
- *
- * Y los dos peores fallos de la semana vivían justo ahí: el combate ajeno
- * dibujado dentro de tu pelea, y todas las figuras apagándose en el segundo
- * cero. Los dos daban números plausibles y ninguna prueba los tocaba.
- *
- * Y NO HAY CONVENCIÓN A LA QUE MIRAR: una reproducción no tiene una salida
- * esperada como la tiene un dps, así que aquí la vigilancia hay que fabricarla
- * entera. Esto es esa vigilancia.
- *
- * ── QUÉ HACE ──────────────────────────────────────────────────────────────
- *
- * Recorre el registro UNA vez repartiendo las líneas por la ventana de cada
- * pelea, llama a `guion()` con exactamente lo que le llega en la aplicación, y
- * devuelve la escena. Nada de esto necesita navegador: `guion()` es puro.
+ * NO HAY CONVENCIÓN A LA QUE MIRAR: una reproducción no tiene salida esperada
+ * como la tiene un dps, así que aquí la vigilancia hay que fabricarla entera.
  *
  *     npm run reproductor                    -- el resumen
  *     npm run reproductor -- --detalle 20    -- las 20 primeras escenas

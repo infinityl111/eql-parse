@@ -1,20 +1,10 @@
 /**
- * Cuánto tarda la portada en una conexión normal, medido y no supuesto.
+ * Cuánto tarda la portada en una conexión normal, medido con un servidor de
+ * verdad y la conexión estrangulada, no supuesto desde el disco.
  *
- * POR QUÉ. La muestra animada es lo que explica el producto sin leer nada, y
- * pesa megas. «Va bien» dicho desde una máquina que lee el fichero del disco
- * no significa nada: aquí no hay red. Así que se levanta un servidor de
- * verdad, se estrangula la conexión a velocidades reales y se mide.
- *
- * QUÉ SE MIDE, y por qué estas tres cosas y no «el tiempo de carga»:
- *
- *   · PRIMER PINTADO      cuándo aparece algo en pantalla. Antes de esto, el
- *                         visitante ve una página en blanco.
- *   · PRIMER FOTOGRAMA    cuándo se ve la muestra QUIETA. Un APNG lleva su
- *                         primer fotograma al principio del fichero, así que
- *                         se ve mucho antes de que termine de bajar entera:
- *                         es la diferencia entre un hueco y una imagen.
- *   · ENTERA              cuándo termina de bajar y empieza a moverse.
+ * Tres cifras y no «el tiempo de carga»: PRIMER PINTADO —antes de eso el
+ * visitante ve una página en blanco—, PRIMER FOTOGRAMA —la muestra quieta, que
+ * se ve mucho antes de que baje entera— y ENTERA.
  *
  * Uso:  npm run web:peso
  */

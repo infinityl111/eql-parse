@@ -1,22 +1,10 @@
 /**
- * QUÉ NOTAS DE MATIZ VIVEN POR DEBAJO DEL PLIEGUE.
+ * Qué notas de matiz caen por debajo del pliegue: mide dónde queda cada
+ * `.hint` y cada `.hallazgo` respecto del alto visible de su panel y lista las
+ * que no entran en la primera pantalla. NO CAMBIA NADA — es la entrada de una
+ * decisión, no la decisión.
  *
- * En esta aplicación casi ninguna cifra va sola: al lado hay una nota que dice
- * de dónde sale o qué no significa —«la vida estimada descontando lo que se
- * curaron», «2 en 9 caídas son dos cifras medidas juntas, no una
- * probabilidad»—. Esa nota es parte del dato: sin ella el número afirma más de
- * lo que se midió.
- *
- * Y las notas tienden a irse al final del bloque que matizan, que es donde se
- * escriben cómodas. Cuando el bloque no cabe en la pantalla, la nota queda
- * debajo del pliegue: el número se ve siempre y su matiz sólo si alguien baja.
- *
- * Esto lo MIDE en vez de opinarlo: recorre las secciones, mira dónde cae cada
- * `.hint` y cada `.hallazgo` respecto del alto visible del panel, y lista las
- * que se quedan fuera de la primera pantalla.
- *
- * NO CAMBIA NADA. Es la entrada de una decisión posterior — qué notas hay que
- * subir, cuáles pueden quedarse donde están y cuáles sobran.
+ * Se ejecuta con `electron`.
  *
  * Uso:  npm run pliegue            (español, tema oscuro)
  *       npm run pliegue -- --idioma=en

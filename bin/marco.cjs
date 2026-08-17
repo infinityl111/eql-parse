@@ -1,40 +1,12 @@
 /**
- * EL ARMAZÓN, COMPROBADO POR ESTADO Y NO POR PINTURA.
+ * El armazón comprobado por ESTADO y no por pintura: qué sobrevive al ir a una
+ * sección y volver — la lista con su selección, la pelea abierta y sus cifras,
+ * el ancho sin huecos fantasma, las migas y el titular del registro.
  *
- * Las capturas cazan lo que se ve mal. No cazan lo que se PIERDE al ir y
- * volver: una selección que se olvida, una pelea que se cierra sola, una
- * columna que desaparece y deja su hueco. Eso no es una imagen fea — es una
- * imagen correcta de un estado equivocado, que es peor.
+ * Si el fallo se ve en una foto es de `npm run capturas`; si hay que HACER algo
+ * y luego mirar, es de aquí. No se solapan.
  *
- * Y hace falta ahora porque la mudanza 5 estrena la primera sección SIN la
- * lista de peleas al lado: el momento en que el armazón deja de ser un sitio
- * donde colgar paneles y pasa a tener dos formas distintas.
- *
- * Las tres preguntas, y las tres son de ida y vuelta:
- *
- *   1. Al entrar en una sección del histórico, ¿desaparece la lista? Y al
- *      volver a una de pelea, ¿VUELVE, con la misma pelea marcada?
- *   2. Sin lista, ¿la sección ocupa el ancho que queda, o queda un hueco
- *      fantasma donde estaba la columna?
- *   3. Al volver, ¿sigue abierta la misma pelea — el mismo título, las mismas
- *      cifras— o se ha reseteado a la primera?
- *
- * ── LAS DOS HERRAMIENTAS, Y NINGUNA CUBRE A LA OTRA ───────────────────────
- *
- *   `npm run capturas`  ve PINTURA. Qué hay en cada sección, en cinco idiomas y
- *                       dos temas, y cuánto de cada panel entró en la foto.
- *   `npm run marco`     ve ESTADO. Qué sobrevive al ir y volver: la selección,
- *                       la pelea abierta, el ancho, y las migas.
- *
- * NO SE SOLAPAN, y conviene saberlo antes de confiar en una sola. Una miga rota
- * da una imagen IDÉNTICA a una buena —el expediente se pinta igual— y sólo se
- * cae al intentar volver; eso no lo caza ninguna captura por muchas que se
- * hagan. Y al revés: un rótulo sin traducir en portugués o un panel cortado por
- * abajo no los caza esto, que no mira lo que dice la pantalla sino lo que le
- * pasa a la aplicación cuando la usas.
- *
- * La regla, para el que venga: si el fallo se ve en una foto, es de capturas; si
- * hay que HACER ALGO y luego mirar, es de aquí.
+ * Se ejecuta con `electron`.
  *
  * Uso:  npm run marco
  */

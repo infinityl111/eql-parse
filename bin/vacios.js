@@ -1,38 +1,12 @@
 #!/usr/bin/env node
 /**
- * QUÉ TEXTOS DEL DICCIONARIO NO LOS PINTA NADIE.
+ * Qué textos del diccionario no los pinta nadie.
  *
- * Sale de un caso real: `loot.none` —«Sin botín en esta pelea»— llevaba
- * versiones escrito en los cinco idiomas, traducido cinco veces, y no había un
- * solo camino que lo enseñara. Dentro de la cabecera de la pelea un botín vacío
- * simplemente no se dibujaba, así que la frase estaba lista para una pantalla
- * que no existía. Es la salida muerta con otra ropa: trabajo hecho, correcto, y
- * sin lector.
+ * Cada clave queda en uno de tres estados: PINTADA, POSIBLE —casa con un
+ * prefijo de los que se arman al vuelo, y ésas no se afirman muertas sin
+ * ejecutar— o SIN CAMINO.
  *
- * Y AHORA IMPORTA MÁS QUE ANTES. Cada sección del armazón nuevo estrena una
- * obligación: **una sección vacía tiene que decir que está vacía**, o no se
- * distingue de una que falló al cargar. Mejor tener la lista entera delante que
- * descubrirla de una en una, sección a sección.
- *
- * ── CÓMO BUSCA, Y POR QUÉ NO BASTA CON `grep` ─────────────────────────────
- *
- * Media docena de claves no se escriben nunca enteras en el código: se arman al
- * vuelo —`t(`enc.${s.key}`)`, `t(`cl.${c}`)`, `t(`log.err.${r.motivo}`)`— o
- * viven dentro de un mapa —`FILA_CTRL = { miedo: 'ctrl.rowMiedo' }`—. Un `grep`
- * literal las daría por muertas y la lista saldría llena de falsos positivos,
- * que es la forma segura de que nadie la vuelva a mirar.
- *
- * Así que se recogen tres cosas del árbol:
- *   1. las claves escritas enteras, en `t('…')` o sueltas dentro de un mapa;
- *   2. los PREFIJOS de las que se arman al vuelo (`enc.`, `cl.`, `log.err.`);
- *   3. y con eso, cada clave del diccionario queda en uno de tres estados:
- *      PINTADA, POSIBLE (casa con un prefijo dinámico) o SIN CAMINO.
- *
- * Las POSIBLES no se cuentan como muertas: no se puede afirmar sin ejecutar.
- * Decir «no la pinta nadie» de algo que sí se pinta es el mismo fallo que
- * perseguimos, sólo que en la herramienta.
- *
- * Uso:  npm run vacios          las de estado vacío
+ * Uso:  npm run vacios              las de estado vacío
  *       npm run vacios -- --todas   todas las claves sin camino
  */
 import fs from 'node:fs';

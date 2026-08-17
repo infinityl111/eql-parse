@@ -1,16 +1,11 @@
 /**
- * EL RECORRIDO POR LAS SECCIONES, EN UN SOLO SITIO.
- *
- * Lo usan dos herramientas —`capturas`, que fotografía, y `pliegue`, que mide
- * dónde caen las notas— y las dos necesitan exactamente lo mismo: arrancar la
- * aplicación de verdad, esperar a que tenga datos, y saber cómo se llega a cada
- * sección. Tenerlo dos veces significa que el día que se mueva una sección sólo
- * se arreglaría una de las dos, y la otra seguiría dando verdes de una pantalla
- * que ya no existe. Es la misma razón por la que existe `bin/cdp.js`.
+ * El recorrido por las secciones, en un solo sitio: lo comparten `capturas` y
+ * `pliegue`, para que mover una sección no deje a una de las dos dando verdes
+ * de una pantalla que ya no existe.
  *
  * Quien lo requiera tiene que haber fijado ANTES el nombre y la carpeta de la
- * aplicación, y haber requerido `electron/main.cjs`: eso no se puede hacer aquí
- * porque depende de ser el proceso principal.
+ * aplicación y haber requerido `electron/main.cjs`: eso depende de ser el
+ * proceso principal y aquí no se puede hacer.
  */
 const espera = (ms) => new Promise((r) => { setTimeout(r, ms); });
 

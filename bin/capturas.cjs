@@ -1,37 +1,12 @@
 /**
- * Una captura por SECCIÓN × IDIOMA × TEMA, de la aplicación de verdad.
+ * Una captura por SECCIÓN × IDIOMA × TEMA de la aplicación de verdad, con la
+ * cuenta de cuánto de cada panel entró en la foto: si no cuadra, la tanda no se
+ * entrega.
  *
- * POR QUÉ EXISTE. El armazón de secciones mueve cosas de sitio, y lo único que
- * dice si algo se perdió por el camino es mirarlo. Son más de cien pantallas
- * —quince secciones, cinco idiomas, dos temas— y a mano no se revisan: se miran
- * las dos primeras, se supone el resto, y lo que se cayó estaba en la cuarenta.
- *
- * ── POR QUÉ NO PASA POR EL DEPURADOR ──────────────────────────────────────
- *
- * `bin/cdp.js` sabe hacer capturas y lleva semanas roto para esto:
- * `Page.captureScreenshot` se queda sin responder cada pocas llamadas —está
- * contado allí mismo, con su plazo y su reintento—. Con tres capturas por tanda
- * se sobrevive reintentando; con quinientas, no.
- *
- * `webContents.capturePage()` no pasa por el depurador: es el proceso principal
- * pidiéndole el fotograma a su propia ventana. Por eso este fichero ES un
- * proceso principal —se ejecuta con `electron`, no con `node`— y arranca la
- * aplicación de verdad requiriendo `electron/main.cjs`. Nada de esto toca el
- * camino roto, y nada de esto lo arregla: sigue ahí para quien lo use.
- *
- * ── LA TRAMPA DEL ARRANQUE, QUE ES LA QUE MÁS CARO SALE ───────────────────
- *
- * `electron .` lee el `package.json` de la raíz, así que la aplicación se llama
- * `eql-parse` y su configuración vive en `%APPDATA%/eql-parse`.
- * `electron bin/capturas.cjs` NO: sin `package.json` al lado, Electron la llama
- * «Electron» y le da otra carpeta — vacía. Sin log, sin histórico y sin peleas.
- *
- * Y no fallaría: levantaría la ventana, recorrería las secciones y escribiría
- * ciento cincuenta capturas de una aplicación recién instalada. Es la forma del
- * comodín que recoge de más (ver `PUBLICAR.md`, paso 8): no falla, entrega algo
- * plausible. Por eso el nombre y la carpeta se fijan aquí arriba, antes de
- * requerir nada, y por eso el recorrido exige peleas en la lista antes de
- * empezar (ver `esperaDatos` en `bin/recorrido.cjs`).
+ * Se ejecuta con `electron`, no con `node`: es un proceso principal, y por eso
+ * fija el nombre y la carpeta de la aplicación aquí abajo ANTES de requerirla.
+ * Sin eso Electron le daría una carpeta vacía y fotografiaría, sin fallar, una
+ * instalación recién hecha.
  *
  * Uso:
  *   npm run capturas -- --salida=antes
