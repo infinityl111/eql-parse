@@ -90,10 +90,10 @@ const state = {
   expanded: new Set(),
   hover: null,
   setup: false,
-  view: 'combat',
+  view: 'sec',
   // La sección abierta de la barra lateral, cuando `view` es 'sec'. Vive aparte
   // de `view` porque las secciones son una lista que crece, no un estado más.
-  seccion: null,
+  seccion: 'escena',
   cfg: {},
   rowNodes: new Map(),
   sideHeads: new Map(),
@@ -216,7 +216,8 @@ async function renderWizard() {
     await window.eql.setOnboarded(true);
     state.cfg = await window.eql.getConfig();
     state.wizard = null;
-    state.view = 'combat';
+    state.view = 'sec';
+    state.seccion = state.seccion ?? 'escena';
     host.innerHTML = '';
     renderApp();
   };
@@ -792,9 +793,7 @@ function renderFightList(snap) {
       mates: state.filter.mates ?? [],
       mergePets: !!state.cfg.mergePets, petLabel: t('pets.merged'),
       myPets: state.cfg.myPets ?? [], notPets: state.cfg.notPets ?? [] });
-    state.view = 'summary';
-    $('bodyGrid').innerHTML = '';
-    renderApp();
+    abrirSeccion('resumen');
   });
   list.querySelectorAll('.fight').forEach((el) => {
     const uid = el.dataset.live === '1' ? null : +el.dataset.uid;
@@ -851,7 +850,6 @@ function renderFightList(snap) {
     state.picked = new Set();
     state.summary = null;
     list.dataset.sig = '';
-    if (state.view === 'summary') state.view = 'combat';
     renderApp();
   });
   $('pickOpen')?.addEventListener('click', async () => {
@@ -859,9 +857,7 @@ function renderFightList(snap) {
     state.summary = await window.eql.aggregate({ uids: [...state.picked],
       mergePets: state.cfg.mergePets, petLabel: t('pets.merged'),
       myPets: state.cfg.myPets ?? [], notPets: state.cfg.notPets ?? [] });
-    state.view = 'summary';
-    $('bodyGrid').innerHTML = '';
-    renderApp();
+    abrirSeccion('resumen');
   });
   $('btnShowAll')?.addEventListener('click', () => { state.showAll = !state.showAll; list.dataset.sig = ''; renderApp(); });
 }
@@ -3323,7 +3319,7 @@ function renderHead(snap) {
     clearTimeout(b._t);
     b._t = setTimeout(() => { b.textContent = t('share.copy'); b.classList.remove('ok', 'bad'); }, 1600);
   });
-  $('btnAnalyse')?.addEventListener('click', (e) => { e.stopPropagation(); state.view = 'analysis'; $('bodyGrid').innerHTML = ''; renderApp(); });
+  $('btnAnalyse')?.addEventListener('click', (e) => { e.stopPropagation(); abrirSeccion('analisis'); });
   /**
    * EL REPRODUCTOR SE MONTA DENTRO DE ESCENA, no en otra pantalla.
    *
@@ -3336,7 +3332,9 @@ function renderHead(snap) {
    * modo de fallo de abrir una pelea — que es lo que más se hace en toda la
    * aplicación. Pulsar es barato; abrir no puede serlo menos que ahora.
    *
-   * Fuera de la sección —mientras la pestaña vieja siga viva— hace lo de antes.
+   * Y ya no hay «fuera de la sección»: si se pulsa sin la Escena montada —queda
+   * el camino desde una pelea abierta en otra sección—, se abre Escena, que es
+   * donde vive el reproductor.
    */
   $('btnReplay')?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -3349,9 +3347,7 @@ function renderHead(snap) {
       renderReplay(state.snap);
       return;
     }
-    state.view = 'replay';
-    $('bodyGrid').innerHTML = '';
-    renderApp();
+    abrirSeccion('escena');
   });
   // Después del innerHTML, que si no los nodos de la gráfica no existen aún.
   cablearGrafica();
@@ -3375,7 +3371,7 @@ async function renderReplay(snap) {
   const host = $('rpView');
   if (!host) return;
   const f = withPets(fightFor(snap));
-  const back = `<button id="rpBack">← ${esc(t('tab.combat'))}</button>`;
+  const back = `<button id="rpBack">← ${esc(t('sec.escena'))}</button>`;
   const sig = `${getLang()}|${f?.uid ?? 'live'}`;
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
@@ -3438,12 +3434,11 @@ async function renderReplay(snap) {
   });
 }
 
+/** Salir de la reproducción: se vuelve a Escena, que es de donde se entra. */
 function volverACombate() {
   repro?.destruir();
   repro = null;
-  state.view = 'combat';
-  $('bodyGrid').innerHTML = '';
-  renderApp();
+  abrirSeccion('escena');
 }
 
 // ═══════════ Análisis del combate ═══════════
@@ -3452,7 +3447,7 @@ const LEVEL_ICON = { bad: '!', warn: '·', info: 'i', good: '✓' };
 function renderAnalysis(snap) {
   const f = fightFor(snap);
   const host = $('anView');
-  const back = `<button id="anBack">← ${esc(t('tab.combat'))}</button>`;
+  const back = `<button id="anBack">← ${esc(t('sec.escena'))}</button>`;
 
   // Sin esta guarda el snapshot de 250 ms rehacía la vista entera: el análisis
   // se recalculaba cuatro veces por segundo y, como #anView es el contenedor
@@ -3466,7 +3461,7 @@ function renderAnalysis(snap) {
   if (!f || f.duration < 30) {
     host.innerHTML = `<div class="analysis"><div class="an-head"><h2>${esc(t('an.title'))}</h2>${back}</div>
       <div class="hint">${esc(t('an.tooShort'))}</div></div>`;
-    $('anBack').addEventListener('click', () => { state.view = 'combat'; renderApp(); });
+    $('anBack').addEventListener('click', () => abrirSeccion('escena'));
     return;
   }
 
@@ -3529,7 +3524,7 @@ function renderAnalysis(snap) {
 
     <div class="hint" style="margin-top:18px">${esc(t('an.limits'))}</div>
   </div>`;
-  $('anBack').addEventListener('click', () => { state.view = 'combat'; renderApp(); });
+  $('anBack').addEventListener('click', () => abrirSeccion('escena'));
 }
 
 // ═══════════ Orquestación ═══════════
@@ -3586,7 +3581,7 @@ function renderSummary() {
   if (!a || !a.fights) {
     host.innerHTML = `<div class="empty"><h2>${esc(t('sum.empty'))}</h2>
       <button id="sumBack">${esc(t('sum.back'))}</button></div>`;
-    $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
+    $('sumBack')?.addEventListener('click', () => abrirSeccion('escena'));
     return;
   }
   const card = (v, l, cls = '') => `<div class="metric ${cls}"><b>${v}</b><span>${esc(l)}</span></div>`;
@@ -3666,7 +3661,7 @@ function renderSummary() {
   const root = $('sumRoot');
   if (root && scroll) root.scrollTop = scroll;
 
-  $('sumBack')?.addEventListener('click', () => { state.view = 'combat'; $('bodyGrid').innerHTML = ''; renderApp(); });
+  $('sumBack')?.addEventListener('click', () => abrirSeccion('escena'));
   // El botón de la ficha del enemigo. Su listener estaba registrado en la rama
   // del resumen VACÍO, donde ese botón no existe: con `?.` no daba error y el
   // botón se pintaba inerte. Ahora el nombre va en el propio botón, así que el
@@ -4567,7 +4562,9 @@ function encCrumb() {
    * la barra ya está diciendo a la izquierda. Cuando la pestaña se vaya en la
    * mudanza 10, esta condición se queda sola y la línea de arriba se borra.
    */
-  const partes = state.seccion ? [] : [{ label: t('tab.encyclopedia'), page: 'index' }];
+  // Ya no hay índice de enciclopedia sobre las páginas: se entra por la
+  // sección, así que la primera miga es la página, no un cajón que la contenga.
+  const partes = [];
   if (e.page !== 'index') partes.push({ label: t(`enc.${desde}`), page: desde });
   if (e.page === 'zona' || (e.page === 'foe' && desde === 'zonas')) {
     partes.push({ label: e.base, page: 'zona' });
@@ -5334,7 +5331,7 @@ function renderEncyclopedia() {
     state.selectedFight = +crudo;
     state.rowNodes.clear();
     await loadFight(state.selectedFight);
-    setView('combat');
+    abrirSeccion('escena');
   }));
   host.querySelector('.dos-wiki')?.addEventListener('click', (ev) => {
     ev.stopPropagation();
@@ -5366,7 +5363,7 @@ async function loadAbility(name) {
   try {
     const d = await window.eql.wikiMob?.(name);
     mobCache.set(k, d ?? null);
-    if (d && state.view === 'encyclopedia' && state.enc.page === 'foe') renderEncyclopedia();
+    if (d && state.enc.page === 'foe') renderEncyclopedia();
   } catch { /* sin red */ }
 }
 
@@ -5378,8 +5375,8 @@ async function loadMob(name) {
     const d = await window.eql.wikiMob?.(name);
     mobCache.set(name, d ?? null);
     // El expediente vive en dos sitios y la wiki llega tarde a los dos.
-    if (d && (state.view === 'summary' || state.seccion === 'resumen')) renderSummary();
-    if (d && state.view === 'encyclopedia' && state.enc.page === 'foe') renderEncyclopedia();
+    if (d && state.seccion === 'resumen') renderSummary();
+    if (d && state.enc.page === 'foe') renderEncyclopedia();
   } catch { /* sin red */ }
 }
 
@@ -5483,7 +5480,7 @@ function renderLateral() {
   // que ir: la barra se quita en vez de ofrecer un sitio al que no se puede
   // entrar todavía. `.lateral:empty` se encarga de que no quede el carril.
   const hay = state.setup || state.wizard ? [] : SECCIONES.filter((s) => s.listo);
-  const activa = state.view === 'sec' ? state.seccion : null;
+  const activa = state.seccion;
   const sig = `${getLang()}|${activa ?? ''}|${hay.map((s) => s.id).join(',')}`;
   if (host.dataset.sig === sig) return;
   host.dataset.sig = sig;
@@ -5524,37 +5521,27 @@ function abrirSeccion(id) {
    * ya ha dicho a dónde quiere ir.
    */
   state.enc.page = null;
-  ['tabCombat', 'tabTriggers', 'tabEnc'].forEach((x) => $(x)?.classList.remove('active'));
   $('bodyGrid').innerHTML = '';
   state.rowNodes.clear();
   renderApp();
 }
 
 function renderApp() {
-  if (state.view === 'sec' && !state.setup && !state.wizard) {
-    const s = SECCIONES.find((x) => x.id === state.seccion);
-    if (s) {
-      if (!$('secPane')) {
-        $('bodyGrid').innerHTML = `${s.lista ? '<aside id="fightList"></aside>' : ''}<main id="secPane"></main>`;
-        $('bodyGrid').classList.toggle('solo', !s.lista);
-      }
-      if (s.lista) renderFightList(state.snap);
-      s.pinta(state.snap);
-      return;
+  if (!state.setup && !state.wizard && state.snap?.path) {
+    /**
+     * NO HAY OTRA COSA QUE UNA SECCIÓN. Una sección que no existe —una
+     * configuración vieja, un identificador cambiado— cae en la PRIMERA de la
+     * barra en vez de dejar la pantalla en blanco: es la única rama de esta
+     * función que puede quedarse sin nada que pintar.
+     */
+    const s = SECCIONES.find((x) => x.id === state.seccion) ?? SECCIONES[0];
+    state.seccion = s.id;
+    if (!$('secPane')) {
+      $('bodyGrid').innerHTML = `${s.lista ? '<aside id="fightList"></aside>' : ''}<main id="secPane"></main>`;
+      $('bodyGrid').classList.toggle('solo', !s.lista);
     }
-    // Una sección que ya no existe no deja la pantalla en blanco: se vuelve.
-    state.view = 'combat';
-    state.seccion = null;
-  }
-  if (state.view === 'summary') {
-    // Sólo se monta una vez. Sin esta guarda el snapshot de 250 ms reconstruye
-    // la vista entera y el scroll vuelve arriba en cuanto lo mueves.
-    if (!$('sumRoot')) renderSummary();
-    return;
-  }
-  if (state.view === 'encyclopedia') {
-    // La misma guarda: es una vista con su propio scroll.
-    if (!$('encRoot')) renderEncyclopedia();
+    if (s.lista) renderFightList(state.snap);
+    s.pinta(state.snap);
     return;
   }
   if (state.wizard) {
@@ -5568,25 +5555,6 @@ function renderApp() {
     }
     return;
   }
-  if (state.view === 'analysis') {
-    if (!$('anView')) $('bodyGrid').innerHTML = '<aside id="fightList"></aside><main id="anView"></main>';
-    renderFightList(state.snap);
-    renderAnalysis(state.snap);
-    return;
-  }
-  if (state.view === 'replay') {
-    if (!$('rpView')) $('bodyGrid').innerHTML = '<aside id="fightList"></aside><main id="rpView"></main>';
-    renderFightList(state.snap);
-    renderReplay(state.snap);
-    return;
-  }
-  if (state.view === 'triggers') {
-    // Vaciada por las mudanzas 9 y 10: los disparadores están en Avisos y la voz,
-    // las listas y lo de compartir en Preferencias. La pestaña se va con las
-    // otras dos en cuanto no quede nada en ninguna.
-    if (!$('vacioAvisos')) $('bodyGrid').innerHTML = '<div class="tabpane" id="vacioAvisos"></div>';
-    return;
-  }
   if (state.setup || !state.snap?.path) {
     // Sin esta guarda el snapshot de 250 ms reconstruiría el formulario
     // en cada refresco y sería imposible escribir en él.
@@ -5596,19 +5564,6 @@ function renderApp() {
     }
     return;
   }
-  /**
-   * Y AQUÍ NO QUEDA NADA, que es el resultado de la mudanza 4.
-   *
-   * Las cuatro secciones de «esta pelea» se han llevado todo lo que pintaba
-   * esta vista. Se deja el `<main>` vacío a propósito y no se le pone un texto:
-   * la pestaña se quita en la mudanza 10 y un cartel aquí sería escribir algo
-   * para borrarlo dentro de seis pasos.
-   */
-  if (!$('vacioCombate')) {
-    $('bodyGrid').innerHTML = '<aside id="fightList"></aside><main id="vacioCombate"></main>';
-    state.rowNodes.clear();
-  }
-  renderFightList(state.snap);
 }
 
 function renderChrome(snap) {
@@ -5647,7 +5602,7 @@ function renderChrome(snap) {
       state.rowNodes.clear();
       if ($('rows')) $('rows').innerHTML = '';
       const l = $('bodyGrid'); if (l) l.dataset.sig = '';
-      state.summary = null; state.view = 'combat';
+      state.summary = null;
       renderApp();
     });
   } else if (!snap.pets.length) { fp.innerHTML = ''; fp.dataset.sig = ''; }
@@ -5706,7 +5661,6 @@ function renderLangPicker() {
     state.rowNodes.clear();
     ['fightHead', 'advice', 'petHint', 'clsPrompt', 'fightList'].forEach((id) => { const n = $(id); if (n) n.dataset.sig = ''; });
     if ($('rows')) $('rows').innerHTML = '';
-    if (state.view === 'triggers') $('bodyGrid').innerHTML = '';
     renderLangPicker();
     renderApp();
   }));
@@ -5715,9 +5669,6 @@ function renderLangPicker() {
 /** Textos fijos del marco que no pasan por renderApp. */
 function applyLangToChrome() {
   const set = (id, v) => { const n = $(id); if (n) n.textContent = v; };
-  set('tabCombat', t('tab.combat'));
-  set('tabTriggers', t('tab.alerts'));
-  set('tabEnc', t('tab.encyclopedia'));
   set('lblChar', t('hdr.character'));
   set('lblZone', t('hdr.zone'));
   set('lblStance', t('hdr.stance'));
@@ -5786,7 +5737,6 @@ function openWizard() {
     attached: !!state.snap?.path,   // ya está conectado: no reconectar
     fromStart: false,
   };
-  state.view = 'combat';
   $('bodyGrid').innerHTML = '';
   renderApp();
 }
@@ -5819,20 +5769,6 @@ window.eql.onAlert((a) => {
   showBanner(a);
 });
 
-function setView(v) {
-  state.view = v;
-  // Volver por una pestaña vieja apaga la sección de la barra: mientras las dos
-  // navegaciones conviven, sólo una puede estar diciendo dónde estás.
-  state.seccion = null;
-  $('tabCombat').classList.toggle('active', v === 'combat');
-  $('tabTriggers').classList.toggle('active', v === 'triggers');
-  $('tabEnc').classList.toggle('active', v === 'encyclopedia');
-  $('bodyGrid').innerHTML = '';
-  state.rowNodes.clear();
-  renderApp();
-}
-$('tabCombat').addEventListener('click', () => setView('combat'));
-$('tabTriggers').addEventListener('click', async () => { await initTriggers(); setView('triggers'); });
 /**
  * Los recuentos y el estado se piden al entrar y no en cada repintado: salen de
  * la ficha, que ya está en memoria del otro lado, pero el viaje por el puente
@@ -5842,12 +5778,6 @@ async function encRefresh() {
   state.encCounts = (await window.eql.encCounts?.().catch(() => null)) ?? null;
   state.encStatus = (await window.eql.encStatus?.().catch(() => null)) ?? null;
 }
-
-$('tabEnc').addEventListener('click', async () => {
-  await encRefresh();
-  state.enc.page = 'index';
-  setView('encyclopedia');
-});
 
 window.eql.onLang((c) => { setLang(c); applyLangToChrome(); renderLangPicker(); });
 

@@ -72,7 +72,7 @@ const VISTAS = [
   {
     fichero: 'combate.png',
     llega: [
-      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('[data-sec=escena]')?.click()",
       TODO_EL_HISTORICO,
       "document.querySelector('.fight[data-live=\"0\"]')?.click()",
     ],
@@ -81,7 +81,7 @@ const VISTAS = [
   {
     fichero: 'analisis.png',
     llega: [
-      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('[data-sec=escena]')?.click()",
       TODO_EL_HISTORICO,
       "document.querySelector('.fight[data-live=\"0\"]')?.click()",
       "document.getElementById('btnAnalyse')?.click()",
@@ -90,7 +90,9 @@ const VISTAS = [
   },
   {
     fichero: 'enciclopedia.png',
-    llega: [TODO_EL_HISTORICO, "document.getElementById('tabEnc')?.click()"],
+    // Ya no hay índice de enciclopedia: la rejilla de enemigos es la portada
+    // de lo que aquella pestaña enseñaba, y es una sección más de la barra.
+    llega: [TODO_EL_HISTORICO, "document.querySelector('[data-sec=enemigos]')?.click()"],
     espera: 2000,
   },
   {
@@ -107,7 +109,7 @@ const VISTAS = [
      */
     fichero: 'postura.png',
     llega: [
-      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('[data-sec=escena]')?.click()",
       TODO_EL_HISTORICO,
     ],
     espera: 2000,
@@ -160,7 +162,7 @@ const VISTAS = [
      */
     fichero: 'postura-nocambiar.png',
     llega: [
-      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('[data-sec=escena]')?.click()",
       TODO_EL_HISTORICO,
     ],
     espera: 2000,

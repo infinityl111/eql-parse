@@ -54,21 +54,21 @@ const VISTAS = [
     // Hay que cargar una pelea del histórico: recién abierta, la lista de
     // combatientes está vacía y no hay nada por donde pasar el ratón.
     llega: [
-      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('[data-sec=escena]')?.click()",
       "document.querySelector('.fight[data-live=\"0\"]')?.click()",
     ],
     cajas: '.row',
     raton: '.row',
   },
   {
-    // Los documentos de la pelea. Se entra pulsando la ÚLTIMA pestaña, que es
-    // la que nunca está abierta por defecto: si el panel no se repinta al
-    // cambiar de pestaña, aquí se ve, porque lo que se mide es el contenido y
-    // no la barra. Y se miden las tres cajas de dentro —lo que pinte el
-    // documento abierto— además de las propias pestañas.
+    // Los documentos de la pelea, que viven en «Por habilidad». Se entra
+    // pulsando la ÚLTIMA pestaña de la barra de documentos, que es la que nunca
+    // está abierta por defecto: si el panel no se repinta al cambiar de
+    // documento, aquí se ve, porque lo que se mide es el contenido y no la
+    // barra. Y se miden las tres cajas de dentro además de las pestañas.
     nombre: 'documentos',
     llega: [
-      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('[data-sec=habilidad]')?.click()",
       "document.querySelector('.fight[data-live=\"0\"]')?.click()",
       "[...document.querySelectorAll('.doctab')].at(-1)?.click()",
       // La captura es para mirarla: sin esto salía el principio de la pantalla
@@ -84,7 +84,7 @@ const VISTAS = [
     // que si algo revienta al montarla, revienta aquí.
     nombre: 'reproduccion',
     llega: [
-      "document.getElementById('tabCombat')?.click()",
+      "document.querySelector('[data-sec=escena]')?.click()",
       "document.querySelector('.fight[data-live=\"0\"]')?.click()",
       "document.getElementById('btnReplay')?.click()",
     ],
@@ -101,8 +101,7 @@ const VISTAS = [
     // migajero que pulsar, y la vista se quedaba en cero filas dando un rojo
     // por el motivo equivocado.
     llega: [
-      "document.getElementById('tabEnc')?.click()",
-      "document.querySelector('.enccard[data-enc=\"hechizos\"]')?.click()",
+      "document.querySelector('[data-sec=hechizos]')?.click()",
     ],
     cajas: '.cat-row',
     raton: '.cat-row.abre',
@@ -110,8 +109,7 @@ const VISTAS = [
   {
     nombre: 'hechizo',
     llega: [
-      "document.getElementById('tabEnc')?.click()",
-      "document.querySelector('.enccard[data-enc=\"hechizos\"]')?.click()",
+      "document.querySelector('[data-sec=hechizos]')?.click()",
       "document.querySelectorAll('.cat-row.abre')[0]?.click()",
     ],
     cajas: '.tramo',
@@ -119,16 +117,14 @@ const VISTAS = [
   {
     nombre: 'progreso',
     llega: [
-      "document.getElementById('tabEnc')?.click()",
-      "document.querySelector('.enccard[data-enc=\"progreso\"]')?.click()",
+      "document.querySelector('[data-sec=progreso]')?.click()",
     ],
     cajas: '.encrow.serie-row',
   },
   {
     nombre: 'enemigo',
     llega: [
-      "document.getElementById('tabEnc')?.click()",
-      "document.querySelector('.enccard[data-enc=\"enemigos\"]')?.click()",
+      "document.querySelector('[data-sec=enemigos]')?.click()",
       "document.querySelectorAll('.encrow.foe .nm')[0]?.click()",
     ],
     cajas: '.difgrid > *',
@@ -136,8 +132,7 @@ const VISTAS = [
   {
     nombre: 'muertes',
     llega: [
-      "document.getElementById('tabEnc')?.click()",
-      "document.querySelector('.enccard[data-enc=\"muertes\"]')?.click()",
+      "document.querySelector('[data-sec=muertes]')?.click()",
     ],
     cajas: '.encrow',
   },

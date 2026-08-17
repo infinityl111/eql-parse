@@ -86,28 +86,27 @@ const VISTAS = [
     // entra por la sección y se abre la última pestaña, que es la que nunca
     // está abierta por defecto.
     nombre: 'documentos',
-    pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="habilidad"]'),
+    pasos: [pulsa('[data-sec="escena"]'), pulsa(PELEA), pulsa('[data-sec="habilidad"]'),
       '[...document.querySelectorAll(".doctab")].at(-1)?.click()'],
   },
-  { nombre: 'registro', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="registro"]')],
+  { nombre: 'registro', pasos: [pulsa('[data-sec="escena"]'), pulsa(PELEA), pulsa('[data-sec="registro"]')],
     espera: 3000 },
   // Las secciones del armazón nuevo se abren por la barra lateral. `data-sec`
   // no se traduce, igual que los identificadores de las pestañas viejas.
-  { nombre: 'escena', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="escena"]')] },
-  { nombre: 'habilidad', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="habilidad"]')] },
-  { nombre: 'botin', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="botin"]')] },
-  { nombre: 'analisis', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="analisis"]')] },
+  { nombre: 'escena', pasos: [pulsa('[data-sec="escena"]'), pulsa(PELEA), pulsa('[data-sec="escena"]')] },
+  { nombre: 'habilidad', pasos: [pulsa('[data-sec="escena"]'), pulsa(PELEA), pulsa('[data-sec="habilidad"]')] },
+  { nombre: 'botin', pasos: [pulsa('[data-sec="escena"]'), pulsa(PELEA), pulsa('[data-sec="botin"]')] },
+  { nombre: 'analisis', pasos: [pulsa('[data-sec="escena"]'), pulsa(PELEA), pulsa('[data-sec="analisis"]')] },
   { nombre: 'resumen', pasos: [pulsa('[data-sec="resumen"]')], espera: 2500 },
   // El botón de reproducir vive en la cabecera de la pelea, que se mudó a la
   // sección Escena en la mudanza 2: entrando por la pestaña vieja ya no hay
   // botón que pulsar, y la tanda salía fotografiando el Combate vacío. Lo cazó
   // la comprobación de «el panel salió vacío», diez veces seguidas.
   { nombre: 'reproduccion',
-    pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="escena"]'), pulsa('#btnReplay')],
+    pasos: [pulsa('[data-sec="escena"]'), pulsa(PELEA), pulsa('[data-sec="escena"]'), pulsa('#btnReplay')],
     espera: 2500 },
   { nombre: 'avisos', pasos: [pulsa('[data-sec="avisos"]')], espera: 2500 },
   { nombre: 'preferencias', pasos: [pulsa('[data-sec="preferencias"]')], espera: 2500 },
-  { nombre: 'enciclopedia', pasos: [pulsa('#tabEnc')] },
   { nombre: 'zonas', pasos: [pulsa('[data-sec="zonas"]')], espera: 2500 },
   { nombre: 'enemigos', pasos: [pulsa('[data-sec="enemigos"]')], espera: 3000 },
   { nombre: 'botin-h', pasos: [pulsa('[data-sec="botin-h"]')], espera: 3000 },

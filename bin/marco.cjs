@@ -58,7 +58,7 @@ app.whenReady().then(async () => {
   const { ejec } = await arranque(app, { idioma: 'es' });
 
   // ── Punto de partida: una pelea abierta en una sección de pelea ──────────
-  await ejec(pulsa('#tabCombat'));
+  await ejec(pulsa('[data-sec="escena"]'));
   await espera(1000);
   await ejec(pulsa('[data-sec="escena"]'));
   await espera(1200);

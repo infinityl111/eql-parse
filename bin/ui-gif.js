@@ -153,7 +153,7 @@ try {
   // Llegar a la reproducción de una pelea concreta. Por identificadores, no por
   // el texto de los botones: la aplicación tiene cinco idiomas.
   console.log('\nabriendo la reproducción…');
-  await evalua("document.getElementById('tabCombat')?.click()");
+  await evalua("document.querySelector('[data-sec=escena]')?.click()");
   await espera(1200);
   /**
    * EL HISTÓRICO ENTERO, no las últimas 24 horas.
@@ -267,7 +267,7 @@ try {
     if (reglas.conForma && !reglas.sinBando) break;
     console.log(`  («${elegida}» ${reglas.sinBando ? 'tiene combatientes sin bando y la escena crece a mitad'
       : 'se guardó antes de la forma del golpe'}; probando otra)`);
-    await evalua("document.getElementById('tabCombat')?.click()");
+    await evalua("document.querySelector('[data-sec=escena]')?.click()");
     await espera(1200);
   }
   if (!elegida) {

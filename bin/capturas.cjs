@@ -318,9 +318,23 @@ async function dispara(win, ejec, destino) {
    */
   const cuadra = Math.abs(previsto - cubierto) <= 2 && fin2.alto === m.alto;
 
+  /**
+   * `declara` Y `nodos` VIAJAN HASTA AQUÍ, y no viajaban.
+   *
+   * Se medían arriba —el bloque de vacío, el número de hijos— y esta función no
+   * los devolvía, así que quien decide si un panel está en blanco leía
+   * `undefined` y contaba como «no lo declara». El mecanismo entero de «vacío
+   * declarado» llevaba desde que se escribió sin poder dispararse nunca: una
+   * sección que dice «Sin botín en esta pelea» —34 caracteres, por debajo del
+   * umbral de 40— tumbaba la tanda entera. Salida muerta con la alarma en el
+   * otro extremo: lo que no llegaba no era un dato que nadie lee, es el dato del
+   * que dependía distinguir la ausencia del fallo.
+   */
   return {
     trozos,
     largo: m.largo,
+    declara: m.declara,
+    nodos: m.nodos,
     viejos,
     fin,
     fuera,
