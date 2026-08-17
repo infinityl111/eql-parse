@@ -1183,7 +1183,7 @@ export class Encounter {
   /**
    * Convenciones de duración. Importa en peleas cortas:
    *  span      = último - primero        (en pelea de 1s da 0 -> DPS infinito)
-   *  inclusive = span + 1                (GamParse/ACT, la comparable)
+   *  inclusive = span + 1                (la convención de siempre)
    */
   durations() {
     const span = Math.max(0, this.end - this.start);

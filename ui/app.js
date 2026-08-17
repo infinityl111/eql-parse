@@ -1357,8 +1357,9 @@ function sinControlHTML(f) {
  *
  * El denominador es donde más te penaliza un secuestro: veinte segundos
  * encantado te hunden la cifra por un rato en el que no decidías nada. Y sin
- * embargo `dps` NO se cambia — es la convención comparable con GamParse y ACT, y
- * moverla en silencio dejaría tus números sin poder compararse con los de nadie.
+ * embargo `dps` NO se cambia — divide por la pelea entera, que es la convención
+ * de siempre, y moverla en silencio dejaría tus números sin poder compararse con
+ * ningún otro.
  *
  * Así que se enseñan los dos, con la resta delante. Es la misma solución que el
  * resto del programa da cuando hay dos maneras legítimas de contar: las dos, con

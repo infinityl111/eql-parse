@@ -1301,8 +1301,9 @@ export class Engine extends EventEmitter {
        * que no manejabas nada, y encima la duración no la eliges tú.
        *
        * `duration` SE QUEDA COMO ESTÁ y esto viaja al lado, que es deliberado:
-       * `duration` es la convención comparable con GamParse y ACT, y cambiarla
-       * en silencio haría que tus cifras dejaran de compararse con las de nadie.
+       * `duration` es de la primera a la última línea de la pelea, que es la
+       * convención de siempre, y cambiarla en silencio haría que tus cifras
+       * dejaran de compararse con ninguna otra.
        * Lo que se hace es dar la otra al lado y usarla donde se te juzga — ver
        * `huecoReal` y el hallazgo de tiempo muerto en `analysis.js`.
        */

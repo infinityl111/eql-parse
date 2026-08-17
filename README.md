@@ -353,8 +353,8 @@ ahí salen los límites del programa, y ninguno se disimula:
 - La vida de un enemigo es una estimación del daño que costó matarlo, no un
   dato oficial.
 - La marca de tiempo tiene resolución de un segundo, así que en peleas de
-  pocos segundos el DPS tiene un error estructural grande. Se usa la
-  convención de GamParse y ACT, `total / (último − primero + 1)`.
+  pocos segundos el DPS tiene un error estructural grande. El cálculo es
+  `total / (último − primero + 1)`, que es la convención de siempre.
 - El daño de escudo sin posesivo (`shards of ice`) no se puede atribuir y se
   deja aparte en vez de adjudicarlo a alguien.
 - Con una postura de evasión puesta no se puede saber cuánto daño entraría sin

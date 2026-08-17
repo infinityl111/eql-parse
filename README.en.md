@@ -356,8 +356,8 @@ where the program's limits come from, and none of them are papered over:
 - An enemy's health is an estimate from the damage it took to kill it, not an
   official figure.
 - Timestamps have one-second resolution, so on short fights DPS carries a large
-  structural error. It uses the GamParse/ACT convention,
-  `total / (last − first + 1)`.
+  structural error. The figure is `total / (last − first + 1)`, the usual
+  convention.
 - Shield damage without a possessive (`shards of ice`) can't be attributed, so
   it's kept separate rather than pinned on someone.
 - While an evasion stance is active there's no way to know how much damage
