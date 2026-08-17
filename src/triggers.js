@@ -338,8 +338,24 @@ export class TriggerEngine extends EventEmitter {
  * qué pasa si alguien RENOMBRÓ una plantilla sin tocarle el patrón. Preferir la
  * traducción le pisaría su nombre. Se distingue midiendo: si el nombre guardado
  * coincide con el de fábrica en CUALQUIERA de los cinco idiomas, es el de
- * fábrica y se traduce; si no coincide con ninguno, lo escribió él y se
- * respeta. Eso no necesita ningún campo nuevo.
+ * fábrica y se traduce; si no coincide con ninguno, lo escribió él.
+ *
+ * PERO ESA CUENTA SE HACE UNA VEZ Y SE ESCRIBE. Rehacerla en cada arranque es lo
+ * que la rompe: el día que MEJOREMOS una traducción, el nombre guardado dejará
+ * de coincidir con los cinco de entonces y TODOS los disparadores intactos
+ * pasarán a «renombrado a mano», congelados en el idioma viejo — un arreglo de
+ * calidad rompiendo la traducción meses después, sin que nadie ate los cabos.
+ *
+ * Así que: al cargar un fichero sin veredicto se aplica la heurística UNA vez y
+ * se anota el resultado; a partir de ahí, renombrar es una acción del usuario y
+ * se apunta cuando ocurre. Sí necesita un campo —el veredicto— y no necesita
+ * formato nuevo: es configuración, y un campo que falta se rellena al leer.
+ *
+ * Y OJO, QUE YA PASA AQUÍ MISMO: la deducción de `origen` de abajo no se escribe
+ * nunca —`saveTriggers` sólo corre al editar— así que se rehace en cada arranque
+ * contra el `STARTER_TRIGGERS` de la versión instalada. Hoy acierta; el día que
+ * una plantilla cambie de patrón, todas sus copias pasarán a «escrito por ti»
+ * solas. Va en el mismo arreglo.
  */
 export const STARTER_TRIGGERS = [
   {

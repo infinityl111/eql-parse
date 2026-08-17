@@ -204,7 +204,7 @@ que el armazón estaba bien.
 | **2 ✔** | **Escena** (sin figuras todavía) | C1–C16, C19, C20, A1, A2, A8, A12 | `renderHead`, `renderClassPrompt`, `renderPetHint`, `charmHTML`, `incertidumbreHTML` |
 | **3 ✔** | **Por habilidad** | R1–R17, y de paso D1–D4, A9 y A10 | `renderRows` y `renderDocs` |
 | **4 ✔** | **Análisis** | N1–N8, A3–A7, A9–A11 y D1 | `renderAnalysis`, `renderAdvice`, `entreTuyosHTML`, `sinControlHTML`, `dpsMandoHTML`, `DOC_AGUANTAR` |
-| 5 | **Resumen** | U1–U13 | `renderSummary` |
+| **5 ✔** | **Resumen** | U1–U13 | `renderSummary` |
 | 6 | **Enemigos** | E6–E11 | páginas `enemigos`, `foe`, `foeDif` |
 | 7 | **Botín (histórico)** | U12, E12 | página `botin` |
 | 8 | **Progreso** | E19–E21 | página `progreso` |
@@ -294,6 +294,25 @@ Las dos notas largas están escritas donde se van a leer: en `src/triggers.js`
 en `electron/main.cjs` (**el proceso principal no sabe el idioma: el idioma vive
 en la ventana**, así que el arreglo es hacer llegar el idioma, no sustituir
 literales).
+
+### Rótulos ya traducidos esperando en el diccionario
+
+`npm run vacios -- --rotulos` busca claves sin camino con forma de rótulo —tres
+palabras como mucho, sin variables ni puntuación—, que es como se encontró
+`an.tab`. Hay **16**, y de ellas sirven para lo que viene:
+
+| clave | dice | para |
+|---|---|---|
+| `foe.file` | «Ficha del enemigo» | la sección Enemigos (mudanza 6) |
+| `rp.title` | «Reproducir» | el control de reproducción dentro de Escena |
+| `an.roles` | «Reparto» | el encabezado que a los roles de Análisis les falta |
+| `an.impact` | «Impacto» | ídem, en los hallazgos |
+
+Las otras doce son del overlay y de los disparadores. Ninguna es un nombre de
+GRUPO: «Esta pelea», «Todo el histórico» y «Ajustes» hubo que escribirlos.
+
+Y las dos últimas son contenido —hoy esos bloques no llevan encabezado—, así que
+van con las familias 16 a 18, no en una mudanza.
 
 ### Lo encontrado por el camino, que se hace APARTE
 

@@ -14,6 +14,7 @@
     "pliegue": "electron bin/pliegue.cjs",
     "vacios": "node bin/vacios.js",
     "espanol": "node bin/espanol.js",
+    "marco": "electron bin/marco.cjs",
     "ui:gif": "node bin/ui-gif.js",
     "web:build": "node web/build.mjs",
     "web:deploy": "npx wrangler pages deploy web/dist --project-name=eqlparse",

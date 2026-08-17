@@ -118,7 +118,27 @@ for (const k of ES) {
   (casaPrefijo(k) ? posibles : sinCamino).push(k);
 }
 
-const interesan = TODAS ? sinCamino : sinCamino.filter(esVacio);
+/**
+ * LAS CLAVES MUERTAS CON FORMA DE RÓTULO.
+ *
+ * `an.tab` —«Análisis»— llevaba versiones traducida a los cinco idiomas sin que
+ * la pintara nadie, y resultó ser EXACTAMENTE el rótulo corto que pedía la barra
+ * lateral del armazón nuevo. No fue suerte: un diccionario grande lleva dentro
+ * el diseño que alguien pensó y no llegó a hacer, y esas claves son nombres de
+ * sección ya escritos y ya traducidos a cinco idiomas.
+ *
+ * Se reconocen por la FORMA —tres palabras como mucho, sin variables, sin punto
+ * ni dos puntos—, que es la regla diecinueve otra vez: preguntar cómo está
+ * puesto en vez de qué significa.
+ */
+const ROTULO = (k) => {
+  const v = (valorES.get(k) ?? '').trim();
+  if (!v || /[{}.:!?]/.test(v)) return false;
+  return v.split(/\s+/).length <= 3 && v.length <= 26;
+};
+
+const ROTULOS = process.argv.includes('--rotulos');
+const interesan = TODAS ? sinCamino : sinCamino.filter(ROTULOS ? ROTULO : esVacio);
 interesan.sort();
 
 console.log(`\n${ES.size} claves en español · ${usadas.size} escritas en el código`
@@ -127,7 +147,9 @@ console.log(`\n${ES.size} claves en español · ${usadas.size} escritas en el c�
 if (!interesan.length) {
   console.log('  no hay ninguna sin camino\n');
 } else {
-  console.log(`  ${interesan.length} ${TODAS ? 'claves' : 'textos de estado vacío'} SIN CAMINO QUE LOS PINTE:\n`);
+  const qué = TODAS ? 'claves'
+    : (process.argv.includes('--rotulos') ? 'claves con forma de RÓTULO' : 'textos de estado vacío');
+  console.log(`  ${interesan.length} ${qué} SIN CAMINO QUE LOS PINTE:\n`);
   for (const k of interesan) {
     const falta = [...dicts].filter(([, c]) => !c.has(k)).map(([n]) => n);
     console.log(`   ${k.padEnd(28)} «${(valorES.get(k) ?? '').slice(0, 62)}»`

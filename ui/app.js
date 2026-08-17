@@ -3070,6 +3070,43 @@ async function renderNarrate(host) {
    * cambia sola; el contenido lo fija el mundo —el juego, el idioma, el
    * jugador— y cambia sin avisar. Una regla sobre algo que cambia solo hay que
    * volver a comprobarla cada vez, y nadie lo hace.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * LA VEINTEAVA: SE DEDUCE UNA VEZ, SE ANOTA, Y NO SE VUELVE A DEDUCIR.
+   * ───────────────────────────────────────────────────────────────────────────
+   *
+   *     UNA DEDUCCIÓN QUE SE REHACE EN CADA LECTURA CAMBIA DE RESPUESTA EL DÍA
+   *     QUE CAMBIE EL MUNDO CONTRA EL QUE DEDUCE — Y NADIE RELACIONA LAS DOS
+   *     COSAS.
+   *
+   * EL CASO QUE LA ESCRIBE, y no ha llegado a pasar porque se vio antes. Para
+   * traducir las plantillas de disparadores hace falta saber si el usuario
+   * renombró una: la forma de averiguarlo es comparar el nombre guardado con el
+   * de fábrica en los cinco idiomas —si coincide con alguno, es el de fábrica—.
+   * Correcto hoy.
+   *
+   * Y se rompe el día que MEJOREMOS UNA TRADUCCIÓN. El nombre guardado deja de
+   * coincidir con ninguno de los cinco de ahora, así que todos los disparadores
+   * intactos pasan a «renombrados a mano» y se quedan congelados en el idioma
+   * viejo. Un arreglo de calidad rompiendo la traducción, meses después, sin que
+   * nadie ate los dos cabos: el que mejoró la frase no tocó los disparadores.
+   *
+   * LO QUE LA REGLA MANDA HACER: al cargar un fichero SIN veredicto, se aplica
+   * la heurística una vez y SE ESCRIBE el resultado. A partir de ahí, renombrar
+   * es una ACCIÓN DEL USUARIO y se apunta cuando ocurre, que es cuando se sabe
+   * de verdad. La heurística deja de ser la fuente y pasa a ser lo que fue: una
+   * forma de arrancar con datos viejos.
+   *
+   * Y NO ES HIPOTÉTICO EN ESTA CASA: la deducción de `origen` de `load()` en
+   * `src/triggers.js` funciona así y no se escribe nunca —`saveTriggers` sólo
+   * corre cuando editas algo—, o sea que se rehace en CADA ARRANQUE contra el
+   * `STARTER_TRIGGERS` de la versión que tengas instalada. Hoy acierta. El día
+   * que una plantilla cambie de patrón, todas las copias de esa plantilla
+   * pasarán a «escrito por ti» al abrir la aplicación.
+   *
+   * Es la misma raíz que las respuestas ad hoc de pertenencia, una vuelta más
+   * arriba: allí el problema era dejar que un dato inestable mandara sobre una
+   * identidad; aquí es dejar que la mande una CUENTA que se rehace sola.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
@@ -3688,6 +3725,33 @@ function renderEscena(snap) {
 }
 
 /**
+ * SECCIÓN · RESUMEN. La quinta mudanza, y la primera de «todo el histórico».
+ *
+ * Es también la primera sección SIN la lista de peleas al lado, así que es la
+ * que prueba el armazón y no un panel: si la estructura está mal pensada, se ve
+ * aquí y no en la novena.
+ *
+ * Y ESO TRAE UNA DIFERENCIA DE VERDAD: sin lista no hay botón de «ver resumen»,
+ * que es quien pedía los datos. Así que la sección los pide ella al abrirse, con
+ * los mismos criterios que tenga puesto el filtro —`recargarResumen` es la misma
+ * función que ya se usa al declarar a alguien—. Mientras llegan se dice que está
+ * cargando: un resumen vacío y uno que aún no ha llegado se ven igual, y uno de
+ * los dos es mentira.
+ */
+function renderResumen(snap) {
+  const host = $('secPane');
+  if (!host) return;
+  if (!state.summary) {
+    if (state.cargandoResumen) return;
+    state.cargandoResumen = true;
+    host.innerHTML = `<div class="hint">${esc(t('log.loading'))}</div>`;
+    recargarResumen().finally(() => { state.cargandoResumen = false; });
+    return;
+  }
+  if (!$('sumRoot')) renderSummary();
+}
+
+/**
  * SECCIÓN · ANÁLISIS. La cuarta mudanza: qué dice de cómo lo hiciste.
  *
  * Recoge las cuatro piezas que estaban de paso y la vista de análisis entera:
@@ -4110,7 +4174,17 @@ function renderSummary() {
   // La declaración se aplica también aquí, y por la misma razón que en la
   // pelea: se guarda lo que se midió, y quién es cada uno lo dices tú después.
   const a = state.summary && { ...state.summary, rows: marcarCompaneros(state.summary.rows) };
-  const host = $('bodyGrid');
+  /**
+   * DÓNDE PINTA, que desde la mudanza 5 no es siempre el mismo sitio.
+   *
+   * El resumen vive en su sección, y `#secPane` sólo existe cuando hay una
+   * abierta. Se resuelve aquí y no con un parámetro porque esta función la
+   * llaman cinco sitios —el botón, la recarga tras declarar a alguien, la
+   * casilla de juntar mascotas, la wiki cuando llega tarde— y pasarles el
+   * destino a todos sería cinco oportunidades de que uno se quede pintando en
+   * la pantalla vieja sin que nadie lo note.
+   */
+  const host = $('secPane') ?? $('bodyGrid');
   if (!a || !a.fights) {
     host.innerHTML = `<div class="empty"><h2>${esc(t('sum.empty'))}</h2>
       <button id="sumBack">${esc(t('sum.back'))}</button></div>`;
@@ -5890,7 +5964,7 @@ async function loadMob(name) {
     const d = await window.eql.wikiMob?.(name);
     mobCache.set(name, d ?? null);
     // El expediente vive en dos sitios y la wiki llega tarde a los dos.
-    if (d && state.view === 'summary') renderSummary();
+    if (d && (state.view === 'summary' || state.seccion === 'resumen')) renderSummary();
     if (d && state.view === 'encyclopedia' && state.enc.page === 'foe') renderEncyclopedia();
   } catch { /* sin red */ }
 }
@@ -5955,6 +6029,11 @@ const SECCIONES = [
   // lateral; `an.title` es «Análisis del combate», que es el título de la vista.
   { id: 'analisis', grupo: 'pelea', ico: '◑', rotulo: () => t('an.tab'),
     listo: true, lista: true, pinta: renderAnalisis },
+  // `sum.title` es «Resumen del tramo», que es el título de la vista; en una
+  // barra lateral de 176 px un rótulo de tres palabras se parte. Rótulo corto
+  // propio, con sus cinco idiomas.
+  { id: 'resumen', grupo: 'historico', ico: '▤', rotulo: () => t('sec.resumen'),
+    listo: true, lista: false, pinta: renderResumen },
 ];
 
 function renderLateral() {

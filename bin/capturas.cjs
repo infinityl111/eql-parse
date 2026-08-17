@@ -114,10 +114,41 @@ async function disparoNoVacio(win, quien, veces = 4) {
 async function dispara(win, ejec, destino) {
   const m = await ejec(`(() => {
     ${PANEL}
-    window.__cap = panel.scrollHeight - panel.clientHeight > 8 ? panel : document.scrollingElement;
-    window.__cap.scrollTop = 0;
-    return { alto: window.__cap.scrollHeight, visible: window.__cap.clientHeight,
-             largo: panel.textContent.trim().length };
+    /**
+     * QUIÉN SCROLLEA DE VERDAD, que no siempre es el panel.
+     *
+     * El resumen tiene su propio contenedor con scroll dentro —el .summary, que
+     * conserva la posición al desplegar una fila— así que el panel de fuera NO
+     * crece: mide lo mismo con veinte filas que con doscientas. Midiéndolo a él,
+     *
+     * (Y OJO CON LAS COMILLAS INVERTIDAS EN ESTE COMENTARIO: está DENTRO de una
+     * plantilla, así que una comilla invertida aquí la cierra y el error sale
+     * cinco líneas más abajo, hablando de otra cosa. Ya está escrito en
+     * ui/app.js y he vuelto a tropezar con ello.)
+     * el capturador daba la sección por entera con una sola foto y NI SIQUIERA
+     * avisaba de píxeles sin capturar: 19.000 caracteres de resumen resumidos en
+     * una pantalla, en silencio. La misma trampa de la familia quince, otra vez
+     * dentro de la herramienta que existe para cazarla.
+     *
+     * Así que si el panel no desborda, se busca DENTRO de él quién lo hace. El
+     * «dentro» es la parte que importa: buscándolo en todo el documento se
+     * elegiría la lista de peleas, que scrollea 6.300 px y no es el contenido.
+     */
+    let cap = panel;
+    if (panel.scrollHeight - panel.clientHeight <= 8) {
+      let dif = 8;
+      for (const el of panel.querySelectorAll('*')) {
+        const ov = getComputedStyle(el).overflowY;
+        if (ov !== 'auto' && ov !== 'scroll') continue;
+        const d = el.scrollHeight - el.clientHeight;
+        if (d > dif) { cap = el; dif = d; }
+      }
+    }
+    window.__cap = cap;
+    cap.scrollTop = 0;
+    return { alto: cap.scrollHeight, visible: cap.clientHeight,
+             largo: panel.textContent.trim().length,
+             dentro: cap !== panel };
   })()`);
 
   const quieren = Math.max(1, Math.ceil(m.alto / Math.max(1, m.visible)));

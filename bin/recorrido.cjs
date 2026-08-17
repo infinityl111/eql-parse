@@ -81,7 +81,7 @@ const VISTAS = [
   { nombre: 'habilidad', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="habilidad"]')] },
   { nombre: 'botin', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="botin"]')] },
   { nombre: 'analisis', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="analisis"]')] },
-  { nombre: 'resumen', pasos: [pulsa('#tabCombat'), pulsa('#btnSummary')] },
+  { nombre: 'resumen', pasos: [pulsa('[data-sec="resumen"]')], espera: 2500 },
   { nombre: 'reproduccion', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('#btnReplay')], espera: 2500 },
   { nombre: 'avisos', pasos: [pulsa('#tabTriggers')] },
   { nombre: 'enciclopedia', pasos: [pulsa('#tabEnc')] },
