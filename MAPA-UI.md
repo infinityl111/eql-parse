@@ -239,6 +239,23 @@ Enchufarlos cambia el color de todas las gráficas, así que va **con la mudanza
 cambio visible en todas las capturas del resto de mudanzas y no sabríamos cuál
 de los dos cambios estamos mirando.
 
+### Lo encontrado por el camino, que se hace APARTE
+
+Se anota aquí y no se toca dentro de este cambio, que sólo mueve cosas de sitio.
+
+1. **`adv.liveOk` y `adv.liveSwitch` están traducidos a los cinco idiomas y no
+   los pinta nadie.** El consejo en vivo (A7) lleva el texto **escrito a mano en
+   español** dentro de `ui/app.js` —«Cambia a X» / «X es la correcta ahora
+   mismo»—, así que un alemán lo lee en español. Las dos frases existen,
+   traducidas, desde hace versiones. Es un arreglo de dos líneas, y es un fallo,
+   no una mudanza: va en su propio cambio. Lo destapó `npm run vacios`.
+2. **`foe.noDiff` («sin dificultad») no lo pinta nadie**: es un duplicado
+   olvidado de `enc.noDiff`, que es la que sí se usa. Se borra, en el mismo
+   cambio que lo anterior.
+3. **Los doce datos con clase `.hint` de Progreso** (familia 17) y **las tres
+   advertencias al pie** (familia 16): van juntos y son lo primero después del
+   armazón.
+
 ### Después de cada sección, las tres cosas de siempre
 
 1. la misma pelea abierta antes y después enseña **las mismas cifras**;
