@@ -528,3 +528,68 @@ lo hace menos limpio que las abejas.
 
 **PREGUNTA PARA CAMPEÓN:** ¿`a gust of wind` es el caballo? ¿Y `an essence
 carrier` / `an essence harvester` son también cadena, o es que iban en grupo?
+
+---
+
+## D10 · Al entrar en Sky hay tres abejas, y la del CENTRO es la que lleva al named
+
+| | |
+|---|---|
+| **quién** | Campeón |
+| **cuándo** | 17 de agosto de 2026 |
+| **seguridad** | **creencia con duda declarada por él mismo**: «juraría» |
+| **estado** | **no medible desde el registro** — ver el límite duro de abajo |
+
+**Qué dice.** Al entrar en la isla hay **tres** `bzzazzt`, y la del centro es la
+que da el split de una y lleva a la mini-reina y al jefe.
+
+**Contradice a la wiki**, que dice que la buena es **la más grande**
+([DATOS-CONSULTADOS.md](DATOS-CONSULTADOS.md), 16 de agosto). Y las dos reglas no
+son la misma: **la del centro no tiene por qué ser la más grande**, así que son
+dos afirmaciones distintas y comprobables por separado.
+
+### EL LÍMITE DURO: LA POSICIÓN NO ESTÁ EN EL REGISTRO
+
+No es que no se haya medido: **es que no se puede medir desde el log, ni ahora ni
+nunca.** El registro escribe nombres y golpes; no escribe coordenadas, ni tamaño,
+ni cuál de las tres tenías delante. Cualquier cosa que la aplicación dijera sobre
+«la del centro» sería inventada.
+
+**Y aun así esto cambia el papel de la medición, a mejor.** Ver
+[HALLAZGOS.md §4.3](HALLAZGOS.md): la cadencia no compite con la pista visual —
+es lo único que puede **arbitrarla**.
+
+### El rastro indirecto que sí está: el ORDEN DE MUERTE
+
+Si Campeón mata siempre en el mismo orden espacial, el orden de muerte de las
+madres dentro de una visita refleja su posición. **Medido el 17 de agosto sobre
+las siete madres muertas del registro, agrupadas en cuatro visitas:**
+
+| visita | madre nº | cuándo | rama |
+|---|---:|---|---|
+| 1 | 1 | 4 ago 23:05 | dos |
+| 1 | **2** | 4 ago 23:19 | **una · JEFE** |
+| 2 | 1 | 5 ago 13:25 | dos (nietas) |
+| 3 | 1 | 11 ago 20:16 | dos (nietas) |
+| 3 | 2 | 11 ago 20:30 | tres |
+| 3 | **3** | 11 ago 20:34 | **una · JEFE** |
+| 4 | **1** | 13 ago 13:53 | **una · JEFE** |
+
+**El jefe salió de la segunda, de la tercera y de la primera.** No hay una
+posición fija en el orden de muerte, así que **el orden por sí solo no
+identifica a la abeja buena**.
+
+Lo que eso descarta y lo que no: descarta «Campeón mata siempre en el mismo orden
+y la buena está siempre en el mismo sitio de ese orden». **No descarta la
+creencia**, porque no consta que el orden de muerte sea el orden espacial — y con
+cuatro visitas, dos de ellas de una sola madre, tampoco habría con qué.
+
+### LA FECHA DE CORTE, que es lo que hace que estos siete valgan
+
+**Todos los episodios son del 4 al 13 de agosto; la creencia es del 17.** Así que
+ninguno está contaminado: cuando se mataron, Campeón no sospechaba nada de la del
+centro y su forma de tirar era independiente de la hipótesis.
+
+**A partir de hoy deja de serlo.** Quien sepa esto y quiera comprobarlo tiene que
+anotar antes cuál mata primero, o los episodios nuevos valdrán menos que estos
+siete. Se anota aquí para que dentro de dos meses se sepa cuáles son cuáles.

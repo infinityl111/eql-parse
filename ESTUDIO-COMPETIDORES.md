@@ -1157,6 +1157,48 @@ mascota, grupo, entrante). El nuestro es un total dividido por una duración —
 `dps`, `dpsOwn` y `dpsActive` como tres respuestas distintas—. **No son el mismo
 número con distinto suavizado: son una serie y un escalar.**
 
+**7 · EL DIVISOR: UNA TASA NO SE DIVIDE POR EL RELOJ DE OTRO.** Campeón vio en la
+aplicación del competidor que **el dps de un enemigo muerto seguía bajando**
+mientras la pelea continuaba contra otro. Es un divisor que sigue corriendo para
+quien ya paró — y **nosotros tenemos el mismo fallo en dos sitios**: el número
+grande de cada fila y el rótulo emergente dividen por la pelea entera
+(`ui/app.js:964` y `:2002`, sobre `encounter.js:1201`). Medido sobre 1.687
+peleas: el 62,7 % de las muertes ocurren a más de diez segundos del final, el
+45,9 % de las peleas tienen alguna fila con diez segundos o más fuera de su
+ventana, y en esas filas la cifra cambia **×2,04 de mediana** según el divisor.
+Todo el detalle en [DIVISOR-DPS.md](DIVISOR-DPS.md).
+
+Lo decidido, para cuando se arregle:
+
+> **a) LA TASA se divide por LA VENTANA DEL COMBATIENTE** —de su primera acción a
+> su última—, y el tiempo sin mando sigue fuera, como ya está. **La muerte es el
+> mismo caso que el encanto, sólo que permanente.**
+>
+> **b) LA APORTACIÓN** —«hizo el 19 % del daño»— **se divide por la pelea, y se
+> llama aportación, no dps.** El fallo del competidor no es una cifra mal
+> calculada: **es una aportación llamada tasa.**
+>
+> **c) Los dos números pueden convivir en la misma fila si están rotulados.** Lo
+> que no puede es haber uno sin decir cuál.
+
+Y el aviso que sale de la propia medición: **una ventana de un segundo no es una
+tasa**. Los casos extremos —×493— son filas de un golpe suelto en una pelea
+larga; ahí el divisor nuevo da un número enorme igual de inútil que el viejo. La
+ventana necesita un suelo o una marca de muestra corta, o cambiaremos un número
+malo por otro. Es la muestra de uno otra vez, la que ya echó al «mín–máx» de la
+tabla de habilidades.
+
+**8 · LA LÍNEA DE UN COMBATIENTE ACABA CUANDO ACABA ÉL.** No se dibujan ceros
+hasta el final de la pelea. **Un cero afirma «hacía 0 en ese segundo» y la verdad
+es «no estaba»** — cero y ausencia no son lo mismo, y una línea que se arrastra
+por el suelo hasta el borde derecho cuenta una historia falsa: la de alguien que
+siguió allí sin hacer nada. La serie de cada uno empieza en su primera acción y
+termina en la última; lo que hay fuera es hueco, no valle.
+
+Es la misma distinción que ya gobierna el resto del programa —«no consta» no es
+cero, la celda vacía de la rejilla de zonas no es un cero, el nivel desconocido
+no es el nivel 1— aplicada a un gráfico.
+
 ## 15. Los tres detectores de gemelos
 
 > **Medidos sobre nuestro registro y DECIDIDOS: ninguno entra en el suelo.**
