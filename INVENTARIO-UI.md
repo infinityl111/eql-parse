@@ -143,6 +143,8 @@ puede reabrir con M10.
 | mudanza | elementos | sección nueva | comprobado |
 |--:|---|---|---|
 | 1 | C17, C18 | Esta pelea › **Botín** | mismas cifras en la misma pelea · 10 capturas (5 idiomas × 2 temas) en `tmp/capturas-despues-botin/` · `npm test` en verde |
+| 10 | V1–V15 | Ajustes › **Preferencias** | `renderNarrate` · 10 capturas, cobertura 100 % |
+| 9 | G1–G7 | Ajustes › **Avisos** | `renderTriggers` con su `initTriggers` · 10 capturas |
 | 8 | E19–E21 | Histórico › **Progreso** | misma forma que la 6 y la 7 · 10 capturas |
 | 7 | E12 | Histórico › **Botín** | U12 se queda en Resumen, ver la desviación 3 · 10 capturas |
 | 6 | E6–E11 | Histórico › **Enemigos** | primera EXTRACCIÓN: tres páginas sacadas del enrutador `state.enc.page` sin partir `renderEncyclopedia` · migas comprobadas de ida y vuelta con `npm run marco` |

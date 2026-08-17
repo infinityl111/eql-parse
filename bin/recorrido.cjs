@@ -58,7 +58,21 @@ const PANEL = 'const panel = document.querySelector("#bodyGrid > :last-child") ?
  * busque «Combate» no encuentra nada en inglés y la sección sale vacía — que se
  * lee como «esto está roto» y no lo está. El aprendizaje es de `bin/ui-check.js`.
  */
-const pulsa = (sel) => `document.querySelector(${JSON.stringify(sel)})?.click()`;
+/**
+ * PULSAR DICE SI HA PULSADO ALGO, y eso no es un detalle.
+ *
+ * Antes devolvía `undefined` pulsara o no. Un paso que no encuentra su elemento
+ * —porque la pantalla anterior todavía estaba cargando— no hacía nada, el
+ * recorrido seguía, y la sección se fotografiaba donde estuviera. Salieron así
+ * `documentos` = `combate` en siete de diez capturas del ANTES y `enemigo` =
+ * `enemigos` en nueve de diez de la sexta mudanza: fotos perfectas de la
+ * pantalla equivocada, con su nombre correcto encima.
+ *
+ * Devolviendo `true`/`false` el que llama puede esperar y, si no aparece nunca,
+ * decirlo en rojo en vez de fotografiar lo que hubiera.
+ */
+const pulsa = (sel) => `(() => { const el = document.querySelector(${JSON.stringify(sel)});`
+  + ' if (!el) return false; el.click(); return true; })()';
 const PELEA = '.fight[data-live="0"]';
 
 const VISTAS = [
@@ -89,7 +103,8 @@ const VISTAS = [
   { nombre: 'reproduccion',
     pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="escena"]'), pulsa('#btnReplay')],
     espera: 2500 },
-  { nombre: 'avisos', pasos: [pulsa('#tabTriggers')] },
+  { nombre: 'avisos', pasos: [pulsa('[data-sec="avisos"]')], espera: 2500 },
+  { nombre: 'preferencias', pasos: [pulsa('[data-sec="preferencias"]')], espera: 2500 },
   { nombre: 'enciclopedia', pasos: [pulsa('#tabEnc')] },
   { nombre: 'enc-zonas', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="zonas"]')] },
   { nombre: 'enemigos', pasos: [pulsa('[data-sec="enemigos"]')], espera: 3000 },
@@ -207,7 +222,25 @@ async function arranque(app, { ancho = 1400, alto = 900, idioma = null } = {}) {
   return { win, ejec, espera, peleas, idiomaPrevio };
 }
 
+/**
+ * Da un paso del recorrido, esperando a que exista lo que hay que pulsar.
+ *
+ * Nueve segundos de plazo: la rejilla de enemigos tarda tres en pintarse con
+ * cuatrocientas fichas y sus retratos. Si al cabo no aparece, se devuelve
+ * `false` y quien llama decide — pero nadie sigue como si hubiera pulsado.
+ */
+async function paso(ejec, js, plazo = 9000) {
+  const hasta = Date.now() + plazo;
+  for (;;) {
+    const r = await ejec(js);
+    // Un paso que no es un `pulsa` devuelve otra cosa: se da por hecho.
+    if (r !== false) return true;
+    if (Date.now() > hasta) return false;
+    await espera(400);
+  }
+}
+
 module.exports = {
-  espera, conPlazo, argumentos, PANEL, pulsa, VISTAS,
+  espera, conPlazo, argumentos, PANEL, pulsa, paso, VISTAS,
   ventanaPrincipal, esperaDatos, esperaFotograma, fijarIdioma, fijarTema, arranque,
 };

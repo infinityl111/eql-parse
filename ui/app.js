@@ -3821,6 +3821,35 @@ function renderEscena(snap) {
 }
 
 /**
+ * SECCIONES · AVISOS y PREFERENCIAS. Las mudanzas 9 y 10.
+ *
+ * Las dos salen de la misma pantalla vieja —la pestaña de Avisos montaba
+ * `renderNarrate` y `renderTriggers` una encima de otra— y se separan porque son
+ * dos preguntas: qué te avisa y cómo se comporta el programa. Ninguna de las dos
+ * funciones se toca; lo único que cambia es que cada una tiene su sitio.
+ *
+ * `initTriggers()` va antes de pintar los disparadores y sólo una vez: es lo que
+ * hacía la pestaña, y sin ello la lista sale vacía sin decir por qué.
+ */
+function renderAvisos() {
+  const host = $('secPane');
+  if (!host) return;
+  if ($('trigBox')) return;
+  host.innerHTML = '<div class="tabpane"><div id="trigBox"></div></div>';
+  const caja = $('trigBox');
+  caja.innerHTML = `<div class="hint">${esc(t('log.loading'))}</div>`;
+  initTriggers().then(() => renderTriggers(caja));
+}
+
+function renderPreferencias() {
+  const host = $('secPane');
+  if (!host) return;
+  if ($('narrateBox')) return;
+  host.innerHTML = '<div class="tabpane"><div id="narrateBox"></div></div>';
+  renderNarrate($('narrateBox'));
+}
+
+/**
  * SECCIÓN · ENEMIGOS. La sexta, y la primera EXTRACCIÓN disfrazada de mudanza.
  *
  * Las otras cinco movían un panel que ya era suyo. Aquí no hay panel: hay tres
@@ -6237,6 +6266,10 @@ const SECCIONES = [
   // parte en dos líneas. Rótulo corto propio, con sus cinco.
   { id: 'progreso', grupo: 'historico', ico: '▲', rotulo: () => t('sec.progreso'),
     listo: true, lista: false, pinta: renderProgreso },
+  { id: 'avisos', grupo: 'ajustes', ico: '◉', rotulo: () => t('tab.alerts'),
+    listo: true, lista: false, pinta: renderAvisos },
+  { id: 'preferencias', grupo: 'ajustes', ico: '⚙', rotulo: () => t('sec.preferencias'),
+    listo: true, lista: false, pinta: renderPreferencias },
 ];
 
 function renderLateral() {
@@ -6344,11 +6377,10 @@ function renderApp() {
     return;
   }
   if (state.view === 'triggers') {
-    if (!$('narrateBox')) {
-      $('bodyGrid').innerHTML = '<div class="tabpane"><div id="narrateBox"></div><div id="trigBox"></div></div>';
-      renderNarrate($('narrateBox'));
-      renderTriggers($('trigBox'));
-    }
+    // Vaciada por las mudanzas 9 y 10: los disparadores están en Avisos y la voz,
+    // las listas y lo de compartir en Preferencias. La pestaña se va con las
+    // otras dos en cuanto no quede nada en ninguna.
+    if (!$('vacioAvisos')) $('bodyGrid').innerHTML = '<div class="tabpane" id="vacioAvisos"></div>';
     return;
   }
   if (state.setup || !state.snap?.path) {

@@ -208,8 +208,8 @@ que el armazón estaba bien.
 | **6 ✔** | **Enemigos** | E6–E11 | páginas `enemigos`, `foe`, `foeDif` — **es una extracción**, ver abajo |
 | **7 ✔** | **Botín (histórico)** | E12 | página `botin` · U12 se queda en Resumen |
 | **8 ✔** | **Progreso** | E19–E21 | página `progreso` |
-| 9 | **Avisos** | G1–G7 | `renderTriggers` |
-| 10 | **Preferencias** | V1–V15, E2 | `renderNarrate`, `encEstado` |
+| **9 ✔** | **Avisos** | G1–G7 | `renderTriggers` |
+| **10 ✔** | **Preferencias** | V1–V15 | `renderNarrate` · E2 sigue en la enciclopedia, ver desviación 4 |
 
 Empieza por la 1, que es la más barata: dos elementos y una función que ya
 existe. Si el armazón está mal pensado, se ve ahí y no en la cuarta.
@@ -257,6 +257,12 @@ no choquen con `--s1/--s2/--s3`.
    construido DENTRO de `renderAdvice`, en la misma plantilla que el resto del
    consejo. Sacarlo de ahí no es mover un panel: es partir una función en dos, y
    este cambio no toca funciones. Viaja con su panel a Análisis (mudanza 4).
+4. **E2, el pie de estado de la ficha, se queda donde está.** El mapa lo mandaba
+   a Preferencias; vive dentro de `encEstado()`, que es parte del índice de la
+   enciclopedia —el que se elimina—, así que moverlo no es sacar un panel sino
+   reescribir dónde se pinta. Se decide con la extracción de las páginas que
+   quedan, no aquí.
+
 3. **U12, el botín del tramo, se queda en Resumen.** El mapa lo mandaba a Botín
    (histórico) y al llegar se ve que son dos alcances distintos: U12 es lo que
    cayó EN EL TRAMO que estás resumiendo y E12 es todo lo que has recogido
@@ -387,6 +393,11 @@ Se anota aquí y no se toca dentro de este cambio, que sólo mueve cosas de siti
    hay que hacer algo y luego mirar, es del marco;
 4. **los tres estados de la sección, diferenciables**: cargando, vacío y con
    datos —y el cuarto, falló, que no puede verse como vacío—. Es la familia 22;
+5. **¿he movido algo de lo que dependa el recorrido?** El verificador está dentro
+   del radio de lo que verifica: la mudanza 2 se llevó el botón que pulsaba el
+   capturador para llegar a la reproducción, y la tanda siguió saliendo verde
+   fotografiando otra pantalla. Cada vez que se mueve un botón, un identificador
+   o una pestaña, hay que mirar `bin/recorrido.cjs` **antes** de fotografiar;
 5. el inventario tachado por donde va.
 
 Y la navegación vieja **sigue funcionando hasta el final**: se quita en el paso

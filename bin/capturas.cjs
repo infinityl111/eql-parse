@@ -49,7 +49,7 @@ app.setPath('userData', path.join(app.getPath('appData'), 'eql-parse'));
 require('../electron/main.cjs');
 
 const {
-  espera, argumentos, PANEL, VISTAS, esperaFotograma, fijarIdioma, fijarTema, arranque,
+  espera, argumentos, PANEL, VISTAS, esperaFotograma, fijarIdioma, fijarTema, arranque, paso,
 } = require('./recorrido.cjs');
 
 const args = argumentos();
@@ -340,7 +340,11 @@ app.whenReady().then(async () => {
         const dir = path.join(SALIDA, `${idioma}-${tema}`);
         fs.mkdirSync(dir, { recursive: true });
         for (const v of RECORRIDO) {
-          for (const paso of v.pasos) { await ejec(paso); await espera(900); }
+          let llego = true;
+          for (const p2 of v.pasos) {
+            if (!(await paso(ejec, p2))) { llego = false; break; }
+            await espera(900);
+          }
           if (v.espera) await espera(v.espera);
           const destino = path.join(dir, `${v.nombre}.png`);
           // Que la sección haya llegado a pintar algo. Una captura de un panel
@@ -349,7 +353,7 @@ app.whenReady().then(async () => {
           const r = await dispara(win, ejec, destino);
           // Vacío DECLARADO: la sección dice que no hay nada, y eso es una foto
           // buena de un estado. En blanco: no llegó el recorrido, y eso invalida.
-          const enBlanco = r.largo < 40 && !r.declara;
+          const enBlanco = (r.largo < 40 && !r.declara) || !llego;
           const vacio = r.largo < 40 && r.declara;
           const bien = !enBlanco && !r.viejos && r.cuadra;
           if (!bien) mal++;
@@ -363,7 +367,8 @@ app.whenReady().then(async () => {
             + `${r.creció ? ` · EL PANEL CRECIÓ MIENTRAS (${r.creció.antes} → ${r.creció.despues})` : ''}`
             + `${!r.cuadra && !r.creció ? ` · LA CUENTA NO CUADRA: previstos ${r.previsto}, medidos ${r.cubierto}` : ''}`
             + `${vacio ? ' · vacío declarado (es un estado, no un fallo)' : ''}`
-            + `${enBlanco ? ` · EN BLANCO: ${r.nodos} nodos, el recorrido no llegó` : ''}`);
+            + `${!llego ? ' · EL RECORRIDO NO LLEGÓ: un paso no encontró lo que pulsar' : ''}`
+            + `${enBlanco && llego ? ` · EN BLANCO: ${r.nodos} nodos` : ''}`);
         }
       }
     }
