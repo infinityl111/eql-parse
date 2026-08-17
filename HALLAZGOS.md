@@ -1156,6 +1156,17 @@ Crushbone (8:04), igual. **Con n=3 no se decide, y no se va a decidir aquí.**
 
 ### 3.7 ¿Es el parámetro de la ZONA? Medido, con su control
 
+> **⚠ LA PREGUNTA ESTABA MAL PLANTEADA, y lo dice [D11](HECHOS-DECLARADOS.md):**
+> el parámetro no es de la zona ni del bicho — **se elige al crear la
+> instancia**. Dos instancias de la misma Befallen pueden tener tiempos
+> distintos sin que ninguna esté mal medida, así que «un valor por zona» no
+> podía sostenerse por un motivo que no era el que se midió aquí.
+>
+> Y hay un bloqueo que hay que resolver antes de tocar nada de este apartado:
+> **el racimo de 4:27 no se ha podido reproducir** con muerte→muerte sobre el
+> registro de hoy. Todo, con sus cifras, en
+> [REAPARICION-INSTANCIA.md](REAPARICION-INSTANCIA.md).
+
 > **CORREGIDO el 16 de agosto por la noche.** Una versión anterior de §3.3 decía
 > que los mínimos caen **«±2 s entre nombres distintos de la misma zona»** y lo
 > presentaba como el resultado. **Eso era escoger la mitad que apoyaba la idea**:
@@ -1501,4 +1512,333 @@ es una forma de taparlo, no de enseñarlo—.
   corriente y tiene que estar bien resuelto: **la superficie de descubrimiento es
   «lo que ha muerto», que no cuesta nada y no afirma nada** — su
   «Recently-killed», y la ruta por la que su dueño llegó ahí está medida arriba.
+
+---
+
+## 4. La isla de las abejas: contar homónimos por cadencia
+
+**El árbol está en [DATOS-CONSULTADOS.md](DATOS-CONSULTADOS.md) §1** — wiki de
+`eqlwiki.com`, traída por Campeón el **16 de agosto de 2026**. Lo que importa de
+él para esto: **de la primera `bzzazzt` salen una, dos o tres `bazzzazzt`, y sólo
+la rama de UNA lleva a la reina y al jefe de la isla.** La wiki dice
+explícitamente que no se puede saber en qué rama estás; lo único que ofrece para
+distinguirlas es visual —la abeja que lleva a la reina es más grande—, y eso un
+registro de texto no lo ve.
+
+**Pero contarlas sí es cosa de un parser.** El registro no dice cuántas hay: las
+tres se llaman igual, y hasta que no muere la segunda, el **suelo** sigue
+diciendo una. La pregunta de este apartado es si algo en el registro las delata
+antes.
+
+### 4.1 El techo de un bicho: 10 golpes en un segundo
+
+La idea era la del tic de veneno de sowoky llevada al melé —si un bicho pega a
+un ritmo, N golpes del mismo nombre en el mismo segundo son N bichos—. **Para que
+valga hace falta un techo medido, y sólo se puede medir donde CONSTA que hay uno
+solo: los nameds, por [D7](HECHOS-DECLARADOS.md).**
+
+Sobre 75 nameds y **14.206 segundos con golpe suyo** (melé y fallos, con él de
+origen; ni escudo de daño —que es del defensor— ni hechizos —que van por otra
+cadencia—):
+
+| golpes/s | segundos | % | acumulado |
+|---:|---:|---:|---:|
+| 1 | 4.278 | 30,11 % | 30,11 % |
+| 2 | 6.377 | 44,89 % | 75,00 % |
+| 3 | 1.532 | 10,78 % | 85,79 % |
+| 4 | 1.280 | 9,01 % | 94,80 % |
+| 5 | 407 | 2,86 % | 97,66 % |
+| 6 | 221 | 1,56 % | 99,22 % |
+| 7 | 72 | 0,51 % | 99,73 % |
+| 8 | 27 | 0,19 % | 99,92 % |
+| 9 | 8 | 0,06 % | 99,97 % |
+| 10 | 4 | 0,03 % | 100 % |
+
+**Techo observado de un solo bicho: 10 golpes en un segundo. p99,9: 8.**
+
+*Corrección durante la medición:* el primer pase daba 76 nameds y metía
+`kalforgelp`, que es **un jugador** —419 segundos por encima del techo, máximo de
+23—. Se apartó todo nombre que alguna vez saliera como aliado. **El techo no se
+movió: los 10 son de bichos.** Un named con ráfaga y doble ataque llega ahí solo.
+
+### 4.2 El máximo no sirve — y por qué casi me lo trago
+
+En todo el registro, **629 segundos superan los 10 golpes, en 44 nombres**; de
+ellos **597 caen en nombres que el suelo YA cuenta como múltiples por dos
+muertes**. Sólo 32 segundos, en 18 nombres, dirían algo nuevo, y el mayor
+—`a fire giant warrior`, 54 segundos, máximo de 33— es un nombre con 114 muertes
+en el histórico: nadie dudaba de que fueran varios.
+
+**Con las abejas, el máximo dice que no.** `bazzzazzt` pasa de 10 en **2 segundos
+de 445**; las otras cinco no lo pasan nunca. Con tres abejas vivas eso debería ser
+sistemático, y no lo es. **Ahí es donde estuve a punto de escribir que la cadencia
+no separa.**
+
+**El fallo del máximo es que se confunde con la duración.** Un episodio con dos
+abejas dura el doble, y un máximo sobre el doble de segundos sube por contar más
+veces, no por pegar más fuerte. Se ve en los siete episodios: los de una muerta
+duran 56–60 s y su máximo es exactamente **5, 5, 5**; el de dos muertas dura 122 s
+y su máximo es **9**. Parece un corte limpio y no lo es.
+
+### 4.3 La media por segundo sí separa, y en tres montones
+
+> **SIGUE SIENDO EL DETECTOR, Y AHORA ES EL ÚNICO.** El 17 de agosto Campeón
+> propuso que la buena es la del centro ([D10](HECHOS-DECLARADOS.md)) y **la
+> retiró el mismo día tras mirarlo**: la del centro no es distinta, de cualquiera
+> de las tres puede salir la cadena buena. Con eso se cae la última pista visual
+> —la de la wiki, «la más grande», ya era dudosa— y **no queda ninguna otra forma
+> de saber en qué rama estás**: la posición y el tamaño no están en el registro y
+> no lo estarán nunca. La cadencia lo dice después del split, y es lo único que
+> lo dice.
+>
+> *(Durante unas horas esto estuvo escrito como «de detector a árbitro», mientras
+> la creencia estaba en pie. Se deja dicho porque el papel de una medición cambia
+> con lo que se sepa alrededor, y conviene ver que puede cambiar en las dos
+> direcciones.)*
+>
+> **Recuento del 17 de agosto: siguen siendo siete episodios**, ninguno nuevo, y
+> la p sigue en 0,029. Con lo que salió al repetir la cuenta —el método no está
+> escrito y una lectura razonable mueve un episodio al medio de dos montones— en
+> [ABEJAS-RECUENTO.md](ABEJAS-RECUENTO.md).
+
+**Lo que no depende de la duración es la media de golpes por segundo, y sólo
+mientras están todas vivas** —en cuanto cae una, la media del episodio entero se
+diluye y deja de decir nada—. Ventana: desde la muerte de la `bzzazzt` hasta la
+primera muerte de una `bazzzazzt`.
+
+Siete episodios, del 4 al 13 de agosto de 2026:
+
+| cuándo | media/s (todas vivas) | media/s (episodio entero) | murieron |
+|---|---:|---:|---:|
+| 4 ago 23:05 | **3,67** | 3,67 | 0 |
+| 4 ago 23:19 | **1,93** | 1,93 | 1 |
+| 5 ago 13:25 | **3,71** | 3,71 | 0 |
+| 11 ago 20:16 | **3,70** | 2,77 | **2** |
+| 11 ago 20:30 | **5,89** | 5,89 | 0 |
+| 11 ago 20:34 | **1,96** | 1,96 | 1 |
+| 13 ago 13:53 | **1,97** | 1,97 | 1 |
+
+**Tres montones, y nada en medio: 1,93–1,97 · 3,67–3,71 · 5,89.** **El único
+episodio cuyo número consta por muertes —dos cadáveres— cae en el montón de en
+medio**, y su columna «episodio entero» (2,77) enseña la dilución de la que
+hablaba el párrafo anterior.
+
+#### La proporción es la prueba fuerte, más que el acierto del jefe
+
+**Los centros no están sólo separados: están en proporción entera.** Tomando el
+de abajo como unidad:
+
+| montón | media/s | ÷ 1,954 | lo que predice «N bichos pegan N veces» |
+|---|---:|---:|---:|
+| uno | 1,954 | **1,00** | 1 |
+| dos | 3,693 | **1,90** | 2 |
+| tres | 5,89 | **3,02** | 3 |
+
+**1 : 1,90 : 3,02.** Eso es una **predicción física cumplida**, no una
+coincidencia de etiquetas: nadie ajustó nada para que el tercer montón cayera en
+3,02: sale de dividir dos medias independientes. **Convence más que el 7 de 7 del
+apartado siguiente**, porque una correlación acertada podría salir por azar —y
+abajo se dice con cuánto— mientras que un número continuo que aterriza a 0,02 de
+un entero, dos veces, no tiene esa salida.
+
+**Anotado sin perseguirlo: el montón de dos va un 5 % bajo su múltiplo**, y de
+forma sistemática —3,67 · 3,70 · 3,71, los tres por debajo de 3,91—. La hipótesis
+probable es que **la segunda abeja entra un latido más tarde y la ventana la
+cuenta entera**: los primeros segundos tienen una sola pegando y bajan la media
+del tramo. Si fuera eso, el montón de tres debería ir aún más bajo y va a 3,02,
+así que **no cuadra del todo y se queda como anotación**. No se persigue: con
+siete episodios no hay con qué.
+
+### 4.4 La comprobación que no es circular: 7 de 7 contra el árbol
+
+**Que los episodios de una muerta den 1,00 no prueba nada**, porque el ritmo de
+una abeja (**1,954 golpes/s**) se calculó con ellos. Lo que sí prueba es el árbol:
+según la wiki, **sólo el split de una lleva a la reina `bzzzt` y al jefe
+`bazzt Zzzt`**. La cadencia no ve eso.
+
+| cuándo | media/s | la cadencia dice | qué aparece después | el árbol predice |
+|---|---:|---:|---|---|
+| 4 ago 23:05 | 3,67 | **2** | nada más | nietas, sin jefe |
+| 4 ago 23:19 | 1,93 | **1** | **reina + JEFE** | reina y jefe |
+| 5 ago 13:25 | 3,71 | **2** | nada más | nietas, sin jefe |
+| 11 ago 20:16 | 3,70 | **2** | **nietas** | nietas, sin jefe |
+| 11 ago 20:30 | 5,89 | **3** | nada más | nada más, sin jefe |
+| 11 ago 20:34 | 1,96 | **1** | **reina + JEFE** | reina y jefe |
+| 13 ago 13:53 | 1,97 | **1** | **reina + JEFE** | reina y jefe |
+
+**Siete de siete.** El jefe de la isla salió en **los tres** episodios donde la
+cadencia lee 1, y en **ninguno** de los cuatro donde lee 2 o 3. Las nietas
+salieron en uno de los de 2, y en ninguno de los de 1 ni en el de 3.
+
+**Esto es una predicción acertada sobre un hecho que la cuenta no tenía delante.**
+
+#### Y la fuerza que tiene, escrita al lado
+
+**p ≈ 0,03.** Tres de los siete episodios trajeron jefe, y la cadencia señaló
+exactamente esos tres. Si la cadencia no supiera nada y sólo estuviera repartiendo
+tres etiquetas al azar entre siete episodios, acertar los tres tiene probabilidad
+**1 entre C(7,3) = 35**, o sea **0,029**.
+
+**Es evidencia buena y no es demostración**, y hay que leer las dos mitades de esa
+frase:
+
+- **0,03 no es un accidente**, y con la proporción de [§4.3](#la-proporción-es-la-prueba-fuerte-más-que-el-acierto-del-jefe)
+  encima, las dos pruebas son independientes entre sí y apuntan al mismo sitio.
+- **Un episodio más la mueve mucho, y de forma muy asimétrica.** Un octavo
+  episodio que encaje sólo la baja de 0,029 a **0,018** —1 entre C(8,3) = 56—:
+  casi nada. Un octavo que **falle** rompe el «todos» y obliga a bajar a «3 de 4
+  bien», que con ocho episodios y cuatro jefes tiene probabilidad
+  **17/C(8,4) = 17/70 = 0,24**. **Un acierto más apenas mejora; un fallo cuesta un
+  orden de magnitud.** Con siete observaciones, cada una vale demasiado. **Eso es
+  exactamente lo que quiere decir «no es demostración»**, y es la razón de que
+  esto no se construya todavía.
+
+### 4.5 Lo que NO está probado, dicho antes que lo que sí
+
+- **Siete episodios.** Un jugador, seis días, una isla. Es una señal, no una ley.
+- **Tres de los siete no tienen ninguna muerte de `bazzzazzt`** —se huyó, murió
+  Campeón o cambió de zona—, así que su cuenta es **deducida, no medida**: el
+  aval es el árbol, no un cadáver. El «3» descansa entero en un episodio así.
+- **De los cuatro con muertes, sólo uno prueba un número mayor que 1.**
+- **La ralentización no está controlada.** Una abeja ralentizada pega menos, y
+  1,95 podría ser dos abejas frenadas. Contra eso: 1,93 · 1,96 · 1,97 en tres
+  días distintos es demasiado apretado para depender de si cayó un hechizo.
+- **No se ha probado fuera de las abejas.** Que el ritmo de un bicho sea constante
+  a ±0,02 es lo que hace que esto funcione, y sólo consta para `bazzzazzt`.
+
+### 4.6 LA FIABILIDAD NO ES DE LA FUENTE, ES DEL CAMPO
+
+**La misma wiki acertó al segundo y falló, y no es que sea buena o mala: es que
+un campo suyo se sostiene y otro no.**
+
+| campo | qué dice | qué medimos | veredicto |
+|---|---|---|---|
+| temporizador de ``kahaptra Z`Taj`` | 4:27 | 4:27 (267 s) | **al segundo** (§3.6) |
+| temporizador de `an elf skeleton` | 4:27 | 6:40 (400 s) | **por debajo** de nuestro suelo |
+| árbol de la isla de las abejas | tres ramas, con sus hijos | 7 de 7 episodios encajan | **acierta** |
+| «no se puede saber en qué rama estás» | no se puede | **se puede, contando** | **se queda corta** |
+
+**Las cuatro filas son de la misma casa.** Y no se ordenan por página ni por
+autor: el temporizador de un bicho y el árbol de una isla son cosas distintas,
+recogidas de maneras distintas, y envejecen distinto —un árbol de spawns es
+mecánica del juego y no cambia; un temporizador depende del servidor, y por eso
+[§3.8](#38-y-los-dos-desacuerdos-con-la-wiki-encajan-con-su-zona-la-wiki-no-describe-este-servidor)
+explica los desacuerdos por la zona y no por la wiki—.
+
+**La regla, entonces:**
+
+> **Un dato consultado no hereda la fiabilidad de su fuente. La hereda de su
+> campo.** «Según la wiki» no es una etiqueta: hay que decir **qué campo**, **de
+> cuándo**, y **contra qué lo hemos contrastado**. Una fuente que acierta el
+> árbol puede errar el reloj de la misma criatura, y al revés.
+
+**Y el corolario que esto añade:** *«no se puede saber»* **es una afirmación de la
+fuente sobre sus propios medios, no sobre los nuestros.** La wiki dice que la rama
+no se distingue porque su medio es mirar, y las tres abejas se ven iguales salvo
+el tamaño. El nuestro es contar golpes, y ahí sí se distingue. **Cuando una fuente
+declara un límite, hay que leerlo como el límite de su método** — y comprobar si
+es también el del nuestro antes de repetirlo.
+
+### 4.7 Lo que costaría, si Campeón lo quiere
+
+**No está construido.** El coste, con las piezas que ya existen:
+
+| pieza | coste | por qué |
+|---|---|---|
+| cadencia por nombre y segundo | **ya está** | `encounter.js` ya recorre los sucesos con su segundo de pelea; es un `Map` más |
+| ritmo base de un nombre | **~40 líneas** | media de golpes/s en tramos donde el suelo dice uno |
+| la ventana «todas vivas» | **~20 líneas** | corta en la primera muerte del nombre; ya tenemos `killTimes` |
+| el aviso en pantalla | **~60 líneas** + 5 traducciones | una línea en el panel de pelea |
+| **el árbol como dato consultado** | **ya está** | [DATOS-CONSULTADOS.md](DATOS-CONSULTADOS.md), sin cablear |
+| pruebas | **~120 líneas** | los 7 episodios como casos fijos, más el control del párrafo siguiente |
+
+**Medio día, y no es lo caro.** Lo caro es lo otro:
+
+- **El ritmo base hay que medirlo por nombre, y casi ningún nombre tiene muestra.**
+  Con `bazzzazzt` salió a ±0,02 porque hay 445 segundos suyos. Para el resto del
+  registro esto no existe, igual que la reaparición se quedó parada por muestra
+  ([§3.13](#313-la-reaparición-queda-parada-por-muestra-no-por-código)).
+- **El control obligatorio antes de enseñar nada:** correr el registro entero con
+  la regla y sin ella, y ver a cuántos nombres les cambia la cuenta y en cuántos
+  de ésos el suelo ya lo sabía por muertes. Si repite lo del §4.2 —597 de 629
+  redundantes—, el aviso no aporta.
+- **Y el aviso afirma sobre el presente.** «Hay tres» mientras están vivas es
+  exactamente el tipo de frase que [§3.14](#314-la-forma-que-tendría-si-se-construye)
+  prohíbe para la reaparición. La forma honrada es la misma: **la evidencia,
+  no la conclusión.**
+
+> **«Cadencia de 5,9 golpes/s — el ritmo de una `bazzzazzt` es 1,95 (445 s
+> medidos). Eso son 3.»**
+> **«Con 3, la wiki (16 ago 2026) dice que no hay jefe en esta tirada.»**
+
+#### Y esas dos líneas llevan TRES procedencias, cada una con su etiqueta
+
+**Es la mejor demostración de la doctrina que ha dado el proyecto**: tres
+procedencias distintas en dos frases, con las mismas etiquetas que usa el resto
+de la aplicación.
+
+| pieza | procedencia | lo que hay detrás |
+|---|---|---|
+| «cadencia de 5,9 golpes/s» | **MEDIDO** | 19 segundos con golpe de ese episodio, contados |
+| «el ritmo de una es 1,95» | **MEDIDO** | 445 s de `bazzzazzt`, tres episodios de una sola |
+| «eso son 3» | **DEDUCIDO** | aritmética sobre un ritmo base que **sólo está medido para `bazzzazzt`** |
+| «con 3 no hay jefe» | **CONSULTADO**, 16 ago 2026 | [DATOS-CONSULTADOS.md §1](DATOS-CONSULTADOS.md) |
+
+**La distinción que más importa es la tercera fila.** «Eso son 3» tiene pinta de
+medido y no lo es: es una división. Si el ritmo base de ese nombre no estuviera
+medido —y para casi ningún nombre lo está— **la línea entera se cae**, aunque los
+5,9 golpes/s de arriba sigan siendo ciertos. **Un deducido no es más débil por
+serlo; es más débil por lo que hay debajo, y hay que poder verlo.**
+
+**La segunda línea lleva su fecha porque es prestada y envejece.** La primera es
+nuestra y se puede auditar contra el registro cuando se quiera.
+
+**Sin la orden de Campeón, aquí se para.**
+
+### 4.8 La condición de desbloqueo: faltan EPISODIOS, no código
+
+**Las dos cosas que este proyecto tiene medidas y paradas esperan lo mismo, y no
+es trabajo nuestro.** Escrito junto para que no se confunda con una lista de
+tareas:
+
+| | qué está medido | qué falta | qué desbloquea |
+|---|---|---|---|
+| **reaparición** ([§3.13](#313-la-reaparición-queda-parada-por-muestra-no-por-código)) | 172 observaciones, pendiente 0,976, racimos por zona con p<0,0001 | valores con **n≥5**: hoy hay 3 | **campar nameds en Clan Crushbone 4 y Befallen 2** |
+| **contar abejas** (§4.4) | 3 montones en proporción 1 : 1,90 : 3,02, y 7 de 7 con p≈0,03 | **episodios**: hoy hay 7, y 3 sin ningún cadáver | **volver a la isla de las abejas** |
+
+**Para la reaparición**, los seis nombres que más rinden por partida están en
+[§3.13](#313-la-reaparición-queda-parada-por-muestra-no-por-código): cuatro en el
+racimo de 8:04 de Crushbone —`marrowbane`, `emperor Crush`, ``ambassador D`Vinn``,
+`bloodgurgler`— y dos en el de 4:27 de Befallen —``kahaptra Z`Taj``,
+`gynok Moltor`—. **Cada muerte de uno de ésos, campada en el sitio, es una muestra
+directa sobre un valor que ya tiene tres o cuatro.**
+
+> **Y ese valor ya no se puede llamar «el tiempo de Befallen».** Con
+> [D11](HECHOS-DECLARADOS.md) —el tiempo se elige al crear la instancia— lo más
+> que puede llegar a decir es «el tiempo de las instancias que Campeón crea en
+> Befallen», y **no se generaliza a otro jugador**, porque otro elegiría otro
+> ajuste. Antes de renombrarlo hay que poder volver a medirlo: hoy no se
+> reproduce ([REAPARICION-INSTANCIA.md](REAPARICION-INSTANCIA.md)).
+>
+> **Sky sale de esta cuenta igual que antes, pero por el motivo bueno**: no
+> porque una instancia no reaparezca —eso era una deducción mía y era falsa—
+> sino porque allí lo que hay es una CADENA de apariciones, que es otra cosa.
+
+**Para las abejas hace falta menos, pero de un tipo concreto.** No vale cualquier
+episodio:
+
+- **Los que cuentan doble son los que acaban con las abejas muertas**, porque ahí
+  el número queda **medido** y no deducido. De los siete, sólo cuatro tienen algún
+  cadáver, y sólo uno prueba un número mayor que 1.
+- **El «3» es el que más flojo está**: descansa entero en un episodio sin ninguna
+  muerta ([§4.5](#45-lo-que-no-está-probado-dicho-antes-que-lo-que-sí)). **Una sola
+  tanda que salga 3 y acabe con tres cadáveres lo convierte en medido.**
+- **Y cada episodio nuevo mueve la p mucho más de lo que parece**, en los dos
+  sentidos: ver
+  [§4.4](#y-la-fuerza-que-tiene-escrita-al-lado).
+
+**Ninguna de las dos necesita que se escriba una línea de código para avanzar.**
+Lo que las mueve es que Campeón juegue en un sitio concreto, y por eso está
+escrito aquí y no en [CACERIA.md](CACERIA.md): **no es una rama sin pisar, es una
+medición sin muestra.**
 
