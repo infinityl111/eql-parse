@@ -10,6 +10,8 @@
     "store:check": "node bin/store-check.js",
     "store:rebuild": "node bin/store-rebuild.js",
     "ui:check": "node bin/ui-check.js",
+    "capturas": "electron bin/capturas.cjs",
+    "pliegue": "electron bin/pliegue.cjs",
     "ui:gif": "node bin/ui-gif.js",
     "web:build": "node web/build.mjs",
     "web:deploy": "npx wrangler pages deploy web/dist --project-name=eqlparse",

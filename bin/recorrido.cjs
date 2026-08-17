@@ -1,0 +1,197 @@
+/**
+ * EL RECORRIDO POR LAS SECCIONES, EN UN SOLO SITIO.
+ *
+ * Lo usan dos herramientas —`capturas`, que fotografía, y `pliegue`, que mide
+ * dónde caen las notas— y las dos necesitan exactamente lo mismo: arrancar la
+ * aplicación de verdad, esperar a que tenga datos, y saber cómo se llega a cada
+ * sección. Tenerlo dos veces significa que el día que se mueva una sección sólo
+ * se arreglaría una de las dos, y la otra seguiría dando verdes de una pantalla
+ * que ya no existe. Es la misma razón por la que existe `bin/cdp.js`.
+ *
+ * Quien lo requiera tiene que haber fijado ANTES el nombre y la carpeta de la
+ * aplicación, y haber requerido `electron/main.cjs`: eso no se puede hacer aquí
+ * porque depende de ser el proceso principal.
+ */
+const espera = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+/**
+ * NINGUNA ESPERA SIN PLAZO.
+ *
+ * El capturador esperaba a `requestAnimationFrame` para asegurarse de que la
+ * ventana había pintado. Con la ventana tapada por otra, el navegador deja de
+ * programar fotogramas: la promesa no se resolvió nunca y el recorrido se quedó
+ * diez minutos sin escribir un fichero ni un error — la misma forma exacta del
+ * cuelgue que está contado en `bin/cdp.js`.
+ */
+const conPlazo = (promesa, ms, quien) => Promise.race([
+  promesa,
+  espera(ms).then(() => { throw new Error(`«${quien}» no respondió en ${ms / 1000}s`); }),
+]);
+
+/** Los argumentos de la línea de órdenes, en un objeto. */
+const argumentos = () => Object.fromEntries(process.argv.slice(2)
+  .filter((a) => a.startsWith('--'))
+  .map((a) => {
+    const i = a.indexOf('=');
+    return i < 0 ? [a.slice(2), '1'] : [a.slice(2, i), a.slice(i + 1)];
+  }));
+
+/**
+ * CUÁL ES EL PANEL DE CONTENIDO, que no es el que dice `index.html`.
+ *
+ * El esqueleto trae `<main id="mainPane">`, pero `renderApp()` reescribe
+ * `#bodyGrid` entero y lo que queda dentro cambia de nombre según la vista:
+ * `main` sin identificador en Combate, `#anView` en Análisis, `.tabpane` en la
+ * Enciclopedia. Preguntar por `#mainPane` devuelve `null` SIEMPRE.
+ *
+ * Lo estable es la POSICIÓN: el contenido es el último hijo de `#bodyGrid`. El
+ * primero, cuando hay dos, es la lista de peleas — que scrollea 6.300 px con
+ * noventa peleas y se llevaría el recorte entero si se eligiera «el que más
+ * scrollea».
+ */
+const PANEL = 'const panel = document.querySelector("#bodyGrid > :last-child") ?? document.body;';
+
+/**
+ * Cómo se llega a cada sección.
+ *
+ * SE NAVEGA POR IDENTIFICADOR, NUNCA POR TEXTO. Son cinco idiomas: un paso que
+ * busque «Combate» no encuentra nada en inglés y la sección sale vacía — que se
+ * lee como «esto está roto» y no lo está. El aprendizaje es de `bin/ui-check.js`.
+ */
+const pulsa = (sel) => `document.querySelector(${JSON.stringify(sel)})?.click()`;
+const PELEA = '.fight[data-live="0"]';
+
+const VISTAS = [
+  { nombre: 'combate', pasos: [pulsa('#tabCombat'), pulsa(PELEA)] },
+  {
+    nombre: 'documentos',
+    pasos: [pulsa('#tabCombat'), pulsa(PELEA),
+      '[...document.querySelectorAll(".doctab")].at(-1)?.click()'],
+  },
+  // Las secciones del armazón nuevo se abren por la barra lateral. `data-sec`
+  // no se traduce, igual que los identificadores de las pestañas viejas.
+  { nombre: 'botin', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('[data-sec="botin"]')] },
+  { nombre: 'analisis', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('#btnAnalyse')] },
+  { nombre: 'resumen', pasos: [pulsa('#tabCombat'), pulsa('#btnSummary')] },
+  { nombre: 'reproduccion', pasos: [pulsa('#tabCombat'), pulsa(PELEA), pulsa('#btnReplay')], espera: 2500 },
+  { nombre: 'avisos', pasos: [pulsa('#tabTriggers')] },
+  { nombre: 'enciclopedia', pasos: [pulsa('#tabEnc')] },
+  { nombre: 'enc-zonas', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="zonas"]')] },
+  { nombre: 'enc-enemigos', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="enemigos"]')] },
+  { nombre: 'enc-botin', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="botin"]')] },
+  { nombre: 'enc-hechizos', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="hechizos"]')] },
+  { nombre: 'enc-progreso', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="progreso"]')] },
+  { nombre: 'enc-muertes', pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="muertes"]')] },
+  {
+    nombre: 'enc-hechizo',
+    pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="hechizos"]'), pulsa('.cat-row.abre')],
+  },
+  {
+    nombre: 'enc-enemigo',
+    pasos: [pulsa('#tabEnc'), pulsa('.enccard[data-enc="enemigos"]'), pulsa('.encrow.foe .nm')],
+  },
+];
+
+/** La ventana principal, cuando exista y haya terminado de cargar. */
+function ventanaPrincipal(app) {
+  return new Promise((res, rej) => {
+    const reloj = setTimeout(() => rej(new Error('la ventana principal no apareció en 60 s')), 60_000);
+    app.on('browser-window-created', (_e, win) => {
+      win.webContents.once('did-finish-load', () => {
+        // El overlay usa el mismo preload y la misma clase: se distingue por lo
+        // que carga, no por ser el primero.
+        if (!win.webContents.getURL().includes('index.html')) return;
+        clearTimeout(reloj);
+        res(win);
+      });
+    });
+  });
+}
+
+/**
+ * Que la aplicación tenga DATOS antes de empezar.
+ *
+ * Sin esto, una carpeta de configuración equivocada o un log que ya no está dan
+ * exactamente lo mismo que un arranque lento: una ventana en pie y ni una
+ * pelea. La diferencia es que lo segundo se arregla esperando y lo primero no,
+ * y la única forma de no confundirlos es poner un plazo y reventar al pasarlo.
+ */
+async function esperaDatos(ejec) {
+  for (let i = 0; i < 60; i++) {
+    const n = await ejec('document.querySelectorAll(".fight").length');
+    if (n > 0) return n;
+    await espera(1000);
+  }
+  throw new Error('la lista de peleas sigue vacía después de 60 s: '
+    + '¿es ésta la carpeta de configuración con tu histórico?');
+}
+
+/**
+ * UNA VENTANA TAPADA DEVUELVE EL FOTOGRAMA DE ANTES.
+ *
+ * Con la ventana detrás de otra, Chromium deja de componer: `capturePage()`
+ * sigue contestando —rápido, con una imagen válida y sin un solo error— pero lo
+ * que devuelve es lo ÚLTIMO que se pintó. `requestAnimationFrame` sólo se
+ * ejecuta cuando el compositor produce fotogramas, así que sirve de acuse de
+ * recibo: si vuelve, lo que se mida o capture a continuación es NUEVO.
+ */
+async function esperaFotograma(ejec) {
+  try {
+    await conPlazo(ejec('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))'),
+      5000, 'un fotograma nuevo');
+    return true;
+  } catch { return false; }
+}
+
+/**
+ * EL IDIOMA Y EL TEMA SON CONFIGURACIÓN, NO ESTADO DE VENTANA.
+ *
+ * Los dos se guardan en `config.json`, así que tocarlos se los cambia a quien
+ * ejecute esto. Quien los cambie tiene que devolverlos, y decirlo en voz alta
+ * si no puede. La lección es de `cdp.js`.
+ */
+async function fijarIdioma(ejec, code) {
+  await ejec(pulsa(`#langPick .lang-item[data-code="${code}"]`));
+  await espera(700);
+}
+
+async function fijarTema(ejec, css) {
+  const ahora = await ejec("document.documentElement.dataset.theme || 'dark'");
+  if (ahora === css) return;
+  await ejec(pulsa('#btnTheme'));
+  await espera(500);
+}
+
+/**
+ * Arranca, coloca la ventana y espera a que haya datos.
+ *
+ * La ventana va DELANTE y sin frenos a propósito: tapada o en segundo plano
+ * deja de producir fotogramas, y entonces lo que se capture es el pasado.
+ */
+async function arranque(app, { ancho = 1400, alto = 900, idioma = null } = {}) {
+  const win = await ventanaPrincipal(app);
+  // Electron dice «Script failed to execute» y nada más: sin saber QUÉ paso
+  // reventó, un recorrido de quince secciones no se depura.
+  const ejec = async (js) => {
+    try { return await win.webContents.executeJavaScript(js, true); }
+    catch (e) { throw new Error(`${e.message}\n       al evaluar: ${js.slice(0, 120)}`); }
+  };
+  if (win.isMaximized()) win.unmaximize();
+  win.setContentSize(ancho, alto);
+  win.webContents.setBackgroundThrottling(false);
+  win.show();
+  win.focus();
+  await espera(2500);
+  if (!(await esperaFotograma(ejec))) {
+    console.log('  (aviso: la ventana no está pintando fotogramas — ponla delante)');
+  }
+  const peleas = await esperaDatos(ejec);
+  const idiomaPrevio = await ejec('window.eql.getConfig().then((c) => c.lang)');
+  if (idioma && idioma !== idiomaPrevio) await fijarIdioma(ejec, idioma);
+  return { win, ejec, espera, peleas, idiomaPrevio };
+}
+
+module.exports = {
+  espera, conPlazo, argumentos, PANEL, pulsa, VISTAS,
+  ventanaPrincipal, esperaDatos, esperaFotograma, fijarIdioma, fijarTema, arranque,
+};
