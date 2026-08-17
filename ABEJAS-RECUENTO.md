@@ -85,7 +85,12 @@ del mismo registro sale 1 : 1,89 : 2,91… o 1 : 1,28 : 2,91, según lo que cuen
 
 ---
 
-## Y el orden de muerte, que es el rastro indirecto de [D10](HECHOS-DECLARADOS.md)
+## Y el orden de muerte, que era el rastro indirecto de D10
+
+> **D10 se retiró el mismo día**: Campeón miró y la abeja del centro no es
+> distinta. Así que esto ya no arbitra ninguna creencia — y la consecuencia es
+> que **la cadencia vuelve a ser la única forma de saber en qué rama estás**, que
+> es más de lo que era esta mañana.
 
 Está en la ficha de D10 con su tabla: **el jefe salió de la segunda madre, de la
 tercera y de la primera** — no hay posición fija en el orden de muerte.
