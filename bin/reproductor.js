@@ -18,8 +18,9 @@
  * dibujado dentro de tu pelea, y todas las figuras apagándose en el segundo
  * cero. Los dos daban números plausibles y ninguna prueba los tocaba.
  *
- * ES LA FUNCIÓN QUE NINGÚN COMPETIDOR TIENE, así que tampoco hay de quién
- * copiar la vigilancia.
+ * Y NO HAY CONVENCIÓN A LA QUE MIRAR: una reproducción no tiene una salida
+ * esperada como la tiene un dps, así que aquí la vigilancia hay que fabricarla
+ * entera. Esto es esa vigilancia.
  *
  * ── QUÉ HACE ──────────────────────────────────────────────────────────────
  *

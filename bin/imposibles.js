@@ -121,8 +121,9 @@ const IMPOSIBLES = [
    *
    * O sea que **en EQ Legends un nombre propio no garantiza un individuo**, y
    * la afirmación que había aquí no era una imposibilidad: era una suposición
-   * sobre el juego. Se retira y la pregunta queda apuntada en
-   * `HECHOS-DECLARADOS.md`. Lo que la sustituye sí es imposible.
+   * sobre el juego, y una suposición sobre el juego no se comprueba con un
+   * `assert`: se pregunta a quien juega. Se retira, y lo que la sustituye sí
+   * es imposible.
    */
   /**
    * Y LA SEGUNDA QUE TUMBÓ LA PRIMERA CORRIDA: «el mismo nombre no cae dos

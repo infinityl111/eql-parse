@@ -8,8 +8,8 @@
  * desde que existe.
  *
  * Y lo que eso destapa es más grande que las dos frases: **«cinco idiomas» es
- * una afirmación sin medir**, y está escrita en el estudio de competidores, en
- * el README y en las notas de la 1.15.0. Esto la mide.
+ * una afirmación sin medir**, y está escrita en el README y en las notas de la
+ * 1.15.0. Esto la mide.
  *
  * ── QUÉ CUENTA Y QUÉ NO, QUE ES DONDE ESTÁ TODO EL TRABAJO ────────────────
  *

@@ -8,12 +8,14 @@
  * fichero de hoy— eso son 1,1 GB a seis meses y 2,3 GB al año, así que la
  * pregunta no es si va a rotar: es qué hace el código el día que lo haga.
  *
- * Y el camino de la rotación es el que más silenciosamente puede mentir. La
- * incidencia #9 del competidor sowoky es exactamente éste: cuando el fichero
- * encoge reinician el desplazamiento a cero alegando que una marca de agua
- * impide recontar, pero los bytes releídos entran por el camino en vivo, que
- * lleva esa marca DESACTIVADA. El invariante no se cumple justo en el camino
- * que lo cita, y a ellos les duplica las muertes.
+ * Y el camino de la rotación es el que más silenciosamente puede mentir. EL
+ * MODO DE FALLO QUE PERSIGUE ESTA PRUEBA, escrito antes de buscarlo: cuando el
+ * fichero encoge se pone el desplazamiento a cero y los bytes vuelven a
+ * entrar; si entran por un camino que lleva DESACTIVADA la marca que impide
+ * recontar, cada muerte se cuenta dos veces. Lo venenoso es que el invariante
+ * se incumple justo en el camino que lo invoca —el código dice «no puede
+ * recontar» dos líneas antes de recontar—, así que leyéndolo no se ve: hay que
+ * partir el fichero y contar.
  *
  * ── LOS DOS CAMINOS, Y EL QUE ESTABA MAL ─────────────────────────────────
  *

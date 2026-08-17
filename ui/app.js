@@ -1057,9 +1057,10 @@ function updateRow(node, r, snap, live, rank) {
  * y que sigue puesto al acabar no deja ni una línea en esta pelea. No se
  * cuenta como 0% ni como 100%: no se cuenta, y la nota lo dice.
  *
- * Y NO SE MIDE EL MANÁ NI EL VIGOR, que es lo que otros parsers llaman ADPS
- * entero. El registro de EQL no da ninguno de los dos. Esto es la mitad que sí
- * se puede: el tiempo.
+ * Y NO SE MIDE EL MANÁ NI EL VIGOR. El rendimiento sostenido de un lanzador se
+ * lee de tres cosas —cuánto tiempo estuvo puesto el buff, cuánto maná costó y
+ * cuánto vigor—, y el registro de EQL no da ninguna de las dos últimas. Esto es
+ * la parte que sí se puede: el tiempo.
  */
 function uptimeDatos(f) {
   const dur = Math.max(1, Math.round(f?.duration ?? 0));
@@ -2635,33 +2636,30 @@ async function renderNarrate(host) {
    * ninguna de las tres preguntas anteriores podía dar, porque las tres
    * preguntaban al acusado.
    *
-   * ES EL ORÁCULO DE EQUIVALENCIA DE jmoyers PUESTO DEL REVÉS. Ellos pliegan los
-   * mismos ficheros con y sin trocear y exigen que salga IGUAL, para probar que
-   * una optimización no cambia nada. Aquí se corre con y sin una regla y se exige
-   * que salga DISTINTO, y la diferencia es exactamente lo que hace la regla. La
-   * misma herramienta contestando las dos preguntas que importan de un cambio:
-   * «¿esto no cambia nada?» y «¿qué cambia esto?».
+   * ES UN ORÁCULO DE EQUIVALENCIA PUESTO DEL REVÉS. El oráculo corriente corre
+   * el mismo trabajo con y sin una optimización y exige que salga IGUAL, para
+   * probar que la optimización no cambia nada. Aquí se corre con y sin una regla
+   * y se exige que salga DISTINTO, y la diferencia es exactamente lo que hace la
+   * regla. La misma herramienta contesta las dos preguntas que importan de un
+   * cambio: «¿esto no cambia nada?» y «¿qué cambia esto?».
    *
    * ── LA REGLA DE LA PUERTA, QUE ES LO QUE LE FALTA A LA HERRAMIENTA DE ARRIBA ──
    *
    * La partición diferencial es un ARNÉS: se corre a mano, se miran los dos
-   * números y se resta. La tentación evidente —y jmoyers la tuvo— es
-   * automatizarla: dejarla corriendo EN SOMBRA junto a lo que juzga, contar
-   * divergencias, y encender la función cuando el contador lleve tiempo a cero.
-   * Eso es exactamente esta misma herramienta convertida en puerta automática.
+   * números y se resta. La tentación evidente es automatizarla: dejarla
+   * corriendo EN SOMBRA junto a lo que juzga, contar divergencias, y encender la
+   * función cuando el contador lleve tiempo a cero. Eso es exactamente esta
+   * misma herramienta convertida en puerta automática, y ahí se rompe.
    *
-   * LO QUE LES PASÓ, con su cifra (ver `ESTUDIO-COMPETIDORES.md` §5.1 y §12.1).
-   * Construyeron dieciséis ficheros de persistencia del fold detrás de un
-   * verificador en sombra con esa puerta. El 11 de agosto lo borraron entero:
-   *
-   *     «shadowChecks was ZERO on every build. The counters were the rollout
-   *      gate ("stays off until divergences hold at zero"), and a gate whose
-   *      denominator never moves cannot open.»
-   *
-   * El verificador no corrió NI UNA VEZ. Cero divergencias sobre cero
-   * comprobaciones. La función pasó su vida entera apagada y salió del programa
-   * sin que nadie llegara a saber si servía. No fue una decisión de diseño: fue
-   * una puerta que no podía abrirse.
+   * DÓNDE SE ROMPE, paso a paso, porque el fallo es silencioso de principio a
+   * fin: el verificador en sombra sólo corre cuando corre el camino que juzga, y
+   * ese camino está detrás de la misma bandera que la puerta tiene que abrir. Si
+   * la bandera nace apagada, el verificador no corre NI UNA VEZ, el contador se
+   * queda a cero, y cero es exactamente lo que la puerta está esperando ver. La
+   * función se pasa la vida entera apagada, con su panel diciendo «cero
+   * divergencias», y el día que alguien la borre por no usarse nadie habrá
+   * llegado a saber si servía. No es una decisión de diseño: es una puerta que
+   * no podía abrirse.
    *
    *     UNA PUERTA QUE SE ABRE CUANDO UN CONTADOR LLEVA TIEMPO A CERO TIENE QUE
    *     DEMOSTRAR PRIMERO QUE EL CONTADOR SE MUEVE. Un cero de «no ha divergido»
@@ -2973,7 +2971,7 @@ async function renderNarrate(host) {
    *
    * Decidido y pendiente: las tres suben a la cabecera de su rejilla, debajo
    * del título y antes de la primera fila. Es CONTENIDO, así que va después del
-   * armazón y es lo primero que va después. Ver `BAJO-EL-PLIEGUE.md`.
+   * armazón y es lo primero que va después.
    *
    * ───────────────────────────────────────────────────────────────────────────
    * LA DIECISIETEAVA: UNA CLASE QUE SIGNIFICA ALGO NO SE USA POR CÓMO SE VE.
@@ -3285,28 +3283,32 @@ async function renderNarrate(host) {
    * métodos, y la diferencia entre reproducir y no.
    *
    * ───────────────────────────────────────────────────────────────────────────
-   * LA VEINTISIETEAVA: SI NADIE MÁS LO TIENE, NADIE MÁS LO VIGILA.
+   * LA VEINTISIETEAVA: LO QUE NO TIENE CONVENCIÓN NO TIENE SALIDA ESPERADA.
    * ───────────────────────────────────────────────────────────────────────────
    *
-   *     CUANDO UN COMPETIDOR NO TIENE ALGO, ESO NO ES UNA VENTAJA: ES UN AVISO.
-   *     SIGNIFICA QUE NADIE ESTÁ VIGILANDO ESE TERRENO — NI SU EXPERIENCIA, NI
-   *     SUS ERRORES, NI SUS PRUEBAS. AHÍ EL INSTRUMENTO VA ANTES QUE LA FUNCIÓN.
+   *     UNA FUNCIÓN QUE NO EXISTE EN NINGUNA PARTE NO ES UNA VENTAJA: ES UN
+   *     AVISO. NO HAY CONVENCIÓN QUE DIGA QUÉ TENDRÍA QUE SALIR, ASÍ QUE NADA
+   *     CHILLA CUANDO SALE MAL. AHÍ EL INSTRUMENTO VA ANTES QUE LA FUNCIÓN.
    *
    * LA PRUEBA, y es de las que no se pueden discutir: los cuatro peores fallos
    * de este proyecto —las peleas ajenas dibujadas en el reproductor, todas las
    * figuras apagadas en el segundo cero, el suelo que nunca sumaba el que no
    * llegó a caer, y el divisor que sigue bajando para los muertos— están LOS
-   * CUATRO en territorio que ninguno de los dos competidores tiene.
+   * CUATRO en funciones que nos hemos inventado nosotros.
    *
-   * No es casualidad: donde hay competidor hay alguien que ya se dio el golpe, y
-   * su código lleva la cicatriz puesta. Donde no lo hay, el golpe nos toca
-   * entero — y encima sin nadie que lo haya nombrado.
+   * No es casualidad. Un total de daño o un dps traen su convención puesta: hay
+   * un número que se espera, y una cifra rara se ve rara sin herramientas. Una
+   * reproducción, un suelo de reaparición o un dps por enemigo no traen ninguna
+   * — su resultado es el primero que se ha visto, así que cualquier cosa parece
+   * plausible, y las cuatro lo parecieron hasta que se construyó el instrumento
+   * que las miró.
    *
-   * POR ESO LA PREGUNTA CAMBIA. Donde ellos tienen algo, la pregunta es «¿qué
-   * hacen y con qué constantes?». Donde no lo tienen, la pregunta es **«¿qué
-   * mira esto?»**, y si la respuesta es «nada», lo primero que se construye no es
-   * la función: es lo que la vigila. El protocolo entero, con sus cinco
-   * preguntas, en `ESTUDIO-COMPETIDORES.md`.
+   * POR ESO LA PREGUNTA CAMBIA. Donde hay convención, la pregunta es «¿qué dice
+   * la convención, y con qué constantes?». Donde no la hay, la pregunta es
+   * **«¿qué mira esto?»**, y si la respuesta es «nada», lo primero que se
+   * construye no es la función: es lo que la vigila. De ahí salieron la
+   * partición diferencial, el capturador que demuestra su cobertura y
+   * `npm run marco`.
    * ═══════════════════════════════════════════════════════════════════════════
    */
   host.querySelectorAll('[data-trio-at]').forEach((el) => el.addEventListener('click', async () => {
@@ -3904,8 +3906,7 @@ function cablearBotin(host) {
  * la sección exista, esos nodos viven aquí y no en la vista vieja, así que no
  * hay dos con el mismo `id` — hay uno, mudado.
  *
- * EL CRITERIO QUE DECIDE QUÉ ENTRA, escrito en `MAPA-UI.md`: Escena es QUÉ
- * PASÓ; Análisis es QUÉ DICE DE CÓMO LO HICISTE. Por eso el consejo de postura,
+ * EL CRITERIO QUE DECIDE QUÉ ENTRA: Escena es QUÉ PASÓ; Análisis es QUÉ DICE DE CÓMO LO HICISTE. Por eso el consejo de postura,
  * el fuego amigo y los tramos sin mando no están aquí, y sí está el aviso de la
  * pelea dudosa: uno juzga tu actuación, el otro dice que estas cifras no valen.
  */
@@ -6426,10 +6427,10 @@ function foeDetail(a, f) {
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Esta pelea · Todo el histórico · Ajustes. Por ALCANCE y no por tipo de dato,
- * que es lo que nos separa del competidor: lo primero que hay que saber de un
- * número es de qué está hablando. «Botín» dentro de «esta pelea» y «Botín»
- * dentro de «todo el histórico» son dos preguntas distintas, y agrupados por
- * tipo se leerían como la misma con dos vistas.
+ * y la razón es que lo primero que hay que saber de un número es de qué está
+ * hablando. «Botín» dentro de «esta pelea» y «Botín» dentro de «todo el
+ * histórico» son dos preguntas distintas, y agrupados por tipo se leerían como
+ * la misma con dos vistas.
  *
  * SÓLO SE PINTA LO QUE YA EXISTE (`listo`). Una sección dibujada y vacía es una
  * promesa, y el prototipo trae varias que hoy no tienen datos. Mientras el

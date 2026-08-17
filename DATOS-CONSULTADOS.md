@@ -5,17 +5,15 @@ nombre y su fecha. Es el tercer tipo de dato del proyecto, y no se mezcla con lo
 otros dos:
 
 - **medido** — sale de nuestro registro, con su población y su corrida.
-- **declarado** — lo afirma Campeón, que juega. Va en
-  [HECHOS-DECLARADOS.md](HECHOS-DECLARADOS.md).
+- **declarado** — lo afirma Campeón, que es quien juega.
 - **consultado** — lo dice alguien de fuera. Va aquí, **con la fecha en que se
   trajo**, porque un catálogo de fuera envejece y nosotros no nos enteramos.
 
 **Ninguno de estos datos está cableado en el código.** No hay importación, no hay
 tabla, no hay valor por defecto. Están escritos para poder contrastarlos.
 
-**Y la regla que gobierna este fichero está en
-[HALLAZGOS.md §4.6](HALLAZGOS.md):** *la fiabilidad no es de la fuente, es del
-campo.* Cada entrada de aquí lleva por eso una columna de **contraste**: qué
+**Y la regla que gobierna este fichero:** *la fiabilidad no es de la fuente, es
+del campo.* Cada entrada de aquí lleva por eso una columna de **contraste**: qué
 hemos podido comprobar contra el registro, y qué no.
 
 ---
@@ -97,18 +95,17 @@ lo mismo sin tener con qué.
 
 | campo del árbol | contrastado | resultado |
 |---|---|---|
-| las cadenas y su orden | **sí** | las cuatro salen del registro por sí solas, con huecos de 0–1 s ([D9](HECHOS-DECLARADOS.md)) |
-| que sólo la rama de 1 lleve al jefe | **sí** | **7 de 7 episodios** ([HALLAZGOS.md §4.4](HALLAZGOS.md)) |
-| «no se puede saber en qué rama estás» | **sí** | **se queda corta**: la cadencia de golpes lo dice ([§4.3](HALLAZGOS.md)) |
+| las cadenas y su orden | **sí** | las cuatro salen del registro por sí solas, con huecos de 0–1 s |
+| que sólo la rama de 1 lleve al jefe | **sí** | **7 de 7 episodios** medidos en el registro |
+| «no se puede saber en qué rama estás» | **sí** | **se queda corta**: la cadencia de golpes lo dice |
 | que las de la rama de 3 sean finales | **no** | el único episodio que leemos como 3 no acabó con ninguna muerta |
 | la distinción visual (más grande) | **no se puede** | el registro no da tamaños |
 | cuántas salen y con qué probabilidad | **no lo dice la wiki** | tampoco lo hemos medido: 7 episodios no son una proporción |
 
 **El árbol es la primera cosa consultada de este proyecto que el registro
 CONFIRMA en vez de discutir**, y conviene decirlo al lado de que el mismo sitio
-nos dio un temporizador por debajo de nuestro suelo
-([HALLAZGOS.md §3.6](HALLAZGOS.md)). Es el ejemplo de por qué la fiabilidad se
-mira campo a campo.
+nos dio un temporizador por debajo de nuestro suelo medido. Es el ejemplo de por
+qué la fiabilidad se mira campo a campo.
 
 ---
 

@@ -571,7 +571,7 @@ const ES = {
   'det.dpsFight': 'DPS sobre la pelea', 'det.dpsOwn': 'DPS desde su primer golpe',
   'det.dpsActive': 'DPS sólo en segundos activos', 'det.activeSecs': 'Segundos con actividad',
   'det.of': 'de',
-  'det.paceNote': 'El log de EQ marca la hora al segundo, así que en peleas de pocos segundos estas tres cifras divergen bastante. La primera es la comparable con otros parsers.',
+  'det.paceNote': 'El log de EQ marca la hora al segundo, así que en peleas de pocos segundos estas tres cifras divergen bastante. La primera es daño total ÷ duración de la pelea, que es la convención de siempre.',
   'det.stanceNote': 'Stances e invocaciones sólo existen en EQL. Se atribuyen a la postura activa en el momento del golpe; el log no informa de la de los demás.',
 
   // ── Consejo de postura ──
@@ -1425,7 +1425,7 @@ const EN = {
   'det.dpsFight': 'DPS over the fight', 'det.dpsOwn': 'DPS from their first hit',
   'det.dpsActive': 'DPS over active seconds only', 'det.activeSecs': 'Seconds with activity',
   'det.of': 'of',
-  'det.paceNote': 'The EQ log stamps time to the second, so on short fights these three numbers diverge a lot. The first one is what other parsers report.',
+  'det.paceNote': 'The EQ log stamps time to the second, so on short fights these three numbers diverge a lot. The first one is total damage ÷ fight duration, the usual convention.',
   'det.stanceNote': 'Stances and invocations only exist in EQL. Damage is attributed to the stance active at the moment of the hit; the log never states anyone else\u2019s.',
 
   'adv.title': 'Recommended stance',
@@ -2586,7 +2586,7 @@ const FR = {
   'det.dpsFight': 'DPS sur le combat', 'det.dpsOwn': 'DPS depuis son premier coup',
   'det.dpsActive': 'DPS sur les secondes actives', 'det.activeSecs': 'Secondes d\u2019activit\u00e9',
   'det.of': 'sur',
-  'det.paceNote': 'Le journal d\u2019EQ horodate \u00e0 la seconde : sur les combats courts ces trois chiffres divergent beaucoup. Le premier est celui que rapportent les autres parseurs.',
+  'det.paceNote': 'Le journal d\u2019EQ horodate \u00e0 la seconde : sur les combats courts ces trois chiffres divergent beaucoup. Le premier, c\u2019est d\u00e9g\u00e2ts totaux \u00f7 dur\u00e9e du combat, la convention habituelle.',
   'det.stanceNote': 'Postures et invocations n\u2019existent que dans EQL. Les d\u00e9g\u00e2ts sont attribu\u00e9s \u00e0 la posture active au moment du coup ; le journal n\u2019indique jamais celle des autres.',
 
   'adv.title': 'Posture recommand\u00e9e',
@@ -3512,7 +3512,7 @@ const DE = {
   'det.dpsFight': 'DPS \u00fcber den Kampf', 'det.dpsOwn': 'DPS ab dem ersten Treffer',
   'det.dpsActive': 'DPS nur in aktiven Sekunden', 'det.activeSecs': 'Sekunden mit Aktivit\u00e4t',
   'det.of': 'von',
-  'det.paceNote': 'Das EQ-Log stempelt sekundengenau, deshalb gehen diese drei Zahlen bei kurzen K\u00e4mpfen stark auseinander. Die erste ist die, die andere Parser melden.',
+  'det.paceNote': 'Das EQ-Log stempelt sekundengenau, deshalb gehen diese drei Zahlen bei kurzen K\u00e4mpfen stark auseinander. Die erste ist Gesamtschaden \u00f7 Kampfdauer, die \u00fcbliche Konvention.',
   'det.stanceNote': 'Haltungen und Invokationen gibt es nur in EQL. Der Schaden wird der im Moment des Treffers aktiven Haltung zugeordnet; die der anderen steht nie im Log.',
 
   'adv.title': 'Empfohlene Haltung',
@@ -4438,7 +4438,7 @@ const PT = {
   'det.dpsFight': 'DPS sobre o combate', 'det.dpsOwn': 'DPS desde o primeiro golpe',
   'det.dpsActive': 'DPS s\u00f3 nos segundos ativos', 'det.activeSecs': 'Segundos com atividade',
   'det.of': 'de',
-  'det.paceNote': 'O registo do EQ marca a hora ao segundo, por isso em combates curtos estes tr\u00eas n\u00fameros divergem bastante. O primeiro \u00e9 o que os outros parsers reportam.',
+  'det.paceNote': 'O registo do EQ marca a hora ao segundo, por isso em combates curtos estes tr\u00eas n\u00fameros divergem bastante. O primeiro \u00e9 dano total \u00f7 dura\u00e7\u00e3o do combate, a conven\u00e7\u00e3o de sempre.',
   'det.stanceNote': 'Posturas e invoca\u00e7\u00f5es s\u00f3 existem no EQL. O dano \u00e9 atribu\u00eddo \u00e0 postura ativa no momento do golpe; o registo nunca indica a dos outros.',
 
   'adv.title': 'Postura recomendada',

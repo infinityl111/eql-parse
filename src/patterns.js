@@ -935,14 +935,21 @@ for (const r of rules) {
  * ── UNA DUDA QUE QUEDA ABIERTA, Y NO SE RESUELVE HOY ───────────────────────
  *
  * `pet_leader` se cree un `says`, y un `says` LO PUEDE ESCRIBIR UN JUGADOR: nada
- * impide teclear «My leader is Campeon» en el canal de decir. El competidor
- * sowoky documenta justo esto y lo resuelve al revés — sólo se cree el `told
- * you`, que es pasado y sólo lo imprime el cliente para un NPC, y deja escrito
- * que un `says` no reclama nunca porque su registro de referencia tiene un
- * contraejemplo real de un jugador saludando a un NPC con la palabra dentro.
+ * impide teclear «My leader is Campeon» en el canal de decir, y entonces le
+ * damos una mascota a quien no la tiene.
  *
- * No se cambia ahora porque es un cambio de comportamiento y esto era un
- * cambio de orden. Queda escrito aquí para que se decida a propósito.
+ * LA ALTERNATIVA, ESCRITA ENTERA POR SI SE TOMA: creerse sólo el `told you`. Es
+ * pasado y sólo lo imprime el cliente cuando un NPC te habla a ti, así que un
+ * jugador NO puede fabricarlo tecleando; un `says` sí. La regla quedaría en
+ * «`pet_leader` sólo cuenta dentro de un `told you`».
+ *
+ * POR QUÉ NO SE TOMA HOY, y no es pereza. Primero, es un CAMBIO DE
+ * COMPORTAMIENTO y esto era un cambio de orden: hay mascotas que hoy se
+ * reconocen por `says` y dejarían de reconocerse, y eso se decide a propósito y
+ * en su propio cambio. Y segundo, falta el número que lo decide: cuántos
+ * `pet_leader` de nuestro registro entran por `says` y no por `told you`, y
+ * cuántos de ésos los teclea una persona. Sin esa cuenta, el cambio intercambia
+ * un falso positivo por un falso negativo a ciegas.
  *
  * ── SE MANTIENE SOLO, CASI ────────────────────────────────────────────────
  *

@@ -45,10 +45,11 @@
  *
  *     ESTO DEVUELVE UNA CLAVE, NUNCA UN TEXTO DE PANTALLA.
  *
- * Es la ley 2 de jmoyers —*«los nombres están sucios: se normalizan en los
- * bordes, se muestran crudos»*— y la contradecimos a propósito durante meses:
- * la clave plegada se estaba usando como rótulo. Quien necesite escribir un
- * nombre en la interfaz NO llama aquí.
+ * La regla, y es general: *los nombres están sucios, así que se normalizan en
+ * los BORDES y se muestran CRUDOS*. La contradecimos a propósito durante meses:
+ * la clave plegada se estaba usando como rótulo, así que la interfaz enseñaba
+ * nombres con la primera letra caída que el juego no escribe así nunca. Quien
+ * necesite escribir un nombre en la interfaz NO llama aquí.
  */
 
 /**
