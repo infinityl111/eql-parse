@@ -2130,6 +2130,19 @@ async function renderNarrate(host) {
 
     <div class="sec-title eyebrow" style="margin-top:16px">${t('voice.combat')}</div>
     <div class="chks">${NARRATE_COMBAT.map(([k, l]) => box('combat', k, l())).join('')}</div>
+    ${/*
+      CADA CUÁNTO SE DICE QUE TE HAN RESISTIDO, y sólo dos opciones.
+      Va pegado a su casilla y no en un panel aparte: es un ajuste DE ella, y
+      separarlo obligaría a buscarlo. La clave del estrangulador es el hechizo
+      —no el enemigo—, porque lo que cansa es oír catorce veces el mismo nombre.
+    */''}
+    <div class="narrate-row">
+      <label class="eyebrow" style="flex:1">${esc(t('voice.resistMode'))}
+        <select id="nResistMode">
+          <option value="cada20"${n.resistMode !== 'todas' ? ' selected' : ''}>${esc(t('voice.resistEvery20'))}</option>
+          <option value="todas"${n.resistMode === 'todas' ? ' selected' : ''}>${esc(t('voice.resistAll'))}</option>
+        </select></label>
+    </div>
     <div class="hint">${esc(t('voice.combatHint'))}</div>
 
     <div class="sec-title eyebrow" style="margin-top:16px">${t('voice.enemyCasts')}</div>
@@ -2253,6 +2266,7 @@ async function renderNarrate(host) {
     host.querySelectorAll('input[type=checkbox]').forEach((el) => {
       next[el.dataset.g][el.dataset.k] = el.checked;
     });
+    next.resistMode = host.querySelector('#nResistMode').value === 'todas' ? 'todas' : 'cada20';
     next.maxChars = +host.querySelector('#nMax').value || 120;
     next.nukeNames = host.querySelector('#nNukes').value.split(',').map((x) => x.trim()).filter(Boolean);
     next.tts = { ...(n.tts ?? {}), voice: host.querySelector('#nVoice').value || null,
@@ -2262,6 +2276,9 @@ async function renderNarrate(host) {
     await window.eql.setNarrate(next);
   };
   host.querySelectorAll('input').forEach((el) => el.addEventListener('change', save));
+  // El desplegable del modo se cablea aparte: el selector de voz no tiene
+  // oyente propio y engancharlos juntos guardaría de más sin pedirlo.
+  host.querySelector('#nResistMode')?.addEventListener('change', save);
   // Dónde tu tabla y el log no dicen lo mismo. Se señala, no se decide: lo
   // manual manda a propósito, y sólo tú sabes cuál de los dos está mal.
   const pintarConflictos = async () => {
@@ -3555,6 +3572,15 @@ function renderAnalysis(snap) {
         Y el 100 % se dice con palabras además del número, porque «44 de 44» hay
         que restarlo mentalmente y «no entra nunca» no.
       */''}
+      ${/*
+        LA POBLACIÓN, PRIMERO. Sin ella la tabla enseña cinco filas y no dice de
+        cuántos hechizos salen: se lee «cinco se resistieron» sin saber si
+        lanzaste cinco o veinte. Pasó de verdad leyéndola con atención.
+      */''}
+      ${x.poblacion?.conResistencia ? `<div class="an-find-pob">${esc(t('an.resistsPoblacion', {
+    hechizos: x.poblacion.hechizos, con: x.poblacion.conResistencia,
+    resistidas: x.poblacion.resistidas, lanzadas: x.poblacion.lanzadas,
+  }))}</div>` : ''}
       ${(x.filas ?? []).length ? `<div class="an-find-filas">${x.filas.map((r) => {
     const pct100 = r.resisted === r.intentos;
     return `<div class="an-fila${pct100 ? ' nunca' : ''}">

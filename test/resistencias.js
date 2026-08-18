@@ -25,7 +25,7 @@
  * distintas y dos consejos distintos. Lo único que cambia lo que haces en la
  * siguiente pelea es saber si ese hechizo entra alguna vez.
  */
-import { resistenciasPorHechizo } from '../src/analysis.js';
+import { resistenciasPorHechizo, poblacionDeResistencias } from '../src/analysis.js';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -102,6 +102,43 @@ console.log('\nlos vacíos');
   ok(resistenciasPorHechizo({}).length === 0, 'una pelea sin spellVsFoe da lista vacía');
   ok(resistenciasPorHechizo(null).length === 0, 'y una pelea que no existe, también');
   ok(resistenciasPorHechizo({ spellVsFoe: [] }).length === 0, 'y una lista vacía');
+}
+
+/**
+ * ── 6. LA POBLACIÓN, que es lo que evita leer la tabla al revés ───────────
+ *
+ * La tabla sólo enseña lo que se resistió alguna vez, así que sin decir de
+ * cuántos hechizos salen esas filas, cinco filas se leen como «lancé cinco».
+ * Se comprueba con la pelea de verdad: cinco hechizos resistidos de los seis
+ * lanzados contra ese enemigo, 103 resistencias de 129 lanzamientos.
+ */
+console.log('\nla tabla dice de cuántos hechizos sale');
+{
+  const f = {
+    spellVsFoe: [
+      { foe: 'Coercer T`vala', spell: 'Drain Spirit X', inv: null, landed: 0, resisted: 44 },
+      { foe: 'Coercer T`vala', spell: 'Blade Dance', inv: null, landed: 0, resisted: 26 },
+      { foe: 'Coercer T`vala', spell: "Oathbreaker's Curse", inv: null, landed: 0, resisted: 14 },
+      { foe: 'Coercer T`vala', spell: 'Scream of Death Strike', inv: null, landed: 0, resisted: 14 },
+      { foe: 'Coercer T`vala', spell: 'Water Elemental Attack', inv: null, landed: 26, resisted: 5 },
+      // Éste entró siempre: NO sale en la tabla, pero SÍ cuenta en la población.
+      { foe: 'Coercer T`vala', spell: 'Reaving Strike', inv: null, landed: 9, resisted: 0 },
+    ],
+  };
+  const p = poblacionDeResistencias(f);
+  ok(p.hechizos === 6, 'cuenta los hechizos lanzados, incluido el que entró siempre', p.hechizos);
+  ok(p.conResistencia === 5, 'y cuántos de ellos se resistieron alguna vez', p.conResistencia);
+  ok(p.resistidas === 103, 'las resistencias suman 103, no 5', p.resistidas);
+  ok(p.lanzadas === 129, 'sobre 129 lanzamientos de esos cinco', p.lanzadas);
+  /**
+   * EL CONTROL DEL ERROR QUE LA TRAJO: leyendo la última fila «5 de 31» se
+   * puede entender «entraron 5». Entraron 26. Se deja fijado en una aserción
+   * para que la aritmética de la vista no se pueda invertir sin que salte.
+   */
+  ok(p.lanzadas - p.resistidas === 26, 'CONTROL: entraron 26, que no es el 5 de la última fila',
+    p.lanzadas - p.resistidas);
+  ok(resistenciasPorHechizo(f).length === 5, 'y la tabla enseña cinco filas, no seis',
+    resistenciasPorHechizo(f).length);
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

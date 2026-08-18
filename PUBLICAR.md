@@ -154,6 +154,38 @@ Y sube a la release el `.exe` y el `latest.yml` que produce: el actualizador
 busca los dos en los adjuntos (`src/actualizar.js`), y sin `latest.yml` no
 detecta la versión nueva.
 
+#### COMPRUEBA QUE LO EMPAQUETADO ES LO QUE CREES, por hash y por contenido
+
+La versión del `.exe` y el `sha512` dicen que el fichero es coherente consigo
+mismo. No dicen **qué código lleva dentro**. Con `asar` desactivado eso se
+comprueba en un minuto, y hay que comprobarlo en los dos sentidos:
+
+```
+R=dist/win-unpacked/resources/app
+git hash-object $R/src/actualizar.js     # ¿es el del commit etiquetado?
+git rev-parse   <commit>:src/actualizar.js
+```
+
+**Y EL SENTIDO QUE SE OLVIDA ES EL POSITIVO.** Al construir la 1.16.0 se
+comprobó que `sin-instalador` daba **CERO** dentro del paquete, porque esa
+guarda iba a la 1.16.1 y no debía colarse. Eso está bien y es la mitad.
+
+> **La otra mitad: a partir de la 1.16.1, `sin-instalador` tiene que dar
+> DISTINTO DE CERO en todo instalador posterior.**
+>
+> ```
+> grep -c 'sin-instalador' dist/win-unpacked/resources/app/src/actualizar.js
+> ```
+>
+> Si da cero, la guarda **se ha perdido por el camino** —una rama mal fusionada,
+> un fichero que no entró— y estás publicando una versión que vuelve a poder
+> ofrecer una descarga que no existe. Es el fallo que la 1.16.1 vino a cerrar,
+> reabierto sin que nadie lo note.
+
+La regla general, que vale para cualquier guarda: **comprobar que lo que NO debe
+estar no está es sólo la mitad; la otra es que lo que SÍ debe estar, está.** Un
+`grep` a cero no distingue «lo quitamos a propósito» de «se perdió».
+
 #### El instalador se sube POR SU NOMBRE, nunca con comodín
 
 ```
