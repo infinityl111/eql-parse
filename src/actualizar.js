@@ -117,9 +117,57 @@ export async function consultar(repo, versionActual, lang = 'es') {
     } catch { /* sin adjunto legible: se cae al cuerpo */ }
   }
 
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * QUÉ SE PUEDE OFRECER, DICHO Y NO DEDUCIDO.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * EL CASO REAL: la v1.16.0 estuvo marcada como la última, con sus
+   * cinco `.md` subidos y SIN el `.exe`.
+   *
+   * CUÁNTO DURÓ, ACOTADO Y NO A OJO. Aquí ponía «dos horas» y es más de lo que
+   * pasó. La API de releases guarda `published_at` y `updated_at`, pero NO
+   * cuándo se marcó prelanzamiento, así que la ventana no se puede medir: se
+   * acota. Publicada a las 22:23:38 y última modificación a las 23:44:21 —o
+   * sea, el prelanzamiento se puso en o antes de ésa—, y una comprobación
+   * externa la vio todavía como la última a las 22:40. La ventana está entre
+   * 17 y 81 minutos, y no hay forma de estrecharla más con lo que GitHub
+   * expone. Por eso la nota de versión no lleva ninguna cifra: un rango de
+   * cuatro a uno no es un número, y una nota que trata de decir la verdad
+   * sobre un fallo no lleva su propia duración a ojo.
+   *
+   * Esto la daba por nueva —lo es—, y el
+   * cartel salía entero: «Hay una versión nueva: 1.16.0», notas traducidas, y
+   * un botón primario que pone «Descargar» y abre una página donde no hay nada
+   * que descargar. `web:build` tiene una guarda para exactamente este hecho
+   * desde hace dos versiones; este camino, que es el que ve el usuario, no.
+   *
+   * Y NO BASTA CON MIRAR `descargable`, que es lo que parece a primera vista:
+   * ese booleano es `exe && sha512`, y se pone en falso también cuando SÍ hay
+   * instalador y lo que falta es el `latest.yml` con el que comprobarlo. Ése es
+   * el caso del enlace manual, que es correcto y deliberado — hay algo que
+   * descargar, sólo que no desde aquí. Colapsar los dos dejaría sin aviso a
+   * quien sí puede actualizar.
+   *
+   *     «NO SE PUEDE INSTALAR DESDE AQUÍ» Y «NO HAY INSTALADOR» NO SON LO
+   *     MISMO, Y HASTA AHORA SE ESCRIBÍAN IGUAL.
+   *
+   * Así que el estado va dicho, no deducido por quien mire:
+   *
+   *   'descargable'     hay .exe y hay sha512 — el cartel completo
+   *   'enlace'          hay .exe y no hay sha512 — el cartel con enlace manual
+   *   'sin-instalador'  no hay .exe — no se ofrece NADA, y quien llame lo dice
+   *                     en el registro; ver `checkUpdate` en electron/main.cjs
+   *
+   * Quien decide qué se enseña es `checkUpdate`, no esto: aquí se contesta qué
+   * hay publicado, que es lo que se puede probar sin una ventana delante.
+   */
+  const estado = !exe ? 'sin-instalador' : (sha512 ? 'descargable' : 'enlace');
+
   return {
     version,
     url: j.html_url,
+    estado,
     notas: notas ?? (j.body ?? '').slice(0, 4000),
     // De dónde salieron, para que la interfaz pueda decirlo si algún día quiere
     // y para que una prueba pueda distinguir los dos caminos sin adivinar.

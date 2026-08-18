@@ -144,6 +144,56 @@ console.log('\nel cartel de actualización pide su idioma');
 }
 
 /**
+ * ── UNA VERSIÓN NUEVA SIN INSTALADOR NO SE OFRECE ─────────────────────────
+ *
+ * El caso real: la v1.16.0, marcada como la última con sus cinco
+ * `.md` subidos y sin el `.exe`. El cartel salía entero, con un botón que ponía
+ * «Descargar» y llevaba a una página sin nada que descargar.
+ *
+ * SE PRUEBAN LOS CUATRO ESTADOS, no sólo el que bloquea. Una guarda probada
+ * sólo por su lado malo pasa verde aunque se haya tragado los otros tres, y
+ * aquí los otros tres son justo lo que no se puede romper: quien sí puede
+ * actualizar tiene que seguir enterándose. Sobre todo el del enlace manual, que
+ * también tiene `descargable` en falso y NO es este caso.
+ */
+{
+  console.log('\nel cartel no ofrece lo que no existe');
+  const { consultar } = await import('../src/actualizar.js');
+  const original = globalThis.fetch;
+  const respuesta = (obj) => ({ ok: true, json: async () => obj, text: async () => obj });
+  const exe = { name: 'EQL-Parse-9.9.9-setup.exe', browser_download_url: 'https://ejemplo/e.exe', size: 78 };
+  const yml = { name: 'latest.yml', browser_download_url: 'https://ejemplo/latest.yml' };
+
+  const con = (assets, tag = 'v9.9.9') => async (url) => (String(url).includes('/releases/latest')
+    ? respuesta({ tag_name: tag, html_url: 'https://ejemplo/r', body: 'notas de sobra para el cartel', assets })
+    : respuesta('sha512: loquesea'));
+
+  try {
+    globalThis.fetch = con([exe, yml]);
+    const bien = await consultar('x/y', '1.0.0', 'es');
+    ok(bien?.estado === 'descargable', 'con .exe y sha512 se ofrece entera', bien?.estado);
+    ok(bien?.descargable === true, 'y `descargable` sigue diciendo lo suyo');
+
+    // El enlace manual: `descargable` en falso y SÍ hay algo que descargar.
+    globalThis.fetch = con([exe]);
+    const enlace = await consultar('x/y', '1.0.0', 'es');
+    ok(enlace?.estado === 'enlace', 'sin latest.yml queda el enlace manual, que es correcto', enlace?.estado);
+    ok(enlace?.descargable === false && enlace?.exeUrl,
+      'y ese caso tiene exe aunque no sea instalable desde dentro');
+
+    // El de la v1.16.0: hay versión, hay notas, y no hay nada que bajar.
+    globalThis.fetch = con([{ name: '9.9.9.es.md', browser_download_url: 'https://ejemplo/n.md' }]);
+    const roto = await consultar('x/y', '1.0.0', 'es');
+    ok(roto?.estado === 'sin-instalador', 'sin .exe se dice, y no se confunde con el enlace', roto?.estado);
+    ok(roto?.exeUrl === null && roto?.bytes === 0, 'y no hay nada que ofrecer');
+
+    // Y el cero de siempre, que tiene que seguir siendo un cero.
+    globalThis.fetch = con([exe, yml], 'v1.0.0');
+    ok((await consultar('x/y', '1.0.0', 'es')) === null, 'sin versión nueva no se devuelve nada');
+  } finally { globalThis.fetch = original; }
+}
+
+/**
  * ── NOTAS ESCRITAS PARA UNA VERSIÓN QUE NUNCA SE PUBLICÓ ──────────────────
  *
  * Lo que se comprueba aquí es LA REGLA, sin red: la comprobación de verdad sólo
