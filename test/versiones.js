@@ -40,7 +40,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { esPublicada, releases } from '../web/build.mjs';
+import { esPublicada, releases, TOPE_CUERPO } from '../web/build.mjs';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -171,6 +171,48 @@ try {
     ok(!!m && m.includes('v1.15.0'), 'la guarda del instalador nombra la 1.15.0', m?.slice(0, 60));
     ok(!!m && !m.includes('v1.16.0'),
       'y NO la 1.16.0, que está en `todas` pero no en `publicadas`');
+  }
+  /**
+   * ── EL TECHO DEL CUERPO PARA, NO RECORTA ───────────────────────────────
+   *
+   * Antes había un 6.000 a pelo que cortaba en silencio, y nueve notas
+   * publicadas salían a mitad de frase. Ahora la guarda grita. Se prueban LOS
+   * DOS LADOS, que es lo que faltaba la última vez: que pare cuando se pasa, y
+   * —lo que de verdad se puede romper sin enterarse— QUE DEJE PASAR lo que
+   * cabe. Una guarda probada sólo por su lado malo pasaría verde aunque hubiera
+   * vuelto a recortar, o aunque parase con todo.
+   *
+   * El lado bueno se comprueba sin escribir la copia porque el techo va ANTES
+   * que la guarda del instalador: si el cuerpo cabe, la queja que sale es la
+   * del .exe que falta. Que hable la SIGUIENTE guarda es la prueba de que ésta
+   * dejó pasar.
+   *
+   * Y el tope se importa, no se copia: un test con su propio 200.000 escrito
+   * volvería a ser el número escrito dos veces, que es el fallo original.
+   */
+  console.log('\nel cuerpo de una nota se mide, y pasado el techo se para');
+  {
+    const largo = 'x'.repeat(TOPE_CUERPO + 1);
+    const pasado = await guarda([rel('v2.0.0', { body: largo }), rel('v1.9.0')], null);
+    ok(!!pasado && pasado.includes('v2.0.0'), 'un cuerpo pasado del techo para la construcción y dice cuál',
+      pasado?.slice(0, 52));
+    ok(!!pasado && pasado.includes((TOPE_CUERPO + 1).toLocaleString('es')),
+      'y cuánto medía, para poder juzgarlo sin ir a mirarlo', (TOPE_CUERPO + 1).toLocaleString('es'));
+
+    // Justo por debajo: tiene que llegar entero a la siguiente guarda.
+    const cabe = await guarda([
+      rel('v2.0.0', { body: 'x'.repeat(TOPE_CUERPO - 1), assets: [] }),
+      rel('v1.9.0'),
+    ], null);
+    ok(!!cabe && cabe.includes('no trae instalador'),
+      'lo que cabe pasa de largo: la queja que sale es la de la guarda siguiente', cabe?.slice(0, 52));
+    ok(!!cabe && !cabe.includes('techo'), 'y no la del techo, que ya lo dejó pasar');
+
+    // Un cuerpo normal y corriente no lo roza ni de lejos.
+    const normal = await guarda([rel('v2.0.0', { body: 'x'.repeat(6000), assets: [] })], null);
+    ok(!!normal && normal.includes('no trae instalador'),
+      'y 6.000 caracteres —el viejo recorte— ya no son ningún límite',
+      `${Math.round(TOPE_CUERPO / 6000)} veces por debajo del techo`);
   }
 } finally {
   globalThis.fetch = original;

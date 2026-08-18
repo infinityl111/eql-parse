@@ -234,6 +234,39 @@ const MAX_PAGINAS = 50;
  */
 export const esPublicada = (x) => !x?.draft && !x?.prerelease;
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EL TECHO DEL CUERPO DE UNA NOTA. NO RECORTA: PARA.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * AQUÍ HABÍA UN 6.000 A PELO, escrito dos veces —el `slice` y el aviso—, sin
+ * constante y sin una línea que dijera de dónde salía. No salía de ningún
+ * sitio: no es un límite de GitHub ni del HTML ni del navegador, es un número
+ * que alguien escribió una tarde. Y cortaba de verdad: DOCE versiones pasadas
+ * de raya, NUEVE de ellas saliendo recortadas en la página, 42.431 caracteres
+ * perdidos, y la peor dejándose el 64 % de su nota.
+ *
+ * El corte era mudo donde importa. Avisaba en la consola de quien construye
+ * —que ya sabe lo que ha escrito— y en la página no se veía nada: la nota se
+ * acaba a mitad de frase y parece que acababa ahí. Quien lo paga es quien lee.
+ *
+ *     UN NÚMERO QUE NADIE SABE DE DÓNDE SALIÓ NO SE NEGOCIA, SE RETIRA.
+ *
+ * Así que no se sube a doce mil: se quita el recorte y en su lugar queda esto,
+ * que es lo contrario de un límite editorial. Es una guarda de seguridad, alta
+ * a propósito: doscientos mil caracteres son treinta y tres veces la nota más
+ * larga que hemos escrito nunca. Nadie la va a rozar escribiendo; sólo la puede
+ * tocar una respuesta de la API que se haya vuelto loca, y ése es justo el caso
+ * en el que hornear el cuerpo entero en veinte páginas sale caro.
+ *
+ * Y MANDA SOBRE TODO LO QUE HAYA QUE DECIDIR CON ESTE NÚMERO. El fallo de fondo
+ * no fue el 6.000: fue que estaba escrito dos veces. Dos copias del mismo
+ * número son dos números que un día dirán cosas distintas —cambias el `slice`
+ * y el aviso sigue midiendo por el viejo, y entonces recorta EN SILENCIO, que
+ * es exactamente lo que este fichero lleva todo el rato intentando que no pase.
+ */
+export const TOPE_CUERPO = 200_000;
+
 /** La URL de `rel="next"` de una cabecera `link`, si la trae. */
 function siguientePagina(link) {
   for (const parte of String(link ?? '').split(',')) {
@@ -345,7 +378,7 @@ export async function releases() {
    */
   const normalizar = (x) => ({
     tag: x.tag_name, nombre: x.name ?? x.tag_name, fecha: x.published_at,
-    cuerpo: (x.body ?? '').slice(0, 6000), url: x.html_url,
+    cuerpo: x.body ?? '', url: x.html_url,
     exe: (x.assets ?? []).find((a) => /\.exe$/i.test(a.name)) ?? null,
   });
   const conDescarga = (x) => ({ ...x, bytes: x.exe?.size ?? 0, descarga: x.exe?.browser_download_url ?? x.url });
@@ -368,17 +401,30 @@ export async function releases() {
       + ' toque y vuelve.');
   }
 
+  /**
+   * Y LA GUARDA QUE SUSTITUYE AL RECORTE. Ver `TOPE_CUERPO`.
+   *
+   * Mira `todas` y no `publicadas` — sí, es la otra pregunta de la casa, y
+   * aquí la respuesta es la ancha a propósito: un prelanzamiento con el cuerpo
+   * desbocado se marca definitivo unas horas después, y entonces el problema
+   * aparecería A MITAD DE UNA PUBLICACIÓN en vez de hoy. Una parada de más un
+   * martes cuesta un minuto; la misma parada el día que se publica, no.
+   */
+  const desbocadas = todas.filter((x) => x.cuerpo.length > TOPE_CUERPO)
+    .map((x) => `${x.tag}: ${x.cuerpo.length.toLocaleString('es')} caracteres`);
+  if (desbocadas.length) {
+    throw new Error(`hay notas que pasan del techo de ${TOPE_CUERPO.toLocaleString('es')}`
+      + ` caracteres: ${desbocadas.join('; ')}. Ese techo NO es un límite editorial —es`
+      + ' treinta veces la nota más larga que hemos escrito— así que esto no es «te has'
+      + ' pasado escribiendo»: o la API está devolviendo algo que no es una nota, o hay'
+      + ' un volcado ahí dentro. Antes esto se recortaba en silencio y la nota acababa a'
+      + ' mitad de frase en la página. Ahora se para: mira ese cuerpo y decide tú.');
+  }
+
   if (!publicadas[0].exe) {
     throw new Error(`la versión publicada más nueva (${publicadas[0].tag}) no trae instalador.`
       + ' El botón de descarga llevaría a la página de la release y el tamaño'
       + ' saldría en 0 bytes. Si estás publicando, sube el .exe y vuelve.');
-  }
-  // Un cuerpo recortado no se nota en la página: se corta a mitad de frase y
-  // parece que la nota acababa ahí.
-  for (const x of j) {
-    if ((x.body ?? '').length > 6000) {
-      console.log(`  AVISO: las notas de ${x.tag_name} pasan de 6.000 caracteres y salen recortadas`);
-    }
   }
   // LA COPIA GUARDA LO PUBLICADO, que es lo que la web enseña. Un registro que
   // llevara los prelanzamientos diría otra cosa que la página que acompaña.
