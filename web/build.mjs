@@ -177,19 +177,90 @@ function tokenGitHub() {
     + ' no se distinguiría de «GitHub no contesta».');
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SE PIDEN TODAS, NO LAS PRIMERAS QUE QUEPAN.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Esto pedía `per_page=20` y se quedaba con lo que viniera. El 20 nunca fue una
+ * cuenta: era EL TECHO QUE PEDÍAMOS, y salía impreso —«20 versiones desde la
+ * API»— con la misma cara que si lo fuera. Había 38. Las dieciocho más viejas
+ * no tenían página en la web, y nadie lo notó porque el número cuadraba consigo
+ * mismo: pides veinte, recibes veinte, escribes veinte.
+ *
+ *     UN TECHO QUE SE CUMPLE Y UNA CUENTA QUE COINCIDE SE ESCRIBEN IGUAL.
+ *
+ * Es el mismo cero de dos significados de todo este fichero, con otro número.
+ *
+ * Ahora se pide de cien en cien y se sigue la cabecera `link` mientras anuncie
+ * un `rel="next"`. NO HAY NINGUNA CANTIDAD DE VERSIONES ESCRITA AQUÍ: si mañana
+ * hay una más, sale una más, sin tocar nada.
+ *
+ * ── LA GUARDA DE SATURACIÓN, que es la que faltaba ────────────────────────
+ *
+ * Paginar solo no basta, porque el fallo no era paginar poco: era no poder
+ * distinguir «hay justo estos» de «hay más y no me lo dicen». Eso sigue vivo
+ * con cualquier tamaño de página, así que se comprueba, en dos formas:
+ *
+ *   · una página llena Y SIN cabecera `link` ninguna — nadie nos dice si hay
+ *     más, y justo esa es la respuesta que no sabemos leer;
+ *   · el bucle termina con la última página llena y un `rel="next"` todavía
+ *     anunciado — nos hemos parado antes que la API.
+ *
+ * En los dos casos se para. Una lista que a lo mejor está recortada, publicada
+ * como si fuera entera, es la avería de arriba otra vez.
+ *
+ * `MAX_PAGINAS` NO ES UN TECHO DE VERSIONES: son 5.000, y es el detector de
+ * bucle que necesita cualquier `while` que siga una URL que llega de fuera. Si
+ * se alcanzara, no se recorta en silencio — salta la guarda de saturación, que
+ * es exactamente para lo que está.
+ */
+const POR_PAGINA = 100;
+const MAX_PAGINAS = 50;
+
+/** La URL de `rel="next"` de una cabecera `link`, si la trae. */
+function siguientePagina(link) {
+  for (const parte of String(link ?? '').split(',')) {
+    const m = /<([^>]+)>\s*;\s*rel="next"/.exec(parte);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 async function releases() {
   const { token, de } = tokenGitHub();
   console.log(`  API de GitHub: autenticada (${de})`);
-  let j;
+  let j = [];
+  let paginas = 0;
+  let ultima = 0;        // cuántas trajo la última página
+  let pendiente = null;  // el `rel="next"` que quedó sin seguir, si quedó alguno
+  let mudo = false;      // una página llena y sin `link`: nadie dice si hay más
   try {
-    const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`,
-      { headers: {
+    let url = `https://api.github.com/repos/${REPO}/releases?per_page=${POR_PAGINA}`;
+    while (url && paginas < MAX_PAGINAS) {
+      const r = await fetch(url, { headers: {
         'User-Agent': 'eqlparse-web',
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
       } });
-    if (!r.ok) throw new Error(`GitHub devolvió ${r.status}`);
-    j = await r.json();
+      if (!r.ok) throw new Error(`GitHub devolvió ${r.status}`);
+      const pagina = await r.json();
+      // Que lo cuente la guarda de abajo, con su mensaje, como cuando no
+      // paginábamos: aquí sólo se deja de acumular.
+      if (!Array.isArray(pagina)) { j = pagina; break; }
+      paginas++;
+      ultima = pagina.length;
+      const link = r.headers.get('link');
+      pendiente = siguientePagina(link);
+      if (pagina.length === POR_PAGINA && !link) mudo = true;
+      j.push(...pagina);
+      // El `Authorization` va en cada salto, así que la siguiente URL la manda
+      // una cabecera y no nosotros: si no es de la API de GitHub, no se sigue.
+      if (pendiente && new URL(pendiente).origin !== 'https://api.github.com') {
+        throw new Error(`la cabecera «link» manda a ${new URL(pendiente).origin}, que no es la API`);
+      }
+      url = mudo ? null : pendiente;
+    }
   } catch (err) {
     throw new Error(`no se pudo preguntar por las versiones: ${err.message}.`
       + ' La construcción se para aquí: un sitio sin lista de versiones y sin'
@@ -204,6 +275,22 @@ async function releases() {
     throw new Error('la API contestó con CERO versiones. O el repositorio no tiene'
       + ' releases, o la respuesta no es la que esperamos; en los dos casos la'
       + ' portada saldría sin descargas.');
+  }
+  // Y LA QUINTA: la lista puede estar recortada y no saberlo. Ver arriba.
+  if (mudo) {
+    throw new Error(`se han recibido ${j.length} versiones y una de las páginas trajo`
+      + ` exactamente ${POR_PAGINA}, que es el techo que pedimos, SIN cabecera «link»`
+      + ' que diga si hay más. Con esa respuesta no se distingue «hay justo ese'
+      + ' número» de «hay más y no nos lo están diciendo». La construcción se para'
+      + ' aquí: publicar una lista de versiones posiblemente recortada, con cara de'
+      + ' entera, es peor que no desplegar.');
+  }
+  if (ultima === POR_PAGINA && pendiente) {
+    throw new Error(`se han recibido ${j.length} versiones en ${paginas} páginas, que es`
+      + ` el techo que pedimos (${MAX_PAGINAS} × ${POR_PAGINA}), y la API TODAVÍA anuncia`
+      + ' otra página. Nos hemos parado antes que ella, así que faltan versiones y no'
+      + ' sabemos cuántas. La construcción se para aquí: publicar una lista de versiones'
+      + ' recortada, con cara de entera, es peor que no desplegar.');
   }
   const limpio = j.map((x) => ({
     tag: x.tag_name, nombre: x.name ?? x.tag_name, fecha: x.published_at,
@@ -224,7 +311,11 @@ async function releases() {
     }
   }
   await fsp.writeFile(CACHE, JSON.stringify(limpio, null, 1));
-  console.log(`  novedades: ${limpio.length} versiones desde la API, la más nueva ${limpio[0].tag}`);
+  // El número de páginas va en la línea a propósito: es lo que deja ver que la
+  // cuenta se ha agotado y no se ha topado con nada.
+  console.log(`  novedades: ${limpio.length} versiones desde la API`
+    + ` (${paginas} ${paginas === 1 ? 'página' : 'páginas'} de ${POR_PAGINA}),`
+    + ` la más nueva ${limpio[0].tag}`);
   return limpio;
 }
 
