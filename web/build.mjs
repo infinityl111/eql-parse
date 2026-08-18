@@ -409,9 +409,74 @@ export async function releases() {
  * nada. Si no, cada corte de línea sale como un párrafo aparte —con su hueco— y
  * lo que peor queda es que la negrita y los enlaces que cruzan el corte no se
  * convierten y salen los asteriscos crudos en la página.
+ *
+ * ── Y LOS BLOQUES ```, QUE SE SACAN ANTES QUE NADA ─────────────────────────
+ *
+ * Cuatro versiones publicadas traen volcados del medidor entre vallas —1.6.2 y
+ * 1.1.0 con cuatro bloques cada una, 1.6.0 y 1.3.0 con dos—, y esto no sabía
+ * que existían. Salían por el camino del párrafo normal, con dos destrozos a la
+ * vez: el volcado entero pegado en un renglón —`junta.join(' ')` se come los
+ * saltos, y con ellos las columnas— y las vallas MEDIO COMIDAS, porque la regex
+ * del código en línea emparejaba el segundo acento con el tercero y dejaba los
+ * otros dos a la vista: ``<code>…</code>``.
+ *
+ *     ES EL MISMO FALLO DE ORDEN QUE EL FILTRO Y LA GUARDA DE SATURACIÓN.
+ *
+ * Por eso los bloques se EXTRAEN ENTEROS antes de cualquier transformación, se
+ * dejan en su sitio unas marcas que ninguna regex de aquí puede tocar, y sólo
+ * al reconstruir la salida se reinserta el contenido —pasado por `esc()` y por
+ * nada más—. Dentro de un bloque no hay negrita, ni enlaces, ni código en
+ * línea, ni párrafos: hay lo que escribió quien lo escribió, con sus saltos.
+ * Va en `test/vallas.js`, con el orden como aserción, porque una restricción de
+ * orden que no está en un test es un comentario con los días contados.
+ *
+ * Y UNA VALLA SIN CERRAR PARA LA CONSTRUCCIÓN, nombrando la versión. Misma
+ * doctrina que el resto: las notas las escribimos nosotros, así que es un error
+ * nuestro y arreglable, y una nota destrozada en el sitio publicado es peor que
+ * no desplegar. Sin esto, el resto del documento se tragaría dentro del bloque
+ * y saldría en un `<pre>` gigante sin que nadie lo viera al construir.
+ *
+ * @param {string} s      el markdown de la nota
+ * @param {string} quien  de quién es, para poder nombrarla si algo se rompe
  */
-function md(s) {
+export function md(s, quien = 'unas notas sin identificar') {
   const lineas = String(s ?? '').replace(/\r/g, '').split('\n');
+
+  /**
+   * LA MARCA lleva \u0000 a los dos lados a propósito: `esc()` no lo toca —sólo
+   * mira `&<>"`— y no hay ninguna regex de las de abajo que pueda casarlo. Una
+   * marca hecha de caracteres normales («__BLOQUE0__») sí es alcanzable, y
+   * entonces el arreglo tendría el mismo agujero que el fallo.
+   */
+  const MARCA = (i) => `\u0000BLOQUE${i}\u0000`;
+  const bloques = [];
+  const sinBloques = [];
+  let dentro = null;      // las líneas del bloque abierto, si hay uno abierto
+  let abiertaEn = 0;      // dónde se abrió, para poder decirlo
+  for (let i = 0; i < lineas.length; i++) {
+    const esValla = /^\s*```/.test(lineas[i]);
+    if (esValla && dentro === null) {
+      // La etiqueta de lenguaje —```js— se va con la línea de la valla: se
+      // ignora y no se imprime.
+      dentro = [];
+      abiertaEn = i + 1;
+      continue;
+    }
+    if (esValla) {
+      bloques.push(dentro);
+      sinBloques.push(MARCA(bloques.length - 1));
+      dentro = null;
+      continue;
+    }
+    (dentro ?? sinBloques).push(lineas[i]);
+  }
+  if (dentro !== null) {
+    throw new Error(`${quien}: hay un bloque \`\`\` abierto en la línea ${abiertaEn} y SIN CERRAR.`
+      + ` Lo que queda de la nota —${dentro.length} líneas— se iría dentro del bloque y saldría`
+      + ' en un <pre> gigante. Las notas las escribimos nosotros, así que esto se arregla'
+      + ' cerrando la valla; publicar la nota destrozada es peor que no desplegar.');
+  }
+
   const out = [];
   /**
    * Las imágenes ANTES que los enlaces: la insignia de PayPal de las notas es
@@ -434,7 +499,23 @@ function md(s) {
   };
   const cierraLista = () => { if (enLista) { out.push('</ul>'); enLista = false; } };
 
-  for (const l of lineas) {
+  for (const l of sinBloques) {
+    /**
+     * LA REINSERCIÓN, y por qué aquí y no con un `replace` al final de todo.
+     *
+     * Un `replace` sobre la salida ya montada metería el `<pre>` dentro del
+     * `<p>` que lo envolvió por el camino, y `<p><pre>…</pre></p>` no es HTML
+     * válido. Tomándolo como su propio bloque —cerrando antes párrafo y lista—
+     * sale donde tiene que salir. Y el contenido pasa por `esc()` y por nada
+     * más: ni negrita, ni enlaces, ni código en línea. Los saltos, tal cual.
+     */
+    const marca = /^\u0000BLOQUE(\d+)\u0000$/.exec(l);
+    if (marca) {
+      cierra();
+      cierraLista();
+      out.push(`<pre><code>${esc(bloques[Number(marca[1])].join('\n'))}</code></pre>`);
+      continue;
+    }
     if (!l.trim()) { cierra(); cierraLista(); continue; }
     const li = /^\s*[-*]\s+(.*)$/.exec(l);
     if (li) {
@@ -900,7 +981,7 @@ function novedades(lang, publicadas) {
   ${publicadas.map((r) => `<article class="version">
       <h2>${esc(r.nombre)}</h2>
       <div class="fecha">${esc(fecha(r.fecha))}</div>
-      <div class="notas">${md(notasDe(r.tag, lang) ?? r.cuerpo)}</div>
+      <div class="notas">${md(notasDe(r.tag, lang) ?? r.cuerpo, `${r.tag} (${lang})`)}</div>
     </article>`).join('')}
   <p><a href="https://github.com/${REPO}/releases">${esc(tt.verTodas)}</a></p>`;
 }

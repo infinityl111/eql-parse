@@ -267,6 +267,24 @@ figcaption { font-size: 13.5px; color: var(--bone-faint); margin-top: 6px; }
 .notas strong { color: var(--texto); }
 /* Una insignia suelta en una nota no debe desbordar la columna. */
 .notas img { max-width: 100%; vertical-align: middle; }
+/**
+ * UN VOLCADO ANCHO SE DESPLAZA DENTRO DE SU CAJA; NO ENSANCHA LA PÁGINA.
+ *
+ * La línea más larga de las notas —un reparto de daño de la v1.6.2— mide 157
+ * caracteres, y la columna 76. Sin esta regla, un `<pre>` con el
+ * `white-space: pre` que trae de fábrica empuja el ancho del documento y la
+ * barra horizontal se la come la VENTANA: en un móvil eso arrastra la cabecera,
+ * el pie y las demás notas, y hay que desplazar el sitio entero para leer un
+ * párrafo normal. Con esto el desplazamiento se queda dentro del bloque, que es
+ * donde está lo ancho.
+ */
+.notas pre {
+  max-width: 100%; overflow-x: auto; background: var(--panel);
+  border-radius: 3px; padding: 10px 12px; margin: 14px 0;
+}
+/* El fondo ya lo pone la caja: la píldora del código en línea se pintaría
+   encima, un recuadro dentro de otro. */
+.notas pre code { background: none; padding: 0; border-radius: 0; }
 .bloque { border-top: 1px solid var(--linea); padding-top: 28px; }
 
 footer {
