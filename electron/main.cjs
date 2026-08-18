@@ -84,7 +84,29 @@ async function checkUpdate() {
     // piden en él y sólo caen al español si esa versión no trae adjunto.
     const info = await consultar(REPO, app.getVersion(), cfg.lang ?? 'es');
     latest = info;
-    if (info && cfg.skipVersion !== info.version) mainWin?.webContents.send('update', info);
+    if (!info) return;
+    /**
+     * UNA VERSIÓN NUEVA SIN INSTALADOR NO SE OFRECE. Ver `consultar`.
+     *
+     * No se enseña cartel ninguno: el que salía prometía una descarga que no
+     * existe. Y NO ES UN SILENCIO — la línea de abajo distingue este cero del
+     * otro, el de «no hay novedad», que no escribe nada. Los dos se veían igual
+     * desde fuera y son problemas distintos: éste es una release a medio
+     * publicar, y hay que arreglarla en GitHub, no aquí.
+     *
+     * Y SIN BOTÓN DE OMITIR, que es la parte que no se puede deshacer. Omitir
+     * escribe `cfg.skipVersion` en disco, así que quien se cansara del aviso
+     * roto se quedaba sin la versión buena cuando por fin subieran el `.exe`.
+     * Un cartel que no puede cumplir lo que ofrece no toca la configuración de
+     * nadie. Al no mandarse nada, no hay cartel y no hay botón: sale de la
+     * forma del código y no de acordarse de quitarlo.
+     */
+    if (info.estado === 'sin-instalador') {
+      console.log(`[update] ${info.version} está publicada y NO trae instalador:`
+        + ' no se ofrece nada. La release está a medio publicar.');
+      return;
+    }
+    if (cfg.skipVersion !== info.version) mainWin?.webContents.send('update', info);
   } catch { /* sin red: se reintenta en la próxima comprobación */ }
 }
 
