@@ -273,8 +273,21 @@ estás en la rama de producción del proyecto**. Si estás en otra rama, o si lo
 lanzas desde una carpeta que no es un git, la rama detectada cambia y el
 despliegue se va a una vista previa. `--branch` es la manera de forzarla.
 
-Wrangler imprime la rama que ha detectado: **mírala**. Es el aviso temprano, y
-llega antes que cualquier comprobación.
+**Y NO CUENTES CON QUE WRANGLER TE LO DIGA.** Aquí ponía «wrangler imprime la
+rama que ha detectado: mírala», y con la 4.123.0 **no la imprime**: el
+despliegue de la 1.16.0 salió sin una sola línea `Detected branch:`, sólo con el
+aviso de árbol sucio y la URL de siempre —`https://<hash>.eqlparse.pages.dev`—,
+que tiene la misma cara tanto si fue a producción como si fue a una vista
+previa. Esperar un aviso que ya no llega es peor que no esperar ninguno.
+
+Lo que sí lo dice, después y siempre:
+
+```
+npx wrangler pages deployment list --project-name=eqlparse
+```
+
+La primera fila tiene que decir **Production**, rama **main**, y en `Source` el
+commit que acabas de subir. Ahí se ve de verdad a dónde fue.
 
 #### Cómo se comprueba, que es lo que de verdad cierra el paso
 
@@ -282,17 +295,44 @@ No vale la consola. La consola dice que subió algo, no que lo subido sea lo que
 la gente ve — es la misma distinción que el paso 7 hace con los adjuntos:
 comprobar el artefacto donde lo ve el usuario, no donde lo produjiste.
 
-Comprueba contra **el dominio de producción**, y busca algo que sólo tenga la
-versión nueva:
+Comprueba contra **el dominio de producción**. Y no con un grep del número de
+versión, que es lo que ponía aquí y no vale:
 
 ```
-curl -s https://eqlparse.com/es/ | findstr /C:"1.13.0"
+curl -s https://eqlparse.com/es/ | findstr /C:"1.13.0"      ← NO BASTA
 ```
 
-Si no aparece, el despliegue se quedó en la vista previa aunque la consola
-dijera que todo fue bien. Y con el número de versión no basta si el navegador o
-el borde te sirven algo cacheado: recarga forzada, o pide la página con un
-parámetro cualquiera.
+**Ese grep da verde con el sitio roto.** El número de versión sale también en el
+pie de las veinte páginas, así que casa aunque el botón de descarga apunte a una
+release que no existe, aunque las novedades salgan recortadas o aunque la mitad
+de los idiomas se hayan quedado sin traducir. Es la misma avería que este
+documento persigue en todos los demás pasos —comprobar que hay algo en vez de
+comprobar que es lo correcto—, cometida en el último.
+
+Lo que hay que comprobar son **las cosas que se rompen, en los cinco idiomas**:
+
+| qué | cómo se sabe |
+|---|---|
+| la portada declara la versión nueva | `1.16.0` en `/<idioma>/` |
+| el botón lleva al instalador | la página trae `releases/download/v1.16.0/EQL-Parse-1.16.0-setup.exe` |
+| y ese instalador EXISTE | esa URL responde `200` y devuelve los bytes que dice `latest.yml` |
+| el tamaño es el de verdad | `75 MB` en la portada, y cuadra con los bytes del `.exe` |
+| las novedades están enteras | tantos `<article>` como versiones publicadas |
+| los volcados salen como volcados | los `<pre>` que toquen, y **cero** acentos graves sueltos |
+| las notas están en su idioma | la nota de la versión nueva, en la página alemana, en alemán |
+
+Ninguna se deduce de otra: el botón puede apuntar a un `.exe` que no existe —eso
+es exactamente lo que pasó con la 1.16.0—, y las notas pueden salir en español
+en las cinco páginas sin que ningún recuento se entere.
+
+Las corre todas `npm run web:vivo` (`bin/web-vivo.mjs`), que reintenta mientras
+Cloudflare propaga, porque
+**la primera respuesta no vale como respuesta**: si algo no cuadra al primer
+intento, se espera y se repite antes de decidir nada.
+
+Si algo falla, el despliegue se quedó en la vista previa —o subió mal— aunque la
+consola dijera que todo fue bien. Y si sospechas de la caché del borde, pide la
+página con `Cache-Control: no-cache` o con un parámetro cualquiera.
 
 **Confirmado, y el comando no necesita `--branch`.** El registro de wrangler
 prueba que detecta `main`, pero no guarda la respuesta de la API con

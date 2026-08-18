@@ -17,6 +17,7 @@
     "marco": "electron bin/marco.cjs",
     "ui:gif": "node bin/ui-gif.js",
     "web:build": "node web/build.mjs",
+    "web:vivo": "node bin/web-vivo.mjs",
     "web:deploy": "npx wrangler pages deploy web/dist --project-name=eqlparse",
     "live": "node bin/live.js",
     "test": "node test/formato.js && node test/peleas.js && node test/pista.js && node test/jerga.js && node test/figuras.js && node test/muertos.js && node test/smoke.js && node test/stances.js && node test/reversion.js && node test/tramos.js && node test/bridge.js && node test/store.js && node test/rotacion.js && node test/citas.js && node test/ajenos.js && node test/combat.js && node test/survival.js && node test/zones.js && node test/foes.js && node test/encyclopedia.js && node test/rebuild.js && node test/classes.js && node test/trios.js && node test/tiempo.js && node test/loot.js && node test/notas.js && node test/versiones.js && node test/vallas.js && node test/secciones.js && node test/curacion.js && node test/dificultades.js && node test/mascotas.js && node test/share.js && node test/raid.js && node test/hechizos.js && node test/periodos.js && node test/libro.js && node test/ambito.js && node test/fallo.js && node test/estilos.js && node test/importar.js && node test/charm.js && node test/aliados.js && node test/nombres.js && node test/verbos.js && node test/tanqueo.js && node test/forma.js && node test/registro.js && node test/casteos.js && node test/companeros.js",
