@@ -1821,6 +1821,23 @@ function table(cols, rows) {
 
 const section = (title, body) => `<div class="sec"><div class="sec-title eyebrow">${esc(title)}</div>${body}</div>`;
 
+/**
+ * El rótulo de una caja de la página apilada, reescrito en cada pasada.
+ *
+ * LAS CUATRO SE PRESENTAN IGUAL, y hasta ahora sólo lo hacían dos: Botín lo
+ * saca de `lootHTML` y El registro del suyo, pero Escena y Por habilidad no
+ * tenían ninguno. Sueltas en el panel daba lo mismo —la barra lateral las
+ * nombraba—, apiladas se tocaban sin nada que dijera dónde acaba una.
+ *
+ * Se escribe aquí y no en el `innerHTML` de cada sección porque ese armazón se
+ * monta UNA VEZ, detrás de una guarda por id: un título horneado dentro se
+ * quedaría con el idioma del arranque y no cambiaría al cambiar de idioma.
+ */
+function ponRotulo(id, clave) {
+  const n = $(id);
+  if (n) n.textContent = t(clave);
+}
+
 // ═══════════ Desglose completo ═══════════
 function detailHTML(r) {
   const dmgTotal = r.damage || 1;
@@ -2916,11 +2933,16 @@ function renderEscena(snap, cajaSec) {
   }
   host.dataset.pelea = String(abierta);
   if (!$('fightHead')) {
-    host.innerHTML = '<div id="fightHead"></div><div id="clsPrompt"></div>'
+    host.innerHTML = '<div class="sec-title eyebrow" id="escenaTit"></div>'
+      + '<div id="fightHead"></div><div id="clsPrompt"></div>'
       + '<div id="petHint"></div>'
       + '<div class="charm-note" id="escenaNota" style="display:none"></div>'
       + '<div id="rpView"></div>';
   }
+  // El rótulo se escribe en CADA pasada y no dentro del `innerHTML` de arriba:
+  // ese armazón se monta una sola vez, así que un título horneado ahí se
+  // quedaría en el idioma con el que arrancó la aplicación. Ver `renderPorHabilidad`.
+  ponRotulo('escenaTit', 'sec.escena');
   renderHead(snap);
   renderClassPrompt(snap);
   renderPetHint(snap);
@@ -3187,7 +3209,8 @@ function renderPorHabilidad(snap, cajaSec) {
   const host = cajaSec ?? $('secPane');
   if (!host) return;
   if (!$('rows')) {
-    host.innerHTML = `<div class="charm-note" id="charmNote" style="display:none"></div>
+    host.innerHTML = `<div class="sec-title eyebrow" id="habilidadTit"></div>
+      <div class="charm-note" id="charmNote" style="display:none"></div>
       <div id="rows"></div>
       <div class="legend eyebrow">${TYPES.map((x) => `<span><i class="seg ${x}"></i>${x}</span>`).join('')}</div>
       <div class="docbar" id="docBar"></div><div class="docpane" id="docPane"></div>`;
@@ -3201,6 +3224,7 @@ function renderPorHabilidad(snap, cajaSec) {
       renderDocs(withPets(fightFor(state.snap)));
     });
   }
+  ponRotulo('habilidadTit', 'sec.habilidad');
   renderRows(snap);
 }
 
