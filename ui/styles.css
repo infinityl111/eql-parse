@@ -1930,3 +1930,17 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .acerca-legal code { font-size: 11px; color: var(--bone); }
 #fCredit { cursor: pointer; }
 #fCredit:hover { color: var(--bone); }
+
+/**
+ * LAS CUATRO DE «ESTA PELEA», APILADAS EN UNA PÁGINA.
+ *
+ * Sin separación se leen como una sola cosa larga: la regla y el aire de arriba
+ * son lo que dice dónde acaba Escena y empieza Por habilidad. La primera no
+ * lleva ninguna de las dos, que si no la página abre con una raya suelta.
+ */
+.enlapagina + .enlapagina {
+  margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--slate-700);
+}
+/* Y el desplazamiento por la barra lateral tiene que dejar la sección arriba
+   del todo, no pegada al borde. */
+.enlapagina { scroll-margin-top: 12px; }

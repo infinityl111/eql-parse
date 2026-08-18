@@ -2897,8 +2897,8 @@ function cablearBotin(host) {
  * el fuego amigo y los tramos sin mando no están aquí, y sí está el aviso de la
  * pelea dudosa: uno juzga tu actuación, el otro dice que estas cifras no valen.
  */
-function renderEscena(snap) {
-  const host = $('secPane');
+function renderEscena(snap, cajaSec) {
+  const host = cajaSec ?? $('secPane');
   if (!host) return;
   /**
    * AL CAMBIAR DE PELEA, EL REPRODUCTOR SE VA CON LA ANTERIOR.
@@ -3100,8 +3100,8 @@ function renderResumen(snap) {
  * la sección: es de la navegación vieja y se va con ella. Esconderlo es
  * reversible; quitarlo sería tocar la función, y esto sólo mueve.
  */
-function renderAnalisis(snap) {
-  const host = $('secPane');
+function renderAnalisis(snap, cajaSec) {
+  const host = cajaSec ?? $('secPane');
   if (!host) return;
   if (!$('anView')) {
     host.innerHTML = '<div id="advice"></div>'
@@ -3133,8 +3133,8 @@ function renderAnalisis(snap) {
  * sin abrir nada— y el aviso de espera mientras se lee el disco, que no es lo
  * mismo que un registro vacío.
  */
-function renderRegistro(snap) {
-  const host = $('secPane');
+function renderRegistro(snap, cajaSec) {
+  const host = cajaSec ?? $('secPane');
   if (!host) return;
   const f = withPets(fightFor(snap));
   const listo = f && registroCache.has(f.uid ?? 'live') ? 1 : 0;
@@ -3158,8 +3158,9 @@ function renderRegistro(snap) {
   // Se pide DESPUÉS de pintar el aviso de espera, igual que hacía la pestaña.
   if (!listo) {
     pedirRegistro(f, () => {
-      const h2 = $('secPane');
-      if (h2 && state.seccion === 'registro') { h2.dataset.sig = ''; renderRegistro(state.snap); }
+      // Su caja si está apilada, y el panel si va suelta.
+      const h2 = document.getElementById('ap-registro') ?? $('secPane');
+      if (h2 && EN_LA_PAGINA.includes(state.seccion)) { h2.dataset.sig = ''; renderRegistro(state.snap, h2); }
     });
   }
 }
@@ -3182,8 +3183,8 @@ function renderRegistro(snap) {
  *   una función, no un cambio de sitio. Aguantar se va a Análisis en la cuarta y
  *   Registro a su propia sección en la extracción once.
  */
-function renderPorHabilidad(snap) {
-  const host = $('secPane');
+function renderPorHabilidad(snap, cajaSec) {
+  const host = cajaSec ?? $('secPane');
   if (!host) return;
   if (!$('rows')) {
     host.innerHTML = `<div class="charm-note" id="charmNote" style="display:none"></div>
@@ -3217,8 +3218,8 @@ function renderPorHabilidad(snap) {
  * Una sección sí tiene que decir que está vacía: si no, no se distingue de una
  * que falló al cargar.
  */
-function renderBotinPelea(snap) {
-  const host = $('secPane');
+function renderBotinPelea(snap, cajaSec) {
+  const host = cajaSec ?? $('secPane');
   if (!host) return;
   const f = withPets(fightFor(snap));
   const sig = `${getLang()}|${f?.uid ?? 'live'}|${(f?.loot ?? []).length}`;
@@ -5499,6 +5500,153 @@ function renderLateral() {
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LAS CUATRO DE «ESTA PELEA» SON UNA SOLA PÁGINA QUE SE DESPLAZA.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * MEDIDO ANTES DE MOVER NADA, a 1920×1080 y sobre 961 px de alto útil: Escena
+ * llenaba el 32,6 %, Por habilidad el 89,4 %, Botín el 14,2 % y El registro el
+ * 53,4 %. Tres de las cuatro no pasaban de media pantalla. Juntas suman lo que
+ * la página de Combate de la 1.15.0 medía entera, así que la mudanza no había
+ * repartido contenido: había repartido AIRE.
+ *
+ * Análisis se queda aparte a propósito: ella sola mide 2.330 px, más que las
+ * cuatro juntas, y meterla haría de esto un rollo de pergamino.
+ *
+ * ── EL REQUISITO QUE SÍ ES REQUISITO ──────────────────────────────────────
+ *
+ * EL REGISTRO CONSERVA SU DESPLAZADOR. Su caja esconde unos 21.000 px detrás
+ * de un `.logbox` con `max-height: 420px`. Dejándolo crecer, la página pasa de
+ * 1.875 px a casi 23.000 y deja de ser una página. El desplazador interno no
+ * es una preferencia: es lo que hace posible esto.
+ *
+ * ── Y LA PUERTA DE VISIBILIDAD QUE AQUÍ NO ESTÁ ───────────────────────────
+ *
+ * Hubo una, y se quitó CON LA MEDICIÓN DELANTE. La idea era repintar sólo las
+ * cajas a la vista, porque cuatro secciones vivas a 4 Hz parecían cuatro veces
+ * el trabajo. El banco —`tmp/banco.cjs`, cinco tandas de 25 s con 12,4 líneas
+ * por segundo de tráfico real— dijo que no:
+ *
+ *     una sección sola   p50 16,7 ms · p99 24,0 · CPU 0,5 %
+ *     las cuatro, con puerta   p50 16,7 ms · p99 23,3 · CPU 0,5 %
+ *     las cuatro, SIN puerta   p50 16,7 ms · p99 24,2 · CPU 0,6 %
+ *
+ * Las tres iguales, y la diferencia entre tandas mayor que la diferencia entre
+ * versiones. Lo que ya mantenía el coste plano son las guardas de firma que
+ * cada sección tiene desde siempre —`if (host.dataset.sig === sig) return;`,
+ * `if (!$('rows'))`—: repintar una sección que no ha cambiado ya era gratis.
+ *
+ * Y la puerta no salía gratis: al saltarse las cajas de abajo dejaba CONTENIDO
+ * VIEJO esperando. Al montar aún no hay pelea elegida, así que las cuatro se
+ * pintaban con «Elige una pelea»; al elegirla se repintaban las tres visibles
+ * y El registro se quedaba con el cartel puesto hasta que alguien bajara. Hizo
+ * falta un repintado en el desplazamiento sólo para tapar eso.
+ *
+ *     UNA OPTIMIZACIÓN QUE NO SE MIDE EN EL BANCO Y SÍ SE VE EN LA PANTALLA
+ *     ESTÁ COSTANDO DINERO, NO AHORRÁNDOLO.
+ *
+ * Se pintan las cuatro en cada tic y ya está. La medición queda aquí escrita
+ * por si la página crece: el día que estas cuatro cajas se vuelvan diez, o que
+ * una pierda su guarda de firma, hay que volver a medir — y entonces la puerta
+ * tendrá algo que ahorrar.
+ */
+const EN_LA_PAGINA = ['escena', 'habilidad', 'botin', 'registro'];
+
+/** Pinta la página de «esta pelea»: las cuatro, siempre. */
+function pintaLaPagina(snap) {
+  const pane = $('secPane');
+  if (!pane) return;
+  const montando = !pane.querySelector('.enlapagina');
+  if (montando) {
+    pane.innerHTML = EN_LA_PAGINA.map((id) => `<section class="enlapagina" id="ap-${id}" data-ap="${id}"></section>`).join('');
+    pane.addEventListener('scroll', alDesplazarse, { passive: true });
+  }
+  for (const id of EN_LA_PAGINA) {
+    const caja = document.getElementById(`ap-${id}`);
+    if (caja) SECCIONES.find((x) => x.id === id)?.pinta(snap, caja);
+  }
+  if (montando) irALaSeccion(state.seccion, false);
+  /**
+   * Y LA MARCA SE RECALCULA TAMBIÉN AQUÍ, no sólo al desplazarse.
+   *
+   * Atarla únicamente al evento de desplazamiento la deja mentir en cuanto el
+   * contenido cambia de alto SIN que nadie se desplace, que en vivo pasa todo
+   * el rato: una pelea nueva encoge Botín y El registro, el navegador recorta
+   * el desplazamiento hasta lo que quepa —medido, de 998 a 4— y la marca se
+   * queda señalando la sección que había ahí antes. Salió en el banco: la
+   * barra decía «Por habilidad» con la página arriba del todo.
+   */
+  else marcaLaQueSeVe();
+}
+
+/**
+ * ── LA MARCA DE LA BARRA SIGUE AL DESPLAZAMIENTO ──────────────────────────
+ *
+ * No es pulido. Agrupar por alcance sirve para saber DE QUÉ HABLA CADA NÚMERO
+ * antes de leerlo, y una barra que señala Escena mientras estás mirando El
+ * registro informa mal justo en lo único que el índice prometía. Con cuatro
+ * secciones en una página, la barra ya no es un conmutador: es un índice, y un
+ * índice que no sigue a la página está roto.
+ *
+ * MANDA LA QUE OCUPA LA LÍNEA DE LECTURA, no la que más área ocupa. A un
+ * tercio de la altura del panel: es donde está mirando quien lee, y evita que
+ * una caja alta de abajo se lleve la marca en cuanto asoma por el borde.
+ *
+ * LOS DOS EXTREMOS MANDAN SOBRE LA LÍNEA, y los dos por el mismo motivo: en
+ * ellos la línea de lectura da una respuesta que nadie diría.
+ *
+ *   · Arriba del todo manda la PRIMERA. Escena mide 251 px y el panel 961, así
+ *     que a un tercio la línea ya cae dentro de Por habilidad: pulsabas
+ *     «Escena», la página subía al principio y la marca saltaba sola a la
+ *     siguiente. Salió en el banco —«habilidad» con `scrollTop 4`— y es
+ *     justo el fallo que esto venía a arreglar, cometido al revés.
+ *   · Abajo del todo manda la ÚLTIMA. Si El registro es más corto que el panel
+ *     nunca llegaría a cruzar la línea, y su botón no se encendería jamás por
+ *     mucho que lo tengas delante.
+ */
+function seccionALaVista(pane) {
+  const linea = pane.getBoundingClientRect().top + pane.clientHeight / 3;
+  if (pane.scrollTop <= 4) return EN_LA_PAGINA[0];
+  if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 4) return EN_LA_PAGINA.at(-1);
+  let cual = EN_LA_PAGINA[0];
+  for (const id of EN_LA_PAGINA) {
+    const caja = document.getElementById(`ap-${id}`);
+    if (caja && caja.getBoundingClientRect().top <= linea) cual = id;
+  }
+  return cual;
+}
+
+/**
+ * Poner la marca en la sección que se está viendo.
+ *
+ * SÓLO LA MARCA: no monta ni desmonta nada. Cambiar de sección de verdad aquí
+ * volvería a montar la página bajo los pies de quien se está desplazando.
+ */
+function marcaLaQueSeVe() {
+  const pane = $('secPane');
+  if (!pane || !pane.querySelector('.enlapagina')) return;
+  const id = seccionALaVista(pane);
+  if (!id || id === state.seccion) return;
+  state.seccion = id;
+  renderLateral();
+}
+
+/** Encolado en un fotograma: el desplazamiento dispara muchas veces seguidas. */
+function alDesplazarse() {
+  const pane = $('secPane');
+  if (!pane || pane.dataset.enCola === '1') return;
+  pane.dataset.enCola = '1';
+  requestAnimationFrame(() => { pane.dataset.enCola = '0'; marcaLaQueSeVe(); });
+}
+
+/** Llevar la página hasta la sección pedida. */
+function irALaSeccion(id, suave = true) {
+  const caja = document.getElementById(`ap-${id}`);
+  if (!caja) return;
+  caja.scrollIntoView({ behavior: suave ? 'smooth' : 'auto', block: 'start' });
+}
+
+/**
  * Entrar en una sección.
  *
  * Y APAGA LAS PESTAÑAS VIEJAS, que es lo que evita que las dos navegaciones se
@@ -5522,6 +5670,16 @@ function abrirSeccion(id) {
    * ya ha dicho a dónde quiere ir.
    */
   state.enc.page = null;
+  /**
+   * Y ENTRE LAS CUATRO DE LA PÁGINA NO SE DESMONTA NADA: se baja hasta ellas.
+   * Borrar `#bodyGrid` aquí tiraría la página entera para volver a montarla
+   * igual, perdiendo por el camino el sitio del desplazador del registro.
+   */
+  if (EN_LA_PAGINA.includes(id) && $('secPane')?.querySelector('.enlapagina')) {
+    renderLateral();
+    irALaSeccion(id);
+    return;
+  }
   $('bodyGrid').innerHTML = '';
   state.rowNodes.clear();
   renderApp();
@@ -5542,7 +5700,8 @@ function renderApp() {
       $('bodyGrid').classList.toggle('solo', !s.lista);
     }
     if (s.lista) renderFightList(state.snap);
-    s.pinta(state.snap);
+    if (EN_LA_PAGINA.includes(s.id)) pintaLaPagina(state.snap);
+    else s.pinta(state.snap);
     return;
   }
   if (state.wizard) {
