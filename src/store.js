@@ -399,14 +399,19 @@ export const FORMATO_VERSION = 12;
  *
  * El registro escribe tu hechizo resistido como «X resisted your Spell!», y la
  * regla pedía un posesivo que esa forma no lleva: 955 líneas por el desagüe,
- * en un almacén de 1.777 peleas.
+ * medidas sobre los 103,8 MB de referencia.
  *
  * Y NO ES UN NÚMERO BAJO, ES UNA FILA QUE NO EXISTE. `spellVsFoe` guarda
  * `{foe, spell, landed, resisted}` por pelea, así que el denominador —«62 de
  * 62»— ya tenía dónde vivir. Pero un hechizo que se resiste SIEMPRE nunca
- * aterriza, así que no llegaba a crear su fila: el más resistido del histórico
- * —62 veces contra el mismo enemigo, cero aciertos— **no aparece en ninguna de
- * las 1.777 peleas guardadas**. Cero filas.
+ * aterriza, así que no llegaba a crear su fila.
+ *
+ * LA PRUEBA, y no hace falta ningún almacén viejo para tenerla: el registro NO
+ * ESCRIBE NUNCA tu nombre en esas líneas. «resisted Campeon's …» aparece **0
+ * veces** en todo el registro; las 955 vienen todas como «resisted your …». Con
+ * la regla que se publicó, ninguna casaba, así que ninguna se guardó. Las 62 de
+ * «Drain Spirit X contra Coercer T`vala» —62 de 62, cero aciertos— son 62 de
+ * esas, y no había ni una fila suya en ninguna pelea.
  *
  * Eso es lo que decide la constante y no el recuento: leyendo lo guardado no
  * sale, porque no hay nada que leer. La prueba está en el registro.

@@ -189,15 +189,15 @@ const rules = [
   // "X resisted Y's Z"  -> a Y le resistieron su hechizo (malo si Y eres tú)
   // "You resist X's Z"  -> TÚ resististe el hechizo de X (bueno para ti)
   /**
-   * «X resisted your Spell!» — TU hechizo, resistido. 895 líneas que se tiraban.
+   * «X resisted your Spell!» — TU hechizo, resistido. 955 líneas que se tiraban.
    *
-   * VA ANTES QUE LA DE ABAJO Y NO LA SUSTITUYE: la de abajo casa 2.315 líneas
+   * VA ANTES QUE LA DE ABAJO Y NO LA SUSTITUYE: la de abajo casa 2.535 líneas
    * legítimas —el hechizo de otro, resistido— y se queda como está.
    *
    * EL APÓSTROFO ERA LA TRAMPA. La regla del posesivo pide `(.+?)'s` y `your`
    * no lo lleva… pero el NOMBRE DEL HECHIZO sí puede llevarlo, y entonces
    * casaba por el sitio equivocado: «resisted your Oathbreaker's Curse!» daba
-   * un lanzador llamado «your Oathbreaker» y un hechizo llamado «Curse». 54
+   * un lanzador llamado «your Oathbreaker» y un hechizo llamado «Curse». 66
    * veces en el registro. No se vio nunca porque ese lanzador inventado no está
    * en `#mine()` y la rama entera se descartaba — un dato falso que se salvó de
    * pintarse por una guarda que lo rechazaba por el motivo equivocado.
@@ -211,7 +211,7 @@ const rules = [
   { kind: 'resist', hint: 'resisted', re: /^(.+?) resisted (.+?)'s (.+?)!$/, map: (m) => ({ target: m[1], caster: m[2], ability: m[3] }) },
   { kind: 'resist_by_you', hint: 'You resist', re: /^You resist (.+?)'s (.+?)!$/, map: (m) => ({ caster: m[1], ability: m[2], target: 'You' }) },
   /**
-   * EL RECHAZO POR PROTECCIÓN: 2.450 líneas que iban al cajón.
+   * EL RECHAZO POR PROTECCIÓN: 2.665 líneas que iban al cajón.
    *
    * No es una resistencia y por eso no comparte `kind` con ellas. Una
    * resistencia es tu tirada contra el hechizo; esto es un hechizo que NI
