@@ -957,8 +957,22 @@ function updateRow(node, r, snap, live, rank) {
       r.charmed ? 'charmed' : ''}`;
     refs.name.title = r.charmed ? t('row.charmedNote')
       : (r.petOf ? t('row.petOf', { who: r.petOf }) : '');
+    /**
+     * DOS COSAS DISTINTAS, Y AHORA SE DICE CUÁL ES CUÁL.
+     *
+     * El número grande es una TASA —daño ÷ duración de la pelea— y el
+     * porcentaje de al lado es una APORTACIÓN —qué parte del total pusiste—.
+     * Salían pegados, sin rótulo, y se leían como si fueran dos vistas del
+     * mismo dato. No lo son: se dividen por cosas distintas y contestan
+     * preguntas distintas, y el fallo clásico es llamar tasa a una aportación.
+     *
+     * EL DPS NO SE TOCA: sigue siendo daño ÷ duración de la pelea, que es la
+     * cifra comparable con cualquier otro medidor. Aquí sólo se rotula.
+     */
     refs.dps.textContent = n0(r.dps);
+    refs.dps.title = t('row.tasaNote');
     refs.share.textContent = `${(r.share * 100).toFixed(1)}%`;
+    refs.share.title = t('row.aportacionNote');
     refs.bar.innerHTML = `<div class="bar-track">${barHTML(r.types, r.share * 100)}</div>`;
     // LAS DOS VELOCIDADES, y no es una duplicada.
     //
@@ -974,6 +988,17 @@ function updateRow(node, r, snap, live, rank) {
       `<span>${t('row.damage')} <b>${n0(r.damage)}</b></span>`,
       r.dpsActive && Math.abs(r.dpsActive - r.dps) > 1
         ? `<span title="${esc(t('row.paceNote'))}">${t('row.pace')} <b>${n1(r.dpsActive)}</b></span>` : '',
+      /**
+       * LA VENTANA PROPIA, que estaba calculada y sólo se veía abriendo la ficha.
+       *
+       * Daño ÷ desde su primera acción hasta la última. Sube a la línea porque
+       * es la que responde a «¿entró tarde?»: quien llega a mitad de pelea tiene
+       * una tasa baja y una ventana propia normal, y con el número grande solo
+       * esos dos casos no se distinguen. Sale únicamente cuando difiere, como el
+       * ritmo — un dato repetido no informa, ocupa.
+       */
+      r.dpsOwn && Math.abs(r.dpsOwn - r.dps) > 1
+        ? `<span title="${esc(t('row.ownNote'))}">${t('row.own')} <b>${n1(r.dpsOwn)}</b></span>` : '',
       // LA TERCERA VELOCIDAD: tu mejor tramo de diez segundos seguidos.
       //
       // Las otras dos contestan cuánto pusiste y a qué ritmo; ésta contesta si
@@ -3524,6 +3549,21 @@ function renderAnalysis(snap) {
   x.accion ? `<i class="acc acc-${esc(x.accion)}" title="${esc(t(`an.accion.${x.accion}Note`))}">${
     esc(t(`an.accion.${x.accion}`))}</i>` : ''}</div>
       <div class="an-find-d">${esc(x.detail)}</div>
+      ${/*
+        LAS FILAS, CADA UNA CON SU DENOMINADOR. Nunca «62 resistidas» a secas:
+        62 de 62 y 62 de 300 son dos peleas distintas y dos consejos distintos.
+        Y el 100 % se dice con palabras además del número, porque «44 de 44» hay
+        que restarlo mentalmente y «no entra nunca» no.
+      */''}
+      ${(x.filas ?? []).length ? `<div class="an-find-filas">${x.filas.map((r) => {
+    const pct100 = r.resisted === r.intentos;
+    return `<div class="an-fila${pct100 ? ' nunca' : ''}">
+        <span>${esc(r.spell)} <span class="dim">${esc(t('an.contra'))} ${esc(r.foe)}</span></span>
+        <b>${r.resisted} ${esc(t('an.de'))} ${r.intentos}</b>
+        <span class="${pct100 ? 'bad' : 'dim'}">${pct100 ? esc(t('an.nuncaEntra'))
+      : `${Math.round((r.resisted / r.intentos) * 100)}%`}</span>
+      </div>`;
+  }).join('')}</div>` : ''}
       ${x.impact ? `<div class="an-find-i">${esc(x.impact)}</div>` : ''}
     </div>`).join('') : `<div class="hint">${esc(t('an.noFindings'))}</div>`;
 
