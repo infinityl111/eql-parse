@@ -18,6 +18,7 @@
  * Reintenta mientras Cloudflare propaga; no da por bueno el primer intento.
  */
 import fs from 'node:fs';
+import { md } from '../web/build.mjs';
 
 const DOM = 'https://eqlparse.com';
 const IDIOMAS = ['es', 'en', 'de', 'fr', 'pt'];
@@ -55,6 +56,27 @@ const VERSION = NUEVA.tag.replace(/^v/, '');
 const URL_EXE = NUEVA.descarga;
 const EXE = NUEVA.descarga.replace(/^https:\/\/github\.com\//, '');
 const MB = Math.round(NUEVA.bytes / 1024 / 1024);
+/**
+ * LOS DOS ÚLTIMOS NÚMEROS ESCRITOS A MANO, y caducaron a la primera.
+ *
+ * Aquí ponía `!== 12` y `!== 0`. La 1.17.0 añade un bloque cercado a sus notas
+ * —el ejemplo de las resistencias— y dentro va «Coercer T`vala», que lleva tres
+ * acentos graves en el nombre. Las dos comprobaciones se pusieron rojas **con
+ * el sitio correcto**, que es el peor color posible: el rojo que no significa
+ * nada se aprende a ignorar, y entonces deja de avisar del que sí.
+ *
+ * Se derivan de lo mismo que sirve la página: `md()` sobre los cuerpos de
+ * `web/releases.json`. Y el acento grave sólo es un fallo FUERA de un `<pre>`;
+ * dentro es el nombre de un bicho, escrito como lo escribe el juego.
+ */
+const sinPre = (h) => h.replace(/<pre>[\s\S]*?<\/pre>/g, '');
+const ESPERADO = REG.reduce((a, r) => {
+  const h = md(r.cuerpo ?? '', r.tag);
+  a.pres += (h.match(/<pre>/g) ?? []).length;
+  a.graves += (sinPre(h).match(/`/g) ?? []).length;
+  return a;
+}, { pres: 0, graves: 0 });
+
 const HUELLA = Object.fromEntries(IDIOMAS.map((l) => {
   const p = new URL(`../web/notas/${VERSION}.${l}.md`, import.meta.url);
   const txt = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '';
@@ -80,7 +102,7 @@ async function ronda() {
     const peso = new RegExp(`${MB}\\s*(MB|Mo)`).test(idx.texto);
     const arts = (nov.texto.match(/<article class="version">/g) ?? []).length;
     const pres = (nov.texto.match(/<pre>/g) ?? []).length;
-    const graves = (nov.texto.match(/`/g) ?? []).length;
+    const graves = (sinPre(nov.texto).match(/`/g) ?? []).length;
     // La nota de la versión nueva es el PRIMER artículo de la página.
     const i = nov.texto.indexOf('<article class="version">');
     const primero = nov.texto.slice(i, nov.texto.indexOf('</article>', i));
@@ -94,8 +116,8 @@ async function ronda() {
     if (!boton) fallos.push(`${l}: el botón no apunta al .exe de la ${VERSION}`);
     if (!peso) fallos.push(`${l}: el tamaño no dice ${MB} MB`);
     if (arts !== REG.length) fallos.push(`${l}: ${arts} artículos, esperaba ${REG.length}`);
-    if (pres !== 12) fallos.push(`${l}: ${pres} <pre>, esperaba 12`);
-    if (graves !== 0) fallos.push(`${l}: ${graves} acentos graves sueltos`);
+    if (pres !== ESPERADO.pres) fallos.push(`${l}: ${pres} <pre>, esperaba ${ESPERADO.pres}`);
+    if (graves !== ESPERADO.graves) fallos.push(`${l}: ${graves} acentos graves fuera de un <pre>, esperaba ${ESPERADO.graves}`);
     if (enSuIdioma === false) fallos.push(`${l}: la nota de la ${VERSION} NO sale en su idioma`);
   }
   return { fallos, filas };
