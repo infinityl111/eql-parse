@@ -131,13 +131,17 @@ const CAPTURAS = [
  * escribe SÓLO después de las comprobaciones, para que una respuesta mala no se
  * lleve por delante la copia buena.
  *
- * SE COMPRUEBAN TRES CEROS, no uno:
+ * SE COMPRUEBAN CUATRO CEROS, no uno:
  *
  *   · no se pudo preguntar — red caída, 503, lo que sea;
  *   · cero versiones — la API contestó, pero con la lista vacía;
- *   · la más nueva sin instalador — el botón de descarga cae a la página de la
- *     release y `bytes` sale 0. Pasa de verdad entre crear la release y subir
- *     el .exe, y desde fuera se ve como una descarga que no descarga.
+ *   · cero PUBLICADAS con la lista NO vacía — hay releases y todas son borrador
+ *     o prelanzamiento. Es otro cero y lleva otra frase, porque lo que hay que
+ *     arreglar es otro: ver «dos poblaciones», más abajo;
+ *   · la más nueva publicada sin instalador — el botón de descarga cae a la
+ *     página de la release y `bytes` sale 0. Pasa de verdad entre crear la
+ *     release y subir el .exe, y desde fuera se ve como una descarga que no
+ *     descarga.
  */
 /**
  * EL TOKEN DE GITHUB, Y SIN ÉL NO SE CONSTRUYE.
@@ -218,6 +222,18 @@ function tokenGitHub() {
 const POR_PAGINA = 100;
 const MAX_PAGINAS = 50;
 
+/**
+ * QUÉ CUENTA COMO PUBLICADA, sobre el objeto CRUDO de la API.
+ *
+ * Un borrador no lo ve nadie de fuera. Un prelanzamiento sí se ve, pero se
+ * publica a propósito sin anunciarlo: es lo que se sube para probar el
+ * instalador antes de marcarlo definitivo. Ninguno de los dos va a la web.
+ *
+ * Se pregunta por `draft` y `prerelease` —los nombres de la API— porque el
+ * filtro se hace ANTES de normalizar, sobre lo que llegó tal cual.
+ */
+export const esPublicada = (x) => !x?.draft && !x?.prerelease;
+
 /** La URL de `rel="next"` de una cabecera `link`, si la trae. */
 function siguientePagina(link) {
   for (const parte of String(link ?? '').split(',')) {
@@ -227,7 +243,7 @@ function siguientePagina(link) {
   return null;
 }
 
-async function releases() {
+export async function releases() {
   const { token, de } = tokenGitHub();
   console.log(`  API de GitHub: autenticada (${de})`);
   let j = [];
@@ -292,14 +308,68 @@ async function releases() {
       + ' sabemos cuántas. La construcción se para aquí: publicar una lista de versiones'
       + ' recortada, con cara de entera, es peor que no desplegar.');
   }
-  const limpio = j.map((x) => ({
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * DOS POBLACIONES, Y NO ES UN FILTRO: LAS DOS GUARDAS NO PREGUNTAN LO MISMO.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * Esto era UNA lista, `limpio`, haciendo dos trabajos. El nombre se muere
+   * aquí a propósito: mientras hubiera una sola lista con un nombre que no dice
+   * a cuál de las dos preguntas contesta, volvería a pasar.
+   *
+   *   · La portada, el botón de descarga, el número de versión, el tamaño y la
+   *     lista de novedades preguntan «¿QUÉ DEBE VER EL USUARIO?». Un
+   *     prelanzamiento NO cuenta: no se anuncia, no se ofrece y no se numera.
+   *   · `exigirNotasPublicadas` pregunta «¿HAY UNA RELEASE QUE RESPALDE ESTAS
+   *     NOTAS?». Un prelanzamiento SÍ las respalda. Una nota huérfana es una
+   *     nota sin NINGUNA release detrás, no una sin release definitiva.
+   *
+   * Por eso salen las dos con su nombre y cada guarda lee la suya. `todas` es
+   * la población entera y `publicadas` la que se enseña; «cruda» quiere decir
+   * SIN FILTRAR, no sin normalizar — las dos llevan la misma forma, que es lo
+   * que deja que `huerfanas.mjs` siga leyendo `tag` sin saber de dónde viene.
+   *
+   * ── DÓNDE VA EL FILTRO, que es una RESTRICCIÓN DE ORDEN ──────────────────
+   *
+   * DESPUÉS DEL BUCLE Y DESPUÉS DE LAS GUARDAS DE SATURACIÓN. Nunca por página:
+   * la saturación compara `pagina.length === POR_PAGINA` contra el TAMAÑO
+   * CRUDO. Una página de cien con tres prelanzamientos, filtrada antes, trae
+   * noventa y siete: deja de parecer llena, y la guarda que existe justo para
+   * distinguir «hay justo estos» de «hay más y no me lo dicen» deja de saltar
+   * sin decir nada. Volveríamos a perder versiones, y otra vez en silencio.
+   *
+   * Y no se queda en comentario: `test/versiones.js` monta esa página de cien
+   * con tres prelanzamientos y exige que la guarda salte Y que diga CIEN. Una
+   * restricción de orden que no está en un test es un comentario con los días
+   * contados.
+   */
+  const normalizar = (x) => ({
     tag: x.tag_name, nombre: x.name ?? x.tag_name, fecha: x.published_at,
     cuerpo: (x.body ?? '').slice(0, 6000), url: x.html_url,
     exe: (x.assets ?? []).find((a) => /\.exe$/i.test(a.name)) ?? null,
-  })).map((x) => ({ ...x, bytes: x.exe?.size ?? 0, descarga: x.exe?.browser_download_url ?? x.url }));
+  });
+  const conDescarga = (x) => ({ ...x, bytes: x.exe?.size ?? 0, descarga: x.exe?.browser_download_url ?? x.url });
+  const todas = j.map(normalizar).map(conDescarga);
+  const publicadas = j.filter(esPublicada).map(normalizar).map(conDescarga);
 
-  if (!limpio[0].exe) {
-    throw new Error(`la versión más nueva (${limpio[0].tag}) no trae instalador.`
+  /**
+   * EL SEGUNDO CERO, y la razón de que no comparta frase con el de arriba.
+   *
+   * «La API contestó con cero versiones» y «hay versiones y ninguna publicada»
+   * se arreglan de dos maneras distintas: la primera mirando si el repositorio
+   * o el token están bien, la segunda marcando definitiva la que toque. Con una
+   * sola frase para las dos, la mitad de las veces sería mentira.
+   */
+  if (!publicadas.length) {
+    throw new Error(`la API contestó con ${todas.length} versiones y NINGUNA publicada:`
+      + ' todas son borrador o prelanzamiento. La lista llegó bien —esto no es el'
+      + ' cero de «no hay releases»—, pero no hay ninguna que enseñar: la portada'
+      + ' saldría sin versión, sin tamaño y sin descarga. Marca definitiva la que'
+      + ' toque y vuelve.');
+  }
+
+  if (!publicadas[0].exe) {
+    throw new Error(`la versión publicada más nueva (${publicadas[0].tag}) no trae instalador.`
       + ' El botón de descarga llevaría a la página de la release y el tamaño'
       + ' saldría en 0 bytes. Si estás publicando, sube el .exe y vuelve.');
   }
@@ -310,13 +380,21 @@ async function releases() {
       console.log(`  AVISO: las notas de ${x.tag_name} pasan de 6.000 caracteres y salen recortadas`);
     }
   }
-  await fsp.writeFile(CACHE, JSON.stringify(limpio, null, 1));
+  // LA COPIA GUARDA LO PUBLICADO, que es lo que la web enseña. Un registro que
+  // llevara los prelanzamientos diría otra cosa que la página que acompaña.
+  await fsp.writeFile(CACHE, JSON.stringify(publicadas, null, 1));
   // El número de páginas va en la línea a propósito: es lo que deja ver que la
-  // cuenta se ha agotado y no se ha topado con nada.
-  console.log(`  novedades: ${limpio.length} versiones desde la API`
+  // cuenta se ha agotado y no se ha topado con nada. Y las dos poblaciones van
+  // juntas: la resta entre ellas es la cifra que si no habría que ir a buscar.
+  console.log(`  novedades: ${todas.length} versiones desde la API`
     + ` (${paginas} ${paginas === 1 ? 'página' : 'páginas'} de ${POR_PAGINA}),`
-    + ` la más nueva ${limpio[0].tag}`);
-  return limpio;
+    + ` ${publicadas.length} publicadas, la más nueva ${publicadas[0].tag}`);
+  // Y CUÁLES se quedaron fuera, con su motivo. Sin esto, «38, 37 publicadas»
+  // obliga a abrir GitHub para saber a cuál le falta el sello.
+  const apartadas = j.filter((x) => !esPublicada(x))
+    .map((x) => `${x.tag_name} (${x.draft ? 'borrador' : 'prelanzamiento'})`);
+  if (apartadas.length) console.log(`  fuera de la web: ${apartadas.join(', ')}`);
+  return { todas, publicadas };
 }
 
 /**
@@ -614,9 +692,9 @@ function reglasMuestra(lang) {
 }
 
 // ── Las cuatro páginas ──────────────────────────────────────────────────────
-function portada(lang, rels) {
+function portada(lang, publicadas) {
   const tt = T[lang];
-  const rel = rels[0];
+  const rel = publicadas[0];
   /**
    * EL NOMBRE SALE DEL DICCIONARIO, LA DESCRIPCIÓN SE ESCRIBE AQUÍ.
    *
@@ -726,11 +804,11 @@ function portada(lang, rels) {
   ${avisoOtro(tt)}`;
 }
 
-function instalacion(lang, rels) {
+function instalacion(lang, publicadas) {
   const tt = T[lang];
   return `<section><h1>${esc(tt.instalarT)}</h1>
     <p class="ancho">${esc(tt.instalarP)}</p>
-    ${botonDescarga(tt, rels[0])}
+    ${botonDescarga(tt, publicadas[0])}
     <ol class="pasos">
       <li>${esc(tt.paso1)}</li><li>${esc(tt.paso2)}</li>
       <li>${esc(tt.paso3)}</li><li>${esc(tt.paso4)}</li>
@@ -815,11 +893,11 @@ function notasDe(tag, lang) {
   try { return sustituirRotulos(fs.readFileSync(p, 'utf8'), lang); } catch { return null; }
 }
 
-function novedades(lang, rels) {
+function novedades(lang, publicadas) {
   const tt = T[lang];
   const fecha = (s) => (s ? new Date(s).toLocaleDateString(lang, { year: 'numeric', month: 'long', day: 'numeric' }) : '');
   return `<section><h1>${esc(tt.novedadesT)}</h1><p class="ancho">${esc(tt.novedadesP)}</p></section>
-  ${rels.map((r) => `<article class="version">
+  ${publicadas.map((r) => `<article class="version">
       <h2>${esc(r.nombre)}</h2>
       <div class="fecha">${esc(fecha(r.fecha))}</div>
       <div class="notas">${md(notasDe(r.tag, lang) ?? r.cuerpo)}</div>
@@ -912,8 +990,16 @@ async function main() {
   ]);
   if (huecos.length) throw new Error(`textos sin escribir: ${huecos.join(', ')}`);
 
-  const rels = await releases();
-  exigirNotasPublicadas(rels, JSON.parse(fs.readFileSync(path.join(PROY, 'package.json'), 'utf8')).version);
+  /**
+   * CADA GUARDA CON SU POBLACIÓN. Ver `releases()`.
+   *
+   * `todas` para las notas huérfanas: un prelanzamiento respalda unas notas
+   * igual de bien que una release definitiva, y exigirlas contra `publicadas`
+   * pararía la construcción por unas notas que SÍ tienen release detrás.
+   * `publicadas` para todo lo que mira el usuario.
+   */
+  const { todas, publicadas } = await releases();
+  exigirNotasPublicadas(todas, JSON.parse(fs.readFileSync(path.join(PROY, 'package.json'), 'utf8')).version);
 
   // Y AHORA sí: lo anterior se va porque ya hay con qué sustituirlo.
   await fsp.rm(DIST, { recursive: true, force: true });
@@ -977,10 +1063,10 @@ async function main() {
     setLang(lang);            // los nombres de las funciones, en su idioma
     const tt = T[lang];
     for (const [fichero, hacer, tit, desc] of paginas) {
-      const cuerpo = hacer(lang, rels);
+      const cuerpo = hacer(lang, publicadas);
       const html = pagina({
         lang, pag: fichero, titulo: `${tit(tt)} · EQL Parse`,
-        descripcion: desc(tt), cuerpo, version: rels[0]?.tag?.replace(/^v/, ''),
+        descripcion: desc(tt), cuerpo, version: publicadas[0]?.tag?.replace(/^v/, ''),
       });
       await fsp.mkdir(path.join(DIST, lang), { recursive: true });
       await fsp.writeFile(path.join(DIST, lang, fichero), html);
