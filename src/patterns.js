@@ -188,8 +188,42 @@ const rules = [
   // Dos direcciones opuestas que antes se contaban juntas:
   // "X resisted Y's Z"  -> a Y le resistieron su hechizo (malo si Y eres tú)
   // "You resist X's Z"  -> TÚ resististe el hechizo de X (bueno para ti)
+  /**
+   * «X resisted your Spell!» — TU hechizo, resistido. 895 líneas que se tiraban.
+   *
+   * VA ANTES QUE LA DE ABAJO Y NO LA SUSTITUYE: la de abajo casa 2.315 líneas
+   * legítimas —el hechizo de otro, resistido— y se queda como está.
+   *
+   * EL APÓSTROFO ERA LA TRAMPA. La regla del posesivo pide `(.+?)'s` y `your`
+   * no lo lleva… pero el NOMBRE DEL HECHIZO sí puede llevarlo, y entonces
+   * casaba por el sitio equivocado: «resisted your Oathbreaker's Curse!» daba
+   * un lanzador llamado «your Oathbreaker» y un hechizo llamado «Curse». 54
+   * veces en el registro. No se vio nunca porque ese lanzador inventado no está
+   * en `#mine()` y la rama entera se descartaba — un dato falso que se salvó de
+   * pintarse por una guarda que lo rechazaba por el motivo equivocado.
+   *
+   * `Charm` se queda fuera con un `(?!Charm!)`: tiene su propia regla de ruido
+   * más abajo y se descarta POR DECISIÓN. Sin esta exclusión pasaría a ser una
+   * resistencia normal, porque esta regla se declara antes y su pista gana.
+   */
+  { kind: 'resist', hint: 'resisted your', re: /^(.+?) resisted your (?!Charm!)(.+?)!$/,
+    map: (m) => ({ target: m[1], caster: 'You', ability: m[2] }) },
   { kind: 'resist', hint: 'resisted', re: /^(.+?) resisted (.+?)'s (.+?)!$/, map: (m) => ({ target: m[1], caster: m[2], ability: m[3] }) },
   { kind: 'resist_by_you', hint: 'You resist', re: /^You resist (.+?)'s (.+?)!$/, map: (m) => ({ caster: m[1], ability: m[2], target: 'You' }) },
+  /**
+   * EL RECHAZO POR PROTECCIÓN: 2.450 líneas que iban al cajón.
+   *
+   * No es una resistencia y por eso no comparte `kind` con ellas. Una
+   * resistencia es tu tirada contra el hechizo; esto es un hechizo que NI
+   * SIQUIERA LLEGA A LANZARSE contra ti, porque algo activo lo rechaza antes.
+   * Contarlas juntas mezclaría «aguanté» con «ni me tocó», que son dos cosas
+   * que se consiguen de maneras distintas.
+   *
+   * Es la contrapartida observable de un buff puesto: la única forma que tiene
+   * el registro de decir que una protección estaba funcionando.
+   */
+  { kind: 'ward', hint: 'but you are protected', re: /^(.+?) tries to cast a spell on you, but you are protected\.$/,
+    map: (m) => ({ caster: m[1], target: 'You' }) },
 
   // ═══ CRÍTICOS EN LÍNEA APARTE (formato clásico, por si acaso) ═══
   { kind: 'crit', hint: 'critical', re: /^You (?:score|deliver) a critical (?:hit|blast)! \((\d+)\)/, map: (m) => ({ source: 'You', amount: +m[1] }) },

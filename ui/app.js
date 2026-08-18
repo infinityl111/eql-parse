@@ -6077,7 +6077,6 @@ async function showMigration() {
 
   pintar(`<div class="mig-h">${esc(t('mig.title'))}</div>
     <p>${esc(t('mig.body', { n: m.fights }))}</p>
-    <p class="mig-fix">${esc(t('mig.fix'))}</p>
     ${/*
       El aviso va JUNTO AL BOTÓN, antes de pulsarlo. Mientras el cierre de pelea
       se decida con dos relojes, reconstruir puede mover fronteras: quien pulsa

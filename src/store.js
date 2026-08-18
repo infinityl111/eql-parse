@@ -219,7 +219,7 @@ const logicalKey = (s) => claveSegura('logicalKey', s.at, s.total ?? 0, s.durati
  * Sube SIEMPRE que cambie lo que se escribe a disco. Sin excepciones y sin
  * ramas de escape: `test/formato.js` no deja publicar sin subirlo.
  */
-export const FORMATO_VERSION = 11;
+export const FORMATO_VERSION = 12;
 
 /**
  * Por debajo de esta generación, lo guardado NO se puede arreglar leyéndolo
@@ -394,8 +394,29 @@ export const FORMATO_VERSION = 11;
  * Y hay una arista conocida y medida: al reconstruir puede cambiar el
  * emparejamiento de alguna pelea. Antes de esto había **1 pelea repetida de
  * 1.547** en el almacén; después tiene que seguir habiendo como mucho una.
+ *
+ * ── 12 · LAS RESISTENCIAS QUE NO SE LEÍAN (1.17.0) ────────────────────────
+ *
+ * El registro escribe tu hechizo resistido como «X resisted your Spell!», y la
+ * regla pedía un posesivo que esa forma no lleva: 955 líneas por el desagüe,
+ * en un almacén de 1.777 peleas.
+ *
+ * Y NO ES UN NÚMERO BAJO, ES UNA FILA QUE NO EXISTE. `spellVsFoe` guarda
+ * `{foe, spell, landed, resisted}` por pelea, así que el denominador —«62 de
+ * 62»— ya tenía dónde vivir. Pero un hechizo que se resiste SIEMPRE nunca
+ * aterriza, así que no llegaba a crear su fila: el más resistido del histórico
+ * —62 veces contra el mismo enemigo, cero aciertos— **no aparece en ninguna de
+ * las 1.777 peleas guardadas**. Cero filas.
+ *
+ * Eso es lo que decide la constante y no el recuento: leyendo lo guardado no
+ * sale, porque no hay nada que leer. La prueba está en el registro.
+ *
+ * LO QUE CUESTA HOY, remedido el 18 de agosto sobre 103,8 MB: **62,2 s**, no
+ * los 25,5 de la 1.15.0. El registro ha crecido y el coste con él; la cifra
+ * vieja se quedó corta a la mitad. Y la ventana NO se bloquea: 3.763 fotogramas
+ * en 63 s, cero por encima de 100 ms.
  */
-export const RECONSTRUIR_DESDE = 11;
+export const RECONSTRUIR_DESDE = 12;
 
 const META = 'store.json';
 

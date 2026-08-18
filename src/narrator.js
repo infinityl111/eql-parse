@@ -82,6 +82,20 @@ export const DEFAULT_NARRATE = {
     seeinvis: false, petprompt: true,
   },
   /**
+   * CADA CUÁNTO SE DICE QUE TE HAN RESISTIDO. Dos modos y ninguno más.
+   *
+   *   'todas'   una por resistencia.
+   *   'cada20'  una cada 20 s POR HECHIZO — mismo mecanismo que el
+   *             estrangulador de 8 s de los casteos ajenos, con otra clave.
+   *
+   * El estrangulado es el que viene puesto, y sale de una medición: en la pelea
+   * que trajo todo esto hubo 62 resistencias del mismo hechizo en 13 minutos
+   * —una cada 12 s—, así que «todas» es hablar encima de la pelea entera. Quien
+   * las quiera todas las pide; quien no diga nada no acaba silenciando la
+   * casilla por hartazgo, que es como se pierde un aviso útil.
+   */
+  resistMode: 'cada20',
+  /**
    * Supervivencia: sucesos donde un segundo de retraso cuesta el personaje.
    *
    * Van todos activados por defecto y cortan por delante de cualquier otra voz,
@@ -157,6 +171,8 @@ export class Narrator extends EventEmitter {
     this.pets = new Set();
     this.foes = new Set();
     this.lastCast = new Map();
+    // Mismo mecanismo que `lastCast`, con la clave puesta en el hechizo.
+    this.lastResist = new Map();
   }
 
   setConfig(c) { this.config = mergeNarrate(this.config, c); }
@@ -265,10 +281,37 @@ export class Narrator extends EventEmitter {
         }
         return false;
 
-      case 'resist':
-        if (!c.combat.resist || ev.target !== this.self) return false;
+      /**
+       * EL GUARDIÁN MIRA AL LANZADOR, NO AL OBJETIVO.
+       *
+       * Aquí ponía `ev.target !== this.self`, y en un suceso `resist` el
+       * `target` es QUIEN RESISTE —el bicho—, nunca tú. La casilla «Te resisten
+       * un hechizo» lleva marcada desde la 1.0.0 y no había sonado una sola vez
+       * en 1,19 millones de líneas: cero disparos, medido.
+       *
+       * La etiqueta siempre estuvo bien —«te resisten», y el respaldo del
+       * nombre dice literalmente «tu hechizo»—; lo que estaba del revés era el
+       * campo. Se pregunta lo mismo que `encounter.js` pregunta para contar una
+       * resistencia sufrida: ¿el hechizo era MÍO?
+       */
+      case 'resist': {
+        if (!c.combat.resist || ev.caster !== this.self) return false;
+        /**
+         * LA CLAVE ES EL HECHIZO Y NO EL ENEMIGO, que es lo que lo diferencia
+         * del estrangulador de los casteos ajenos —allí la clave lleva el
+         * lanzador—. Lo que cansa aquí no es el bicho: es oír catorce veces el
+         * nombre del mismo hechizo. Y separando por hechizo, el segundo que
+         * empieza a resistirse sí se oye en el acto aunque el primero esté
+         * callado, que es cuando la información vale algo.
+         */
+        if ((this.config.resistMode ?? 'cada20') === 'cada20') {
+          const clave = ev.ability ?? '?';
+          if (ev.t - (this.lastResist.get(clave) ?? -99) < 20) return false;
+          this.lastResist.set(clave, ev.t);
+        }
         this.#say(t('say.resisted', { spell: ev.ability ?? t('say.theSpell') }), { kind: 'warn' });
         return true;
+      }
 
       case 'interrupt':
         if (ev.source && ev.source !== this.self && ev.source !== 'You') return false;

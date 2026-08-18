@@ -699,6 +699,16 @@ export class Parser {
 
     // La postura sólo se conoce para tu personaje: el log no dice la de los demás.
     const me = this.self ?? 'You';
+    /**
+     * «your» ES TU NOMBRE, y aquí es donde se resuelve.
+     *
+     * El registro escribe tu hechizo como «resisted your X!», así que la regla
+     * no puede saber cómo te llamas: pone `'You'` y lo traduce esto, que es lo
+     * único que tiene el nombre delante. Sin esta línea, `ev.caster` valdría
+     * `'You'`, no casaría con `#mine()` —que guarda tu nombre real— y la rama
+     * volvería a descartarse en silencio, que es de donde venimos.
+     */
+    if (ev.caster === 'You') ev.caster = me;
     // También cuando el lanzador eres tú: en una resistencia, tu nombre viene
     // en `caster`, no en `source`, y sin esto no sabríamos con qué invocación
     // se lanzó el hechizo que te resistieron.
