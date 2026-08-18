@@ -287,7 +287,9 @@ export class Narrator extends EventEmitter {
        * Aquí ponía `ev.target !== this.self`, y en un suceso `resist` el
        * `target` es QUIEN RESISTE —el bicho—, nunca tú. La casilla «Te resisten
        * un hechizo» lleva marcada desde la 1.0.0 y no había sonado una sola vez
-       * en 1,26 millones de líneas: cero disparos, medido.
+       * en los 1.188.684 sucesos que el análisis SÍ reconoce del registro de
+       * referencia: cero disparos, medido. El denominador es ése y no las
+       * 1.259.379 líneas del fichero — al narrador sólo le llega lo reconocido.
        *
        * La etiqueta siempre estuvo bien —«te resisten», y el respaldo del
        * nombre dice literalmente «tu hechizo»—; lo que estaba del revés era el
