@@ -750,8 +750,28 @@ export class Encyclopedia {
   }
 }
 
-/** La zona base de una pelea, venga guardada o haya que sacarla del nombre. */
-export const zoneBaseOf = (f) => f.zoneBase ?? (f.zone ? parseZone(f.zone).base : null);
+/**
+ * La zona base de una pelea. SE RECALCULA SIEMPRE que haya nombre de zona.
+ *
+ *     SE PERSISTE LO OBSERVADO; SE RECALCULA LO DERIVADO.
+ *
+ * `f.zone` es lo que dijo el registro: un hecho, y se guarda. `zoneBase` es
+ * INTERPRETACIÓN NUESTRA de ese hecho, y una interpretación guardada envejece
+ * sin avisar. Ésta envejeció el 19/08/2026: hasta ese día «The Plane of Hate 4
+ * (Refined)» daba base «The Plane of Hate 4», porque se creía que el dígito era
+ * parte del nombre. Todas las peleas guardadas antes llevan dentro esa lectura.
+ *
+ * Antes esto decía `f.zoneBase ?? …`, o sea que prefería lo guardado. Con la
+ * regla nueva, las peleas viejas seguirían agrupando por la base con dígito y
+ * las nuevas por la limpia: el histórico partido en dos sin una sola señal.
+ * Recalculando, el cambio alcanza a todo lo guardado sin pedirle al usuario que
+ * reconstruya nada, y por eso esto NO sube `FORMATO_VERSION`.
+ *
+ * El valor guardado se conserva como respaldo para las peleas sin `zone` —las
+ * anteriores a la primera línea de zona del registro—, que son las únicas donde
+ * no hay nada que recalcular.
+ */
+export const zoneBaseOf = (f) => (f.zone ? parseZone(f.zone).base : f.zoneBase ?? null);
 
 /**
  * El nivel de una dificultad, para agrupar y comparar.

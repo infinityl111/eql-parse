@@ -33,16 +33,42 @@ console.log('\nnombre de zona -> base, modo y dificultad');
   ok(c("Nagafen's Lair - Solo 3 (Fused)").base === "Nagafen's Lair", 'y la base queda limpia');
   ok(c("Nagafen's Lair - Solo 3 (Fused)").mode === 'Solo', 'con su modo');
 
-  // LA TRAMPA: aquí el 2 es parte del nombre de la zona, no una dificultad.
-  // El /who la llama gukbottom, así que «The Ruins of Old Guk 2» es el nombre.
+  /**
+   * EL DÍGITO PEGADO AL NOMBRE ES LA DIFICULTAD, Y SALE DE LA BASE.
+   *
+   * Aquí se afirmaba lo contrario —que el 2 de «Old Guk 2» era parte del
+   * nombre porque el /who la llama gukbottom— y era falso. Lo desmiente el
+   * registro por tres sitios: los 22 dígitos pegados coinciden con el índice
+   * de su etiqueta las 22 veces, Old Guk aparece con 1, 2, 3 y 4 —si el 2
+   * fuera el nombre no existirían los otros tres—, y ningún dígito del corpus
+   * viene sin etiqueta.
+   *
+   * Costaba 15 visitas de Hate y 4 de Fear en el censo de jefes, porque
+   * «The Plane of Hate 4» y «The Plane of Hate» eran bases distintas.
+   */
   const guk = c('The Ruins of Old Guk 2 (Adaptive)');
-  ok(guk.base === 'The Ruins of Old Guk 2', 'el 2 de «Old Guk 2» se queda en el nombre', guk.base);
-  ok(guk.diff === 2, 'y la dificultad sale de la etiqueta, no del número');
+  ok(guk.base === 'The Ruins of Old Guk 2'.replace(/ 2$/, ''),
+    'el 2 de «Old Guk 2» SALE de la base: es la dificultad', guk.base);
+  ok(guk.diff === 2, 'y la dificultad es 2, que es lo que decía el dígito y la etiqueta');
+  ok(c('The Plane of Hate 4 (Refined)').base === c('The Plane of Hate').base,
+    'CONTROL: «The Plane of Hate 4 (Refined)» y «The Plane of Hate» son la MISMA base',
+    `${c('The Plane of Hate 4 (Refined)').base} vs ${c('The Plane of Hate').base}`);
+  ok(c('The Plane of Hate 4 (Refined)').base === c('The Plane of Hate - Solo 4 (Refined)').base,
+    'y también la misma que la forma con modo');
+
+  /**
+   * PERO SÓLO CUANDO COINCIDE CON LA ETIQUETA. De dígitos sin etiqueta no hay
+   * ni un caso en el corpus, así que no se legisla sobre lo que no se ha visto:
+   * se dejan donde están.
+   */
   ok(c('The Ruins of Old Guk 2').diff === 0,
     'sin etiqueta, un número suelto NO es una dificultad: el silencio es D0',
     String(c('The Ruins of Old Guk 2').diff));
   ok(c('The Ruins of Old Guk 2').base === 'The Ruins of Old Guk 2',
-    'y el 2 sigue siendo parte del nombre');
+    'y sin etiqueta el dígito se queda: no hay medida que diga otra cosa');
+  ok(c('The Ruins of Old Guk 3 (Adaptive)').base === 'The Ruins of Old Guk 3',
+    'y si el dígito NO coincide con la etiqueta, tampoco sale',
+    c('The Ruins of Old Guk 3 (Adaptive)').base);
 
   // Esta afirmación estaba al revés, y estaba bien estarlo: sin medida, decir
   // que «- Solo» a secas era D0 habría sido inventar. Lo que cambió no es el

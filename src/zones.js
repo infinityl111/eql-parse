@@ -12,10 +12,30 @@
  *     Nagafen's Lair - Solo is now available to you.           ← modo, sin dificultad
  *     You have entered Nagafen's Lair - Solo 2 (Adaptive).     ← aquí, y sólo aquí
  *
- * LA TRAMPA: en «The Ruins of Old Guk 2 (Adaptive)» el 2 es parte del NOMBRE de
- * la zona —el /who la llama gukbottom— y no una dificultad. Por eso el número
- * sólo cuenta cuando va detrás del modo: «- Solo 3». La etiqueta entre
- * paréntesis es la que manda, y el número suelto no se toca.
+ * ── EL DÍGITO PEGADO AL NOMBRE ES LA DIFICULTAD. Medido el 19/08/2026 ──────
+ *
+ * Aquí decía que en «The Ruins of Old Guk 2 (Adaptive)» el 2 era parte del
+ * NOMBRE —el /who la llama gukbottom— y que el número suelto no se tocaba.
+ * ERA FALSO, y lo desmienten tres medidas independientes sobre el registro:
+ *
+ *   1. De los 22 nombres con dígito pegado, el dígito coincide con el índice
+ *      de su propia etiqueta las 22 veces. CERO excepciones. Y Old Guk aparece
+ *      con 1, 2, 3 y 4, cada uno con su etiqueta: si el 2 fuera «gukbottom»,
+ *      no existirían los otros tres.
+ *   2. En la tabla de reaparición, cada zona con dígito sale con D igual a su
+ *      dígito —Old Guk 2·D2, Crushbone 4·D4, Hate 4·D4— y las que no llevan
+ *      dígito salen D0.
+ *   3. Los 47 dígitos del corpus —los 22 pegados y los 25 detrás del modo—
+ *      vienen SIEMPRE con etiqueta. No hay ni un dígito huérfano.
+ *
+ * EL COSTE DE LA CREENCIA VIEJA, medido: «The Plane of Hate 4» y «The Plane of
+ * Hate» eran bases distintas, así que el censo de las visitas de jefe perdía
+ * 15 visitas de Hate y 4 de Fear al agrupar. Partía en dos una zona que es una.
+ *
+ * LA REGLA, ajustada a lo que se puede probar: el dígito sale de la base SÓLO
+ * cuando coincide con el índice de su etiqueta. Un dígito sin etiqueta se
+ * queda donde está, porque de ésos no hay ni un caso y no se legisla sobre lo
+ * que no se ha visto.
  */
 
 /** Nombres oficiales de los niveles (wiki de EQL). */
@@ -89,7 +109,17 @@ export function parseZone(zona) {
   //
   // Lo que NO se toca es no saber dónde estabas: eso vive en `SIN_ZONA` y
   // llega aquí como `name` nulo, que sale arriba con `diff: null`.
-  return { name, base: resto, mode: null, diff: tag ? POR_ETIQUETA[tag] : 0, tag };
+  /**
+   * Sin modo: el dígito final ES la dificultad, y sale de la base — pero sólo
+   * si coincide con el índice de la etiqueta. Ver la cabecera: 22 de 22 en el
+   * registro, y ni un dígito sin etiqueta.
+   */
+  let baseLimpia = resto;
+  if (tag) {
+    const d = /^(.*?)\s+([0-4])$/.exec(resto);
+    if (d && +d[2] === POR_ETIQUETA[tag]) baseLimpia = d[1];
+  }
+  return { name, base: baseLimpia, mode: null, diff: tag ? POR_ETIQUETA[tag] : 0, tag };
 }
 
 /** Etiqueta corta para enseñar: «D3 Fused», «D2», o nada. */

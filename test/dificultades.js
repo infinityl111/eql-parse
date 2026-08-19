@@ -61,9 +61,24 @@ console.log('\nel silencio sobre la dificultad es D0');
     ok(r.diff === diff && r.mode === modo, `${zona} → ${diff === null ? 'no consta' : 'D' + diff} · ${nota}`,
       `salió diff=${r.diff} modo=${r.mode}`);
   }
-  // «The Ruins of Old Guk 2» es parte del NOMBRE de la zona, no una dificultad.
-  ok(parseZone('The Ruins of Old Guk 2 (Adaptive)').base === 'The Ruins of Old Guk 2',
-    'el número del nombre de la zona se queda en el nombre');
+  /**
+   * EL DÍGITO PEGADO AL NOMBRE ES LA DIFICULTAD, Y SALE DE LA BASE.
+   *
+   * Aquí decía lo contrario —que el 2 de «Old Guk 2» era parte del nombre— y
+   * era la misma creencia que había en `src/zones.js` y en `test/zones.js`:
+   * escrita en tres sitios, así que corregirla en uno habría dejado dos
+   * mintiendo. Medido el 19/08/2026: los 22 dígitos pegados del corpus
+   * coinciden con el índice de su etiqueta las 22 veces, y ninguno de los 47
+   * dígitos del registro viene sin etiqueta.
+   */
+  ok(parseZone('The Ruins of Old Guk 2 (Adaptive)').base === 'The Ruins of Old Guk',
+    'el dígito pegado al nombre SALE de la base: es la dificultad',
+    parseZone('The Ruins of Old Guk 2 (Adaptive)').base);
+  ok(parseZone('The Plane of Fear 4 (Refined)').base === parseZone('The Plane of Fear').base,
+    'CONTROL: con dígito y sin dígito son la MISMA zona',
+    `${parseZone('The Plane of Fear 4 (Refined)').base} vs ${parseZone('The Plane of Fear').base}`);
+  ok(parseZone('The Ruins of Old Guk 2').base === 'The Ruins of Old Guk 2',
+    'pero sin etiqueta el dígito se queda: de ésos no hay ni un caso medido');
 }
 
 // ── 2. Las claves de cajón: null sigue sin ser cero ────────────────────────

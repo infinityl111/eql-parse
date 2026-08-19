@@ -749,7 +749,10 @@ function rehacerDif(s) {
   const z = parseZone(s.zone);
   s.diff = z.diff;
   if (s.diffTag === null || s.diffTag === undefined) s.diffTag = z.tag;
-  if (s.zoneBase === null || s.zoneBase === undefined) s.zoneBase = z.base;
+  // Se persiste lo observado (`zone`) y se RECALCULA lo derivado (`zoneBase`).
+  // Una interpretación guardada envejece sin avisar: ésta envejeció el
+  // 19/08/2026, cuando el dígito pegado al nombre pasó a ser la dificultad.
+  s.zoneBase = z.base;
   return s;
 }
 
@@ -1380,7 +1383,10 @@ export class FightStore {
     // dificultades a la vez, que es justo lo que hay que separar.
     if (q.foeExact) out = out.filter((s) => (s.foes ?? []).includes(q.foeExact));
     if (q.zoneBase) {
-      out = out.filter((s) => (s.zoneBase ?? null) === q.zoneBase);
+      // Contra la base RECALCULADA, no contra la guardada: si no, una consulta
+      // por «The Plane of Hate» no encontraría las peleas guardadas cuando esa
+      // base se escribía «The Plane of Hate 4».
+      out = out.filter((s) => (s.zone ? parseZone(s.zone).base : s.zoneBase ?? null) === q.zoneBase);
     }
     // `diff: null` es un valor que se filtra —«no se sabe ni la zona»— y no «no
     // filtres». Se distingue por que la clave venga o no, no por su valor.
