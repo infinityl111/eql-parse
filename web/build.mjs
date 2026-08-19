@@ -1085,12 +1085,86 @@ function instalacion(lang, publicadas) {
  *   · una prueba de una línea: toda `{{clave}}` de `web/notas/*.md` existe en
  *     `i18n.js`. Sin falsos positivos, porque sólo mira lo marcado.
  */
+/**
+ * ── EL CUERPO BILINGÜE, Y POR QUÉ HAY QUE PARTIRLO ────────────────────────
+ *
+ * Cuando no hay nota propia en `web/notas/`, la página cae al `cuerpo` de la
+ * release. Y 18 DE LAS 40 RELEASES TRAEN EL CUERPO BILINGÜE: «## Español» con
+ * la nota entera, y detrás «## English» con la nota entera otra vez. El
+ * respaldo volcaba LAS DOS MITADES en LAS CINCO páginas.
+ *
+ * Medido antes de tocar nada, en caracteres de nota por página:
+ *
+ *     página   en su idioma   español ajeno   inglés ajeno   % propio
+ *     es           125.526              0          58.149      68,3 %
+ *     en           102.027         82.220               0      55,4 %
+ *     de            48.323         82.220          58.149      25,6 %
+ *     fr            47.818         82.220          58.149      25,4 %
+ *     pt            43.091         82.220          58.149      23,5 %
+ *
+ * O sea: la página española era un 31,7 % INGLÉS, y las tres sin notas propias
+ * eran tres cuartas partes texto ajeno. Es al revés y a la vez que el problema
+ * viejo, y por eso costó verlo: nadie busca inglés en la página española.
+ *
+ * ── QUÉ SE LE SIRVE A CADA UNA ────────────────────────────────────────────
+ *
+ *   · es → la mitad española.        · en → la mitad inglesa.
+ *   · de, fr, pt → LA MITAD INGLESA, Y CON UNA MARCA QUE LO DICE.
+ *
+ * Esa última es una decisión, no una obviedad, así que queda escrita: a esas
+ * tres NINGUNA de las dos mitades es su idioma, y hay que elegir entre servir
+ * texto ajeno callando —que es lo que hacíamos— o servirlo diciéndolo. Se
+ * elige decirlo. Un hueco explicado informa; un texto ajeno sin avisar hace
+ * que el lector crea que la traducción existe y está mal hecha.
+ *
+ * Y las 22 releases SIN encabezado son español para todas. Eso es el problema
+ * viejo y esto NO lo arregla — pero con la marca al menos queda dicho, que es
+ * la diferencia entre una carencia y un engaño.
+ *
+ * ── LA GUARDA ─────────────────────────────────────────────────────────────
+ *
+ * Si un cuerpo trae encabezado de idioma pero le FALTA una de las mitades,
+ * PARA. Media nota servida como si fuera entera es peor que no desplegar, y es
+ * exactamente la clase de fallo que no se ve desde la consola de quien
+ * construye. Va con su aserción en `test/mitades.js`.
+ */
+export const ENCABEZADOS = { es: /^#{1,3} *Español *$/m, en: /^#{1,3} *English *$/m };
+
+export function mitad(cuerpo, lang, quien = 'unas notas sin identificar') {
+  const texto = String(cuerpo ?? '');
+  const iEs = texto.search(ENCABEZADOS.es);
+  const iEn = texto.search(ENCABEZADOS.en);
+
+  // Sin encabezado: es el cuerpo entero, y es español. Marca para los demás.
+  if (iEs < 0 && iEn < 0) return { texto, marcada: lang !== 'es', idioma: 'es' };
+
+  // Con encabezado, las dos mitades tienen que estar. Si falta una, se para.
+  if (iEs < 0 || iEn < 0) {
+    const falta = iEs < 0 ? 'Español' : 'English';
+    const hay = iEs < 0 ? 'English' : 'Español';
+    throw new Error(`${quien}: el cuerpo trae «## ${hay}» pero NO trae «## ${falta}».`
+      + ' Media nota servida como si fuera entera es peor que no desplegar:'
+      + ' o se completa la mitad que falta, o se quitan los dos encabezados'
+      + ' para que el cuerpo valga como una sola nota.');
+  }
+
+  const [a, b] = iEs < iEn ? [iEs, iEn] : [iEn, iEs];
+  const primera = texto.slice(a, b), segunda = texto.slice(b);
+  const es = iEs < iEn ? primera : segunda;
+  const en = iEs < iEn ? segunda : primera;
+  if (lang === 'es') return { texto: es, marcada: false, idioma: 'es' };
+  return { texto: en, marcada: lang !== 'en', idioma: 'en' };
+}
+
 function notasDe(tag, lang) {
   const version = String(tag ?? '').replace(/^v/, '');
   if (!version) return null;
   const p = path.join(RAIZ, 'notas', `${version}.${lang}.md`);
   try { return sustituirRotulos(fs.readFileSync(p, 'utf8'), lang); } catch { return null; }
 }
+
+/** Qué notas acaban marcadas como «no traducida», para poder decir cuántas. */
+const MARCADAS = [];
 
 function novedades(lang, publicadas) {
   const tt = T[lang];
@@ -1099,7 +1173,16 @@ function novedades(lang, publicadas) {
   ${publicadas.map((r) => `<article class="version">
       <h2>${esc(r.nombre)}</h2>
       <div class="fecha">${esc(fecha(r.fecha))}</div>
-      <div class="notas">${md(notasDe(r.tag, lang) ?? r.cuerpo, `${r.tag} (${lang})`)}</div>
+      <div class="notas">${(() => {
+        const propia = notasDe(r.tag, lang);
+        if (propia !== null) return md(propia, `${r.tag} (${lang})`);
+        const m = mitad(r.cuerpo, lang, `${r.tag} (${lang})`);
+        if (m.marcada) MARCADAS.push(`${r.tag} ${lang} (${m.idioma})`);
+        const aviso = m.marcada
+          ? `<p class="sinTraducir">${esc(tt.sinTraducir.replace('{idioma}', NOMBRE_IDIOMA[m.idioma]))}</p>`
+          : '';
+        return aviso + md(m.texto, `${r.tag} (${lang})`);
+      })()}</div>
     </article>`).join('')}
   <p><a href="https://github.com/${REPO}/releases">${esc(tt.verTodas)}</a></p>`;
 }
@@ -1367,6 +1450,11 @@ async function main() {
   await fsp.writeFile(path.join(DIST, 'robots.txt'),
     `User-agent: *\nAllow: /\nSitemap: ${DOMINIO}/sitemap.xml\n`);
 
+  if (MARCADAS.length) {
+    const porIdioma = MARCADAS.reduce((a, x) => { const l = x.split(' ')[1]; a[l] = (a[l] ?? 0) + 1; return a; }, {});
+    console.log(`  notas servidas SIN TRADUCIR y marcadas como tales: ${MARCADAS.length}`);
+    console.log(`    ${Object.entries(porIdioma).map(([l, k]) => `${l}: ${k}`).join(' · ')}`);
+  }
   console.log(`  ${n} páginas en ${IDIOMAS.length} idiomas`);
   console.log(`  salida: ${DIST}\n`);
 }

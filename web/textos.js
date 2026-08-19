@@ -66,7 +66,8 @@ export const T = {
     verTodas: 'Todas las versiones en GitHub',
     mideT: 'Qué mide, y qué no',
     mideP: 'Un medidor de combate es una cuenta sobre líneas de texto. Lo que decide si vale es qué se cuenta, qué se deduce y qué no se puede saber — y que cada cifra diga cuál de las tres es.',
-    soloIngles: 'Esta página sólo está escrita en español e inglés. Te llevamos a la inglesa.',
+    soloIngles: 'Esta página sólo está escrita en español e inglés. Te llevamos a la inglesa.',
+    sinTraducir: 'Esta nota no está traducida al español: se muestra en {idioma}, tal como se publicó.',
     verEnIngles: 'Leerla en inglés',
     desc: {
       reparto: 'Cuánto puso cada uno y a qué ritmo real: el daño contra los segundos en los que de verdad hizo algo, no contra la pelea entera.',
@@ -131,7 +132,8 @@ export const T = {
     verTodas: 'All releases on GitHub',
     mideT: 'What it measures, and what it does not',
     mideP: 'A combat meter is a count over lines of text. What decides whether it is any good is what gets counted, what gets inferred and what cannot be known — and that every figure says which of the three it is.',
-    soloIngles: 'This page is only written in Spanish and English.',
+    soloIngles: 'This page is only written in Spanish and English.',
+    sinTraducir: 'This note is not translated into English: it is shown in {idioma}, as published.',
     verEnIngles: 'Read it in English',
     desc: {
       reparto: 'Who put in what, and at what real pace: damage against the seconds they were actually doing something, not against the whole fight.',
@@ -196,7 +198,8 @@ export const T = {
     verTodas: 'Toutes les versions sur GitHub',
     mideT: 'Ce qu’il mesure, et ce qu’il ne mesure pas',
     mideP: 'Un compteur de combat est un décompte sur des lignes de texte.',
-    soloIngles: 'Cette page n’est écrite qu’en espagnol et en anglais.',
+    soloIngles: 'Cette page n’est écrite qu’en espagnol et en anglais.',
+    sinTraducir: 'Cette note n’est pas traduite en français : elle est affichée en {idioma}, telle que publiée.',
     verEnIngles: 'La lire en anglais',
     desc: {
       reparto: 'Ce que chacun a apporté, et à quel rythme réel : les dégâts rapportés aux secondes où il a vraiment agi, pas au combat entier.',
@@ -261,7 +264,8 @@ export const T = {
     verTodas: 'Alle Versionen auf GitHub',
     mideT: 'Was es misst und was nicht',
     mideP: 'Ein Kampfmesser ist eine Zählung über Textzeilen.',
-    soloIngles: 'Diese Seite ist nur auf Spanisch und Englisch geschrieben.',
+    soloIngles: 'Diese Seite ist nur auf Spanisch und Englisch geschrieben.',
+    sinTraducir: 'Diese Notiz ist nicht auf Deutsch übersetzt: Sie wird auf {idioma} gezeigt, so wie veröffentlicht.',
     verEnIngles: 'Auf Englisch lesen',
     desc: {
       reparto: 'Wer wie viel beigetragen hat, und in welchem echten Tempo: Schaden gegen die Sekunden, in denen wirklich etwas getan wurde, nicht gegen den ganzen Kampf.',
@@ -326,7 +330,8 @@ export const T = {
     verTodas: 'Todas as versões no GitHub',
     mideT: 'O que mede, e o que não',
     mideP: 'Um medidor de combate é uma conta sobre linhas de texto.',
-    soloIngles: 'Esta página só está escrita em espanhol e inglês.',
+    soloIngles: 'Esta página só está escrita em espanhol e inglês.',
+    sinTraducir: 'Esta nota não está traduzida para português: mostra-se em {idioma}, tal como foi publicada.',
     verEnIngles: 'Ler em inglês',
     desc: {
       reparto: 'Quanto pôs cada um e a que ritmo real: o dano contra os segundos em que de facto fez alguma coisa, não contra o combate inteiro.',

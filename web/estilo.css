@@ -306,6 +306,19 @@ figcaption { font-size: 13.5px; color: var(--bone-faint); margin-top: 6px; }
 .notas blockquote p:last-child { margin-bottom: 0; }
 /* Un titular dentro de la cita no debe pesar como los de la nota. */
 .notas blockquote h3 { font-size: 15px; margin: 0 0 8px; }
+/**
+ * LA MARCA DE «ESTA NOTA NO ESTÁ TRADUCIDA».
+ *
+ * Va DENTRO de la nota y antes de su texto, no en la cabecera de la página:
+ * lo que no está traducido es esta nota concreta, no el sitio. Discreta a
+ * propósito —es una advertencia, no una alarma— pero con el filete de aviso
+ * para que no se lea como una frase más de la nota.
+ */
+.notas .sinTraducir {
+  font-size: 13px; color: var(--bone-faint); font-style: italic;
+  border-left: 2px solid var(--linea); padding: 2px 0 2px 12px; margin: 0 0 14px;
+}
+
 .bloque { border-top: 1px solid var(--linea); padding-top: 28px; }
 
 footer {
