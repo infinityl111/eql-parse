@@ -5627,14 +5627,22 @@ async function renderCronos(host) {
       medido: c.medido ?? null, heredado: c.heredado ?? null,
     });
     const v = st.valor;
+    // Donde no hay valor suyo NO se pone un número peor. Se dice que no se
+    // sabe y cuántas observaciones van: la marca de «poco fiable» no funciona,
+    // porque se lee el número y no la marca.
+    const sinNumero = v.segundos == null
+      ? (st.estado === ESTADO.SIN_MUERTE && !st.transcurrido ? t('cro.esperando')
+        : t('cro.aunNo', { n: c.muertes ?? 0 }))
+      : t('cro.esperando');
     const cuerpo = st.estado === ESTADO.SIN_MUERTE
-      ? `<div class="cro-espera">${esc(v.segundos == null ? t('cro.sinValor') : t('cro.esperando'))}</div>`
+      ? `<div class="cro-espera">${esc(sinNumero)}</div>`
       : st.estado === ESTADO.CONTANDO
         ? `<div class="cro-num">${cronoRestante(st.restante, v.precision)}</div>`
         : `<div class="cro-num cro-cero">${esc(t('cro.disponible'))}</div>`;
     // La procedencia va SIEMPRE al lado de la cifra, no en un desplegable.
     const fuente = v.fuente
-      ? `<div class="cro-src">${esc(t(`cro.src.${v.fuente}`))} · ${cronoRestante(v.segundos, v.precision)}</div>` : '';
+      ? `<div class="cro-src">${esc(t(`cro.src.${v.fuente}`))} · ${cronoRestante(v.segundos, v.precision)}</div>`
+      : v.retenido ? `<div class="cro-src cro-ret">${esc(t('cro.retenido'))}</div>` : '';
     const discrepa = v.discrepa != null
       ? `<div class="cro-dif">${esc(t('cro.discrepa', {
         tuyo: cronoRestante(v.segundos), nuestro: cronoRestante(v.otro.segundos), dif: cronoRestante(v.discrepa),

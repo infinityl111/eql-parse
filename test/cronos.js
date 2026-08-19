@@ -36,15 +36,31 @@ const ok = (cond, msg, extra) => {
   console.log(`  ${cond ? 'ok ' : 'MAL'}  ${msg}${extra !== undefined ? ` — ${extra}` : ''}`);
 };
 
+// El valor lo pone el JUGADOR: desde el 19/08/2026 es el único que sale a
+// pantalla, así que es con el que hay que probar la maquinaria de la cuenta
+// atrás. Antes se probaba con `medido`, y `medido` ya no produce número.
+const CRONO = { nombre: 'X', manual: 300 };
+
 // ── 1. Las tres fuentes, y cuál manda ──────────────────────────────────────
 console.log('\nlas tres fuentes del valor');
 {
-  ok(valorDe({ medido: 265 }).fuente === 'medido', 'la repetición propia se rotula «medido»');
-  ok(valorDe({ heredado: 484 }).fuente === 'heredado', 'el periodo de la zona, «heredado»');
+  /**
+   * Desde el 19/08/2026 lo nuestro NO SALE A PANTALLA. Se sigue calculando y se
+   * guarda en `otro`, pero no produce `segundos` ni `fuente`: el periodo de zona
+   * no está medido y un número marcado se lee como número.
+   */
+  ok(valorDe({ medido: 265 }).segundos === null,
+    'lo medido por nosotros NO sale como valor');
+  ok(valorDe({ heredado: 484 }).segundos === null,
+    'ni el ritmo de la zona');
+  ok(valorDe({ medido: 265 }).otro?.segundos === 265 && valorDe({ medido: 265 }).retenido === true,
+    'pero se guarda al lado y se dice que se está reteniendo', 'retenido');
+  ok(valorDe({}).retenido === false,
+    'y no tener nada NO es lo mismo que retener algo');
   ok(valorDe({ manual: 300 }).fuente === 'manual', 'y lo que escribe el jugador, «manual»');
 
-  ok(valorDe({ medido: 265, heredado: 484 }).fuente === 'medido',
-    'entre medido y heredado gana el medido: es suyo, no de su vecindario');
+  ok(valorDe({ medido: 265, heredado: 484 }).otro?.fuente === 'medido',
+    'entre medido y heredado sigue ganando el medido, aunque sea para guardarlo');
 
   /**
    * MANDA EL MANUAL. Es una decisión y por eso está aquí: él juega y nosotros
@@ -66,8 +82,8 @@ console.log('\nlas tres fuentes del valor');
 // ── 2. La cuenta atrás descuenta lo transcurrido ───────────────────────────
 console.log('\nal abrirlo se descuenta lo ya transcurrido');
 {
-  const ctx = { ahora: 1000, ultimaMuerte: 800, medido: 300 };
-  const r = estadoCrono({ nombre: 'X' }, ctx);
+  const ctx = { ahora: 1000, ultimaMuerte: 800 };
+  const r = estadoCrono(CRONO, ctx);
   ok(r.estado === ESTADO.CONTANDO, 'está contando');
   ok(r.transcurrido === 200, 'han pasado 200 s desde su muerte', r.transcurrido);
   ok(r.restante === 100, 'así que quedan 100, no 300', r.restante);
@@ -79,7 +95,7 @@ console.log('\nal abrirlo se descuenta lo ya transcurrido');
 // ── 3. Sin ninguna muerte suya no es CERO: es que no ha empezado ───────────
 console.log('\nsin ninguna muerte conocida');
 {
-  const r = estadoCrono({ nombre: 'X' }, { ahora: 1000, ultimaMuerte: null, medido: 300 });
+  const r = estadoCrono(CRONO, { ahora: 1000, ultimaMuerte: null });
   ok(r.estado === ESTADO.SIN_MUERTE, 'el estado es «esperando primera muerte»', r.estado);
   ok(r.restante === null, 'y el restante es NULO, no cero');
   /**
@@ -97,11 +113,11 @@ console.log('\nsin ninguna muerte conocida');
 // ── 4. Al llegar a cero SE QUEDA a cero ────────────────────────────────────
 console.log('\nal llegar a cero se queda a cero');
 {
-  const justo = estadoCrono({ nombre: 'X' }, { ahora: 1100, ultimaMuerte: 800, medido: 300 });
+  const justo = estadoCrono(CRONO, { ahora: 1100, ultimaMuerte: 800 });
   ok(justo.estado === ESTADO.A_CERO, 'justo al cumplirse, a cero', justo.estado);
   ok(justo.restante === 0, 'y el restante es 0, no negativo', justo.restante);
 
-  const pasado = estadoCrono({ nombre: 'X' }, { ahora: 1250, ultimaMuerte: 800, medido: 300 });
+  const pasado = estadoCrono(CRONO, { ahora: 1250, ultimaMuerte: 800 });
   ok(pasado.estado === ESTADO.A_CERO, 'medio periodo después, sigue a cero y sigue existiendo');
   ok(pasado.restante === 0, 'sin números negativos en pantalla', pasado.restante);
 }
@@ -116,11 +132,11 @@ console.log('\nal llegar a cero se queda a cero');
 console.log('\nun cero demasiado largo se avisa');
 {
   const v = 300;
-  const casi = estadoCrono({ nombre: 'X' }, { ahora: 1100 + PERIODOS_SOSPECHA * v - 1, ultimaMuerte: 800, medido: v });
+  const casi = estadoCrono({ nombre: 'X', manual: v }, { ahora: 1100 + PERIODOS_SOSPECHA * v - 1, ultimaMuerte: 800 });
   ok(casi.estado === ESTADO.A_CERO, `con menos de ${PERIODOS_SOSPECHA} periodos a cero, no se sospecha`, casi.estado);
   ok(casi.aviso === null, 'y no hay aviso');
 
-  const mucho = estadoCrono({ nombre: 'X' }, { ahora: 1100 + PERIODOS_SOSPECHA * v, ultimaMuerte: 800, medido: v });
+  const mucho = estadoCrono({ nombre: 'X', manual: v }, { ahora: 1100 + PERIODOS_SOSPECHA * v, ultimaMuerte: 800 });
   ok(mucho.estado === ESTADO.A_CERO_LARGO, `a ${PERIODOS_SOSPECHA} periodos, se sospecha`, mucho.estado);
   ok(mucho.aviso === 'quizá-no-vemos-su-muerte',
     'y el aviso dice la causa probable, no «error»', mucho.aviso);
@@ -133,8 +149,8 @@ console.log('\nun cero demasiado largo se avisa');
   // «Tres periodos A CERO» es el tiempo pasado DESPUÉS de cumplirse, así que
   // el transcurrido total son cuatro periodos: uno para llegar y tres de más.
   const t = 800 + 4 * 100;
-  const corto = estadoCrono({ nombre: 'X' }, { ahora: t, ultimaMuerte: 800, medido: 100 });
-  const largo = estadoCrono({ nombre: 'X' }, { ahora: t, ultimaMuerte: 800, medido: 600 });
+  const corto = estadoCrono({ nombre: 'X', manual: 100 }, { ahora: t, ultimaMuerte: 800 });
+  const largo = estadoCrono({ nombre: 'X', manual: 600 }, { ahora: t, ultimaMuerte: 800 });
   ok(corto.estado === ESTADO.A_CERO_LARGO,
     'CONTROL: con periodo 100 y 400 s transcurridos, sospecha', corto.estado);
   ok(largo.estado === ESTADO.CONTANDO,
@@ -225,12 +241,13 @@ console.log('\nel valor manual conserva la precisión que le dio Campeón');
 console.log('\nlas observaciones traen su ventana');
 {
   const bef = valorDe({ medido: 265, medidoMargen: 6 });
-  ok(bef.segundos === 265 && bef.margenAbajo === 6, 'Befallen: 265 con ventana de 6 s');
-  ok(bef.precision === PRECISION.SEG, 'y por eso se enseña al segundo');
+  ok(bef.otro?.segundos === 265 && bef.otro?.margenAbajo === 6, 'Befallen: 265 con ventana de 6 s');
+  ok(bef.otro?.precision === PRECISION.SEG, 'y su precisión se conserva, para el día que se contraste');
+  ok(bef.segundos === null, 'aunque hoy no salga a pantalla');
 
   const jefe = valorDe({ heredado: 3 * 86400, heredadoMargen: 24 * 3600 });
-  ok(jefe.precision === PRECISION.CAL, 'un jefe de 3 días ±12 h, en calendario', jefe.precision);
-  ok(jefe.fuente === 'heredado', 'y sigue diciendo de dónde sale');
+  ok(jefe.otro?.precision === PRECISION.CAL, 'un jefe de 3 días ±12 h, en calendario', jefe.otro?.precision);
+  ok(jefe.otro?.fuente === 'heredado', 'y sigue diciendo de dónde sale');
 
   ok(valorDe({}).precision === null, 'sin valor no hay precisión que declarar');
 }
@@ -295,6 +312,54 @@ console.log('\nla clave es NOMBRE + ZONA + DIFICULTAD');
     'el separador no se puede falsificar desde un nombre');
   ok(claveCrono({ nombre: 'x' }).includes('\u0000'),
     'y es \\u0000, que no puede salir en el registro');
+}
+
+console.log('\nningún número NUESTRO sale a pantalla');
+{
+  /**
+   * EL VEREDICTO QUE FIJA ESTE BLOQUE, y por qué es una prueba y no una opinión.
+   *
+   * El periodo de reaparición de zona NO ESTÁ MEDIDO: el criterio que produce
+   * esas cifras es indistinguible del azar —15 racimos contra 12,5 ± 2,9 del
+   * nulo, z = 0,87—, diez de los quince desaparecen quitando al azar el 10 % de
+   * las observaciones, y la fuente externa los contradice siempre en el mismo
+   * sentido. Mientras eso siga así, en pantalla no sale ningún número nuestro.
+   *
+   * Y NO BASTA CON MARCARLO. La gente lee el número y no la marca: un
+   * «567 s (poco fiable)» se recuerda como 567. Por eso la regla es que no haya
+   * número, no que lo haya con una advertencia.
+   */
+  const soloNuestro = { ahora: 2000, ultimaMuerte: 1000, medido: 300, heredado: 480 };
+  const st = estadoCrono({ nombre: 'X' }, soloNuestro);
+  ok(st.valor.segundos === null,
+    'con medido Y heredado y sin valor suyo, no hay número');
+  ok(st.restante === null,
+    'y por tanto no hay cuenta atrás que enseñar');
+  ok(st.valor.retenido === true,
+    'pero se dice que hay algo retenido, para poder contar las observaciones');
+
+  /**
+   * CONTROL POSITIVO. Sin esto, las tres de arriba pasarían en verde con un
+   * `valorDe` roto que devolviera null siempre — que es justo el fallo que este
+   * cambio podría introducir. Con valor del jugador, el crono cuenta igual que
+   * antes: lo que se ha retirado es NUESTRO número, no la maquinaria.
+   */
+  const conSuyo = estadoCrono({ nombre: 'X', manual: 1500 }, soloNuestro);
+  ok(conSuyo.valor.segundos === 1500,
+    'CONTROL: con valor suyo SÍ hay número, y es el suyo');
+  ok(conSuyo.restante === 500,
+    'CONTROL: y descuenta lo transcurrido — la maquinaria sigue entera', conSuyo.restante);
+  ok(conSuyo.valor.discrepa === 1200,
+    'CONTROL: y sigue diciendo en cuánto discrepa de lo nuestro', conSuyo.valor.discrepa);
+
+  /**
+   * Y el control por el otro lado: «no hay nada» y «hay algo y no lo enseño»
+   * tienen que verse distintos, o quien pinta no puede decir «van N
+   * observaciones» en un caso y «esperando su primera muerte» en el otro.
+   */
+  const vacio = estadoCrono({ nombre: 'X' }, { ahora: 2000, ultimaMuerte: 1000 });
+  ok(vacio.valor.retenido === false && vacio.valor.otro === null,
+    'sin observaciones, no se retiene nada — y se distingue');
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

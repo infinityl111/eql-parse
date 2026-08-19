@@ -42,6 +42,24 @@
  *   manual     lo escribe Campeón. NO existe todavía, y es la que hace que la
  *              sección sirva desde el primer día — sin ella, 8 enemigos.
  *
+ * ── Y DESDE EL 19/08/2026, EL MANUAL ES LA ÚNICA QUE SALE A PANTALLA ──────
+ *
+ * `NUESTRO_NO_SALE`. Ni `medido` ni `heredado` producen un número en pantalla.
+ * Se siguen calculando y se guardan al lado, y el día que haya muestra
+ * suficiente se contrastarán con el suyo; hoy no.
+ *
+ * El motivo no es prudencia, es un veredicto medido: EL PERIODO DE
+ * REAPARICIÓN DE ZONA NO ESTÁ MEDIDO. El criterio que produce esos números es
+ * indistinguible del azar (15 racimos contra 12,5 ± 2,9 del nulo, z = 0,87),
+ * diez de los quince desaparecen quitando al azar el 10 % de las
+ * observaciones, y la fuente externa los contradice siempre en el mismo
+ * sentido. Está entero en `REAPARICION-INSTANCIA.md`.
+ *
+ * Y la razón por la que no basta con marcarlos: LA GENTE LEE EL NÚMERO Y NO
+ * LA MARCA. Un «567 s (poco fiable)» se recuerda como 567. Por eso donde no
+ * hay valor suyo no se pone un número peor: se pone «aún no lo sabemos» con
+ * el recuento de observaciones al lado, que es lo que de verdad se sabe.
+ *
  * MANDA EL MANUAL, y no es una preferencia: es que él juega y nosotros no. Si
  * hay valor suyo Y observaciones, se enseñan LOS DOS y se dice si discrepan.
  * Sustituir el suyo por el nuestro sería decidir por él con menos información.
@@ -172,6 +190,10 @@ export function valorDe({
   const obsMargen = medido != null ? medidoMargen : (heredado != null ? heredadoMargen : null);
   const fuenteObs = medido != null ? 'medido' : (heredado != null ? 'heredado' : null);
 
+  const nuestro = observado != null
+    ? { segundos: observado, margenAbajo: obsMargen, precision: precisionDe(obsMargen), fuente: fuenteObs }
+    : null;
+
   if (manual != null) {
     return {
       segundos: manual,
@@ -182,18 +204,21 @@ export function valorDe({
       // Con las dos cosas se enseñan las dos. La diferencia va en segundos y
       // sin signo de juicio: no se dice cuál está bien, se dice que no coinciden.
       discrepa: observado != null && observado !== manual ? Math.abs(manual - observado) : null,
-      otro: observado != null
-        ? { segundos: observado, margenAbajo: obsMargen, precision: precisionDe(obsMargen), fuente: fuenteObs }
-        : null,
+      otro: nuestro,
+      retenido: false,
     };
   }
-  if (observado != null) {
-    return {
-      segundos: observado, margenAbajo: obsMargen, precision: precisionDe(obsMargen),
-      fuente: fuenteObs, discrepa: null, otro: null,
-    };
-  }
-  return { segundos: null, margenAbajo: null, precision: null, fuente: null, discrepa: null, otro: null };
+
+  /**
+   * SIN VALOR SUYO NO SALE NINGÚN NÚMERO. Antes salía el nuestro, y eso ya no
+   * se puede hacer: `retenido` dice que lo tenemos y que no lo enseñamos, que
+   * es distinto de no tener nada, y quien pinta necesita esa distinción para
+   * poder decir «van N observaciones» en vez de «no hay nada».
+   */
+  return {
+    segundos: null, margenAbajo: null, precision: null, fuente: null, discrepa: null,
+    otro: nuestro, retenido: nuestro != null,
+  };
 }
 
 /**
