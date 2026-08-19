@@ -5620,7 +5620,28 @@ const cronoParse = (txt) => {
   return /^\d+$/.test(v) ? +v : null;
 };
 
-async function renderCronos(host) {
+/**
+ * ESTA SECCIÓN NUNCA HABÍA PINTADO NADA, y no lo delataba ningún síntoma.
+ *
+ * Estaba escrita como `renderCronos(host)`, recibiendo el contenedor. Pero las
+ * secciones del grupo `historico` NO lo reciben: el despachador las llama con
+ * `s.pinta(state.snap)` y cada una busca su hueco con `$('secPane')`, igual que
+ * `renderResumen(snap)`.
+ *
+ * Así que `host` era el SNAPSHOT. `host.innerHTML = ...` no falla —es asignar
+ * una propiedad a un objeto normal— y por eso no había error ahí; el reventón
+ * llegaba dos líneas después, en `host.querySelector('#croAdd')`, que no es una
+ * función. Resultado: la sección salía en blanco, siempre, desde el primer día.
+ *
+ * Y no lo vio nadie porque nadie la había mirado: la sección cambió cinco veces
+ * en un día —clave, retención del valor, textos, rótulos en cinco idiomas— y
+ * todo eso se probó con pruebas de lógica, que pasan sin DOM. Se destapó al
+ * volcar la vista a fichero con `bin/ui-volcar.js`, que es lo que había que
+ * haber hecho antes de la primera de las cinco.
+ */
+async function renderCronos() {
+  const host = $('secPane');
+  if (!host) return;
   const lista = state.cfg?.cronos ?? [];
   // LA CLAVE ES NOMBRE + ZONA + DIFICULTAD, no el nombre. El periodo es de la
   // zona, así que dos zonas con el mismo bicho son dos cronos con dos tiempos,
@@ -5688,7 +5709,7 @@ async function renderCronos(host) {
   const guardar = async (l) => {
     await window.eql.setFlag('cronos', l);
     state.cfg.cronos = l;
-    await renderCronos(host);
+    await renderCronos();
   };
 
   host.querySelector('#croAdd')?.addEventListener('click', async () => {
@@ -5703,9 +5724,29 @@ async function renderCronos(host) {
     // El aviso de «hay varios» se calcula AL ABRIRLO y se guarda con el crono:
     // después ya se ha creído lo que decía, y avisar entonces no sirve.
     const ficha = (state.enc?.foes ?? []).find((f) => f.name === nombre) ?? null;
+    /**
+     * AQUÍ SE LEÍAN `ficha.respawnMedido` y `ficha.respawnZona`, Y NO EXISTEN.
+     *
+     * No es que estuvieran vacíos a veces: la enciclopedia no escribe esos dos
+     * campos en ninguna parte del proyecto. O sea que `medido` y `heredado` han
+     * sido `null` desde el primer día, y el crono nunca ha podido enseñar un
+     * número nuestro aunque se le dejara.
+     *
+     * Se quitan en vez de rellenarlos, y la razón ya no es de estilo: no hay
+     * periodo que poner. Medido —`PERIODOS-CONGELADOS.md` §13— la unidad que
+     * este crono usa como clave produce UN racimo en todo el corpus, de un
+     * común, que salta el remuestreo y empata con el nulo; y en nombrados
+     * únicos, cero. El día que haya dato, esto vuelve por `valorDe`, que sigue
+     * sabiendo recibirlo y tiene sus pruebas.
+     *
+     * ⚠ Y una que queda ABIERTA y no se toca hasta que alguien vea esta
+     * pantalla: `kills` es el recuento del bicho en TODAS las zonas, y la clave
+     * de este crono es nombre+zona+dificultad. El «van N muertes observadas»
+     * que sale en la ficha cuenta de más. Se arregla con `encZoneFoes(base,
+     * diff)`, que ya existe.
+     */
     await guardar([...lista, {
       ...alta, manual: null,
-      medido: ficha?.respawnMedido ?? null, heredado: ficha?.respawnZona ?? null,
       muertes: ficha?.kills ?? 0,
       aviso: avisoDeVarios(null, ficha?.kills ?? 0),
     }]);

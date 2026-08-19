@@ -10,6 +10,7 @@
     "store:check": "node bin/store-check.js",
     "store:rebuild": "node bin/store-rebuild.js",
     "ui:check": "node bin/ui-check.js",
+    "ui:volcar": "node bin/ui-volcar.js",
     "capturas": "electron bin/capturas.cjs",
     "pliegue": "electron bin/pliegue.cjs",
     "vacios": "node bin/vacios.js",
