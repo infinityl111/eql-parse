@@ -3466,7 +3466,38 @@ async function renderReplay(snap) {
   const r = desde ? await window.eql.logContext?.(desde, desde + (f.duration ?? 0), 20000) : null;
   if (host.dataset.sig !== sig) return;      // te has ido mientras leía
 
+  /**
+   * DESPUÉS DE UNA ESPERA, EL DOM PUEDE NO SER EL QUE ESCRIBISTE.
+   *
+   * Aquí se hacía `host.querySelector('#rpCarga')` y luego `caja.remove()` sin
+   * mirar, y reventaba de verdad:
+   *
+   *     TypeError: Cannot read properties of null (reading 'remove')
+   *     ui/app.js:3474
+   *
+   * `#rpCarga` lo escribe el `innerHTML` de veinte líneas más arriba, y entre
+   * ese `innerHTML` y esta captura está la espera de `logContext`. Durante
+   * ella cualquier otro repintado sustituye el contenido de `host`, así que
+   * `querySelector` devuelve null EN EL ACTO: no es que el elemento se
+   * estropee después de cogerlo, es que ya no está cuando se busca.
+   *
+   * La primera explicación que escribí aquí —«cogido antes del await, usado
+   * después»— era falsa, y no era inocua: la prueba que salió de ella daba
+   * cero sobre el fichero enfermo. Está en `test/repintado.js`.
+   *
+   * La guarda de `sig` no cubre esto: sólo atrapa que te hayas ido a OTRA
+   * sección, no que se haya repintado LA MISMA.
+   *
+   * Y el fallo estaba en las dos ramas: `caja.classList` de abajo tenía el
+   * mismo agujero, y ésa es la que se ve cuando el registro no da líneas.
+   *
+   * Se vuelve a preguntar por el elemento DESPUÉS de la espera. Si ya no está,
+   * es que el panel es de otro repintado y no hay nada que quitar: se sale sin
+   * tocar nada, que es lo correcto — pintar encima de lo que puso otro sería
+   * peor que no pintar.
+   */
   const caja = host.querySelector('#rpCarga');
+  if (!caja) return;
   if (!r?.ok || !r.lineas?.length) {
     caja.classList.add('hallazgo');
     caja.textContent = t('rp.noLineas');
