@@ -1,4 +1,23 @@
 /**
+ * ⚠ ESTA BATERÍA FIJA SIGNIFICADO, NO UN OBSERVABLE.
+ *
+ * Lo que la mayoría de las pruebas fijan es un observable: una línea del
+ * registro entra y sale un número. Si el número cambia, algo se rompió, y la
+ * prueba protege. Ésta no: fija QUÉ DECIDIMOS QUE SIGNIFICA lo que se observa.
+ *
+ * Una prueba así NO PROTEGE, DEFIENDE LA CREENCIA. Sólo suena cuando alguien
+ * corrige la interpretación —que es cuando NO tiene que sonar— y se queda
+ * callada mientras la creencia siga siendo la misma aunque sea falsa. El
+ * 19/08/2026 tres sitios afirmaban que el dígito de «The Ruins of Old Guk 2»
+ * era parte del nombre: los tres estaban en verde, y sonaron al arreglarlo.
+ *
+ * Al ponerse roja, LÉELA ANTES DE TOCARLA. Puede que lo que haya cambiado sea
+ * la creencia, y entonces lo que hay que actualizar es la prueba.
+ *
+ * Se marca al escribir la prueba, no en un barrido: si el barrido cuesta más
+ * que el fallo que evita, no es una regla.
+ */
+/**
  * LAS RESISTENCIAS DE UNA PELEA, SUMADAS POR HECHIZO Y CON DENOMINADOR.
  *
  * ── POR QUÉ HACE FALTA UNA PRUEBA PARA UNA SUMA ───────────────────────────

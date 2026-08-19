@@ -75,13 +75,62 @@ export function clasificaJefe(nombre, { manual = null, wiki = null, vida = null 
   const m = manual?.get?.(nombre);
   if (m !== undefined && m !== null) return { raid: !!m, src: 'manual' };
 
+  /**
+   * LA WIKI SÓLO CUENTA SI HA CONTESTADO DE VERDAD, Y ESO SON DOS COSAS.
+   *
+   * Ponía `if (w && w.found)`, y `found` no bastaba: el caché guardaba
+   * `found: true` con `title: null` para cualquier error de la API. Auditadas
+   * las 19 respuestas guardadas, TRES eran así o peores:
+   *
+   *   Innoruuk, the Prince of Hate  title:null            43.265 de vida
+   *   a fire giant warrior          title:null            11.944
+   *   Cazic-Thule                   «Cazic-Thule (Lore)»  84.200
+   *
+   * Las dos primeras son la wiki diciendo «no tengo página CON ESE NOMBRE»
+   * —la de Innoruuk es «Innoruuk»— y la tercera resolvió al artículo de lore,
+   * que naturalmente no está en `Raid_Encounters`. Las tres se estaban leyendo
+   * como un «no es jefe» rotundo. Innoruuk se cayó del censo por eso, y era la
+   * tercera vez en un día que un criterio nuestro lo tumbaba.
+   *
+   * Así que hacen falta las dos: que haya contestado (`found`) Y que haya
+   * resuelto a una página de verdad (`title`). Sin título no hay respuesta,
+   * hay silencio, y el silencio se deduce.
+   */
   const w = wiki?.get?.(nombre);
-  // Sólo cuenta si la wiki ha contestado de verdad. Que aún no lo haya hecho no
-  // es un «no»: es que no se sabe, y entonces se deduce.
-  if (w && w.found) return { raid: !!w.raid, src: 'wiki' };
+  if (w && w.found && w.title) return { raid: !!w.raid, src: 'wiki' };
 
   if (esNombrado(nombre) && (vida ?? 0) >= VIDA_JEFE) return { raid: true, src: 'deducido' };
   return { raid: false, src: 'deducido' };
+}
+
+/**
+ * EL CONTROL POSITIVO DE LA FUENTE: antes de creerse un «no», comprobar que
+ * la fuente sabe decir «sí».
+ *
+ * Una aserción negativa necesita su control positivo al lado, y aquí faltaba.
+ * Que la wiki conteste `raid: false` sólo significa algo si esa misma wiki,
+ * preguntada por alguien que SABEMOS que está en `Raid_Encounters`, contesta
+ * `raid: true`. Si el canario no canta, la fuente está rota —cambió el nombre
+ * de la categoría, cambió la API, el caché se llenó de errores— y entonces
+ * TODAS sus respuestas negativas son ruido, no datos.
+ *
+ * Esto no es teoría: el 19/08/2026 tres de las diecinueve respuestas guardadas
+ * eran fallos de búsqueda disfrazados de negativa, y `Cazic-Thule` resolviendo
+ * al artículo de lore era el control fallando a la vista de todos.
+ *
+ * @param {Map} wiki  el mismo mapa que recibe `clasificaJefe`
+ * @returns {{ok: boolean, motivo: string}}
+ */
+export const CANARIOS = ['Lord Nagafen', 'Eye of Veeshan'];
+
+export function controlWiki(wiki) {
+  if (!wiki || typeof wiki.get !== 'function') return { ok: false, motivo: 'sin mapa' };
+  const vistos = CANARIOS.map((n) => [n, wiki.get(n)]).filter(([, v]) => v && v.found && v.title);
+  if (!vistos.length) return { ok: false, motivo: 'ningún canario contestado todavía' };
+  const cantan = vistos.filter(([, v]) => v.raid);
+  return cantan.length
+    ? { ok: true, motivo: `${cantan.length} de ${vistos.length} canarios en Raid_Encounters` }
+    : { ok: false, motivo: 'los canarios NO salen en Raid_Encounters: la fuente no distingue' };
 }
 
 /**

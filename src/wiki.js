@@ -440,7 +440,24 @@ export class WikiClient {
       const j = await r.json();
       // `missingtitle` no es un fallo: es la wiki diciendo que ese enemigo no
       // tiene página, y eso ya responde a la pregunta.
-      if (j.error) return { found: true, raid: false, named: false, title: null, at: Date.now() };
+      /**
+       * UNA CONSULTA QUE FALLA NO PUEDE PRODUCIR UNA RESPUESTA NEGATIVA.
+       *
+       * Aquí ponía `found: true, raid: false, title: null`, con el argumento de
+       * que «missingtitle no es un fallo: es la wiki diciendo que ese enemigo
+       * no tiene página, y eso ya responde a la pregunta». No responde:
+       *
+       *   · `j.error` cubre CUALQUIER error de la API, no sólo `missingtitle`;
+       *   · y aunque fuera `missingtitle`, «no hay página CON ESE NOMBRE» no es
+       *     «no es un jefe»: es que el nombre no casa. `Innoruuk, the Prince of
+       *     Hate` no tiene página con ese título —la suya es «Innoruuk»— y se
+       *     quedó guardado como un «no» rotundo, con 43.265 de vida.
+       *
+       * SON TRES ESTADOS, NO DOS: sí, no, y no lo sé. El tercero no se degrada
+       * nunca al segundo. `found: true` con `title: null` era un estado
+       * imposible que este código fabricaba.
+       */
+      if (j.error) return { found: false, motivo: j.error.code ?? 'error', at: Date.now() };
       const cats = (j.parse?.categories ?? []).map((c) => c.category);
       return {
         found: true,
