@@ -1711,6 +1711,19 @@ export class Engine extends EventEmitter {
    * Devuelve segundos epoch, o null si ese nombre no ha muerto nunca. NULL NO
    * ES CERO: «no ha muerto nunca» y «murió en el instante cero» no pueden
    * verse igual, y quien lo pinta se apoya en esa distinción.
+   *
+   * ── LAS UNIDADES VAN EN EL NOMBRE DE LA VARIABLE ──────────────────────
+   *
+   * `sm.at` va en MILISEGUNDOS y `killTimes.t` en SEGUNDOS. Escribiendo esto se
+   * sumaron sin convertir y salieron fechas del AÑO 58600. La aritmética no
+   * falló: `a + b` es correcto para cualquier par de números. Falló el NOMBRE,
+   * que no decía en qué unidad estaba cada uno, así que la operación parecía
+   * bien escrita mirándola.
+   *
+   * Por eso aquí toda variable de tiempo lleva la unidad pegada —`atMs`,
+   * `tSeg`, `muerteSeg`— y no hay ni una que se llame sólo `t` o `at`. Un
+   * error de unidad no lo caza ninguna prueba de tipos ni ninguna revisión
+   * rápida: lo caza el nombre, o no lo caza nadie.
    */
   ultimaMuerte(nombres = []) {
     const pide = new Set(nombres.filter(Boolean));
@@ -1725,21 +1738,17 @@ export class Engine extends EventEmitter {
       if (!faltan.size) break;
       const aqui = (sm.kills ?? []).filter((k) => faltan.has(k));
       if (!aqui.length) continue;
+      const inicioMs = sm.at ?? 0;                  // el índice guarda MILISEGUNDOS
+      const duracionSeg = sm.duration ?? 0;         // y la duración, SEGUNDOS
       let f = null;
       try { f = this.store.get(sm.uid); } catch { f = null; }
       for (const n of aqui) {
-        // `killTimes` da el segundo dentro de la pelea. Si falta —peleas
+        // `killTimes` da el SEGUNDO dentro de la pelea. Si falta —peleas
         // guardadas por versiones que no lo escribían— se cae al final de la
         // pelea, que es la cota más cercana que hay, y no al principio.
-        const kt = (f?.killTimes ?? []).filter((k) => k.name === n).map((k) => k.t);
-        const off = kt.length ? Math.max(...kt) : (sm.duration ?? 0);
-        /**
-         * `sm.at` va en MILISEGUNDOS y `killTimes.t` en SEGUNDOS. Sumarlos sin
-         * convertir daba fechas del año 58600, que es la clase de error que
-         * sólo se ve si miras el resultado: la aritmética no falla, la unidad
-         * sí. Aquí se devuelve en segundos, que es lo que dice la cabecera.
-         */
-        out[n] = Math.round((sm.at ?? 0) / 1000) + off;
+        const tsSeg = (f?.killTimes ?? []).filter((k) => k.name === n).map((k) => k.t);
+        const dentroSeg = tsSeg.length ? Math.max(...tsSeg) : duracionSeg;
+        out[n] = Math.round(inicioMs / 1000) + dentroSeg;
         faltan.delete(n);
       }
     }
