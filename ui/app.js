@@ -2,7 +2,7 @@ import { t, setLang, getLang, LANGS, langInfo, TRANSLATED } from '../src/i18n.js
 import { analyse } from '../src/analysis.js';
 import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
-import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
+import { mergePets, mergeOwnerPets, ownerPets, ensureIdentidad } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
 import { estadoCrono, avisoDeVarios, claveCrono, ESTADO, PERIODOS_SOSPECHA, PRECISION } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
@@ -559,6 +559,16 @@ function withPets(f) {
   // De quién es cada mascota se aplica AHORA y no como quedó guardado: lo
   // asignas a mitad de sesión y las peleas de hace media hora se rotulan bien.
   rows = ownerPets(rows, state.snap?.petOwners ?? {});
+  // Y la identidad entera, por la misma razón y una más: el `unidentified`
+  // guardado dependía de lo que hubiera en MEMORIA cuando se cerró la pelea,
+  // así que la misma mascota tuya salía identificada en una y desconocida en
+  // la siguiente. Se recalcula con lo que hay en disco ahora.
+  rows = ensureIdentidad(rows, {
+    self: state.snap?.self,
+    companions: companeros(),
+    knownPets: petNames(),
+    notPets: state.cfg?.notPets ?? [],
+  });
   if (state.cfg.mergePets) {
     rows = mergePets(rows, t('pets.merged'), petNames(), state.snap?.self, state.cfg.notPets ?? []);
     // La misma casilla pliega también la mascota de cada jugador dentro de él:

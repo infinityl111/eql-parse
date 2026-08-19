@@ -284,6 +284,94 @@ export function mergePets(rows = [], label = 'Mascotas', known = [], self = null
 }
 
 /**
+ * SE PERSISTE LO OBSERVADO; SE RECALCULA LO DERIVADO. Aquí, la identidad.
+ *
+ * `unidentified` se guardaba con la pelea, y es un DERIVADO guardado como
+ * HECHO — la tercera vez que este proyecto se lo encuentra. Se calculaba con
+ * lo que se sabía EN LA SESIÓN en que se cerró la pelea, y las dos fuentes de
+ * las que dependía viven sólo en memoria: `whoSeen` no se escribe nunca, y
+ * `petSet` sólo guarda la mascota ACTUAL. Así que la misma criatura sale como
+ * tuya a las 21:14 y como desconocida a las 21:19, porque entre medias
+ * invocaste otra. «Identificado» no era una propiedad del combatiente: era una
+ * propiedad del momento en que se guardó.
+ *
+ * Medido sobre 1.894 peleas: 369 (19,5 %) tenían a alguien sin identificar
+ * sumando en el total de los tuyos. Recalculando al leer bajan a 248 (13,1 %).
+ *
+ * ── POR QUÉ NO SE MIRA `pet` DE OTRA PELEA, QUE SERÍA LO CÓMODO ──────────
+ *
+ * Porque `pet` sale de `petSet`, o sea del mismo estado de sesión que causó el
+ * fallo: apoyarse en él sería arreglar un derivado con otro derivado. Y está
+ * comprobado que no hace falta — de los 144 nombres con `pet:true` en alguna
+ * pelea, los 144 están en `pets.json`, que es observado y ya llega al lector.
+ * La regla no pierde ni un nombre por ser íntegramente observada.
+ *
+ * ── EL ORDEN, Y POR QUÉ CADA UNO ─────────────────────────────────────────
+ *
+ *   1. eres tú                      observado: sale del nombre del registro
+ *   2. tiene dueño (`petOf`)        observado: `My leader is X` es literal
+ *   3. `X`s warder` y X eres tú o un compañero declarado
+ *   4. compañero declarado          lo dices tú
+ *   5. está en las mascotas conocidas y no lo has desmentido
+ *   6. encantado                    observado: `X has been charmed` es literal
+ *
+ * La guarda del 3 no es adorno: en el almacén hay `Innoruuk`s Chosen`, que es
+ * un BICHO. Sin exigir que el dueño sea tuyo o declarado, esa regla convertiría
+ * a un enemigo en aliado tuyo.
+ *
+ * ── LO QUE ESTO NO ARREGLA, Y HAY QUE SABERLO ────────────────────────────
+ *
+ * Quedan 248 peleas. El 95 % de ese resto no es un fallo de la regla:
+ *   · 22 nombres con forma de mascota de invocador que NUNCA entraron en
+ *     `pets.json` — son del segundo invocador del trío, y el registro que
+ *     leemos es el del otro. Esa información no está en el fichero.
+ *   · 5 nombres que tú mismo has declarado ajenos (`notPets`).
+ * Y quedan 4 filas que se pierden de verdad: gente de la que hubo un `/who` en
+ * su sesión y nadie escribió a disco. Se arreglaría persistiendo `whoSeen`,
+ * que es exactamente el mismo remedio que se le dio a las mascotas.
+ *
+ * @param {object} ctx { self, companions, knownPets, notPets }
+ */
+const POSESIVO = /^(.+)`s (?:warder|pet|familiar)$/i;
+
+export function identificado(r, ctx = {}) {
+  const nombre = r?.name;
+  if (!nombre) return false;
+  const conj = (x) => (x instanceof Set ? x : new Set(x ?? []));
+  const amigos = conj(ctx.companions);
+  if (nombre === ctx.self) return true;
+  if (r.petOf) return true;
+  const m = POSESIVO.exec(nombre);
+  if (m && (m[1] === ctx.self || amigos.has(m[1]))) return true;
+  if (amigos.has(nombre)) return true;
+  if (conj(ctx.knownPets).has(nombre) && !conj(ctx.notPets).has(nombre)) return true;
+  if (r.charmed) return true;
+  return false;
+}
+
+/**
+ * Aplica la identidad a unas filas AL MOSTRAR, no al guardar.
+ *
+ * Se recalcula entera y no se cae al valor persistido: la regla es completa
+ * por sí sola, y respetar el `unidentified` viejo cuando la regla dice otra
+ * cosa sería conservar justo el error. Esto mueve casos en los DOS sentidos —
+ * lo que declaras hoy en `notPets` se aplica también a lo de ayer, igual que
+ * con los compañeros y las exclusiones.
+ */
+export function ensureIdentidad(rows = [], ctx = {}) {
+  if (!rows.length) return rows;
+  let cambia = false;
+  const out = rows.map((r) => {
+    if (r.side === 'enemy') return r;
+    const sin = !identificado(r, ctx);
+    if (!!r.unidentified === sin) return r;
+    cambia = true;
+    return { ...r, unidentified: sin };
+  });
+  return cambia ? out : rows;
+}
+
+/**
  * Quién es la mascota de quién, dicho por ti o sacado de un /pet who leader.
  *
  * Se aplica al MOSTRAR y no al guardar, como las exclusiones y los compañeros:
