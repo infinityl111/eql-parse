@@ -25,7 +25,7 @@ release, ni etiqueta, ni borrador. Todo el mundo siguió en la 1.12.0 seis días
 nada lo dijo.
 
 **REDACTAR EL RITUAL Y EJECUTARLO SE PARECEN LO BASTANTE COMO PARA CONFUNDIRLOS.**
-Escribiendo «paso 5: crea la release» con el detalle de qué fichero copiar y por
+Escribiendo «crea la release» con el detalle de qué fichero copiar y por
 qué, la sensación de haberlo hecho es casi la de hacerlo: se toca el mismo
 material, se comprueba lo mismo, se sale con la misma impresión de tarea cerrada.
 Es la forma exacta de la salida muerta que persigue `ui/app.js` —trabajo que se
@@ -70,6 +70,21 @@ la release y el cuerpo en español que se pega en GitHub. Nunca de la fuente.
 
 ## El orden
 
+> **QUE NO EXISTA LA RELEASE HASTA QUE EXISTA EL ARTEFACTO.**
+
+Ésa es la regla que ordena todo lo de abajo, y **el orden anterior era el
+contrario**: creaba la release en el paso 5 y construía el instalador en el 8.
+Entre esos dos pasos había una release publicada, visible y sin instalador, y
+`/releases/latest` ya la devolvía: cualquiera que abriera la aplicación en esa
+ventana veía el cartel de una versión que no se podía descargar. Es el mismo
+fallo que la guarda «sin-instalador» vino a tapar por el otro lado.
+
+Y una segunda razón, medida el 19/08/2026: construir el instalador es **la
+operación más pesada de todo el ritual** —`npm run dist` reescribe
+`dist/win-unpacked` entero, cientos de MB— y hacerla con la release ya creada
+deja el peor momento posible para que algo se tuerza. La noche del incidente se
+construyó dos veces en ocho minutos.
+
 ### 1. Deja el árbol limpio
 
 Nada que no sea de esta versión. Un documento de otro proyecto dentro del árbol
@@ -87,72 +102,36 @@ que toda `{{clave}}` citada existe en el diccionario— y `test/muertos.js`.
 Antes de la release, no después: la etiqueta apunta a un commit, y una etiqueta
 que apunta a algo que sólo existe en tu disco no la puede reconstruir nadie.
 
+**Y que el último commit nombre la versión.** Cloudflare etiqueta cada
+despliegue con el asunto del commit desde el que se lanzó, y ésa es la única
+etiqueta que tiene. Ver el paso 11.
+
 ### 4. `npm run web:build` — **la primera de dos**
 
 **Por qué dos veces.** La web lee las releases de la API de GitHub para pintar la
 página de cada versión. En este punto la release **todavía no existe**, así que
 esta construcción *no* trae la página de la versión nueva. Se hace igualmente
-porque es la que **genera `web/dist/notas/`**, que es lo que hace falta para los
-dos pasos siguientes.
+porque es la que **genera `web/dist/notas/`**, que es lo que hace falta para la
+release.
 
-Si intentas invertirlo —release primero, construcción después— te encuentras sin
-los ficheros que tienes que adjuntar, y es justo el momento en que la prisa te
-hace subir la fuente.
+Al terminar imprime el comando de subida. **Guárdalo.** Y falla si alguna
+`{{clave}}` no resolvió, en vez de escribir un fichero con las llaves dentro.
 
-Al terminar imprime el comando de subida. **Guárdalo.**
+### 5. `npm run dist` — EL INSTALADOR, ANTES QUE LA RELEASE
 
-Y falla si alguna `{{clave}}` no resolvió, en vez de escribir un fichero con las
-llaves dentro.
+Sale en `dist/`. **Instálalo y ábrelo antes de seguir.**
 
-### 5. Crea la release en GitHub
+#### Desde el commit exacto, y en worktree desasociado
 
-- Etiqueta `v<versión>`, sobre el commit que acabas de empujar.
-- Título **en español**, un solo campo, como en todas las anteriores.
-- **El cuerpo se copia de `web/dist/notas/<versión>.es.md`**, no de
-  `web/notas/`. Si te equivocas de fichero, las llaves se ven en la página de la
-  release — y además ese cuerpo es el respaldo del cartel de actualización para
-  quien no tenga adjunto en su idioma (ver `consultar()` en
-  `src/actualizar.js`).
-
-**La release es la fuente de la verdad**: de ahí lee el actualizador de la
-aplicación y de ahí lee la web al construirse. No hay otro sitio.
-
-### 6. Sube los adjuntos
-
-Con el comando que imprimió el paso 4, que es de esta forma:
+Que el árbol estuviera limpio **no demuestra qué se empaquetó**. Lo que lo
+demuestra es construir desde el commit etiquetado, aislado de tu copia de
+trabajo:
 
 ```
-gh release upload v<versión> web/dist/notas/*.md
+git worktree add --detach ../eql-build <commit>
 ```
 
-**`dist`, no `notas`.** Éstos son literalmente lo que va a leer el cartel de
-actualización: `src/actualizar.js` busca en los adjuntos el nombre exacto
-`<versión>.<idioma>.md` y, si lo encuentra, lo enseña en el idioma de cada uno.
-
-Si faltan, no se rompe nada visible: el cartel cae al cuerpo en español y
-funciona. Sólo que un alemán lee en español justo cuando decide si instala algo
-que le va a mover el histórico. **Es un fallo silencioso, que es la clase que
-este proyecto persigue.**
-
-### 7. Comprueba lo que subiste
-
-Diez segundos, y cierra el caso del todo:
-
-```
-gh release download v<versión> -p "<versión>.es.md" -D tmp
-findstr /C:"{{" tmp\<versión>.es.md
-```
-
-No tiene que encontrar nada. Comprueba lo que hay **en la release**, que es lo
-único que ven los demás — no lo que hay en tu disco.
-
-### 8. `npm run dist` — el instalador, y pruébalo a mano
-
-Sale en `dist/`. **Instálalo y ábrelo antes de anunciar nada.**
-
-Y sube a la release el `.exe` y el `latest.yml` que produce: el actualizador
-busca los dos en los adjuntos (`src/actualizar.js`), y sin `latest.yml` no
-detecta la versión nueva.
+Y ahí `npm ci && npm run dist`. Al terminar, `git worktree remove`.
 
 #### COMPRUEBA QUE LO EMPAQUETADO ES LO QUE CREES, por hash y por contenido
 
@@ -179,14 +158,51 @@ guarda iba a la 1.16.1 y no debía colarse. Eso está bien y es la mitad.
 >
 > Si da cero, la guarda **se ha perdido por el camino** —una rama mal fusionada,
 > un fichero que no entró— y estás publicando una versión que vuelve a poder
-> ofrecer una descarga que no existe. Es el fallo que la 1.16.1 vino a cerrar,
-> reabierto sin que nadie lo note.
+> ofrecer una descarga que no existe.
 
 La regla general, que vale para cualquier guarda: **comprobar que lo que NO debe
 estar no está es sólo la mitad; la otra es que lo que SÍ debe estar, está.** Un
 `grep` a cero no distingue «lo quitamos a propósito» de «se perdió».
 
-#### El instalador se sube POR SU NOMBRE, nunca con comodín
+### 6. Crea la release COMO PRELANZAMIENTO
+
+```
+gh release create v<versión> --target <commit> --prerelease --title "<título>" --notes-file web/dist/notas/<versión>.es.md
+```
+
+**`--prerelease` no es opcional.** Mientras lo sea, `/releases/latest` sigue
+devolviendo la versión anterior, así que **nadie ve nada** hasta que todos los
+artefactos estén subidos y comprobados. Es lo que convierte los pasos 7 y 8 en
+reversibles: si algo está mal, se corrige sin que nadie se haya enterado.
+
+- Etiqueta `v<versión>`, sobre el commit que acabas de empujar.
+- Título **en español**, un solo campo, como en todas las anteriores.
+- **El cuerpo se copia de `web/dist/notas/<versión>.es.md`**, no de
+  `web/notas/`. Si te equivocas de fichero, las llaves se ven en la página de la
+  release — y además ese cuerpo es el respaldo del cartel de actualización para
+  quien no tenga adjunto en su idioma (ver `consultar()` en
+  `src/actualizar.js`).
+
+**La release es la fuente de la verdad**: de ahí lee el actualizador de la
+aplicación y de ahí lee la web al construirse. No hay otro sitio.
+
+### 7. Súbele TODOS los artefactos
+
+Las notas, con el comando que imprimió el paso 4:
+
+```
+gh release upload v<versión> web/dist/notas/*.md
+```
+
+**`dist`, no `notas`.** Éstos son literalmente lo que va a leer el cartel de
+actualización: `src/actualizar.js` busca en los adjuntos el nombre exacto
+`<versión>.<idioma>.md` y, si lo encuentra, lo enseña en el idioma de cada uno.
+Si faltan, no se rompe nada visible: el cartel cae al cuerpo en español y
+funciona. Sólo que un alemán lee en español justo cuando decide si instala algo
+que le va a mover el histórico. **Es un fallo silencioso, que es la clase que
+este proyecto persigue.**
+
+Y el instalador **POR SU NOMBRE, nunca con comodín**:
 
 ```
 gh release upload v<versión> "dist/EQL-Parse-<versión>-setup.exe" dist/latest.yml
@@ -199,9 +215,9 @@ y 1.15.0— y **no falló nada**: `latest.yml` apuntaba al bueno, así que el
 actualizador siguió correcto y nadie se enteró por ahí.
 
 Lo que sí se rompió fue la web. `web/build.mjs` se queda con **el primer adjunto
-que acaba en `.exe`** —`find((a) => /\.exe$/i.test(a.name))`, línea 123— y el
-primero era el de la 1.12.0. El botón de descarga de la versión nueva ofrecía el
-instalador viejo, con su tamaño correcto al lado y sin nada raro a la vista.
+que acaba en `.exe`** y el primero era el de la 1.12.0. El botón de descarga de
+la versión nueva ofrecía el instalador viejo, con su tamaño correcto al lado y
+sin nada raro a la vista.
 
 La otra salida era limpiar `dist/` antes de construir. **El nombre exacto es
 mejor**: no puede recoger nada que no sea de esta versión y no depende de que
@@ -209,42 +225,64 @@ nadie se acuerde de nada. Lo único que escribes a mano es el número de versió
 si te equivocas, `gh` no encuentra el fichero y **para**. Un comodín no para
 nunca: siempre encuentra algo.
 
-Es la forma de la pinza —la catorceava familia de `ui/app.js`—: no falla,
-entrega algo plausible. Un `.exe` de 78 MB con nombre de instalador es un
-resultado creíble hasta que miras cuál.
+Es la forma de la pinza: no falla, entrega algo plausible. Un `.exe` de 78 MB con
+nombre de instalador es un resultado creíble hasta que miras cuál.
 
-#### La comprobación, antes de anunciar: exactamente un `.exe`
+`latest.yml` también es obligatorio: sin él el actualizador no detecta la versión
+nueva.
+
+### 8. Comprueba lo subido — TRES COMPROBACIONES FIJAS
+
+Sobre la release, que es lo único que ven los demás; no sobre tu disco.
+
+**Una · ningún `{{` en las notas publicadas.**
+
+```
+gh release download v<versión> -p "<versión>.es.md" -D tmp
+findstr /C:"{{" tmp\<versión>.es.md
+```
+
+**Dos · exactamente UN `.exe`, y es el de esta versión.**
 
 ```
 gh release view v<versión> --json assets --jq '[.assets[].name | select(endswith(".exe"))]'
 ```
 
-Tiene que salir una lista de **un** elemento y con el número de esta versión. Si
-salen dos o más, la web ofrecerá uno cualquiera de ellos —el primero, no el
-nuevo—. El sobrante se quita con:
+Tiene que salir una lista de **un** elemento. El sobrante se quita con
+`gh release delete-asset v<versión> <nombre>`.
+
+**Tres · «sin-instalador» distinto de cero**, que es la del paso 5 y se repite
+aquí sobre lo que de verdad está colgado, no sobre lo que construiste.
+
+### 9. PUERTA: `/releases/latest` sigue devolviendo la ANTERIOR
 
 ```
-gh release delete-asset v<versión> <nombre del que sobra>
+gh api repos/<repo>/releases/latest --jq .tag_name
 ```
 
-Y después hay que **volver a construir y desplegar la web**: `web/releases.json`
-se rellena desde la API en cada construcción, así que la página sigue ofreciendo
-el instalador equivocado hasta que se reconstruye — quitarlo de la release no
-basta.
+Tiene que decir la versión **vieja**. Si dice la nueva, el `--prerelease` no se
+aplicó y llevas un rato publicando en directo sin saberlo. Para y arréglalo
+antes de seguir.
 
-**Si la versión fuerza una reconstrucción** —`RECONSTRUIR_DESDE` ha subido—
-compruébalo con los ojos:
+### 10. Sólo entonces, márcala definitiva
 
-- que sale el cartel de reconstruir y que la barra avanza
-- que la primera apertura tarda, porque relee el registro entero
-- **y el criterio de aceptación es una DIFERENCIA, no un total.** Apunta cuántas
-  peleas tienes antes de reconstruir y compara. El total absoluto no vale como
-  criterio porque el registro crece mientras tanto: entre dos mediciones de la
-  misma tarde, el mismo cambio dio 714 → 710 y 719 → 715. Lo que se repite es la
-  diferencia.
-- si sale otra diferencia, **para** y averigua por qué antes de anunciar.
+```
+gh release edit v<versión> --prerelease=false --latest
+```
 
-### 9. `npm run web:build` — **la segunda**
+#### PUERTA FINAL: las dos cosas, no una
+
+```
+gh release view v<versión> --json tagName,isLatest,assets
+```
+
+- `/releases/latest` devuelve **la nueva**, y
+- su `.exe` está **entre los adjuntos**.
+
+Las dos. Ninguna se deduce de la otra: una release marcada `latest` sin su
+instalador es exactamente el estado que rompe el cartel de actualización.
+
+### 11. `npm run web:build` — **la segunda** — y despliega
 
 Ahora la release existe, así que ésta sí trae la página de la versión nueva.
 
@@ -254,63 +292,24 @@ ya está creada, esta construcción exige que **toda versión con notas escritas
 que la v1.13.0 no llegó a existir: ver `web/huerfanas.mjs`, y arriba, «nació
 saltándose un paso».
 
-En la primera construcción no salta, y no es un descuido: allí la release de hoy
-todavía no existe **por diseño**, porque esa construcción es justamente la que
-genera lo que hace falta para crearla. La propia release de hoy dice en qué
-pasada estamos, así que la guarda no necesita que nadie le pase nada.
-
 Si se pone roja, hay dos salidas y ninguna es seguir: **publicar esa release**, o
 **borrar sus notas**. Unas notas escritas y sin publicar no son un borrador — son
 algo redactado para alguien que no lo ha leído.
-
-### 10. Despliega la web
 
 ```
 npm run web:deploy
 ```
 
-que es `npx wrangler pages deploy web/dist --project-name=eqlparse`.
-
-**Por qué es un script y no una línea en este documento.** Fue la última pieza
-del ritual que sólo vivía en la memoria de una sesión — y la sesión se acabó.
-Al escribir este fichero se buscó por todo el árbol y no había nada: ni script,
-ni `wrangler.toml`, ni una mención en el código. Hubo que recuperarlo
-ejecutándolo. Nos pasó **mientras escribíamos el documento que cierra
-exactamente ese fallo**, que es la mejor prueba de que hacía falta.
-
-Como script se copia; en un documento se relee, y releer es lo que no se hace
-con prisa.
-
-**Lo único que había en el árbol era el rastro, no el comando:** una carpeta
-`.wrangler/tmp/pages-*` —que sólo crea `wrangler pages deploy`— y el
-`_redirects` que `web/build.mjs` escribe en `web/dist`, que es un fichero de
-Cloudflare Pages. Suficiente para saber **qué** se hacía y no **cómo**.
-
 #### Vista previa y producción no son lo mismo
 
-Cloudflare Pages decide entre las dos **por la rama**, y ahí hay un fallo
-silencioso esperando: un despliegue que sólo llega a la vista previa **parece un
-éxito completo en la consola** mientras el sitio real no cambia.
+Cloudflare decide entre las dos **por la rama**, y ahí hay un fallo silencioso
+esperando: un despliegue que sólo llega a la vista previa **parece un éxito
+completo en la consola** mientras el sitio real no cambia. Wrangler saca la rama
+del propio git y **no imprime cuál detectó**.
 
-Wrangler saca la rama del propio git, sin que se la digas. Del registro de un
-despliegue real:
-
-```
-pages deploy: Detected branch: "main"
-pages deploy: Git information summary - branch: main, commitHash: 9dd243ae…, commitDirty: false
-```
-
-Así que **el despliegue va a producción si lo lanzas desde el repositorio y
-estás en la rama de producción del proyecto**. Si estás en otra rama, o si lo
-lanzas desde una carpeta que no es un git, la rama detectada cambia y el
-despliegue se va a una vista previa. `--branch` es la manera de forzarla.
-
-**Y NO CUENTES CON QUE WRANGLER TE LO DIGA.** Aquí ponía «wrangler imprime la
-rama que ha detectado: mírala», y con la 4.123.0 **no la imprime**: el
-despliegue de la 1.16.0 salió sin una sola línea `Detected branch:`, sólo con el
-aviso de árbol sucio y la URL de siempre —`https://<hash>.eqlparse.pages.dev`—,
-que tiene la misma cara tanto si fue a producción como si fue a una vista
-previa. Esperar un aviso que ya no llega es peor que no esperar ninguno.
+> **Si git está en mal estado, wrangler no puede leer la rama y el despliegue se
+> va a una vista previa.** Pasó el 19/08/2026 con el índice corrupto. En ese
+> caso, `--branch main` fuerza producción.
 
 Lo que sí lo dice, después y siempre:
 
@@ -318,28 +317,22 @@ Lo que sí lo dice, después y siempre:
 npx wrangler pages deployment list --project-name=eqlparse
 ```
 
-La primera fila tiene que decir **Production**, rama **main**, y en `Source` el
-commit que acabas de subir. Ahí se ve de verdad a dónde fue.
+La primera fila tiene que decir **Production**, rama **main**.
 
-#### Cómo se comprueba, que es lo que de verdad cierra el paso
+**Dónde mirar cuando algo salga mal:** wrangler deja un registro por invocación
+en `%APPDATA%\xdg.config\.wrangler\logs\`.
 
-No vale la consola. La consola dice que subió algo, no que lo subido sea lo que
-la gente ve — es la misma distinción que el paso 7 hace con los adjuntos:
-comprobar el artefacto donde lo ve el usuario, no donde lo produjiste.
+### 12. Comprueba contra el dominio de producción
 
-Comprueba contra **el dominio de producción**. Y no con un grep del número de
-versión, que es lo que ponía aquí y no vale:
+No vale la consola: dice que subió algo, no que lo subido sea lo que la gente ve.
+Y no vale un grep del número de versión, que es lo que ponía aquí:
 
 ```
 curl -s https://eqlparse.com/es/ | findstr /C:"1.13.0"      ← NO BASTA
 ```
 
-**Ese grep da verde con el sitio roto.** El número de versión sale también en el
-pie de las veinte páginas, así que casa aunque el botón de descarga apunte a una
-release que no existe, aunque las novedades salgan recortadas o aunque la mitad
-de los idiomas se hayan quedado sin traducir. Es la misma avería que este
-documento persigue en todos los demás pasos —comprobar que hay algo en vez de
-comprobar que es lo correcto—, cometida en el último.
+**Ese grep da verde con el sitio roto.** El número sale también en el pie de las
+veinte páginas, así que casa aunque el botón apunte a una release que no existe.
 
 Lo que hay que comprobar son **las cosas que se rompen, en los cinco idiomas**:
 
@@ -352,89 +345,54 @@ Lo que hay que comprobar son **las cosas que se rompen, en los cinco idiomas**:
 | las novedades están enteras | tantos `<article>` como versiones publicadas |
 | los volcados salen como volcados | los `<pre>` que toquen, y **cero** acentos graves sueltos |
 | las notas están en su idioma | la nota de la versión nueva, en la página alemana, en alemán |
+| y ninguna lleva `{{` | en las cinco, sobre ESTA construcción |
 
-Ninguna se deduce de otra: el botón puede apuntar a un `.exe` que no existe —eso
-es exactamente lo que pasó con la 1.16.0—, y las notas pueden salir en español
-en las cinco páginas sin que ningún recuento se entere.
+Ninguna se deduce de otra. Las corre todas `npm run web:vivo`
+(`bin/web-vivo.mjs`), que reintenta mientras Cloudflare propaga, porque **la
+primera respuesta no vale como respuesta**.
 
-Las corre todas `npm run web:vivo` (`bin/web-vivo.mjs`), que reintenta mientras
-Cloudflare propaga, porque
-**la primera respuesta no vale como respuesta**: si algo no cuadra al primer
-intento, se espera y se repite antes de decidir nada.
+Y si sospechas de la caché del borde, pide la página con `Cache-Control:
+no-cache`.
 
-Si algo falla, el despliegue se quedó en la vista previa —o subió mal— aunque la
-consola dijera que todo fue bien. Y si sospechas de la caché del borde, pide la
-página con `Cache-Control: no-cache` o con un parámetro cualquiera.
+### 13. La comprobación que no es de GitHub: desde una instalación anterior
 
-**Confirmado, y el comando no necesita `--branch`.** El registro de wrangler
-prueba que detecta `main`, pero no guarda la respuesta de la API con
-`production_branch`, así que eso hubo que mirarlo donde sí se ve:
+**Que el cartel ofrezca la nueva y que el botón lleve a un `.exe` que existe.**
+Es el único camino por el que lo ve un usuario, y no lo cubre ninguno de los
+pasos anteriores: los 8 y 10 miran la release, el 12 mira la web, y el cartel no
+sale ni de una ni de la otra sino de `consultar()` en `src/actualizar.js`.
 
-> **Panel de Cloudflare → Workers & Pages → `eqlparse` → Deployments.** El de
-> arriba tiene que decir **Production**, con la rama `main`, y colgando de él
-> `eqlparse.com` y `eqlparse.pages.dev`.
+**Si la versión fuerza una reconstrucción** —`RECONSTRUIR_DESDE` ha subido—
+compruébalo con los ojos:
 
-Ésa es la comprobación de la próxima vez, y la que responde a la única pregunta
-que ni la consola ni los registros contestan: si esto ha llegado al sitio real o
-se ha quedado en una vista previa.
+- que sale el cartel de reconstruir y que la barra avanza
+- que la primera apertura tarda, porque relee el registro entero
+- **y el criterio de aceptación es una DIFERENCIA, no un total.** Apunta cuántas
+  peleas tienes antes de reconstruir y compara. El total absoluto no vale porque
+  el registro crece mientras tanto: entre dos mediciones de la misma tarde, el
+  mismo cambio dio 714 → 710 y 719 → 715. Lo que se repite es la diferencia.
+- si sale otra diferencia, **para** y averigua por qué antes de anunciar.
 
-#### Lánzalo desde un commit que nombre la versión
-
-Cloudflare **etiqueta cada despliegue con el asunto del commit desde el que se
-lanzó**, y ésa es la única etiqueta que tiene: en la lista de Deployments se leen
-«1.12.0 — …» y «1.11.0 — …» sin abrir nada, porque esos despliegues salieron del
-commit de su versión.
-
-Y se ve lo que pasa cuando no: el despliegue de la 1.13.0 salió de un commit
-llamado «la alarma muerta, junto a la salida muerta». Cierto, útil, y **no dice
-qué versión hay ahí arriba**. Un renglón menos legible en una lista que se
-consulta justo cuando algo va mal.
-
-Así que antes del despliegue final, mira en qué commit estás. Si el último de la
-tanda es un arreglo o un documento, el asunto que va a quedar en Cloudflare es
-ése. Lo barato es que **el commit que nombra la versión sea el último antes de
-desplegar** — y si la tanda ya se cerró con otra cosa, un commit de cierre corto
-que la nombre.
-
-No cambia nada de lo que se publica. Cambia que dentro de tres meses la lista de
-Cloudflare se pueda leer sin abrir cada entrada, que es exactamente el mismo
-criterio con el que se eligen los rótulos de la aplicación.
-
-**Dónde mirar cuando algo salga mal:** wrangler deja un registro por invocación
-en `%APPDATA%\xdg.config\.wrangler\logs\`, con la rama detectada, el commit y
-todas las llamadas a la API. Es de donde salieron las dos líneas de arriba.
-
-### 11. Mira los cinco idiomas en la web desplegada
-
-Buscando `{{`. En **esta** construcción, la segunda — en la primera la página de
-la versión nueva ni siquiera existe, así que mirarla ahí no comprueba nada.
-
-El paso 4 ya garantiza que los `.md` de `dist` no llevan llaves, y el 7 que lo
-subido tampoco. Esto comprueba el tercer camino, que es distinto de los dos: el
-de la web construida.
-
-### 12. Avisa a los demás
+### 14. Avisa a los demás
 
 Y si la versión reconstruye, **dilo**: la primera apertura tarda porque relee el
 registro entero. Quien no lo sepa piensa que se ha colgado.
 
-### 13. Después de publicar: la comprobación que sólo se puede hacer jugando
+### 15. Después de publicar: la comprobación que sólo se puede hacer jugando
 
 Sólo para las versiones que tocan cómo se decide dónde empieza y acaba una
 pelea. **No cierra el paso de publicar** —va después, a propósito— pero es la
-única parte de esas versiones que no se puede verificar releyendo, y por eso
-tiene que estar escrita aquí y no en la cabeza de nadie.
+única parte de esas versiones que no se puede verificar releyendo.
 
-**Por qué no la puedo hacer yo releyendo el registro.** Una pelea se cierra por
-dos caminos que no usan el mismo reloj: `feed` decide con la marca del registro
-y `tick` con el reloj de pared —ver `MARGEN_TICK` en `src/encounter.js`—. Releer
-es *uno de los dos lados*, así que comparar dos relecturas no compara nada. Y
-hay una tercera fuente de divergencia que tampoco se ve releyendo: en directo el
-analizador descarta líneas que en frío sí entran, porque su estado —las
-mascotas detectadas, el filtro de relevancia— no es el mismo recién arrancado
-que tras leer el registro entero. Medido sobre el histórico de la 1.13.0: de las
-13 peleas donde la partición en vivo y la de frío no coinciden, **4 son de esa
-causa**, y esa causa se agrava al bajar el plazo. No se puede acotar sin jugar.
+**Por qué no se puede hacer releyendo el registro.** Una pelea se cierra por dos
+caminos que no usan el mismo reloj: `feed` decide con la marca del registro y
+`tick` con el reloj de pared —ver `MARGEN_TICK` en `src/encounter.js`—. Releer es
+*uno de los dos lados*, así que comparar dos relecturas no compara nada. Y hay
+una tercera fuente de divergencia que tampoco se ve releyendo: en directo el
+analizador descarta líneas que en frío sí entran, porque su estado —las mascotas
+detectadas, el filtro de relevancia— no es el mismo recién arrancado que tras
+leer el registro entero. Medido sobre el histórico de la 1.13.0: de las 13 peleas
+donde la partición en vivo y la de frío no coinciden, **4 son de esa causa**, y
+esa causa se agrava al bajar el plazo. No se puede acotar sin jugar.
 
 **Cómo se hace:**
 
@@ -448,9 +406,9 @@ causa**, y esa causa se agrava al bajar el plazo. No se puede acotar sin jugar.
    una pelea que sólo movió el borde no es una pelea distinta, y contarla como
    tal infla la cifra y esconde las que sí importan.
 
-**Qué tiene que salir:** cero peleas exclusivas de un lado o del otro. Lo que
-hay que mirar una por una es cualquier bloque donde el vivo tenga más trozos que
-el frío.
+**Qué tiene que salir:** cero peleas exclusivas de un lado o del otro. Lo que hay
+que mirar una por una es cualquier bloque donde el vivo tenga más trozos que el
+frío.
 
 **Y si sale mal, el hueco del corte dice de qué es** —míralo antes de tocar
 ninguna constante:
@@ -463,23 +421,59 @@ ninguna constante:
 
 ---
 
+## Dos trampas que no van en ningún paso porque son de fuera del ritual
+
+**Al corregir una nota ya publicada:** primero el **CUERPO**, después los
+**ADJUNTOS**, para que el respaldo nunca sea peor que lo que sustituye. Y primero
+GitHub, después `web:build`, o `releases.json` vuelve a guardar lo viejo.
+
+**Con la release borrada, `web:build` NO SE PARA:** publicaría un sitio sin la
+versión nueva y sin decir nada. No lo corras mientras una release esté borrada a
+medias.
+
+**Y `published_at` NO se mueve al editar.** Las fechas no sirven para auditar si
+una edición ocurrió: el único testigo es el contenido.
+---
+
 ## Por qué el orden es el que es
 
 Las dependencias, para que nadie las reordene sin verlas:
 
 ```
 push ──> web:build (1ª) ──> dist/notas/ ──┬─> cuerpo de la release
-                                          └─> adjuntos de la release
-                                                      │
-                       release publicada <────────────┘
+         │                                └─> adjuntos de notas
+         └──> npm run dist ──> .exe + latest.yml ──┐
+                                                   │
+                    release como PRELANZAMIENTO <──┴── todos los artefactos
                                 │
-                                └──> web:build (2ª) ──> página de la versión
+                                ├──> PUERTA: /latest sigue en la anterior
+                                │
+                    marcar definitiva
+                                │
+                                ├──> PUERTA FINAL: /latest nueva Y su .exe
+                                │
+                                └──> web:build (2ª) ──> página ──> deploy
+                                                                     │
+                                             desde una instalación anterior ←┘
 ```
 
-- **La construcción va antes que la release** porque la release necesita lo que
-  la construcción produce.
+- **El instalador va ANTES que la release** porque una release sin su artefacto
+  ya la ve todo el mundo. Era al revés, y ése era el fallo.
+- **La construcción va antes que las dos** porque la release necesita
+  `dist/notas/`, que es lo que produce.
 - **La construcción va también después** porque la página necesita la release.
-- **Los adjuntos van después del cuerpo** sólo por comodidad; lo que no puede
-  cambiar es que los dos salgan de `dist`.
-- **La comprobación va antes del instalador** porque es la barata: si algo está
-  mal, mejor descubrirlo antes de dedicar diez minutos a compilar.
+- **El prelanzamiento es lo que hace reversibles los pasos 7 y 8.** Mientras la
+  release no sea `latest`, corregir un adjunto no lo ve nadie.
+- **Las dos puertas son puertas y no comprobaciones**: la primera confirma que
+  todavía no se ha publicado nada, la segunda que se ha publicado entero. Entre
+  ellas está el único momento en que el estado es visible y a medias, y dura lo
+  que tarda un `gh release edit`.
+- **La última comprobación no es de GitHub ni de la web**, sino del camino por
+  el que lo ve un usuario: el cartel de una instalación anterior.
+
+## Y lo que este documento NO contiene
+
+Las reglas de qué se puede escribir en una nota, la libreta de fallos y el
+criterio de qué se publica viven en el cuaderno de trabajo, fuera de aquí. Este
+fichero es **el procedimiento**: qué se ejecuta, en qué orden y por qué ese
+orden y no otro.
