@@ -51,10 +51,25 @@
  * justo los que casi no tienen intervalos: 2,21 por par de media.
  *
  * Se cae, y no por falta de datos. Medido: `The Ruins of Old Guk D2` tiene SEIS
- * periodos reales —100, 159, 219, 236, 483 y 567 s—, Befallen D2 tiene tres y
- * The Warrens D0 tiene tres. **«El periodo de la zona» no es un número mal
- * medido: es un objeto que no existe.** No se puede heredar de algo que no está
- * ahí, y elegir uno de los seis sería inventar el que conviene.
+ * racimos a valores distintos —100, 159, 219, 236, 483 y 567 s—, Befallen D2
+ * tiene tres y The Warrens D0 tiene tres. «El periodo de la zona» no es un
+ * número mal medido: es un objeto que no existe, y no se puede heredar de algo
+ * que no está ahí.
+ *
+ * Y al medir la unidad que SÍ tiene sentido físico —la clave de este fichero:
+ * zona + dificultad + nombre— sale peor todavía. Al partir por nombre, catorce
+ * de los quince racimos no se parten: SE DISUELVEN. Estaban hechos de bichos
+ * distintos, y cinco de ellos eran literalmente una observación por nombre. La
+ * unidad nueva produce UN racimo en todo el corpus, de un común, que salta el
+ * remuestreo y empata con el nulo de partición (P = 0,516).
+ *
+ * En NOMBRADOS ÚNICOS, que es donde el intervalo significaría algo, el recuento
+ * es CERO — y es un cero vacío, no informativo: con 2,21 intervalos por clave,
+ * en 1.000 réplicas del nulo tampoco sale ninguno. No se ha medido que no haya
+ * periodo; no se ha podido medir nada.
+ *
+ * Por eso el texto de la ficha dice «aún no lo sabemos» y da el recuento de
+ * observaciones: por la clave correcta, ese recuento tiene MEDIANA 2.
  *
  * De paso explica el desacuerdo con la wiki, que declara una cifra por zona: no
  * nos contradice, mide otra cosa.
