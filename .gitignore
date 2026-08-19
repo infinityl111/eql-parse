@@ -12,3 +12,8 @@ config.json
 # propósito» para no perderlas al cambiar de máquina. No lo estaban: las cinco
 # de la 1.11.0 existían sólo en este disco.
 /notas/
+
+# Sondas y borradores. NO son el producto: son ficheros de una sesión que
+# escriben, miden y se tiran. Una prueba de aquí llegó a escribir 97 versiones
+# falsas en web/releases.json, así que esto es una guarda, no orden.
+tmp/

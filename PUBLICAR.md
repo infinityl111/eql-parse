@@ -471,9 +471,14 @@ push ──> web:build (1ª) ──> dist/notas/ ──┬─> cuerpo de la rele
 - **La última comprobación no es de GitHub ni de la web**, sino del camino por
   el que lo ve un usuario: el cartel de una instalación anterior.
 
-## Y lo que este documento NO contiene
+## Qué es este documento, y qué no
 
-Las reglas de qué se puede escribir en una nota, la libreta de fallos y el
-criterio de qué se publica viven en el cuaderno de trabajo, fuera de aquí. Este
-fichero es **el procedimiento**: qué se ejecuta, en qué orden y por qué ese
-orden y no otro.
+**El procedimiento**: qué se ejecuta, en qué orden, y por qué ese orden y no
+otro. Cada paso lleva su motivo, y los motivos son incidentes propios: una
+comprobación sin la avería que la trajo parece redundante, y la primera persona
+con prisa la quita.
+
+Lo que NO va aquí es **qué se escribe** —el estilo de las notas, qué cifras se
+publican y con qué población—. Eso es otra decisión, se toma antes, y mezclarla
+con el procedimiento haría este fichero más largo justo donde tiene que poder
+leerse de un tirón mientras se publica.
