@@ -173,7 +173,7 @@ console.log('\nsólo lo reinicia una muerte nueva');
  *
  *     NUNCA SE ENSEÑA MÁS PRECISIÓN DE LA QUE TIENE EL DATO.
  *
- * TODOS nuestros valores tienen ventana: Befallen no es 265, es 265–271. Lo
+ * TODOS nuestros valores tienen margenAbajo: Befallen no es 265, es 265–271. Lo
  * que cambia entre orígenes es la ANCHURA. Y una cuenta atrás escrita al
  * segundo sobre un valor con ±12 h **parece medida al segundo porque está
  * escrita al segundo**: la precisión del formato es una afirmación sobre el
@@ -181,7 +181,7 @@ console.log('\nsólo lo reinicia una muerte nueva');
  */
 console.log('\nla precisión la decide la ventana');
 {
-  ok(precisionDe(6) === PRECISION.SEG, 'ventana de 6 s (Befallen 265–271) → al segundo', precisionDe(6));
+  ok(precisionDe(6) === PRECISION.SEG, 'margen de 6 s (Befallen: 265 o menos) → al segundo', precisionDe(6));
   ok(precisionDe(59) === PRECISION.SEG, 'y hasta 59 s, al segundo');
   ok(precisionDe(60) === PRECISION.MIN, 'un minuto de ventana ya no tiene segundos que enseñar');
   ok(precisionDe(1800) === PRECISION.MIN, 'media hora de ventana, en minutos');
@@ -205,11 +205,11 @@ console.log('\nla precisión la decide la ventana');
 console.log('\nel valor manual conserva la precisión que le dio Campeón');
 {
   const suyo = valorDe({ manual: 265 });
-  ok(suyo.ventana === null, 'si no declara ventana, no se le inventa una');
+  ok(suyo.margenAbajo === null, 'si no declara ventana, no se le inventa una');
   ok(suyo.precision === PRECISION.SEG, 'y se enseña con la precisión que él escribió', suyo.precision);
 
   // Y si la declara, manda la suya.
-  const conVentana = valorDe({ manual: 3 * 86400, manualVentana: 24 * 3600 });
+  const conVentana = valorDe({ manual: 3 * 86400, manualMargen: 24 * 3600 });
   ok(conVentana.precision === PRECISION.CAL,
     'con ±12 h declaradas por él, calendario igual que si fuera nuestra');
 
@@ -217,7 +217,7 @@ console.log('\nel valor manual conserva la precisión que le dio Campeón');
    * Y LO QUE NO SE HACE: quitarle precisión que él sí escribió. Un valor suyo
    * al segundo se enseña al segundo aunque el nuestro para ese bicho sea ancho.
    */
-  const mixto = valorDe({ manual: 265, medido: 3 * 86400, medidoVentana: 12 * 3600 });
+  const mixto = valorDe({ manual: 265, medido: 3 * 86400, medidoMargen: 12 * 3600 });
   ok(mixto.precision === PRECISION.SEG, 'el suyo manda también en la precisión', mixto.precision);
   ok(mixto.otro.precision === PRECISION.CAL,
     'y el nuestro se enseña al lado con LA SUYA, que es otra', mixto.otro.precision);
@@ -225,11 +225,11 @@ console.log('\nel valor manual conserva la precisión que le dio Campeón');
 
 console.log('\nlas observaciones traen su ventana');
 {
-  const bef = valorDe({ medido: 265, medidoVentana: 6 });
-  ok(bef.segundos === 265 && bef.ventana === 6, 'Befallen: 265 con ventana de 6 s');
+  const bef = valorDe({ medido: 265, medidoMargen: 6 });
+  ok(bef.segundos === 265 && bef.margenAbajo === 6, 'Befallen: 265 con ventana de 6 s');
   ok(bef.precision === PRECISION.SEG, 'y por eso se enseña al segundo');
 
-  const jefe = valorDe({ heredado: 3 * 86400, heredadoVentana: 24 * 3600 });
+  const jefe = valorDe({ heredado: 3 * 86400, heredadoMargen: 24 * 3600 });
   ok(jefe.precision === PRECISION.CAL, 'un jefe de 3 días ±12 h, en calendario', jefe.precision);
   ok(jefe.fuente === 'heredado', 'y sigue diciendo de dónde sale');
 

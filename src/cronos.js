@@ -62,44 +62,66 @@
  */
 
 /**
- * ── LA PRECISIÓN SE SACA DE LA VENTANA, NO DEL RELOJ ──────────────────────
+ * ── LA PRECISIÓN SALE DEL MARGEN DEL DATO, NO DEL RELOJ ──────────────────
  *
  *     NUNCA SE ENSEÑA MÁS PRECISIÓN DE LA QUE TIENE EL DATO.
  *
- * TODOS nuestros valores tienen ventana. Befallen no es 265: es **265–271**, y
- * el 265 es el borde inferior. Lo que cambia entre orígenes no es si hay
- * ventana, es su ANCHURA — de seis segundos en Befallen a doce horas en un jefe
- * de varios días.
+ * TODOS nuestros valores tienen incertidumbre, y lo que cambia entre orígenes
+ * es su ANCHURA — de seis segundos en Befallen a doce horas en un jefe de
+ * varios días.
+ *
+ * ── Y LA INCERTIDUMBRE VA HACIA ABAJO, NO A LOS DOS LADOS ────────────────
+ *
+ * Aquí ponía «Befallen no es 265: es 265–271», como si fuera un ±. **Es falso**,
+ * y el error es de bulto: 265–271 es el rango de los INTERVALOS OBSERVADOS, y
+ * cada intervalo observado es
+ *
+ *     periodo real  +  lo que el jugador tardó en volver
+ *
+ * y ese segundo término **nunca es negativo**. Así que el periodo real está en
+ * 265 **o POR DEBAJO**, jamás en 271. El 271 no es el otro extremo de una barra
+ * de error: es sencillamente la vez que más se tardó en volver.
+ *
+ * CONSECUENCIA PARA LO QUE SE ENSEÑA, y no es cosmética: **el aviso se da en el
+ * borde inferior**. Llegar pronto cuesta esperar; llegar tarde cuesta la vuelta
+ * entera. Los dos errores no valen lo mismo, así que el que se elige es el
+ * barato — y por eso la cuenta atrás corre contra `segundos`, que ES el borde
+ * inferior, y nunca contra el centro ni contra el borde alto.
  *
  * Y una cuenta atrás al segundo sobre un valor con ±12 h **parece medida al
  * segundo porque está escrita al segundo**. La precisión del formato es una
  * afirmación sobre el dato, y escribirla de más es afirmar de más. Es el mismo
  * fallo que persigue toda la aplicación, cometido en la última pulgada.
  *
- * Así que el formato lo decide la ventana:
+ * Así que el formato lo decide EL MARGEN HACIA ABAJO:
  *
- *     ventana en SEGUNDOS       mm:ss          una cuenta atrás de verdad
- *     ventana en MINUTOS        mm             sin segundos: no los tenemos
- *     ventana en HORAS o DÍAS   calendario     no es un cronómetro, es un
- *                                              rango de fechas
+ *     margen en SEGUNDOS       mm:ss          una cuenta atrás de verdad
+ *     margen en MINUTOS        mm             sin segundos: no los tenemos
+ *     margen en HORAS o DÍAS   calendario     no es un cronómetro, es un
+ *                                             rango de fechas
  *
- * El valor MANUAL de Campeón, si lo escribe sin ventana, se enseña con la
+ * El valor MANUAL de Campeón, si lo escribe sin margen, se enseña con la
  * precisión que él le haya dado —si escribe «4:25», se lee 4:25— y marcado
- * como suyo. No se le añade una ventana que él no ha declarado, ni se le quita
+ * como suyo. No se le añade un margen que él no ha declarado, ni se le quita
  * precisión que él sí ha escrito: es su dato.
+ *
+ * Y SE LLAMA `margenAbajo`, NO `ventana`. «Ventana» decía que la incertidumbre
+ * está a los dos lados, y no lo está: sólo va hacia abajo. Un nombre que mete
+ * un supuesto es peor que uno feo, que es la misma lección que las unidades en
+ * `engine.ultimaMuerte`.
  */
 export const PRECISION = { SEG: 'segundos', MIN: 'minutos', CAL: 'calendario' };
 
 /**
- * @param {number|null} ventanaSeg  anchura de la ventana, en segundos
+ * @param {number|null} margenAbajoSeg  cuánto puede bajar el valor, en segundos
  * @returns {'segundos'|'minutos'|'calendario'}
  */
-export function precisionDe(ventanaSeg) {
-  // Sin ventana declarada, la precisión la pone quien escribió el valor. Eso
+export function precisionDe(margenAbajoSeg) {
+  // Sin margen declarado, la precisión la pone quien escribió el valor. Eso
   // sólo pasa con el valor manual, y por eso aquí es el caso «tal cual».
-  if (ventanaSeg == null) return PRECISION.SEG;
-  if (ventanaSeg < 60) return PRECISION.SEG;
-  if (ventanaSeg < 3600) return PRECISION.MIN;
+  if (margenAbajoSeg == null) return PRECISION.SEG;
+  if (margenAbajoSeg < 60) return PRECISION.SEG;
+  if (margenAbajoSeg < 3600) return PRECISION.MIN;
   return PRECISION.CAL;
 }
 
@@ -126,36 +148,36 @@ export const PERIODOS_SOSPECHA = 3;
  *   diferencia en segundos, para poder enseñarla sin decidir por nadie.
  */
 export function valorDe({
-  manual = null, manualVentana = null,
-  medido = null, medidoVentana = null,
-  heredado = null, heredadoVentana = null,
+  manual = null, manualMargen = null,
+  medido = null, medidoMargen = null,
+  heredado = null, heredadoMargen = null,
 } = {}) {
   const observado = medido ?? heredado ?? null;
-  const obsVentana = medido != null ? medidoVentana : (heredado != null ? heredadoVentana : null);
+  const obsMargen = medido != null ? medidoMargen : (heredado != null ? heredadoMargen : null);
   const fuenteObs = medido != null ? 'medido' : (heredado != null ? 'heredado' : null);
 
   if (manual != null) {
     return {
       segundos: manual,
-      // Sin ventana declarada por él, se respeta su precisión tal cual.
-      ventana: manualVentana,
-      precision: precisionDe(manualVentana),
+      // Sin margen declarado por él, se respeta su precisión tal cual.
+      margenAbajo: manualMargen,
+      precision: precisionDe(manualMargen),
       fuente: 'manual',
       // Con las dos cosas se enseñan las dos. La diferencia va en segundos y
       // sin signo de juicio: no se dice cuál está bien, se dice que no coinciden.
       discrepa: observado != null && observado !== manual ? Math.abs(manual - observado) : null,
       otro: observado != null
-        ? { segundos: observado, ventana: obsVentana, precision: precisionDe(obsVentana), fuente: fuenteObs }
+        ? { segundos: observado, margenAbajo: obsMargen, precision: precisionDe(obsMargen), fuente: fuenteObs }
         : null,
     };
   }
   if (observado != null) {
     return {
-      segundos: observado, ventana: obsVentana, precision: precisionDe(obsVentana),
+      segundos: observado, margenAbajo: obsMargen, precision: precisionDe(obsMargen),
       fuente: fuenteObs, discrepa: null, otro: null,
     };
   }
-  return { segundos: null, ventana: null, precision: null, fuente: null, discrepa: null, otro: null };
+  return { segundos: null, margenAbajo: null, precision: null, fuente: null, discrepa: null, otro: null };
 }
 
 /**
