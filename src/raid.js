@@ -29,7 +29,37 @@
 const VIDA_JEFE = 20000;
 
 const esPet = (n) => / pet$/i.test(String(n ?? ''));
-const conArticulo = (n) => /^(an?|the) /i.test(String(n ?? ''));
+
+/**
+ * ¿ES UN NOMBRADO? LA MAYÚSCULA INICIAL, NO EL ARTÍCULO.
+ *
+ * Aquí se usaba «no lleva artículo», y tumbaba a `The Spiroc Lord`, que es un
+ * nombrado con 32.132 de vida —por encima de siete de los que sí entraban—.
+ * El artículo no distingue nada: lo que distingue es que el nombre propio va en
+ * MAYÚSCULA, y ahí «The» es parte del nombre igual que en «The Plane of Sky».
+ *
+ * SOBRE EL NOMBRE CANÓNICO, Y ESO HAY QUE MEDIRLO ANTES DE FIARSE. El registro
+ * capitaliza a principio de línea, así que conviven «a dracoliche» y
+ * «A dracoliche». Medido el 19/08/2026 sobre las líneas de muerte del log:
+ *
+ *     196 pares que difieren sólo en la inicial
+ *     196 son EL MISMO BICHO — la variante en mayúscula NUNCA sale en media
+ *         frase, y la de minúscula sí
+ *       0 son dos criaturas distintas
+ *       0 indecidibles
+ *
+ * Así que la mayúscula es SIEMPRE del renglón, y sólo es fiable sobre el nombre
+ * canónico —el que se ve en mitad de una frase—. La enciclopedia ya guarda ése:
+ * sus 461 fichas no tienen ni un par que difiera sólo en la inicial. Si algún
+ * día se le pasa a esta función un nombre sacado a pelo del principio de una
+ * línea, el criterio mentirá, y por eso queda dicho aquí.
+ *
+ * Y SE SALTAN LOS SIGNOS DE DELANTE. El registro trae `*Inte Akera`, con un
+ * asterisco por delante y 31.089 de vida: un nombrado de manual. Mirando el
+ * primer carácter a secas se caía de la lista, y habría sido un jefe perdido
+ * por un signo de puntuación.
+ */
+const esNombrado = (n) => /^[^\p{L}]*\p{Lu}/u.test(String(n ?? ''));
 
 /**
  * @param {string} nombre
@@ -50,7 +80,7 @@ export function clasificaJefe(nombre, { manual = null, wiki = null, vida = null 
   // es un «no»: es que no se sabe, y entonces se deduce.
   if (w && w.found) return { raid: !!w.raid, src: 'wiki' };
 
-  if (!conArticulo(nombre) && (vida ?? 0) >= VIDA_JEFE) return { raid: true, src: 'deducido' };
+  if (esNombrado(nombre) && (vida ?? 0) >= VIDA_JEFE) return { raid: true, src: 'deducido' };
   return { raid: false, src: 'deducido' };
 }
 
