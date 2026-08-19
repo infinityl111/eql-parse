@@ -28,7 +28,7 @@
  */
 import {
   valorDe, estadoCrono, avisoDeVarios, debeReiniciar,
-  precisionDe, ESTADO, PERIODOS_SOSPECHA, PRECISION, claveCrono, mismaClave } from '../src/cronos.js';
+  precisionDe, ESTADO, PERIODOS_SOSPECHA, PRECISION, claveCrono, mismaClave, ordenCola } from '../src/cronos.js';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -376,6 +376,99 @@ console.log('\nningún número NUESTRO sale a pantalla');
   const vacio = estadoCrono({ nombre: 'X' }, { ahora: 2000, ultimaMuerte: 1000 });
   ok(vacio.valor.retenido === false && vacio.valor.otro === null,
     'sin observaciones, no se retiene nada — y se distingue');
+}
+
+console.log('\nla cola: el que antes vuelve arriba, y los que ya están, encima');
+{
+  /**
+   * LO PIDIÓ CAMPEÓN CON SUS PALABRAS, y es lo que hace que la sección sirva:
+   * un crono correcto en el sitio equivocado de la lista no se lee. Se decidió
+   * y NO ESTABA EN EL CÓDIGO — `renderCronos` recorría la lista en orden de
+   * alta—, y no se vio porque nadie había mirado la pantalla.
+   */
+  const f = (nombre, estado, restante) => ({ crono: { nombre }, estado: { estado, restante } });
+  const nombres = (l) => ordenCola(l).map((x) => x.crono.nombre).join(' ');
+
+  const mezcla = [
+    f('cuenta-largo', ESTADO.CONTANDO, 300),
+    f('sin-valor', ESTADO.SIN_MUERTE, null),
+    f('a-cero', ESTADO.A_CERO, -10),
+    f('cuenta-corto', ESTADO.CONTANDO, 12),
+    f('cero-viejo', ESTADO.A_CERO_LARGO, -9000),
+  ];
+  ok(nombres(mezcla) === 'a-cero cero-viejo cuenta-corto cuenta-largo sin-valor',
+    'los tres grupos en su sitio y ordenados dentro', nombres(mezcla));
+
+  /**
+   * Dentro del primer grupo, EL MÁS RECIENTE PRIMERO. Cuanto más lleva uno a
+   * cero, más probable es que ya se lo haya llevado otro o que no estemos
+   * viendo su línea de muerte. Así los sospechosos se hunden solos, sin regla
+   * aparte.
+   */
+  const ceros = [f('lleva-mucho', ESTADO.A_CERO_LARGO, -5000), f('acaba-de', ESTADO.A_CERO, -3)];
+  ok(nombres(ceros) === 'acaba-de lleva-mucho',
+    'entre los que están a cero, el que acaba de cumplirse va primero', nombres(ceros));
+
+  /**
+   * EL DESEMPATE ES EL NOMBRE, y no es cosmético: esto repinta cada segundo, y
+   * dos cronos con el mismo restante que se intercambian en cada repintado
+   * hacen imposible pulsar su botón.
+   */
+  const iguales = [f('zeta', ESTADO.CONTANDO, 60), f('alfa', ESTADO.CONTANDO, 60)];
+  ok(nombres(iguales) === 'alfa zeta', 'con el mismo restante manda el nombre', nombres(iguales));
+  ok(nombres(iguales) === nombres(iguales.slice().reverse()),
+    'y el orden no depende de cómo vinieran: no baila entre repintados');
+
+  /**
+   * CONTROL POSITIVO. Sin esto, todo lo de arriba pasaría con un `ordenCola`
+   * que devolviera la lista tal cual, si la entrada ya viniera ordenada. Se le
+   * da la entrada EXACTAMENTE AL REVÉS y tiene que darle la vuelta entera.
+   */
+  const alReves = mezcla.slice().reverse();
+  ok(nombres(alReves) === 'a-cero cero-viejo cuenta-corto cuenta-largo sin-valor',
+    'CONTROL: con la entrada al revés, la salida es la misma — ordena de verdad',
+    nombres(alReves));
+
+  // Y no destruye la entrada: `renderCronos` la reusa.
+  const antes = mezcla.map((x) => x.crono.nombre).join(' ');
+  ordenCola(mezcla);
+  ok(mezcla.map((x) => x.crono.nombre).join(' ') === antes,
+    'CONTROL: no reordena la lista original');
+
+  ok(ordenCola([]).length === 0, 'y sin cronos no revienta');
+}
+
+console.log('\nel aviso de varios: la rama fuerte ya se puede disparar');
+{
+  /**
+   * Se llamaba SIEMPRE con `individuosVistos = null`, así que la rama fuerte era
+   * inalcanzable y sólo quedaba la deducida por número de muertes. El dato lo da
+   * ahora `engine.multiplicidadDe`: dos muertes del mismo nombre en la MISMA
+   * pelea son dos bichos, porque dentro de una pelea un muerto no vuelve.
+   *
+   * Y midiéndolo resultó MEJOR que la deducida, no un adorno: de 709 claves con
+   * muertes, 200 tienen multiplicidad demostrada, y 117 de ellas no llegan a las
+   * 10 muertes que dispara la débil. Se perdían.
+   */
+  ok(avisoDeVarios(2, 0) === 'varios-a-la-vez',
+    'con dos vistos a la vez el aviso es el fuerte, y no hace falta ni una muerte más');
+  ok(avisoDeVarios(1, 0) === null, 'con uno solo visto, no se avisa de nada');
+
+  /**
+   * CERO NO ES «HAY UNO». Es «no se ha demostrado que haya más», y por eso cae a
+   * la rama deducida en vez de afirmar que está solo.
+   */
+  ok(avisoDeVarios(0, 12) === 'probablemente-varios',
+    'sin multiplicidad demostrada sigue valiendo la deducida por muertes');
+  ok(avisoDeVarios(0, 3) === null, 'y con pocas muertes, ninguna de las dos');
+
+  /**
+   * CONTROL: la fuerte MANDA sobre la débil. Si no, un bicho con dos vistos y
+   * cincuenta muertes daría el aviso deducido teniendo el demostrado delante,
+   * que es enseñar la prueba peor habiendo la buena.
+   */
+  ok(avisoDeVarios(2, 50) === 'varios-a-la-vez',
+    'CONTROL: con las dos cosas manda la demostrada, no la deducida');
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

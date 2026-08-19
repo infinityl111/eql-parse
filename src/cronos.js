@@ -80,6 +80,16 @@
  * ── Y DESDE EL 19/08/2026, EL MANUAL ES LA ÚNICA QUE SALE A PANTALLA ──────
  *
  * `NUESTRO_NO_SALE`. Ni `medido` ni `heredado` producen un número en pantalla.
+ *
+ * Y SUS ROTULOS SE HAN RETIRADO de los cinco idiomas —`cro.src.medido` y
+ * `cro.src.heredado`—, en vez de dejarlos esperando dato. Una traducción
+ * muerta no es inofensiva: acaba saliendo el día que alguien toque `valorDe`
+ * sin conocer esta historia, y lo que aparecería en pantalla es «medido»
+ * sobre un número que escribió Campeón. Un rótulo que miente sobre la
+ * procedencia es peor que no tener rótulo.
+ *
+ * Si esto se reabre, HAY QUE VOLVER A ESCRIBIRLOS. Está anotado también en
+ * la condición de reapertura del estudio, que es donde se mirará.
  * Se siguen calculando y se guardan al lado, y el día que haya muestra
  * suficiente se contrastarán con el suyo; hoy no.
  *
@@ -367,3 +377,47 @@ export const claveCrono = (c) => [c?.nombre ?? '', c?.base ?? '', c?.diff ?? '',
 
 /** Dos cronos son el mismo si coinciden nombre, zona base y dificultad. */
 export const mismaClave = (a, b) => claveCrono(a) === claveCrono(b);
+
+/**
+ * EL ORDEN DE LA COLA: el que antes vuelve arriba, y los que ya están, encima.
+ *
+ * Pedido por Campeón con sus palabras, y es lo que hace que la sección sirva:
+ * un crono correcto en el sitio equivocado de la lista no se lee. Con seis
+ * abiertos, el orden de alta obliga a repasarlos todos para saber cuál toca.
+ *
+ * Tres grupos, y el reparto no es de estilo:
+ *
+ *   1. LOS QUE YA DEBERÍAN ESTAR. Es a lo que se va: son los que se pueden
+ *      ir a buscar ahora mismo.
+ *   2. LOS QUE CUENTAN, por lo que les queda. El siguiente que va a caer es
+ *      el que decide adónde te mueves.
+ *   3. LOS QUE NO SABEN CUÁNDO. Sin valor o sin una sola muerte suya no
+ *      pueden competir con los que sí lo saben, y arriba sólo estorbarían.
+ *
+ * DENTRO DEL PRIMER GRUPO, EL MÁS RECIENTE PRIMERO, y esto es una decisión
+ * con motivo: cuanto más lleva uno a cero, más probable es que ya se lo haya
+ * llevado otro o que no estemos viendo su línea de muerte —que es justo lo
+ * que avisa `ESTADO.A_CERO_LARGO`—. Así los sospechosos se hunden solos
+ * dentro de su grupo, sin necesidad de una regla aparte.
+ *
+ * Y EL DESEMPATE ES EL NOMBRE, siempre. Sin él, dos cronos con el mismo
+ * restante bailan de sitio en cada repintado —y esto repinta cada segundo—,
+ * que es la clase de movimiento que hace imposible pulsar un botón.
+ *
+ * @param {Array<{crono, estado}>} filas  cada una con su `estadoCrono` hecho
+ */
+export function ordenCola(filas = []) {
+  const grupo = (st) => {
+    if (st?.estado === ESTADO.A_CERO || st?.estado === ESTADO.A_CERO_LARGO) return 0;
+    if (st?.estado === ESTADO.CONTANDO) return 1;
+    return 2;
+  };
+  // Dentro del grupo: los que están a cero, por lo POCO que llevan; los que
+  // cuentan, por lo poco que les queda. Las dos veces, «menos es antes».
+  const dentro = (st) => (grupo(st) === 0
+    ? (st.restante == null ? 0 : -st.restante)   // `restante` es 0 o negativo
+    : (st?.restante ?? 0));
+  return filas.slice().sort((a, b) => grupo(a.estado) - grupo(b.estado)
+    || dentro(a.estado) - dentro(b.estado)
+    || String(a.crono?.nombre ?? '').localeCompare(String(b.crono?.nombre ?? '')));
+}

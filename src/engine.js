@@ -1797,6 +1797,61 @@ export class Engine extends EventEmitter {
     return out;
   }
 
+  /**
+   * CUÁNTOS INDIVIDUOS DEL MISMO NOMBRE SE HAN VISTO A LA VEZ. El suelo.
+   *
+   * EQL no numera los enemigos: `a shin ghoul knight` son tres bichos escritos
+   * igual y el registro no trae nada que los separe. Así que «cuántos hay» no
+   * tiene respuesta exacta — tiene un SUELO, que es lo único afirmable. Es el
+   * mismo razonamiento de `src/suelo.js`, que ya usan el rótulo de la pelea y
+   * las figuras del reproductor.
+   *
+   * Aquí se toma la forma más conservadora: **dos muertes del mismo nombre en
+   * la MISMA pelea**. Dentro de una pelea un muerto no vuelve, así que dos
+   * muertes son dos bichos, y eso es multiplicidad DEMOSTRADA y no deducida.
+   *
+   * Para qué sirve: el temporizador avisa al abrirlo de que su cuenta atrás se
+   * reiniciará con la muerte de CUALQUIERA de ellos, no del que estés mirando.
+   * Ese aviso tenía dos ramas y la fuerte era inalcanzable porque nadie
+   * rellenaba este número.
+   *
+   * Y midiéndolo resultó ser mejor que la deducida, no un adorno: de 709 claves
+   * con muertes, **200 tienen multiplicidad demostrada** y **117 de ellas no
+   * llegan a las 10 muertes** que dispara la rama débil. Se perdían.
+   *
+   * Devuelve el máximo por clave, o 0 si nunca se ha visto más de uno. CERO NO
+   * ES «HAY UNO»: es «no se ha demostrado que haya más», que es otra cosa y por
+   * eso el aviso calla en vez de afirmar que está solo.
+   */
+  multiplicidadDe(claves = []) {
+    const pide = claves.filter((c) => c?.nombre)
+      .map((c) => (typeof c === 'string' ? { nombre: c, base: null, diff: null } : c));
+    const out = {};
+    for (const c of pide) out[claveCrono(c)] = 0;
+    if (!pide.length) return out;
+    if (!this.store) return out;
+
+    for (const sm of this.store.index ?? []) {
+      // El índice ya trae los nombres abatidos de cada pelea, así que esto no
+      // abre ni un fichero: contar repetidos ahí es toda la medición.
+      const caidos = sm.kills ?? [];
+      if (!caidos.length) continue;
+      const cuenta = new Map();
+      for (const k of caidos) {
+        const n = typeof k === 'string' ? k : k?.victim;
+        if (n) cuenta.set(n, (cuenta.get(n) ?? 0) + 1);
+      }
+      for (const c of pide) {
+        if (c.base != null && (sm.zoneBase ?? null) !== c.base) continue;
+        if (c.diff != null && (sm.diff ?? null) !== c.diff) continue;
+        const n = cuenta.get(c.nombre) ?? 0;
+        const k = claveCrono(c);
+        if (n > out[k]) out[k] = n;
+      }
+    }
+    return out;
+  }
+
   encDeaths() { return this.enc?.deaths(this.self) ?? null; }
   encProgress() { return this.enc?.progress() ?? null; }
   encCounts() { return this.enc?.counts() ?? null; }

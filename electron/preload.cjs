@@ -103,6 +103,7 @@ contextBridge.exposeInMainWorld('eql', {
   encLoot: () => ipcRenderer.invoke('enc:loot'),
   encDeaths: () => ipcRenderer.invoke('enc:deaths'),
   ultimaMuerte: (nombres) => ipcRenderer.invoke('cronos:ultimaMuerte', { nombres }),
+  multiplicidadDe: (claves) => ipcRenderer.invoke('cronos:multiplicidad', { claves }),
   encProgress: () => ipcRenderer.invoke('enc:progress'),
   encFights: (q) => ipcRenderer.invoke('enc:fights', q),
   encCounts: () => ipcRenderer.invoke('enc:counts'),

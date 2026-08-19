@@ -4,7 +4,7 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets, ensureIdentidad } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
-import { estadoCrono, avisoDeVarios, claveCrono, ESTADO, PERIODOS_SOSPECHA, PRECISION } from '../src/cronos.js';
+import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
 import { parseZone, labelDiff } from '../src/zones.js';
@@ -5646,18 +5646,52 @@ async function renderCronos(snap, cajaSec) {
   // LA CLAVE ES NOMBRE + ZONA + DIFICULTAD, no el nombre. El periodo es de la
   // zona, así que dos zonas con el mismo bicho son dos cronos con dos tiempos,
   // y la muerte que reinicia uno no puede ser la de la otra punta del mundo.
-  const claves = lista.map((c) => ({ nombre: c.nombre, base: c.base ?? null, diff: c.diff ?? null }));
+  // Las CUATRO partes de la clave, no tres: si aquí se olvida el modo, el mapa
+  // que vuelve se indexa con una clave y se consulta con otra, y hoy no se nota
+  // sólo porque el modo es siempre null.
+  const claves = lista.map((c) => ({
+    nombre: c.nombre, base: c.base ?? null, diff: c.diff ?? null, mode: c.mode ?? null,
+  }));
   // La última muerte se pregunta cada vez que se pinta: el registro está vivo y
   // una marca cacheada dejaría el crono contando desde una muerte vieja.
   const muertes = claves.length ? (await window.eql.ultimaMuerte?.(claves)) ?? {} : {};
   const ahora = Math.floor(Date.now() / 1000);
 
-  const filas = lista.map((c) => {
-    const k = claveCrono(c);
-    const st = estadoCrono(c, {
-      ahora, ultimaMuerte: muertes[k] ?? null,
+  /**
+   * EL ESTADO SE CALCULA ANTES DE ORDENAR, y no puede ser de otra manera: el
+   * orden es «el que antes vuelve», y cuánto le queda a cada uno es
+   * precisamente lo que devuelve `estadoCrono`. Por eso son dos pasadas y no
+   * un `map` con `sort` encima.
+   */
+  const conEstado = lista.map((c) => ({
+    crono: c,
+    clave: claveCrono(c),
+    estado: estadoCrono(c, {
+      ahora, ultimaMuerte: muertes[claveCrono(c)] ?? null,
       medido: c.medido ?? null, heredado: c.heredado ?? null,
-    });
+    }),
+  }));
+
+  /**
+   * LA CLAVE NO PUEDE VIAJAR EN UN ATRIBUTO DEL DOM, y esto no era una teoría.
+   *
+   * `claveCrono` separa con `\u0000` a propósito: es lo único que no puede salir
+   * dentro del nombre de un bicho. Pero al escribirlo en un atributo, **el
+   * navegador lo sustituye por U+FFFD al parsear el HTML**, así que lo que se lee
+   * de vuelta en `dataset` NO ES la clave que se escribió. La comparación fallaba
+   * siempre y el botón «Cerrar» NO CERRABA. «Poner tiempo» tenía el mismo
+   * agujero.
+   *
+   * Se vio volcando el HTML renderizado con `bin/ui-volcar.js` y mirando el
+   * atributo crudo. Leyendo el código no aparece: el `esc()` está puesto, la
+   * clave es correcta y la comparación es la buena.
+   *
+   * Así que por el DOM viaja la POSICIÓN, y la fila se resuelve por identidad de
+   * objeto contra la lista ordenada. Una posición es un entero y no tiene nada
+   * que un parser pueda estropear.
+   */
+  const orden = ordenCola(conEstado);
+  const filas = orden.map(({ crono: c, clave: k, estado: st }, i) => {
     const v = st.valor;
     // Donde no hay valor suyo NO se pone un número peor. Se dice que no se
     // sabe y cuántas observaciones van: la marca de «poco fiable» no funciona,
@@ -5689,14 +5723,14 @@ async function renderCronos(snap, cajaSec) {
     const donde = c.base
       ? `<div class="cro-zona">${esc(c.base)}${c.mode ? ` · ${esc(c.mode)}` : ''}${c.diff ? ` · ${esc(labelDiff(c.diff))}` : ''}</div>`
       : `<div class="cro-zona cro-sinzona">${esc(t('cro.sinZona'))}</div>`;
-    return `<div class="cro" data-cro="${esc(k)}">
+    return `<div class="cro" data-cro="${i}">
       <div class="cro-cab"><b>${esc(c.nombre)}</b>
-        <button class="cro-x" data-quita="${esc(k)}">${esc(t('cro.close'))}</button></div>
+        <button class="cro-x" data-quita="${i}">${esc(t('cro.close'))}</button></div>
       ${donde}
       ${cuerpo}${fuente}${discrepa}${varios}${aviso}
-      <div class="cro-man"><input class="cro-in" data-man="${esc(k)}"
+      <div class="cro-man"><input class="cro-in" data-man="${i}"
         placeholder="${esc(t('cro.manualPh'))}" value="${c.manual != null ? cronoRestante(c.manual) : ''}">
-        <button data-set="${esc(k)}">${esc(t('cro.setManual'))}</button></div>
+        <button data-set="${i}">${esc(t('cro.setManual'))}</button></div>
     </div>`;
   }).join('');
 
@@ -5760,18 +5794,34 @@ async function renderCronos(snap, cajaSec) {
         .find((f) => f.name === nombre) ?? null
       : null;
     const muertes = aqui?.kills ?? (alta.base ? 0 : ficha?.kills ?? 0);
+    /**
+     * Y CUÁNTOS SE HAN VISTO A LA VEZ, que es la rama FUERTE del aviso.
+     *
+     * Se pasaba `null` y por eso esa rama no podía dispararse nunca: quedaba
+     * sólo la deducida —«ha muerto muchas veces, probablemente haya varios»—.
+     * Medido, la fuerte caza 117 claves que la débil no ve.
+     */
+    const vistos = ((await window.eql.multiplicidadDe?.([alta])) ?? {})[claveCrono(alta)] ?? null;
     await guardar([...lista, {
       ...alta, manual: null,
-      muertes,
-      aviso: avisoDeVarios(null, muertes),
+      muertes, vistos,
+      aviso: avisoDeVarios(vistos, muertes),
     }]);
   });
-  host.querySelectorAll('[data-quita]').forEach((el) => el.addEventListener('click',
-    () => guardar(lista.filter((c) => claveCrono(c) !== el.dataset.quita))));
+  // La posición es la de la lista ORDENADA, y la fila se resuelve por identidad
+  // de objeto: `orden[i].crono` es literalmente el mismo objeto que está en
+  // `lista`, así que el filtro no necesita comparar ninguna cadena.
+  host.querySelectorAll('[data-quita]').forEach((el) => el.addEventListener('click', () => {
+    const ese = orden[+el.dataset.quita]?.crono;
+    if (!ese) return;
+    guardar(lista.filter((c) => c !== ese));
+  }));
   host.querySelectorAll('[data-set]').forEach((el) => el.addEventListener('click', () => {
-    const k = el.dataset.set;
-    const txt = host.querySelector(`[data-man="${CSS.escape(k)}"]`)?.value;
-    guardar(lista.map((c) => (claveCrono(c) === k ? { ...c, manual: cronoParse(txt) } : c)));
+    const i = +el.dataset.set;
+    const ese = orden[i]?.crono;
+    const txt = host.querySelector(`[data-man="${i}"]`)?.value;
+    if (!ese) return;
+    guardar(lista.map((c) => (c === ese ? { ...c, manual: cronoParse(txt) } : c)));
   }));
 }
 
