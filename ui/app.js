@@ -4,6 +4,7 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
+import { estadoCrono, avisoDeVarios, ESTADO, PERIODOS_SOSPECHA } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
 import { muertesPorNombre } from '../src/suelo.js';
@@ -5526,6 +5527,111 @@ function foeDetail(a, f) {
  * la aplicación pensando que no funciona. Y hay un cuarto, falló, que tampoco
  * puede verse como el vacío.
  */
+/**
+ * TEMPORIZADORES DE REAPARICIÓN. Sección propia, activación MANUAL.
+ *
+ * La lógica está en `src/cronos.js` y se prueba sin interfaz. Aquí sólo se
+ * pinta, se pregunta al puente por la última muerte, y se guarda la lista.
+ *
+ * NO LO ENCIENDE NINGUNA MUERTE. Con cien bichos por sala, un crono que
+ * aparece solo cada vez que matas algo es ruido en pantalla justo cuando estás
+ * mirando otra cosa. Lo abre el jugador y lo cierra el jugador.
+ *
+ * LA CIFRA LLEVA SIEMPRE DE DÓNDE SALE, y son tres sitios distintos: su propia
+ * repetición, el ritmo de su zona, o lo que escribió Campeón. Es la misma
+ * doctrina que el resto de la aplicación —medido, deducido, declarado— y aquí
+ * importa más que en ningún sitio, porque un «vuelve en 4:25» de un común
+ * estaría prometiendo que el que vuelve es el mismo, y eso no lo sabemos.
+ */
+const cronoRestante = (r) => {
+  if (r == null) return '—';
+  const m = Math.floor(r / 60), sg = Math.round(r % 60);
+  return `${m}:${String(sg).padStart(2, '0')}`;
+};
+
+/** «mm:ss» o «ss» a segundos. Devuelve null si no se entiende. */
+const cronoParse = (txt) => {
+  const v = String(txt ?? '').trim();
+  if (!v) return null;
+  const m = /^(\d+):([0-5]?\d)$/.exec(v);
+  if (m) return (+m[1]) * 60 + (+m[2]);
+  return /^\d+$/.test(v) ? +v : null;
+};
+
+async function renderCronos(host) {
+  const lista = state.cfg?.cronos ?? [];
+  const nombres = lista.map((c) => c.nombre);
+  // La última muerte se pregunta cada vez que se pinta: el registro está vivo y
+  // una marca cacheada dejaría el crono contando desde una muerte vieja.
+  const muertes = nombres.length ? (await window.eql.ultimaMuerte?.(nombres)) ?? {} : {};
+  const ahora = Math.floor(Date.now() / 1000);
+
+  const filas = lista.map((c) => {
+    const st = estadoCrono(c, {
+      ahora, ultimaMuerte: muertes[c.nombre] ?? null,
+      medido: c.medido ?? null, heredado: c.heredado ?? null,
+    });
+    const v = st.valor;
+    const cuerpo = st.estado === ESTADO.SIN_MUERTE
+      ? `<div class="cro-espera">${esc(v.segundos == null ? t('cro.sinValor') : t('cro.esperando'))}</div>`
+      : st.estado === ESTADO.CONTANDO
+        ? `<div class="cro-num">${cronoRestante(st.restante)}</div>`
+        : `<div class="cro-num cro-cero">${esc(t('cro.disponible'))}</div>`;
+    // La procedencia va SIEMPRE al lado de la cifra, no en un desplegable.
+    const fuente = v.fuente
+      ? `<div class="cro-src">${esc(t(`cro.src.${v.fuente}`))} · ${cronoRestante(v.segundos)}</div>` : '';
+    const discrepa = v.discrepa != null
+      ? `<div class="cro-dif">${esc(t('cro.discrepa', {
+        tuyo: cronoRestante(v.segundos), nuestro: cronoRestante(v.otro.segundos), dif: cronoRestante(v.discrepa),
+      }))}</div>` : '';
+    const aviso = st.aviso === 'quizá-no-vemos-su-muerte'
+      ? `<div class="cro-avi">${esc(t('cro.sospecha', { n: PERIODOS_SOSPECHA }))}</div>` : '';
+    const varios = c.aviso === 'varios-a-la-vez' ? `<div class="cro-avi">${esc(t('cro.varios'))}</div>`
+      : c.aviso === 'probablemente-varios' ? `<div class="cro-avi">${esc(t('cro.quizaVarios', { n: c.muertes ?? 0 }))}</div>` : '';
+    return `<div class="cro" data-cro="${esc(c.nombre)}">
+      <div class="cro-cab"><b>${esc(c.nombre)}</b>
+        <button class="cro-x" data-quita="${esc(c.nombre)}">${esc(t('cro.close'))}</button></div>
+      ${cuerpo}${fuente}${discrepa}${varios}${aviso}
+      <div class="cro-man"><input class="cro-in" data-man="${esc(c.nombre)}"
+        placeholder="${esc(t('cro.manualPh'))}" value="${c.manual != null ? cronoRestante(c.manual) : ''}">
+        <button data-set="${esc(c.nombre)}">${esc(t('cro.setManual'))}</button></div>
+    </div>`;
+  }).join('');
+
+  host.innerHTML = `<h2>${esc(t('cro.title'))}</h2>
+    <p class="sub">${esc(t('cro.sub'))}</p>
+    <div class="cro-add"><input id="croNuevo" placeholder="${esc(t('cro.addPh'))}">
+      <button id="croAdd">${esc(t('cro.add'))}</button></div>
+    <div class="cro-lista">${filas || `<p class="sub">${esc(t('cro.vacio'))}</p>`}</div>`;
+
+  const guardar = async (l) => {
+    await window.eql.setFlag('cronos', l);
+    state.cfg.cronos = l;
+    await renderCronos(host);
+  };
+
+  host.querySelector('#croAdd')?.addEventListener('click', async () => {
+    const nombre = host.querySelector('#croNuevo')?.value?.trim();
+    if (!nombre || lista.some((c) => c.nombre === nombre)) return;
+    // El aviso de «hay varios» se calcula AL ABRIRLO y se guarda con el crono:
+    // después ya se ha creído lo que decía, y avisar entonces no sirve.
+    const ficha = (state.enc?.foes ?? []).find((f) => f.name === nombre) ?? null;
+    await guardar([...lista, {
+      nombre, manual: null,
+      medido: ficha?.respawnMedido ?? null, heredado: ficha?.respawnZona ?? null,
+      muertes: ficha?.kills ?? 0,
+      aviso: avisoDeVarios(null, ficha?.kills ?? 0),
+    }]);
+  });
+  host.querySelectorAll('[data-quita]').forEach((el) => el.addEventListener('click',
+    () => guardar(lista.filter((c) => c.nombre !== el.dataset.quita))));
+  host.querySelectorAll('[data-set]').forEach((el) => el.addEventListener('click', () => {
+    const n = el.dataset.set;
+    const txt = host.querySelector(`[data-man="${CSS.escape(n)}"]`)?.value;
+    guardar(lista.map((c) => (c.nombre === n ? { ...c, manual: cronoParse(txt) } : c)));
+  }));
+}
+
 const SECCIONES = [
   { id: 'escena', grupo: 'pelea', ico: '▮', rotulo: () => t('sec.escena'),
     listo: true, lista: true, pinta: renderEscena },
@@ -5559,6 +5665,8 @@ const SECCIONES = [
     listo: true, lista: false, pinta: renderHechizos },
   { id: 'muertes', grupo: 'historico', ico: '†', rotulo: () => t('sec.muertes'),
     listo: true, lista: false, pinta: renderMuertes },
+  { id: 'cronos', grupo: 'historico', ico: '◷', rotulo: () => t('sec.cronos'),
+    listo: true, lista: false, pinta: renderCronos },
   { id: 'avisos', grupo: 'ajustes', ico: '◉', rotulo: () => t('tab.alerts'),
     listo: true, lista: false, pinta: renderAvisos },
   { id: 'preferencias', grupo: 'ajustes', ico: '⚙', rotulo: () => t('sec.preferencias'),

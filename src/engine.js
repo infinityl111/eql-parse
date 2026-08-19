@@ -1699,6 +1699,53 @@ export class Engine extends EventEmitter {
   encFoeAt(name, diff) { return this.enc?.foeAt(name, diff ?? null) ?? null; }
   encFoes() { return this.enc?.foes() ?? []; }
   encLoot() { return this.enc?.lootList() ?? []; }
+  /**
+   * LA ÚLTIMA MUERTE DE CADA NOMBRE, para el temporizador de reaparición.
+   *
+   * Se busca por el ÍNDICE, que ya trae los nombres matados en cada pelea, y
+   * sólo se abre del disco LA PELEA QUE LA CONTIENE, para sacarle el
+   * desplazamiento exacto de `killTimes`. Con el índice a secas la marca sería
+   * la del principio de la pelea, y en una pelea larga eso son minutos de
+   * error justo en la cifra que el crono descuenta.
+   *
+   * Devuelve segundos epoch, o null si ese nombre no ha muerto nunca. NULL NO
+   * ES CERO: «no ha muerto nunca» y «murió en el instante cero» no pueden
+   * verse igual, y quien lo pinta se apoya en esa distinción.
+   */
+  ultimaMuerte(nombres = []) {
+    const pide = new Set(nombres.filter(Boolean));
+    const out = {};
+    for (const n of pide) out[n] = null;
+    if (!pide.size || !this.store) return out;
+
+    // Del más reciente al más viejo: en cuanto un nombre aparece, ya es el suyo.
+    const idx = [...(this.store.index ?? [])].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+    const faltan = new Set(pide);
+    for (const sm of idx) {
+      if (!faltan.size) break;
+      const aqui = (sm.kills ?? []).filter((k) => faltan.has(k));
+      if (!aqui.length) continue;
+      let f = null;
+      try { f = this.store.get(sm.uid); } catch { f = null; }
+      for (const n of aqui) {
+        // `killTimes` da el segundo dentro de la pelea. Si falta —peleas
+        // guardadas por versiones que no lo escribían— se cae al final de la
+        // pelea, que es la cota más cercana que hay, y no al principio.
+        const kt = (f?.killTimes ?? []).filter((k) => k.name === n).map((k) => k.t);
+        const off = kt.length ? Math.max(...kt) : (sm.duration ?? 0);
+        /**
+         * `sm.at` va en MILISEGUNDOS y `killTimes.t` en SEGUNDOS. Sumarlos sin
+         * convertir daba fechas del año 58600, que es la clase de error que
+         * sólo se ve si miras el resultado: la aritmética no falla, la unidad
+         * sí. Aquí se devuelve en segundos, que es lo que dice la cabecera.
+         */
+        out[n] = Math.round((sm.at ?? 0) / 1000) + off;
+        faltan.delete(n);
+      }
+    }
+    return out;
+  }
+
   encDeaths() { return this.enc?.deaths(this.self) ?? null; }
   encProgress() { return this.enc?.progress() ?? null; }
   encCounts() { return this.enc?.counts() ?? null; }
