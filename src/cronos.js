@@ -38,9 +38,29 @@
  * ── LAS TRES FUENTES DEL VALOR, Y HAY QUE DECIR CUÁL ES ───────────────────
  *
  *   medido     de su propia repetición confirmada. Hoy: 2 enemigos.
- *   heredado   del periodo de reaparición de su zona. Hoy: 6 claves de 52.
+ *   heredado   del periodo de reaparición de su zona. RETIRADO como concepto
+ *              el 19/08/2026: ver abajo. Sigue en el código porque el valor se
+ *              guarda al lado, pero no es una vía y no debe volver a serlo.
  *   manual     lo escribe Campeón. NO existe todavía, y es la que hace que la
  *              sección sirva desde el primer día — sin ella, 8 enemigos.
+ *
+ * ── «HEREDADO» NO ES QUE FALTE MUESTRA: ES QUE LA UNIDAD NO ES LA ZONA ────
+ *
+ * `heredado` significaba «este nombrado no tiene datos propios, así que se le
+ * presta el periodo de su zona». Era la vía de rescate de los nombrados, que son
+ * justo los que casi no tienen intervalos: 2,21 por par de media.
+ *
+ * Se cae, y no por falta de datos. Medido: `The Ruins of Old Guk D2` tiene SEIS
+ * periodos reales —100, 159, 219, 236, 483 y 567 s—, Befallen D2 tiene tres y
+ * The Warrens D0 tiene tres. **«El periodo de la zona» no es un número mal
+ * medido: es un objeto que no existe.** No se puede heredar de algo que no está
+ * ahí, y elegir uno de los seis sería inventar el que conviene.
+ *
+ * De paso explica el desacuerdo con la wiki, que declara una cifra por zona: no
+ * nos contradice, mide otra cosa.
+ *
+ * La unidad candidata es la que este fichero ya usa como clave —zona base +
+ * dificultad + NOMBRE—, y si da muestra suficiente está por ver.
  *
  * ── Y DESDE EL 19/08/2026, EL MANUAL ES LA ÚNICA QUE SALE A PANTALLA ──────
  *

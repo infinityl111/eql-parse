@@ -18,9 +18,12 @@
  *     SE PERSISTE LO OBSERVADO; SE RECALCULA LO DERIVADO.
  *
  * `unidentified` es DERIVADO y se guardaba como HECHO. Se calculaba con lo que
- * se sabía EN LA SESIÓN en que se cerró la pelea, y sus dos fuentes viven sólo
- * en memoria: `whoSeen` no se escribe nunca a disco, y `petSet` sólo guarda la
+ * se sabía EN LA SESIÓN en que se cerró la pelea, y sus dos fuentes vivían sólo
+ * en memoria: `whoSeen` no se escribía a disco, y `petSet` sólo guarda la
  * mascota ACTUAL —al invocar otra, la anterior deja de ser tuya para el motor—.
+ *
+ * `whoSeen` ya se persiste, en `who.json` (ver el último bloque). `petSet` no
+ * hace falta persistirlo: `pets.json` es su sustituto acumulado y ya estaba.
  *
  * Medido sobre el almacén real: **369 de 1.894 peleas (19,5 %)** tenían a
  * alguien sin identificar sumando en el total. Recalculando al leer: **248
@@ -43,6 +46,7 @@ const CTX = {
   companions: new Set(['Kalforgelp', 'Notarino']),
   knownPets: new Set(['Loneker', 'Gonartik', 'Jarektik']),
   notPets: new Set(['Jarektik']),
+  whoSeen: new Set(['Armadeath']),
 };
 const fila = (name, extra = {}) => ({ name, side: 'ally', damage: 100, ...extra });
 
@@ -137,6 +141,45 @@ console.log('\nlos enemigos no entran en esto');
     'una fila de enemigo se devuelve tal cual, sin tocar');
   ok(identificado(fila('a greater skeleton', { charmed: true }), CTX),
     'pero un bicho ENCANTADO por alguien sí se identifica: consta lo que es');
+}
+
+console.log('\nun /who identifica, y por eso se persiste');
+{
+  /**
+   * LA DISTINCIÓN QUE HACE QUE ESTO NO CONTRADIGA LA REGLA, y es toda la
+   * cuestión:
+   *
+   *   el `/who` es LO OBSERVADO       -> se persiste, en `who.json`
+   *   «es de los tuyos» es DERIVADO   -> no se guarda, se recalcula al leer
+   *
+   * Un `/who` no dice que alguien sea tuyo. Dice QUIÉN es. Y «sin identificar»
+   * significa exactamente que no se sabe quién es, así que con la línea delante
+   * el rótulo es falso.
+   *
+   * `whoSeen` vivía sólo en memoria (`src/engine.js`), y por eso la misma
+   * persona salía identificada en la pelea de las 21:14 y desconocida en la de
+   * las 21:19. Medido: costaba 4 filas del residuo, las únicas que se perdían
+   * de verdad.
+   */
+  ok(identificado(fila('Armadeath'), CTX),
+    'alguien de quien hay un /who NO está sin identificar');
+
+  /**
+   * Y el control, que es lo que impide que esto se convierta en «todo el mundo
+   * está identificado»: sin la línea, el mismo nombre sigue siendo desconocido.
+   * Lo que identifica es la observación, no la regla.
+   */
+  const sinWho = { ...CTX, whoSeen: new Set() };
+  ok(!identificado(fila('Armadeath'), sinWho),
+    'CONTROL: sin la línea del /who, el mismo nombre sigue siendo un desconocido');
+
+  /**
+   * Y no invierte el bando: un `/who` sobre alguien no lo hace tuyo, sólo
+   * conocido. La fila sigue siendo de quien era.
+   */
+  const [r] = ensureIdentidad([fila('Armadeath', { unidentified: true })], CTX);
+  ok(r.unidentified === false && r.side === 'ally',
+    'identificarlo no le cambia el bando: dice quién es, no de quién es');
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

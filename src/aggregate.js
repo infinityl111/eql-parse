@@ -314,6 +314,7 @@ export function mergePets(rows = [], label = 'Mascotas', known = [], self = null
  *   4. compañero declarado          lo dices tú
  *   5. está en las mascotas conocidas y no lo has desmentido
  *   6. encantado                    observado: `X has been charmed` es literal
+ *   7. sale en un `/who`            observado: la línea del /who es literal
  *
  * La guarda del 3 no es adorno: en el almacén hay `Innoruuk`s Chosen`, que es
  * un BICHO. Sin exigir que el dueño sea tuyo o declarado, esa regla convertiría
@@ -326,9 +327,10 @@ export function mergePets(rows = [], label = 'Mascotas', known = [], self = null
  *     `pets.json` — son del segundo invocador del trío, y el registro que
  *     leemos es el del otro. Esa información no está en el fichero.
  *   · 5 nombres que tú mismo has declarado ajenos (`notPets`).
- * Y quedan 4 filas que se pierden de verdad: gente de la que hubo un `/who` en
- * su sesión y nadie escribió a disco. Se arreglaría persistiendo `whoSeen`,
- * que es exactamente el mismo remedio que se le dio a las mascotas.
+ * Las 4 filas que se perdían —gente de la que hubo un `/who` en su sesión y
+ * nadie escribió a disco— ya no se pierden: `whoSeen` se persiste en
+ * `who.json`. Y no contradice la regla, porque el `/who` es LO OBSERVADO; lo
+ * derivado es el veredicto «es de los tuyos», y eso sigue sin guardarse.
  *
  * @param {object} ctx { self, companions, knownPets, notPets }
  */
@@ -346,6 +348,9 @@ export function identificado(r, ctx = {}) {
   if (amigos.has(nombre)) return true;
   if (conj(ctx.knownPets).has(nombre) && !conj(ctx.notPets).has(nombre)) return true;
   if (r.charmed) return true;
+  // Un `/who` dice QUIÉN es, no que sea tuyo — y «sin identificar» significa
+  // exactamente que no se sabe quién es. Si hay línea, se sabe.
+  if (conj(ctx.whoSeen).has(nombre)) return true;
   return false;
 }
 

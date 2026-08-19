@@ -568,6 +568,7 @@ function withPets(f) {
     companions: companeros(),
     knownPets: petNames(),
     notPets: state.cfg?.notPets ?? [],
+    whoSeen: state.snap?.whoSeen ?? [],
   });
   if (state.cfg.mergePets) {
     rows = mergePets(rows, t('pets.merged'), petNames(), state.snap?.self, state.cfg.notPets ?? []);

@@ -173,12 +173,25 @@ export class Engine extends EventEmitter {
     this.promptedClass = null;    // para no repetir el aviso por cada hechizo
     this.classSourceAt = null;    // de dónde salió el trío: /who, inferido o manual
     this.petPrompted = new Set();  // nombres por los que ya se ha pedido el comando
-    this.whoSeen = new Set();      // jugadores de los que hay un /who: no son desconocidos
+    /**
+     * LOS NOMBRES DE LOS QUE HAY UN `/who`. Se PERSISTE, y no contradice la
+     * regla de no guardar derivados: el `/who` es LO OBSERVADO —una línea
+     * literal del registro—. Lo derivado es el veredicto «es de los tuyos», y
+     * eso es lo que no se guarda: se recalcula al leer.
+     *
+     * Vivía sólo en memoria, y por eso la misma persona salía identificada en
+     * la pelea de las 21:14 y desconocida en la de las 21:19. Es el mismo
+     * error que tenían las mascotas y la misma cura: `pets.json`.
+     *
+     * Y dice lo que dice y nada más: que se sabe QUIÉN es, no que sea tuyo.
+     */
+    this.whoSeen = new Set();
     this.trios = [];              // tabla declarada a mano; manda sobre todo
     this.trioIdx = 0;
     this.trioActive = null;
     this.knownPets = new Set();  // todas las vistas alguna vez, entre sesiones
     this.petsSaved = 0;
+    this.whoSaved = 0;
     this.notMine = new Set();    // aliados que ya dijiste que no son tuyos
     // Compañeros de grupo: declarados por ti o detectados por el canal.
     //
@@ -1533,6 +1546,13 @@ export class Engine extends EventEmitter {
       for (const n of raw.pets ?? []) this.knownPets.add(n);
       this.petsSaved = this.knownPets.size;
     } catch { /* aún no hay lista */ }
+    // Y los `/who` de sesiones anteriores, por lo mismo: sin esto, alguien a
+    // quien identificaste ayer vuelve a salir como desconocido hoy.
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(dir, 'who.json'), 'utf8'));
+      for (const n of raw.who ?? []) this.whoSeen.add(n);
+      this.whoSaved = this.whoSeen.size;
+    } catch { /* aún no hay lista */ }
     const n = this.store.load();
     this.history = this.store.filter({ limit: 60 });
     // La enciclopedia va detrás del almacén y nunca antes: necesita el índice
@@ -1554,6 +1574,11 @@ export class Engine extends EventEmitter {
       if (all.size && all.size !== this.petsSaved) {
         fs.writeFileSync(path.join(this.store.dir, 'pets.json'), JSON.stringify({ pets: [...all] }));
         this.petsSaved = all.size;
+      }
+      // Los `/who`, con el mismo trato y por la misma razón.
+      if (this.whoSeen.size && this.whoSeen.size !== this.whoSaved) {
+        fs.writeFileSync(path.join(this.store.dir, 'who.json'), JSON.stringify({ who: [...this.whoSeen] }));
+        this.whoSaved = this.whoSeen.size;
       }
     } catch { /* sin permisos */ }
     try {
@@ -2020,6 +2045,9 @@ export class Engine extends EventEmitter {
       pets: this.parser ? [...this.parser.pets.keys()] : [],
       allPets: [...new Set([...this.knownPets, ...(this.parser?.pets.keys() ?? [])])],
       petOwners: Object.fromEntries(this.parser?.otherPets ?? []),
+      // Quién ha salido en un `/who`, para que el lector pueda recalcular la
+      // identidad en vez de creerse la que se guardó con la pelea.
+      whoSeen: [...this.whoSeen],
       timers: this.triggers.snapshot(),
       current,
       history: this.history,
