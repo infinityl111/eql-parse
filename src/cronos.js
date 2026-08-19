@@ -11,6 +11,22 @@
  * temporizador que aparece solo cada vez que matas algo es ruido en pantalla
  * cuando estás matando cien bichos, que es justo lo que se hace en este juego.
  *
+ * ── LA CLAVE ES NOMBRE + ZONA + DIFICULTAD ────────────────────────────────
+ *
+ * Corregido el 19/08/2026 por indicación de Campeón. La clave era sólo el
+ * NOMBRE, y eso da mal el número: el periodo es de la zona, no del bicho, así
+ * que `a greater skeleton` de Befallen D2 y `a greater skeleton` de otra zona
+ * son dos cronos distintos con dos tiempos distintos. Con la clave vieja el
+ * segundo pisaba al primero, y la última muerte que lo reiniciaba podía ser de
+ * la otra punta del mundo.
+ *
+ * La dificultad entra en la clave por la misma razón que entra en todo lo
+ * demás de este proyecto: `Old Guk D2` mide 567 y `Old Guk D3` mide 568. Son
+ * medidas distintas y juntarlas es inventar una tercera.
+ *
+ * `base` a null es «no consta la zona» y NO es «cualquier zona»: son los
+ * cronos guardados antes de este cambio, que se conservan pero se marcan.
+ *
  * ── UN CRONO POR NOMBRE, NO POR MUERTE ────────────────────────────────────
  *
  * Con cien individuos del mismo nombre en la zona, matar a tres seguidos no
@@ -259,3 +275,18 @@ export function avisoDeVarios(individuosVistos = null, muertes = 0) {
  */
 export const debeReiniciar = (crono, ultimaMuerte) =>
   ultimaMuerte != null && (crono?.vistaHasta == null || ultimaMuerte > crono.vistaHasta);
+
+/**
+ * LA CLAVE DE UN CRONO: nombre + zona base + dificultad.
+ *
+ * Se separa con `\u0000` y no con un guion porque los nombres del juego traen
+ * de todo —`Kahaptra Z`Taj`, `Notarino\`s warder`— y cualquier separador
+ * imprimible acabaría dentro de un nombre antes o después. `\u0000` no puede
+ * salir en una línea del registro.
+ *
+ * `base` null se guarda como cadena vacía: el crono existe, pero sin zona.
+ */
+export const claveCrono = (c) => `${c?.nombre ?? ''}\u0000${c?.base ?? ''}\u0000${c?.diff ?? ''}`;
+
+/** Dos cronos son el mismo si coinciden nombre, zona base y dificultad. */
+export const mismaClave = (a, b) => claveCrono(a) === claveCrono(b);

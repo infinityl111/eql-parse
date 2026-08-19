@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { claveCrono } from './cronos.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -1700,7 +1701,13 @@ export class Engine extends EventEmitter {
   encFoes() { return this.enc?.foes() ?? []; }
   encLoot() { return this.enc?.lootList() ?? []; }
   /**
-   * LA ÚLTIMA MUERTE DE CADA NOMBRE, para el temporizador de reaparición.
+   * LA ÚLTIMA MUERTE DE CADA CLAVE, para el temporizador de reaparición.
+   *
+   * La clave es NOMBRE + ZONA BASE + DIFICULTAD, no el nombre a secas: el
+   * periodo es de la zona, así que la muerte que reinicia el crono de
+   * `a greater skeleton` en Befallen D2 no puede ser la de otra zona. `base` o
+   * `diff` a null es «no filtres por eso» — los cronos guardados antes de este
+   * cambio, que se conservan.
    *
    * Se busca por el ÍNDICE, que ya trae los nombres matados en cada pelea, y
    * sólo se abre del disco LA PELEA QUE LA CONTIENE, para sacarle el
@@ -1725,31 +1732,41 @@ export class Engine extends EventEmitter {
    * error de unidad no lo caza ninguna prueba de tipos ni ninguna revisión
    * rápida: lo caza el nombre, o no lo caza nadie.
    */
-  ultimaMuerte(nombres = []) {
-    const pide = new Set(nombres.filter(Boolean));
+  ultimaMuerte(claves = []) {
+    // Retrocompatible: una lista de cadenas es la forma vieja, sin zona.
+    const pide = claves.filter(Boolean)
+      .map((c) => (typeof c === 'string' ? { nombre: c, base: null, diff: null } : c))
+      .filter((c) => c.nombre);
     const out = {};
-    for (const n of pide) out[n] = null;
+    for (const c of pide) out[claveCrono(c)] = null;
     if (!pide.size || !this.store) return out;
 
-    // Del más reciente al más viejo: en cuanto un nombre aparece, ya es el suyo.
+    // Del más reciente al más viejo: en cuanto una clave aparece, ya es la suya.
     const idx = [...(this.store.index ?? [])].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
-    const faltan = new Set(pide);
+    const faltan = new Map(pide.map((c) => [claveCrono(c), c]));
     for (const sm of idx) {
       if (!faltan.size) break;
-      const aqui = (sm.kills ?? []).filter((k) => faltan.has(k));
+      // La zona y la dificultad de la pelea, del ÍNDICE: `summary()` las
+      // escribe justo para no tener que abrir cada pelea del disco.
+      const aqui = [];
+      for (const [k, c] of faltan) {
+        if (c.base != null && (sm.zoneBase ?? null) !== c.base) continue;
+        if (c.diff != null && (sm.diff ?? null) !== c.diff) continue;
+        if ((sm.kills ?? []).includes(c.nombre)) aqui.push([k, c.nombre]);
+      }
       if (!aqui.length) continue;
       const inicioMs = sm.at ?? 0;                  // el índice guarda MILISEGUNDOS
       const duracionSeg = sm.duration ?? 0;         // y la duración, SEGUNDOS
       let f = null;
       try { f = this.store.get(sm.uid); } catch { f = null; }
-      for (const n of aqui) {
+      for (const [k, n] of aqui) {
         // `killTimes` da el SEGUNDO dentro de la pelea. Si falta —peleas
         // guardadas por versiones que no lo escribían— se cae al final de la
         // pelea, que es la cota más cercana que hay, y no al principio.
-        const tsSeg = (f?.killTimes ?? []).filter((k) => k.name === n).map((k) => k.t);
+        const tsSeg = (f?.killTimes ?? []).filter((x) => x.name === n).map((x) => x.t);
         const dentroSeg = tsSeg.length ? Math.max(...tsSeg) : duracionSeg;
-        out[n] = Math.round(inicioMs / 1000) + dentroSeg;
-        faltan.delete(n);
+        out[k] = Math.round(inicioMs / 1000) + dentroSeg;
+        faltan.delete(k);
       }
     }
     return out;

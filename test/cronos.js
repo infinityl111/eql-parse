@@ -28,8 +28,7 @@
  */
 import {
   valorDe, estadoCrono, avisoDeVarios, debeReiniciar,
-  precisionDe, ESTADO, PERIODOS_SOSPECHA, PRECISION,
-} from '../src/cronos.js';
+  precisionDe, ESTADO, PERIODOS_SOSPECHA, PRECISION, claveCrono, mismaClave } from '../src/cronos.js';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -234,6 +233,68 @@ console.log('\nlas observaciones traen su ventana');
   ok(jefe.fuente === 'heredado', 'y sigue diciendo de dónde sale');
 
   ok(valorDe({}).precision === null, 'sin valor no hay precisión que declarar');
+}
+
+console.log('\nla clave es NOMBRE + ZONA + DIFICULTAD');
+{
+  /**
+   * EL CASO QUE MOTIVA EL CAMBIO, y por eso va primero.
+   *
+   * `a greater skeleton` existe en más de una zona. Con la clave vieja —sólo el
+   * nombre— el segundo crono no se podía ni abrir, y la muerte que reiniciaba al
+   * primero podía ser de la otra punta del mundo. El periodo es de la ZONA, así
+   * que son dos cronos con dos tiempos.
+   */
+  const befallen = { nombre: 'a greater skeleton', base: 'Befallen', diff: 2 };
+  const guk = { nombre: 'a greater skeleton', base: 'The Ruins of Old Guk', diff: 2 };
+  ok(!mismaClave(befallen, guk),
+    'el mismo bicho en dos zonas son DOS cronos, no uno');
+
+  /**
+   * Y la dificultad entra por la misma razón que en todo lo demás: Old Guk D2
+   * mide 567 y Old Guk D3 mide 568. Son dos medidas y juntarlas inventa una
+   * tercera que no se ha observado.
+   */
+  ok(!mismaClave(guk, { ...guk, diff: 3 }),
+    'la dificultad también parte: D2 y D3 son dos medidas distintas');
+
+  ok(mismaClave(befallen, { ...befallen }), 'y lo idéntico sigue siendo idéntico');
+
+  /**
+   * CONTROL POSITIVO de que la clave separa por lo que decimos y no por el
+   * objeto: dos objetos distintos con los mismos tres campos dan la misma clave,
+   * y cambiar CUALQUIERA de los tres la cambia. Sin esto, un `claveCrono` que
+   * devolviera siempre algo distinto pasaría los tres 'ok' de arriba.
+   */
+  ok(claveCrono(befallen) === claveCrono({ ...befallen, extra: 1 }),
+    'CONTROL: un campo de más no cambia la clave — no depende del objeto');
+  const campos = [
+    ['nombre', 'otro bicho'], ['base', 'otra zona'], ['diff', 4],
+  ];
+  campos.forEach(([k, v]) => ok(claveCrono({ ...befallen, [k]: v }) !== claveCrono(befallen),
+    `CONTROL: cambiar ${k} cambia la clave`));
+
+  /**
+   * Los cronos guardados antes de este cambio no traen zona. Se conservan —vale
+   * más un crono sin zona que ninguno— pero NO se confunden con uno que sí la
+   * tiene, o al abrir el de Befallen se estaría reabriendo el viejo.
+   */
+  const viejo = { nombre: 'a greater skeleton' };
+  ok(!mismaClave(viejo, befallen),
+    'un crono sin zona no es el mismo que uno con zona');
+  ok(mismaClave(viejo, { nombre: viejo.nombre, base: null, diff: null }),
+    'y «sin zona» es una sola cosa: falte el campo o valga null');
+
+  /**
+   * El separador no puede salir en un nombre del juego. Si fuera imprimible,
+   * `Notarino's warder` en la zona X y `Notarino` en la zona `s warder|X`
+   * darían la misma clave. Con `\u0000` eso no puede pasar: no hay línea del
+   * registro que lo contenga.
+   */
+  ok(claveCrono({ nombre: 'a', base: 'b|c' }) !== claveCrono({ nombre: 'a|b', base: 'c' }),
+    'el separador no se puede falsificar desde un nombre');
+  ok(claveCrono({ nombre: 'x' }).includes('\u0000'),
+    'y es \\u0000, que no puede salir en el registro');
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

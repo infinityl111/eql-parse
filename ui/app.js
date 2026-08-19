@@ -4,9 +4,10 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
-import { estadoCrono, avisoDeVarios, ESTADO, PERIODOS_SOSPECHA, PRECISION } from '../src/cronos.js';
+import { estadoCrono, avisoDeVarios, claveCrono, ESTADO, PERIODOS_SOSPECHA, PRECISION } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
+import { parseZone, labelDiff } from '../src/zones.js';
 import { muertesPorNombre } from '../src/suelo.js';
 import { copiarAlPortapapeles } from './clip.js';
 import { pedirDatos, acercaDe } from './dialogo.js';
@@ -5610,15 +5611,19 @@ const cronoParse = (txt) => {
 
 async function renderCronos(host) {
   const lista = state.cfg?.cronos ?? [];
-  const nombres = lista.map((c) => c.nombre);
+  // LA CLAVE ES NOMBRE + ZONA + DIFICULTAD, no el nombre. El periodo es de la
+  // zona, así que dos zonas con el mismo bicho son dos cronos con dos tiempos,
+  // y la muerte que reinicia uno no puede ser la de la otra punta del mundo.
+  const claves = lista.map((c) => ({ nombre: c.nombre, base: c.base ?? null, diff: c.diff ?? null }));
   // La última muerte se pregunta cada vez que se pinta: el registro está vivo y
   // una marca cacheada dejaría el crono contando desde una muerte vieja.
-  const muertes = nombres.length ? (await window.eql.ultimaMuerte?.(nombres)) ?? {} : {};
+  const muertes = claves.length ? (await window.eql.ultimaMuerte?.(claves)) ?? {} : {};
   const ahora = Math.floor(Date.now() / 1000);
 
   const filas = lista.map((c) => {
+    const k = claveCrono(c);
     const st = estadoCrono(c, {
-      ahora, ultimaMuerte: muertes[c.nombre] ?? null,
+      ahora, ultimaMuerte: muertes[k] ?? null,
       medido: c.medido ?? null, heredado: c.heredado ?? null,
     });
     const v = st.valor;
@@ -5638,13 +5643,20 @@ async function renderCronos(host) {
       ? `<div class="cro-avi">${esc(t('cro.sospecha', { n: PERIODOS_SOSPECHA }))}</div>` : '';
     const varios = c.aviso === 'varios-a-la-vez' ? `<div class="cro-avi">${esc(t('cro.varios'))}</div>`
       : c.aviso === 'probablemente-varios' ? `<div class="cro-avi">${esc(t('cro.quizaVarios', { n: c.muertes ?? 0 }))}</div>` : '';
-    return `<div class="cro" data-cro="${esc(c.nombre)}">
+    // La zona va SIEMPRE a la vista, no en un desplegable: sin ella la ficha no
+    // dice a qué se refiere el número, y dos fichas del mismo bicho en dos zonas
+    // se verían idénticas con dos cuentas atrás distintas.
+    const donde = c.base
+      ? `<div class="cro-zona">${esc(c.base)}${c.diff ? ` · ${esc(labelDiff(c.diff))}` : ''}</div>`
+      : `<div class="cro-zona cro-sinzona">${esc(t('cro.sinZona'))}</div>`;
+    return `<div class="cro" data-cro="${esc(k)}">
       <div class="cro-cab"><b>${esc(c.nombre)}</b>
-        <button class="cro-x" data-quita="${esc(c.nombre)}">${esc(t('cro.close'))}</button></div>
+        <button class="cro-x" data-quita="${esc(k)}">${esc(t('cro.close'))}</button></div>
+      ${donde}
       ${cuerpo}${fuente}${discrepa}${varios}${aviso}
-      <div class="cro-man"><input class="cro-in" data-man="${esc(c.nombre)}"
+      <div class="cro-man"><input class="cro-in" data-man="${esc(k)}"
         placeholder="${esc(t('cro.manualPh'))}" value="${c.manual != null ? cronoRestante(c.manual) : ''}">
-        <button data-set="${esc(c.nombre)}">${esc(t('cro.setManual'))}</button></div>
+        <button data-set="${esc(k)}">${esc(t('cro.setManual'))}</button></div>
     </div>`;
   }).join('');
 
@@ -5662,23 +5674,29 @@ async function renderCronos(host) {
 
   host.querySelector('#croAdd')?.addEventListener('click', async () => {
     const nombre = host.querySelector('#croNuevo')?.value?.trim();
-    if (!nombre || lista.some((c) => c.nombre === nombre)) return;
+    if (!nombre) return;
+    // La zona se coge de donde está AHORA, y no se pregunta: el crono se abre
+    // estando delante del bicho. Si no consta zona se abre igual —vale más un
+    // crono sin zona que ninguno— pero la ficha lo dice.
+    const z = state.snap?.zone ? parseZone(state.snap.zone) : null;
+    const alta = { nombre, base: z?.base ?? null, diff: z?.diff ?? null };
+    if (lista.some((c) => claveCrono(c) === claveCrono(alta))) return;
     // El aviso de «hay varios» se calcula AL ABRIRLO y se guarda con el crono:
     // después ya se ha creído lo que decía, y avisar entonces no sirve.
     const ficha = (state.enc?.foes ?? []).find((f) => f.name === nombre) ?? null;
     await guardar([...lista, {
-      nombre, manual: null,
+      ...alta, manual: null,
       medido: ficha?.respawnMedido ?? null, heredado: ficha?.respawnZona ?? null,
       muertes: ficha?.kills ?? 0,
       aviso: avisoDeVarios(null, ficha?.kills ?? 0),
     }]);
   });
   host.querySelectorAll('[data-quita]').forEach((el) => el.addEventListener('click',
-    () => guardar(lista.filter((c) => c.nombre !== el.dataset.quita))));
+    () => guardar(lista.filter((c) => claveCrono(c) !== el.dataset.quita))));
   host.querySelectorAll('[data-set]').forEach((el) => el.addEventListener('click', () => {
-    const n = el.dataset.set;
-    const txt = host.querySelector(`[data-man="${CSS.escape(n)}"]`)?.value;
-    guardar(lista.map((c) => (c.nombre === n ? { ...c, manual: cronoParse(txt) } : c)));
+    const k = el.dataset.set;
+    const txt = host.querySelector(`[data-man="${CSS.escape(k)}"]`)?.value;
+    guardar(lista.map((c) => (claveCrono(c) === k ? { ...c, manual: cronoParse(txt) } : c)));
   }));
 }
 
