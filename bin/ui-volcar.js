@@ -150,7 +150,7 @@ try {
   // temporizador que no abrió.
   if (DEMO) {
     await evalua("document.querySelectorAll('[data-quita]').forEach((b) => b.click())");
-    await espera(1200);
+    await espera(2500);
     const quedan = await evalua("document.querySelectorAll('[data-quita]').length");
     if (quedan) console.log(`    ⚠ quedan ${quedan} temporizadores abiertos: ciérralos a mano`);
     else console.log('    (el temporizador de prueba queda cerrado)');

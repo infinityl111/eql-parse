@@ -345,8 +345,25 @@ export const debeReiniciar = (crono, ultimaMuerte) =>
  * salir en una línea del registro.
  *
  * `base` null se guarda como cadena vacía: el crono existe, pero sin zona.
+ *
+ * ── EL MODO ENTRA EN LA CLAVE, PERO NO ARREGLA NADA HOY ──────────────────
+ *
+ * Escribí que `Nagafen's Lair Solo` y `Nagafen's Lair Grupo` compartían crono.
+ * **Es falso, y lo comprobé después de escribirlo:** `parseZone` deja el modo
+ * DENTRO de `base` —devuelve `base: "Nagafen's Lair Solo"` y `mode: null`—,
+ * así que las dos copias ya tenían claves distintas. No había colisión.
+ *
+ * El campo se queda porque no cuesta nada y porque el día que `parseZone`
+ * aprenda a separar el modo, la clave ya lo espera. Pero HOY es siempre null,
+ * y decir que arregla algo sería vender un arreglo inventado.
+ *
+ * Lo que sí se vio al abrir un crono de verdad es el efecto de esa mezcla en
+ * pantalla: la ficha rotula la zona como `New Sebilis Expedition`, con el modo
+ * pegado al nombre. Es legible, así que se deja; pero es la razón por la que
+ * la zona y el modo no se pueden enseñar por separado.
  */
-export const claveCrono = (c) => `${c?.nombre ?? ''}\u0000${c?.base ?? ''}\u0000${c?.diff ?? ''}`;
+export const claveCrono = (c) => [c?.nombre ?? '', c?.base ?? '', c?.diff ?? '', c?.mode ?? '']
+  .join('\u0000');
 
 /** Dos cronos son el mismo si coinciden nombre, zona base y dificultad. */
 export const mismaClave = (a, b) => claveCrono(a) === claveCrono(b);

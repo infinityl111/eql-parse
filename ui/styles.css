@@ -1943,3 +1943,60 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 /* Y el desplazamiento por la barra lateral tiene que dejar la sección arriba
    del todo, no pegada al borde. */
 .enlapagina { scroll-margin-top: 12px; }
+
+/* ── Temporizadores de reaparición ────────────────────────────────────────
+   Nueve clases sin una sola regla: la sección salía como una pila de divs sin
+   caja ni separación. Se destapó volcando la vista con `bin/ui-volcar.js`, y
+   no leyendo el código, porque el HTML era correcto.
+
+   Convenciones de la casa y no invento: la caja es la misma que `.rp-tiempo`
+   —`slate-850` sobre `slate-700`, radio 2—, la cabecera es la de `.enc-h`, y
+   la procedencia usa las fichas de `.trig-proc`, que ya separan lo vivo de lo
+   que sólo lo parece. */
+.cro-add { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 18px; }
+.cro-add input { flex: 1 1 280px; max-width: 420px; }
+
+/* Una cuadrícula y no una lista: los cronos se miran DE UN VISTAZO mientras se
+   juega, y una columna obliga a desplazarse en cuanto hay cuatro. */
+.cro-lista { display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.cro { background: var(--slate-850); border: 1px solid var(--slate-700);
+  border-radius: 2px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+
+/* El nombre a la izquierda y el cierre a la derecha, no pegado al nombre: si
+   el botón sigue al texto, su posición baila con la longitud del nombre y se
+   pulsa por error. */
+.cro-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cro-cab b { color: var(--bone); font-size: 13px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.cro-x { flex: none; font-size: 10px; padding: 3px 8px; }
+
+/* LA ZONA VA SIEMPRE VISIBLE, no en un desplegable. La clave del crono es
+   nombre+zona+dificultad, así que dos fichas del mismo bicho en dos zonas se
+   verían idénticas con dos cuentas atrás distintas. */
+.cro-zona { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--bone-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cro-sinzona { color: var(--t-fire); text-transform: none; letter-spacing: 0; white-space: normal; }
+
+/* La cuenta atrás es lo único que se lee de lejos, y por eso es lo único
+   grande. En cifras tabulares: sin ellas el número da saltos cada segundo al
+   cambiar de dígito, y un número que se mueve se lee peor que uno quieto. */
+.cro-num { font-family: var(--mono); font-size: 30px; line-height: 1.1; color: var(--bone);
+  font-variant-numeric: tabular-nums; }
+.cro-cero { color: var(--t-good, #7FB77E); font-size: 19px; }
+.cro-espera { font-size: 12px; color: var(--bone-dim); line-height: 1.45; }
+
+/* La procedencia va PEGADA a la cifra y nunca escondida: un número sin decir
+   de dónde sale es la mitad de un dato. */
+.cro-src { font-size: 10.5px; color: var(--bone-faint); }
+.cro-ret { color: var(--t-fire); line-height: 1.45; }
+.cro-dif { font-size: 11px; color: var(--t-fire); line-height: 1.45; }
+.cro-avi { font-size: 11px; line-height: 1.45; padding: 6px 8px; border-radius: 4px;
+  background: var(--slate-700); border-left: 2px solid var(--bone-faint); color: var(--bone-dim); }
+
+/* Lo que escribe el jugador va abajo del todo y separado por una línea: manda
+   sobre lo nuestro, pero no es lo que se viene a mirar. */
+.cro-man { display: flex; gap: 6px; margin-top: auto; padding-top: 9px;
+  border-top: 1px solid var(--slate-700); }
+.cro-in { flex: 1 1 auto; min-width: 0; }
+.cro-man button { flex: none; font-size: 10px; padding: 4px 9px; }

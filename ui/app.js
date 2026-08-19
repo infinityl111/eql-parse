@@ -2970,7 +2970,7 @@ function cablearBotin(host) {
  * pelea dudosa: uno juzga tu actuación, el otro dice que estas cifras no valen.
  */
 function renderEscena(snap, cajaSec) {
-  const host = cajaSec ?? $('secPane');
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   /**
    * AL CAMBIAR DE PELEA, EL REPRODUCTOR SE VA CON LA ANTERIOR.
@@ -3016,8 +3016,8 @@ function renderEscena(snap, cajaSec) {
  * `initTriggers()` va antes de pintar los disparadores y sólo una vez: es lo que
  * hacía la pestaña, y sin ello la lista sale vacía sin decir por qué.
  */
-function renderAvisos() {
-  const host = $('secPane');
+function renderAvisos(snap, cajaSec) {
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   if ($('trigBox')) return;
   host.innerHTML = '<div class="tabpane"><div id="trigBox"></div></div>';
@@ -3026,8 +3026,8 @@ function renderAvisos() {
   initTriggers().then(() => renderTriggers(caja));
 }
 
-function renderPreferencias() {
-  const host = $('secPane');
+function renderPreferencias(snap, cajaSec) {
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   if ($('narrateBox')) return;
   host.innerHTML = '<div class="tabpane"><div id="narrateBox"></div></div>';
@@ -3148,8 +3148,8 @@ const renderMuertes = () => pintaPaginaEnc('muertes', ['muertes']);
  * cargando: un resumen vacío y uno que aún no ha llegado se ven igual, y uno de
  * los dos es mentira.
  */
-function renderResumen(snap) {
-  const host = $('secPane');
+function renderResumen(snap, cajaSec) {
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   if (!state.summary) {
     if (state.cargandoResumen) return;
@@ -3178,7 +3178,7 @@ function renderResumen(snap) {
  * reversible; quitarlo sería tocar la función, y esto sólo mueve.
  */
 function renderAnalisis(snap, cajaSec) {
-  const host = cajaSec ?? $('secPane');
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   if (!$('anView')) {
     host.innerHTML = '<div id="advice"></div>'
@@ -3211,7 +3211,7 @@ function renderAnalisis(snap, cajaSec) {
  * mismo que un registro vacío.
  */
 function renderRegistro(snap, cajaSec) {
-  const host = cajaSec ?? $('secPane');
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   const f = withPets(fightFor(snap));
   const listo = f && registroCache.has(f.uid ?? 'live') ? 1 : 0;
@@ -3261,7 +3261,7 @@ function renderRegistro(snap, cajaSec) {
  *   Registro a su propia sección en la extracción once.
  */
 function renderPorHabilidad(snap, cajaSec) {
-  const host = cajaSec ?? $('secPane');
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   if (!$('rows')) {
     host.innerHTML = `<div class="sec-title eyebrow" id="habilidadTit"></div>
@@ -3298,7 +3298,7 @@ function renderPorHabilidad(snap, cajaSec) {
  * que falló al cargar.
  */
 function renderBotinPelea(snap, cajaSec) {
-  const host = cajaSec ?? $('secPane');
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   const f = withPets(fightFor(snap));
   const sig = `${getLang()}|${f?.uid ?? 'live'}|${(f?.loot ?? []).length}`;
@@ -5639,8 +5639,8 @@ const cronoParse = (txt) => {
  * volcar la vista a fichero con `bin/ui-volcar.js`, que es lo que había que
  * haber hecho antes de la primera de las cinco.
  */
-async function renderCronos() {
-  const host = $('secPane');
+async function renderCronos(snap, cajaSec) {
+  const host = huecoSeccion(cajaSec);
   if (!host) return;
   const lista = state.cfg?.cronos ?? [];
   // LA CLAVE ES NOMBRE + ZONA + DIFICULTAD, no el nombre. El periodo es de la
@@ -5687,7 +5687,7 @@ async function renderCronos() {
     // dice a qué se refiere el número, y dos fichas del mismo bicho en dos zonas
     // se verían idénticas con dos cuentas atrás distintas.
     const donde = c.base
-      ? `<div class="cro-zona">${esc(c.base)}${c.diff ? ` · ${esc(labelDiff(c.diff))}` : ''}</div>`
+      ? `<div class="cro-zona">${esc(c.base)}${c.mode ? ` · ${esc(c.mode)}` : ''}${c.diff ? ` · ${esc(labelDiff(c.diff))}` : ''}</div>`
       : `<div class="cro-zona cro-sinzona">${esc(t('cro.sinZona'))}</div>`;
     return `<div class="cro" data-cro="${esc(k)}">
       <div class="cro-cab"><b>${esc(c.nombre)}</b>
@@ -5709,7 +5709,7 @@ async function renderCronos() {
   const guardar = async (l) => {
     await window.eql.setFlag('cronos', l);
     state.cfg.cronos = l;
-    await renderCronos();
+    await renderCronos(snap, host);
   };
 
   host.querySelector('#croAdd')?.addEventListener('click', async () => {
@@ -5719,7 +5719,10 @@ async function renderCronos() {
     // estando delante del bicho. Si no consta zona se abre igual —vale más un
     // crono sin zona que ninguno— pero la ficha lo dice.
     const z = state.snap?.zone ? parseZone(state.snap.zone) : null;
-    const alta = { nombre, base: z?.base ?? null, diff: z?.diff ?? null };
+    // El modo va en la clave por si algún día `parseZone` lo separa. HOY es
+    // siempre null, y las copias ya no colisionaban: el modo viaja dentro de
+    // `base` —«Nagafen's Lair Solo»—, así que las claves ya eran distintas.
+    const alta = { nombre, base: z?.base ?? null, diff: z?.diff ?? null, mode: z?.mode ?? null };
     if (lista.some((c) => claveCrono(c) === claveCrono(alta))) return;
     // El aviso de «hay varios» se calcula AL ABRIRLO y se guarda con el crono:
     // después ya se ha creído lo que decía, y avisar entonces no sirve.
@@ -5738,17 +5741,29 @@ async function renderCronos() {
      * común, que salta el remuestreo y empata con el nulo; y en nombrados
      * únicos, cero. El día que haya dato, esto vuelve por `valorDe`, que sigue
      * sabiendo recibirlo y tiene sus pruebas.
-     *
-     * ⚠ Y una que queda ABIERTA y no se toca hasta que alguien vea esta
-     * pantalla: `kills` es el recuento del bicho en TODAS las zonas, y la clave
-     * de este crono es nombre+zona+dificultad. El «van N muertes observadas»
-     * que sale en la ficha cuenta de más. Se arregla con `encZoneFoes(base,
-     * diff)`, que ya existe.
      */
+    /**
+     * EL RECUENTO ES EL DE ESTA CLAVE, no el del bicho en todo el mundo.
+     *
+     * `ficha.kills` suma sus muertes en TODAS las zonas y dificultades, y la
+     * clave de este crono es nombre+zona+dificultad+modo. Con el recuento
+     * global, el «van N muertes observadas» de la ficha promete una muestra
+     * que no es de aquí — que es exactamente el error que este proyecto
+     * persigue: una cifra correcta contestando otra pregunta.
+     *
+     * Se pide por zona y dificultad, que es hasta donde llega la enciclopedia.
+     * El modo no lo distingue todavía, así que en esa dimensión el recuento
+     * SIGUE CONTANDO DE MÁS y hay que decirlo aquí en vez de aparentar que no.
+     */
+    const aqui = alta.base
+      ? ((await window.eql.encZoneFoes?.(alta.base, alta.diff)) ?? [])
+        .find((f) => f.name === nombre) ?? null
+      : null;
+    const muertes = aqui?.kills ?? (alta.base ? 0 : ficha?.kills ?? 0);
     await guardar([...lista, {
       ...alta, manual: null,
-      muertes: ficha?.kills ?? 0,
-      aviso: avisoDeVarios(null, ficha?.kills ?? 0),
+      muertes,
+      aviso: avisoDeVarios(null, muertes),
     }]);
   });
   host.querySelectorAll('[data-quita]').forEach((el) => el.addEventListener('click',
@@ -5758,6 +5773,33 @@ async function renderCronos() {
     const txt = host.querySelector(`[data-man="${CSS.escape(k)}"]`)?.value;
     guardar(lista.map((c) => (claveCrono(c) === k ? { ...c, manual: cronoParse(txt) } : c)));
   }));
+}
+
+/**
+ * EL CONTRATO DE `pinta`: SIEMPRE `(snap, caja)`, Y `caja` SIEMPRE ES UN NODO.
+ *
+ * No lo era. Unas secciones recibían el contenedor y otras el snapshot, según
+ * si estaban en `EN_LA_PAGINA` o no, y cada una se defendía por su cuenta con
+ * un `caja ?? $('secPane')`. `renderCronos` no copió esa defensa y recibió el
+ * snapshot como si fuera el hueco.
+ *
+ * Y ESO NO DIO NINGÚN ERROR DONDE ESTABA EL FALLO. En JavaScript,
+ * `objetoCualquiera.innerHTML = '<div>'` es una asignación perfectamente
+ * válida: crea una propiedad y sigue. El reventón llegaba dos líneas después,
+ * en el primer `querySelector`, y para entonces el rastro ya no señalaba a la
+ * llamada equivocada. La sección salió en blanco durante días.
+ *
+ * Por eso esto no es sólo un `??`: es una ASERCIÓN DE ENTRADA. Si llega algo
+ * que no es un elemento, revienta AQUÍ, con el nombre de lo que llegó. Un fallo
+ * de contrato tiene que doler en la frontera, no en el interior.
+ */
+function huecoSeccion(caja) {
+  if (caja != null && !(caja instanceof Element)) {
+    const q = caja?.constructor?.name ?? typeof caja;
+    throw new TypeError(`pinta() esperaba un elemento del DOM y recibió ${q}. `
+      + 'El contrato es pinta(snap, caja): mira la llamada, no esta función.');
+  }
+  return caja ?? $('secPane');
 }
 
 const SECCIONES = [
@@ -6027,7 +6069,11 @@ function renderApp() {
     }
     if (s.lista) renderFightList(state.snap);
     if (EN_LA_PAGINA.includes(s.id)) pintaLaPagina(state.snap);
-    else s.pinta(state.snap);
+    // Las dos cosas SIEMPRE, aunque la sección sólo use una: media docena de
+    // secciones se defendían con un `?? $('secPane')` porque el despachador
+    // les pasaba una cosa distinta según el grupo. Eso es lo que dejó pasar el
+    // fallo de `renderCronos` — cuando el contrato es «depende», nadie lo lee.
+    else s.pinta(state.snap, $('secPane'));
     return;
   }
   if (state.wizard) {

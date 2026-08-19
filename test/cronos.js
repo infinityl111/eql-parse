@@ -275,6 +275,22 @@ console.log('\nla clave es NOMBRE + ZONA + DIFICULTAD');
   ok(!mismaClave(guk, { ...guk, diff: 3 }),
     'la dificultad también parte: D2 y D3 son dos medidas distintas');
 
+  /**
+   * El MODO entra en la clave, y hay que decir para qué NO sirve: escribí que
+   * arreglaba una colisión entre `Solo` y `Grupo`, y al comprobarlo resultó
+   * falso. `parseZone` deja el modo DENTRO de `base` —devuelve
+   * `base: "Nagafen's Lair Solo"`, `mode: null`—, así que esas dos copias ya
+   * tenían claves distintas.
+   *
+   * El campo se queda como guarda para el día que `parseZone` lo separe. Hoy
+   * es siempre null. Esta prueba fija que la clave LO MIRARÍA, no que hoy
+   * cambie nada.
+   */
+  ok(!mismaClave({ ...guk, mode: 'Solo' }, { ...guk, mode: 'Grupo' }),
+    'si el modo llega, la clave lo separa');
+  ok(!mismaClave(guk, { ...guk, mode: 'Solo' }),
+    'y sin modo no es lo mismo que con modo');
+
   ok(mismaClave(befallen, { ...befallen }), 'y lo idéntico sigue siendo idéntico');
 
   /**
