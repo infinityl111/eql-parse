@@ -1989,6 +1989,26 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 /* La procedencia va PEGADA a la cifra y nunca escondida: un número sin decir
    de dónde sale es la mitad de un dato. */
 .cro-src { font-size: 10.5px; color: var(--bone-faint); }
+
+/* LAS TRES PROCEDENCIAS, siempre las tres y en orden fijo. Con hueco donde no
+   hay dato: «aún no» también informa, y una línea que aparece y desaparece
+   obliga a recordar cuáles había. La que manda va MARCADA y no reordenada —
+   el orden fijo es lo que deja leer la ficha sin volver a aprenderla. */
+.cro-fuentes { display: grid; gap: 2px; font-size: 10.5px; }
+.cro-f { display: flex; align-items: baseline; gap: 6px; color: var(--bone-faint); }
+.cro-f-rot { flex: none; min-width: 8.5em; }
+.cro-f-val { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--bone-dim); }
+/* La que mueve la cuenta atrás se distingue por PESO y no por color: el color
+   ya está diciendo otra cosa en esta ficha —lo retenido va en ámbar— y dos
+   significados en el mismo canal no se leen. */
+.cro-f.manda { color: var(--bone-dim); }
+.cro-f.manda .cro-f-val { color: var(--bone); font-weight: 600; }
+/* La página va SIEMPRE con el número de la wiki, no en un desplegable: una
+   cifra declarada sin su fuente no se puede ir a comprobar, y entonces no se
+   distingue de una inventada. */
+.cro-f-pag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .75; }
+.cro-f-no { opacity: .5; font-style: italic; }
+.cro-f-ret { color: var(--t-fire); opacity: .8; }
 .cro-ret { color: var(--t-fire); line-height: 1.45; }
 .cro-dif { font-size: 11px; color: var(--t-fire); line-height: 1.45; }
 .cro-avi { font-size: 11px; line-height: 1.45; padding: 6px 8px; border-radius: 4px;

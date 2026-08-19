@@ -8,6 +8,7 @@ import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOS
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
 import { parseZone, labelDiff } from '../src/zones.js';
+import { tiempoDeZona } from '../src/wiki-zonas.js';
 import { muertesPorNombre } from '../src/suelo.js';
 import { copiarAlPortapapeles } from './clip.js';
 import { pedirDatos, acercaDe } from './dialogo.js';
@@ -5669,6 +5670,11 @@ async function renderCronos(snap, cajaSec) {
     estado: estadoCrono(c, {
       ahora, ultimaMuerte: muertes[claveCrono(c)] ?? null,
       medido: c.medido ?? null, heredado: c.heredado ?? null,
+      // La wiki se consulta AL PINTAR y no se guarda con el crono: la tabla se
+      // corrige con una versión nueva, y un valor congelado en la configuración
+      // seguiría diciendo lo viejo sin que nadie lo supiera.
+      wiki: tiempoDeZona(c.base)?.segundos ?? null,
+      wikiPagina: tiempoDeZona(c.base)?.pagina ?? null,
     }),
   }));
 
@@ -5705,14 +5711,45 @@ async function renderCronos(snap, cajaSec) {
       : st.estado === ESTADO.CONTANDO
         ? `<div class="cro-num">${cronoRestante(st.restante, v.precision)}</div>`
         : `<div class="cro-num cro-cero">${esc(t('cro.disponible'))}</div>`;
-    // La procedencia va SIEMPRE al lado de la cifra, no en un desplegable.
-    const fuente = v.fuente
-      ? `<div class="cro-src">${esc(t(`cro.src.${v.fuente}`))} · ${cronoRestante(v.segundos, v.precision)}</div>`
-      : v.retenido ? `<div class="cro-src cro-ret">${esc(t('cro.retenido'))}</div>` : '';
-    const discrepa = v.discrepa != null
-      ? `<div class="cro-dif">${esc(t('cro.discrepa', {
+    /**
+     * LAS TRES PROCEDENCIAS, SIEMPRE LAS TRES, con hueco donde no hay dato.
+     *
+     * Decisión de Campeón. No se esconde la que falta: «aún no» también
+     * informa, y una línea que aparece y desaparece según el caso obliga a
+     * recordar cuáles había. La que manda va marcada, no reordenada — el
+     * orden fijo es lo que deja leer la ficha sin volver a aprenderla.
+     */
+    const linea = ({ clave, valor, manda }) => {
+      const rot = esc(t(`cro.src.${clave}`));
+      if (!valor) return `<div class="cro-f"><span class="cro-f-rot">${rot}</span>`
+        + `<span class="cro-f-no">${esc(t('cro.sinDato'))}</span></div>`;
+      // Lo NUESTRO no enseña su número: se dice que lo hay y no se pone.
+      if (clave === 'nuestro') {
+        return `<div class="cro-f"><span class="cro-f-rot">${rot}</span>`
+          + `<span class="cro-f-ret">${esc(t('cro.retenido'))}</span></div>`;
+      }
+      const pag = valor.pagina
+        ? `<span class="cro-f-pag" title="${esc(valor.pagina)}">${esc(t('cro.segun', {
+          pagina: String(valor.pagina).replace(/^https?:\/\//, ''),
+        }))}</span>` : '';
+      return `<div class="cro-f${manda ? ' manda' : ''}">`
+        + `<span class="cro-f-rot">${rot}</span>`
+        + `<span class="cro-f-val">${cronoRestante(valor.segundos, valor.precision)}</span>`
+        + `${pag}</div>`;
+    };
+    const fuente = `<div class="cro-fuentes">${(v.fuentes ?? []).map(linea).join('')}</div>`;
+
+    // Y si discrepan, se dice. En segundos y sin decir quién acierta.
+    const dis = [
+      v.discrepa != null && v.fuente === 'manual' ? t('cro.discrepa', {
         tuyo: cronoRestante(v.segundos), nuestro: cronoRestante(v.otro.segundos), dif: cronoRestante(v.discrepa),
-      }))}</div>` : '';
+      }) : null,
+      v.discrepaWiki != null ? t('cro.discrepaWiki', {
+        wiki: cronoRestante(v.fuentes?.find((f) => f.clave === 'wiki')?.valor?.segundos),
+        nuestro: cronoRestante(v.otro.segundos), dif: cronoRestante(v.discrepaWiki),
+      }) : null,
+    ].filter(Boolean);
+    const discrepa = dis.length ? `<div class="cro-dif">${dis.map(esc).join('<br>')}</div>` : '';
     const aviso = st.aviso === 'quizá-no-vemos-su-muerte'
       ? `<div class="cro-avi">${esc(t('cro.sospecha', { n: PERIODOS_SOSPECHA }))}</div>` : '';
     const varios = c.aviso === 'varios-a-la-vez' ? `<div class="cro-avi">${esc(t('cro.varios'))}</div>`

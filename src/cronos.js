@@ -226,8 +226,46 @@ export const PERIODOS_SOSPECHA = 3;
  *   `discrepa` sólo tiene sentido cuando hay manual Y observación: es la
  *   diferencia en segundos, para poder enseñarla sin decidir por nadie.
  */
+/**
+ * ── LAS TRES PROCEDENCIAS, Y LAS TRES SE ENSEÑAN SIEMPRE ─────────────────
+ *
+ * Decisión de Campeón, 19/08/2026. La ficha no elige por él: enseña las tres
+ * líneas SIEMPRE, con hueco donde no hay dato, porque «no hay» también
+ * informa y una línea que desaparece no se echa de menos.
+ *
+ *   manual   lo escribe él. MANDA sobre todo. Él juega y nosotros no.
+ *   wiki     DECLARADO por `eqlwiki`, con la página de la que salió. Nunca
+ *            se presenta como medido, y la página va al lado del número
+ *            porque una cifra sin su fuente no se puede ir a comprobar.
+ *   nuestro  observaciones propias. HOY NO SALEN, sólo se acumulan.
+ *
+ * ── QUÉ MUEVE LA CUENTA ATRÁS, que es una decisión y no se deduce ────────
+ *
+ * `manual` si lo hay; si no, `wiki`. Nuestras observaciones NUNCA.
+ *
+ * Que la wiki mueva la cuenta atrás no estaba dicho, y lo escribo aquí para
+ * que se pueda corregir de un vistazo. El motivo: sin ella la sección no
+ * sirve para ninguna zona hasta que Campeón escriba treinta números a mano, y
+ * un valor DECLARADO, atribuido y comprobable es exactamente lo que este
+ * proyecto acepta mientras no haya medida. Lo que NO se hace es callarlo: el
+ * rótulo dice «de la wiki» y trae su página.
+ *
+ * ── Y SI LA WIKI Y LO NUESTRO DISCREPAN, SE DICE ─────────────────────────
+ *
+ * No se elige por él. La diferencia se enseña en segundos y sin signo de
+ * juicio. Y hay razón para esperar que discrepen: `PERIODOS-CONGELADOS.md`
+ * §12 midió que la wiki declara UNA cifra por zona mientras nuestras claves
+ * contienen varios racimos a valores distintos. Es granularidad distinta, no
+ * un error de nadie, y por eso la discrepancia es información y no una alarma.
+ *
+ * @param {object} v
+ *   - manual, manualMargen      segundos, lo suyo
+ *   - wiki, wikiPagina          segundos y la URL de donde salió
+ *   - medido/heredado + margen  lo nuestro, que hoy no sale
+ */
 export function valorDe({
   manual = null, manualMargen = null,
+  wiki = null, wikiPagina = null,
   medido = null, medidoMargen = null,
   heredado = null, heredadoMargen = null,
 } = {}) {
@@ -238,31 +276,41 @@ export function valorDe({
   const nuestro = observado != null
     ? { segundos: observado, margenAbajo: obsMargen, precision: precisionDe(obsMargen), fuente: fuenteObs }
     : null;
+  // La wiki declara en mm:ss, así que su precisión es el segundo. No lleva
+  // margen: un valor declarado no trae incertidumbre, trae autor.
+  const deWiki = wiki != null
+    ? { segundos: wiki, pagina: wikiPagina ?? null, precision: PRECISION.SEG, fuente: 'wiki' }
+    : null;
 
-  if (manual != null) {
-    return {
-      segundos: manual,
-      // Sin margen declarado por él, se respeta su precisión tal cual.
-      margenAbajo: manualMargen,
-      precision: precisionDe(manualMargen),
-      fuente: 'manual',
-      // Con las dos cosas se enseñan las dos. La diferencia va en segundos y
-      // sin signo de juicio: no se dice cuál está bien, se dice que no coinciden.
-      discrepa: observado != null && observado !== manual ? Math.abs(manual - observado) : null,
-      otro: nuestro,
-      retenido: false,
-    };
-  }
+  // Las tres, SIEMPRE, en orden de mando. `manda` dice cuál mueve la cuenta.
+  const fuentes = [
+    { clave: 'manual', valor: manual != null
+      ? { segundos: manual, margenAbajo: manualMargen, precision: precisionDe(manualMargen), fuente: 'manual' }
+      : null },
+    { clave: 'wiki', valor: deWiki },
+    { clave: 'nuestro', valor: nuestro },
+  ];
+  const manda = manual != null ? 'manual' : (deWiki ? 'wiki' : null);
+  for (const f of fuentes) f.manda = f.clave === manda;
 
-  /**
-   * SIN VALOR SUYO NO SALE NINGÚN NÚMERO. Antes salía el nuestro, y eso ya no
-   * se puede hacer: `retenido` dice que lo tenemos y que no lo enseñamos, que
-   * es distinto de no tener nada, y quien pinta necesita esa distinción para
-   * poder decir «van N observaciones» en vez de «no hay nada».
-   */
+  // La diferencia entre lo que se enseña y lo nuestro, y entre la wiki y lo
+  // nuestro. Las dos en segundos y sin decir cuál está bien.
+  const dif = (a, b) => (a != null && b != null && a !== b ? Math.abs(a - b) : null);
+  const elQueManda = fuentes.find((f) => f.manda)?.valor ?? null;
+
   return {
-    segundos: null, margenAbajo: null, precision: null, fuente: null, discrepa: null,
-    otro: nuestro, retenido: nuestro != null,
+    segundos: elQueManda?.segundos ?? null,
+    margenAbajo: elQueManda?.margenAbajo ?? null,
+    precision: elQueManda?.precision ?? null,
+    fuente: manda,
+    fuentes,
+    // `otro` y `discrepa` se conservan con su significado de siempre: lo
+    // nuestro, y en cuánto discrepa de lo que se está enseñando.
+    otro: nuestro,
+    discrepa: dif(elQueManda?.segundos ?? null, observado),
+    discrepaWiki: dif(deWiki?.segundos ?? null, observado),
+    // Tenemos observaciones y no las enseñamos. Distinto de no tener nada.
+    retenido: nuestro != null,
   };
 }
 
@@ -278,7 +326,11 @@ export function valorDe({
  */
 export function estadoCrono(crono, ctx = {}) {
   const { ahora = 0, ultimaMuerte = null } = ctx;
-  const valor = valorDe({ manual: crono?.manual ?? null, medido: ctx.medido ?? null, heredado: ctx.heredado ?? null });
+  const valor = valorDe({
+    manual: crono?.manual ?? null,
+    wiki: ctx.wiki ?? null, wikiPagina: ctx.wikiPagina ?? null,
+    medido: ctx.medido ?? null, heredado: ctx.heredado ?? null,
+  });
 
   // Sin una sola muerte suya en el registro no hay desde cuándo contar. No es
   // un cero: es que la cuenta no ha empezado, y decir «0» sería decir «ya está».
