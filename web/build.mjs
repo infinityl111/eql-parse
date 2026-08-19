@@ -476,6 +476,36 @@ export async function releases() {
  * Va en `test/vallas.js`, con el orden como aserción, porque una restricción de
  * orden que no está en un test es un comentario con los días contados.
  *
+ * ── Y LAS CITAS «>», QUE SE SACAN IGUAL Y POR LA MISMA RAZÓN ──────────────
+ *
+ * Esto tampoco sabía que existía, y NO eran dos líneas sueltas. Contadas sobre
+ * `web/dist`, son 606 LÍNEAS que salen con el «>» a la vista, repartidas en
+ * DOCE versiones y en los cinco idiomas —121 por página—. Es el aviso de si la
+ * versión pide reconstruir el histórico, que es la línea que más se lee de toda
+ * la nota, y salía con la marca cruda por delante.
+ *
+ * Es OTRA VEZ EL FALLO DE ORDEN. Una línea que empieza por «>» no es un párrafo
+ * y no puede llegar a `junta.join(' ')`: si llega, el «>» se escapa a `&gt;` y
+ * se queda impreso, y de paso las citas seguidas se pegan todas en un renglón.
+ *
+ *     LAS CITAS SE EXTRAEN ANTES DE CUALQUIER OTRA TRANSFORMACIÓN.
+ *
+ * DE VARIAS LÍNEAS: una corrida de líneas «>» seguidas es UNA sola cita. Y por
+ * dentro vale lo mismo que fuera —párrafos unidos a lo ancho, `###` titular,
+ * `-` lista, negrita, enlaces—, así que el contenido se pasa POR ESTA MISMA
+ * FUNCIÓN. Recursión y no un segundo juego de reglas: dos juegos de reglas se
+ * separan, y el día que se separen nadie mirará el de dentro. Una línea en
+ * blanco SIN «>» cierra la cita.
+ *
+ * VACÍA: un «>» pelado es LA LÍNEA EN BLANCO DE DENTRO de la cita. Separa
+ * párrafos, no emite un `<p>` vacío y NO parte la cita en dos —hay ocho en las
+ * fuentes, seis en la 1.2.2 y dos en la 1.6.0, y las ocho son separadores—. Y
+ * una cita que sea SÓLO «>» pelados no emite NADA: ningún `<blockquote>` vacío,
+ * porque un recuadro vacío en la página es peor que nada. De esas hay CERO hoy;
+ * la regla es guarda de futuro, y se dice que lo es.
+ *
+ * Va en `test/sangradas.js`, con su aserción de orden y su control positivo.
+ *
  * Y UNA VALLA SIN CERRAR PARA LA CONSTRUCCIÓN, nombrando la versión. Misma
  * doctrina que el resto: las notas las escribimos nosotros, así que es un error
  * nuestro y arreglable, y una nota destrozada en el sitio publicado es peor que
@@ -523,6 +553,34 @@ export function md(s, quien = 'unas notas sin identificar') {
       + ' cerrando la valla; publicar la nota destrozada es peor que no desplegar.');
   }
 
+  /**
+   * LA EXTRACCIÓN DE LAS CITAS, sobre `sinBloques` y ANTES del bucle de abajo.
+   *
+   * Sobre `sinBloques` a propósito: un «>» DENTRO de un bloque ``` es texto del
+   * volcado y no una cita, y ahí ya no está para poder confundirse. Y antes del
+   * bucle porque ese bucle es justo el que escapa y el que pega renglones.
+   *
+   * La marca lleva \u0000 a los dos lados por lo mismo que la de los bloques.
+   */
+  const CITA = (i) => `\u0000CITA${i}\u0000`;
+  const citas = [];
+  const sinCitas = [];
+  let cita = null;        // las líneas de la cita abierta, ya sin el «>»
+  const cierraCita = () => {
+    if (cita === null) return;
+    citas.push(cita);
+    sinCitas.push(CITA(citas.length - 1));
+    cita = null;
+  };
+  for (const l of sinBloques) {
+    // Se come el «>» y UN espacio detrás: el resto de la sangría es del texto.
+    const m = /^\s*>[ \t]?(.*)$/.exec(l);
+    if (m) { (cita ??= []).push(m[1]); continue; }
+    cierraCita();
+    sinCitas.push(l);
+  }
+  cierraCita();           // una cita que llega al final del texto también cierra
+
   const out = [];
   /**
    * Las imágenes ANTES que los enlaces: la insignia de PayPal de las notas es
@@ -545,7 +603,7 @@ export function md(s, quien = 'unas notas sin identificar') {
   };
   const cierraLista = () => { if (enLista) { out.push('</ul>'); enLista = false; } };
 
-  for (const l of sinBloques) {
+  for (const l of sinCitas) {
     /**
      * LA REINSERCIÓN, y por qué aquí y no con un `replace` al final de todo.
      *
@@ -560,6 +618,20 @@ export function md(s, quien = 'unas notas sin identificar') {
       cierra();
       cierraLista();
       out.push(`<pre><code>${esc(bloques[Number(marca[1])].join('\n'))}</code></pre>`);
+      continue;
+    }
+    /**
+     * LA CITA, por esta misma función. Aquí es donde el «>» pelado se paga
+     * solo: al quitarle la marca queda una línea en blanco, y una línea en
+     * blanco ya sabe separar párrafos. Y si de la cita entera no sale nada,
+     * NO se envuelve la nada en un `<blockquote>`.
+     */
+    const marcaCita = /^\u0000CITA(\d+)\u0000$/.exec(l);
+    if (marcaCita) {
+      cierra();
+      cierraLista();
+      const dentro = md(citas[Number(marcaCita[1])].join('\n'), quien);
+      if (dentro) out.push(`<blockquote>${dentro}</blockquote>`);
       continue;
     }
     if (!l.trim()) { cierra(); cierraLista(); continue; }

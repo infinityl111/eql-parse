@@ -285,6 +285,27 @@ figcaption { font-size: 13.5px; color: var(--bone-faint); margin-top: 6px; }
 /* El fondo ya lo pone la caja: la píldora del código en línea se pintaría
    encima, un recuadro dentro de otro. */
 .notas pre code { background: none; padding: 0; border-radius: 0; }
+/**
+ * LA CITA DE LA CABECERA DE CADA NOTA, QUE ES LA LÍNEA QUE MÁS SE LEE.
+ *
+ * Doce de las cuarenta versiones abren con una cita, y lo que dice es si la
+ * versión PIDE RECONSTRUIR EL HISTÓRICO. Hasta ahora salía como un párrafo más
+ * con un «>» impreso por delante; sin una marca visual seguiría sin
+ * distinguirse del texto que viene detrás, que es de lo que la separa el autor
+ * al escribirla. Filete a la izquierda y no un recuadro: el recuadro compite
+ * con el <pre> de los volcados, que ya usa fondo.
+ *
+ * Sin margen izquierdo propio del navegador —40px de fábrica— porque la
+ * columna ya está centrada a 76ch y la sangría la desalinearía del resto.
+ */
+.notas blockquote {
+  margin: 16px 0; padding: 2px 0 2px 16px;
+  border-left: 2px solid var(--linea); color: var(--texto);
+}
+.notas blockquote p:first-child { margin-top: 0; }
+.notas blockquote p:last-child { margin-bottom: 0; }
+/* Un titular dentro de la cita no debe pesar como los de la nota. */
+.notas blockquote h3 { font-size: 15px; margin: 0 0 8px; }
 .bloque { border-top: 1px solid var(--linea); padding-top: 28px; }
 
 footer {
