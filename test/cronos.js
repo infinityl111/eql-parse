@@ -26,7 +26,10 @@
  * `<Nombre> dies.`. Son el 0,05 %: el riesgo es pequeño, no nulo, y basta una
  * forma desconocida para dejar un crono a cero para siempre.
  */
-import { valorDe, estadoCrono, avisoDeVarios, debeReiniciar, ESTADO, PERIODOS_SOSPECHA } from '../src/cronos.js';
+import {
+  valorDe, estadoCrono, avisoDeVarios, debeReiniciar,
+  precisionDe, ESTADO, PERIODOS_SOSPECHA, PRECISION,
+} from '../src/cronos.js';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -163,6 +166,74 @@ console.log('\nsólo lo reinicia una muerte nueva');
   ok(debeReiniciar({ vistaHasta: 900 }, 800) === false, 'ni una anterior que aparezca al releer');
   ok(debeReiniciar({}, 900) === true, 'y recién abierto, la última muerte conocida lo arranca');
   ok(debeReiniciar({ vistaHasta: 800 }, null) === false, 'sin muertes no hay nada que reiniciar');
+}
+
+/**
+ * ── 8. LA PRECISIÓN SALE DE LA VENTANA, NO DEL RELOJ ──────────────────────
+ *
+ *     NUNCA SE ENSEÑA MÁS PRECISIÓN DE LA QUE TIENE EL DATO.
+ *
+ * TODOS nuestros valores tienen ventana: Befallen no es 265, es 265–271. Lo
+ * que cambia entre orígenes es la ANCHURA. Y una cuenta atrás escrita al
+ * segundo sobre un valor con ±12 h **parece medida al segundo porque está
+ * escrita al segundo**: la precisión del formato es una afirmación sobre el
+ * dato, y escribirla de más es afirmar de más.
+ */
+console.log('\nla precisión la decide la ventana');
+{
+  ok(precisionDe(6) === PRECISION.SEG, 'ventana de 6 s (Befallen 265–271) → al segundo', precisionDe(6));
+  ok(precisionDe(59) === PRECISION.SEG, 'y hasta 59 s, al segundo');
+  ok(precisionDe(60) === PRECISION.MIN, 'un minuto de ventana ya no tiene segundos que enseñar');
+  ok(precisionDe(1800) === PRECISION.MIN, 'media hora de ventana, en minutos');
+  ok(precisionDe(3600) === PRECISION.CAL, 'una hora de ventana ya no es un cronómetro', precisionDe(3600));
+  ok(precisionDe(12 * 3600) === PRECISION.CAL,
+    'y con ±12 h —Innoruuk, 3 días— es un calendario, no una cuenta atrás');
+
+  /**
+   * EL CONTROL POSITIVO: la precisión tiene que BAJAR al ensanchar la ventana,
+   * nunca subir. Sin esto, una función que devolviera siempre lo mismo pasaría
+   * todas las aserciones de arriba.
+   */
+  const orden = { [PRECISION.SEG]: 3, [PRECISION.MIN]: 2, [PRECISION.CAL]: 1 };
+  const anchuras = [1, 6, 30, 59, 60, 300, 3599, 3600, 86400, 3 * 86400];
+  const niveles = anchuras.map((a) => orden[precisionDe(a)]);
+  ok(niveles.every((v, i) => i === 0 || v <= niveles[i - 1]),
+    'CONTROL: la precisión nunca sube al ensanchar la ventana', niveles.join(' '));
+  ok(new Set(niveles).size === 3, 'CONTROL: y usa las TRES precisiones, no una sola', new Set(niveles).size);
+}
+
+console.log('\nel valor manual conserva la precisión que le dio Campeón');
+{
+  const suyo = valorDe({ manual: 265 });
+  ok(suyo.ventana === null, 'si no declara ventana, no se le inventa una');
+  ok(suyo.precision === PRECISION.SEG, 'y se enseña con la precisión que él escribió', suyo.precision);
+
+  // Y si la declara, manda la suya.
+  const conVentana = valorDe({ manual: 3 * 86400, manualVentana: 24 * 3600 });
+  ok(conVentana.precision === PRECISION.CAL,
+    'con ±12 h declaradas por él, calendario igual que si fuera nuestra');
+
+  /**
+   * Y LO QUE NO SE HACE: quitarle precisión que él sí escribió. Un valor suyo
+   * al segundo se enseña al segundo aunque el nuestro para ese bicho sea ancho.
+   */
+  const mixto = valorDe({ manual: 265, medido: 3 * 86400, medidoVentana: 12 * 3600 });
+  ok(mixto.precision === PRECISION.SEG, 'el suyo manda también en la precisión', mixto.precision);
+  ok(mixto.otro.precision === PRECISION.CAL,
+    'y el nuestro se enseña al lado con LA SUYA, que es otra', mixto.otro.precision);
+}
+
+console.log('\nlas observaciones traen su ventana');
+{
+  const bef = valorDe({ medido: 265, medidoVentana: 6 });
+  ok(bef.segundos === 265 && bef.ventana === 6, 'Befallen: 265 con ventana de 6 s');
+  ok(bef.precision === PRECISION.SEG, 'y por eso se enseña al segundo');
+
+  const jefe = valorDe({ heredado: 3 * 86400, heredadoVentana: 24 * 3600 });
+  ok(jefe.precision === PRECISION.CAL, 'un jefe de 3 días ±12 h, en calendario', jefe.precision);
+  ok(jefe.fuente === 'heredado', 'y sigue diciendo de dónde sale');
+
+  ok(valorDe({}).precision === null, 'sin valor no hay precisión que declarar');
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

@@ -4,7 +4,7 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
-import { estadoCrono, avisoDeVarios, ESTADO, PERIODOS_SOSPECHA } from '../src/cronos.js';
+import { estadoCrono, avisoDeVarios, ESTADO, PERIODOS_SOSPECHA, PRECISION } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
 import { muertesPorNombre } from '../src/suelo.js';
@@ -5543,8 +5543,27 @@ function foeDetail(a, f) {
  * importa más que en ningún sitio, porque un «vuelve en 4:25» de un común
  * estaría prometiendo que el que vuelve es el mismo, y eso no lo sabemos.
  */
-const cronoRestante = (r) => {
+/**
+ * NUNCA MÁS PRECISIÓN DE LA QUE TIENE EL DATO.
+ *
+ * El formato lo decide la VENTANA del valor, no el reloj. Escribir «2:59:58»
+ * sobre un jefe con ±12 horas de ventana afirma una precisión al segundo que
+ * el dato no tiene, y quien lo lee no puede saberlo — está escrito igual que
+ * el de Befallen, que sí la tiene.
+ */
+const cronoRestante = (r, precision = PRECISION.SEG) => {
   if (r == null) return '—';
+  if (precision === PRECISION.CAL) {
+    // Con ventana de horas o días esto no es una cuenta atrás: es un rango de
+    // fechas, y se dice como tal. La ventana la pone quien llama.
+    const d = new Date(Date.now() + r * 1000);
+    return d.toLocaleString(getLang(), { weekday: 'long', hour: 'numeric' });
+  }
+  if (precision === PRECISION.MIN) {
+    // Ventana de minutos: los segundos que se escribieran aquí serían
+    // inventados, así que no se escriben.
+    return `${Math.round(r / 60)} min`;
+  }
   const m = Math.floor(r / 60), sg = Math.round(r % 60);
   return `${m}:${String(sg).padStart(2, '0')}`;
 };
@@ -5575,11 +5594,11 @@ async function renderCronos(host) {
     const cuerpo = st.estado === ESTADO.SIN_MUERTE
       ? `<div class="cro-espera">${esc(v.segundos == null ? t('cro.sinValor') : t('cro.esperando'))}</div>`
       : st.estado === ESTADO.CONTANDO
-        ? `<div class="cro-num">${cronoRestante(st.restante)}</div>`
+        ? `<div class="cro-num">${cronoRestante(st.restante, v.precision)}</div>`
         : `<div class="cro-num cro-cero">${esc(t('cro.disponible'))}</div>`;
     // La procedencia va SIEMPRE al lado de la cifra, no en un desplegable.
     const fuente = v.fuente
-      ? `<div class="cro-src">${esc(t(`cro.src.${v.fuente}`))} · ${cronoRestante(v.segundos)}</div>` : '';
+      ? `<div class="cro-src">${esc(t(`cro.src.${v.fuente}`))} · ${cronoRestante(v.segundos, v.precision)}</div>` : '';
     const discrepa = v.discrepa != null
       ? `<div class="cro-dif">${esc(t('cro.discrepa', {
         tuyo: cronoRestante(v.segundos), nuestro: cronoRestante(v.otro.segundos), dif: cronoRestante(v.discrepa),
