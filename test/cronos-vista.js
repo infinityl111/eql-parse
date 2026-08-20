@@ -20,6 +20,7 @@
  */
 import * as V from '../ui/cronos-vista.js';
 import { ESTADO, puedeAfirmarDiscrepancia, MIN_OBS_DISCREPA } from '../src/cronos.js';
+import * as V2 from '../src/cronos.js';
 import { t, setLang, TRANSLATED } from '../src/i18n.js';
 
 let mal = 0;
@@ -157,6 +158,28 @@ console.log('\nlas decisiones son funciones, no ramas dentro de una plantilla');
     'era una suposición, y el visto es un hecho que la sustituye');
   ok(!V.CLAVES.includes('cro.sospecha'), 'y no queda declarado',
     'una clave declarada que nadie produce es un rótulo muerto');
+}
+
+console.log('\nla lectura del visto es pura, y «ahora» entra por parametro');
+{
+  /**
+   * ESTO VIVIA EN EL PINTOR, y por eso la unica forma de ejercitar «esta ahi»
+   * era que la sonda escribiera una linea reciente y la aplicacion la pintara
+   * antes de que pasaran 161 segundos — corriendo contra el reloj de arranque,
+   * que tarda minutos. Una prueba que depende de lo que tarde en abrirse un
+   * programa no es una prueba.
+   */
+  const c = { segundos: 600 };
+  const r = (o) => V2.lecturaDelVisto({ ahora: 1000, cota: c, ...o });
+  ok(r({ visto: { t: 997 } })?.esta === true, 'visto hace 3s: esta ahi');
+  ok(r({ visto: { t: 800 } })?.esta === false, 'visto hace 200s: ya no se afirma',
+    'el corte es el mismo suelo que usa la cota');
+  ok(r({ ultimaMuerte: 100 })?.pasado === true,
+    'sin mencion y con el techo pasado: deberia estar y no lo has visto',
+    'de un bicho que muere en todas sus peleas no hay ninguna mencion posterior');
+  ok(r({ ultimaMuerte: 900 })?.pasado === false, 'y dentro del techo, no se afirma eso');
+  ok(r({}) === null, 'sin mencion y sin muerte no se dice nada',
+    'CONTROL: y no un cero, que se leeria como «no se le ve desde hace 0»');
 }
 
 console.log('\nla discrepancia no se afirma sin poder afirmarla');

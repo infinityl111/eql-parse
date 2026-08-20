@@ -163,6 +163,36 @@ const rePref = PREFIJO.replace(/\./g, '\\.');
 const CLAVES = [...new Set([...es.matchAll(new RegExp(`'(${rePref}[a-zA-Z0-9.]+)'`, 'g'))].map((m) => m[1]))];
 
 /**
+ * ── LA OTRA CAPA ──────────────────────────────────────────────────────────
+ *
+ * Esta sonda mide la PANTALLA. Pero cada seccion reconstruida sobre
+ * `ui/piezas.js` declara sus `CLAVES` en su constructor, y su prueba pura
+ * —`test/<seccion>-vista.js`— exige que cada una salga de una llamada de
+ * verdad, sin navegador.
+ *
+ * Un rotulo que la capa pura SI alcanza y esta sonda no, **no es un muerto**:
+ * es un no-ejercitado por ESTA sonda. Meterlos juntos mezcla «no tiene
+ * cobertura ninguna» con «tiene cobertura, en otro sitio».
+ *
+ *     EL MUERTO ES EL QUE NO ALCANZA NINGUNA CAPA.
+ *
+ * La lista se LEE de los constructores en vez de escribirse aqui, para que no
+ * pueda desincronizarse de lo que de verdad declaran.
+ */
+const CUBIERTAS_PURAS = (() => {
+  const out = new Set();
+  const dir = path.join(RAIZ, 'ui');
+  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('-vista.js'))) {
+    const src = fs.readFileSync(path.join(dir, f), 'utf8');
+    const i = src.indexOf('export const CLAVES');
+    if (i < 0) continue;
+    const j = src.indexOf('];', i);
+    for (const m of src.slice(i, j).matchAll(/'([a-zA-Z0-9.]+)'/g)) out.add(m[1]);
+  }
+  return out;
+})();
+
+/**
  * LO QUE ESTA SONDA NO EJERCITA, declarado con su motivo.
  * No son muertos: son SIN PROBAR, y llamarlos muertos invitaría a retirarlos.
  */
@@ -254,8 +284,23 @@ console.log(`${soloProducidos.length} SE PRODUCEN Y NO LLEGAN A LA PANTALLA:`);
 for (const [k, s] of soloProducidos) console.log(`   ${k.padEnd(22)} «${String(s).slice(0, 46)}»`);
 console.log(`\n${sinProbar.length} que esta sonda NO EJERCITA (no es lo mismo que muertos):`);
 for (const [k, p] of sinProbar) console.log(`   ${k.padEnd(22)} ${p}`);
-console.log(`\n${sinCaso.length} SIN NINGÚN CASO QUE LOS GENERE — los muertos de verdad:`);
-for (const [k] of sinCaso) console.log(`   ${k}`);
+/**
+ * EL CRUCE. Lo que esta sonda no alcanza se parte en dos, y la diferencia no es
+ * de matiz: uno hay que mirarlo hoy y el otro no.
+ */
+const cubiertosFuera = sinCaso.filter(([k]) => CUBIERTAS_PURAS.has(k));
+const muertos = sinCaso.filter(([k]) => !CUBIERTAS_PURAS.has(k));
+
+if (cubiertosFuera.length) {
+  console.log(`\n${cubiertosFuera.length} que esta sonda no alcanza pero SÍ cubre la prueba pura:`);
+  for (const [k] of cubiertosFuera) {
+    console.log(`   ${k.padEnd(22)} declarado en un constructor y ejercitado sin navegador`);
+  }
+  console.log('   No son muertos: tienen cobertura, en otra capa.');
+}
+
+console.log(`\n${muertos.length} SIN NINGÚN CASO QUE LOS GENERE — los muertos de verdad:`);
+for (const [k] of muertos) console.log(`   ${k}`);
 console.log('\nCada uno de ésos o falta por implementar, o sobra por retirar.');
 console.log('Lo que NO puede es seguir sin distinguirse de los vivos.\n');
 fin(0);

@@ -492,6 +492,40 @@ export function cotaDe(sucesos = [], { multiplicidad = 0, suelo = SUELO_COTA } =
   });
 }
 
+/**
+ * QUE DECIR DEL VISTO. Pura, y `ahora` entra por parametro.
+ *
+ * Vivia dentro del pintor, y por eso la unica forma de ejercitar la rama de
+ * «esta ahi» era que la sonda escribiera una linea reciente y la aplicacion la
+ * pintara antes de que pasaran `suelo` segundos — corriendo contra el reloj de
+ * arranque, que tarda minutos. Aqui se prueba entera en microsegundos.
+ *
+ * Tres lecturas, y la tercera es la que hace util el temporizador:
+ *
+ *   · visto hace poco            → esta ahi
+ *   · visto hace rato            → no se le ve desde hace X
+ *   · sin verlo Y su techo pasado → deberia estar, y no lo has visto
+ *
+ * Sin mencion se cuenta desde su ULTIMA MUERTE, que no es una laguna: de un
+ * bicho que muere en todas sus peleas no hay ninguna mencion posterior, y ese
+ * es justo el caso normal.
+ */
+export function lecturaDelVisto({
+  visto = null, ultimaMuerte = null, ahora = 0, cota = null, suelo = SUELO_COTA,
+} = {}) {
+  const desde = visto?.t != null ? Math.max(0, ahora - visto.t)
+    : (ultimaMuerte != null ? Math.max(0, ahora - ultimaMuerte) : null);
+  if (desde == null) return null;
+  // Recien nombrado es «esta ahi». El corte es el mismo suelo que usa la cota,
+  // porque es lo que puede pasar sin que el registro lo nombre estando delante.
+  if (visto?.t != null && desde <= suelo) return { segundos: desde, esta: true };
+  return {
+    segundos: desde,
+    esta: false,
+    pasado: cota?.segundos != null ? desde > cota.segundos : false,
+  };
+}
+
 export function estadoCrono(crono, ctx = {}) {
   const { ahora = 0, ultimaMuerte = null } = ctx;
   const valor = valorDe({
