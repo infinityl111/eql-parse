@@ -1870,6 +1870,64 @@ export class Engine extends EventEmitter {
     return out;
   }
 
+  /**
+   * CUÁNTAS OBSERVACIONES DE REAPARICIÓN LLEVA CADA CLAVE.
+   *
+   * ── POR QUÉ EXISTE ESTA FUNCIÓN ──────────────────────────────────────
+   *
+   * La ficha del temporizador decía «aún no» en la fila de «lo que vamos
+   * viendo», y eso significaba a la vez dos cosas incompatibles: «voy
+   * acumulando y todavía no llego» y «no estoy guardando nada». **Era lo
+   * segundo**: nadie escribía `crono.medido` en ninguna parte del árbol, así
+   * que el rótulo era una cadena sin lógica detrás. Un fallo y un estado
+   * legítimo se veían idénticos en pantalla, que es la misma familia que el
+   * `null` de `ultimaMuerte`.
+   *
+   * Ahora se cuenta de verdad, y la pantalla dice el número. Que la CIFRA no
+   * salga sigue siendo una decisión aparte y medida —ver `NUESTRO_NO_SALE` en
+   * `src/cronos.js`—; lo que no puede seguir es no saber si hay algo detrás.
+   *
+   * ── QUÉ CUENTA UNA OBSERVACIÓN, dicho antes de operar con el número ───
+   *
+   * **Un intervalo entre dos muertes CONSECUTIVAS de esa clave que estén en
+   * PELEAS DISTINTAS.** Con n muertes útiles salen n−1 observaciones.
+   *
+   * Las dos muertes del mismo nombre dentro de UNA pelea no son un intervalo
+   * de reaparición: dentro de una pelea un muerto no vuelve, así que son dos
+   * individuos. Eso es multiplicidad y lo cuenta `multiplicidadDe`. Meterlas
+   * aquí inflaría el recuento con pares que no miden lo que dice el rótulo.
+   *
+   * Devuelve `{ clave: { muertes, observaciones } }`. **Cero observaciones con
+   * una muerte no es un fallo**: es que aún no ha vuelto a morir.
+   */
+  observacionesDe(claves = []) {
+    const pide = claves.filter((c) => c?.nombre)
+      .map((c) => (typeof c === 'string' ? { nombre: c, base: null, diff: null } : c));
+    const out = {};
+    for (const c of pide) out[claveCrono(c)] = { muertes: 0, observaciones: 0 };
+    if (!pide.length || !this.store) return out;
+
+    // Una entrada por pelea y clave: da igual cuántas veces cayera dentro.
+    const porClave = new Map(pide.map((c) => [claveCrono(c), []]));
+    for (const sm of this.store.index ?? []) {
+      const caidos = sm.kills ?? [];
+      if (!caidos.length) continue;
+      for (const c of pide) {
+        if (c.base != null && (sm.zoneBase ?? null) !== c.base) continue;
+        if (c.diff != null && (sm.diff ?? null) !== c.diff) continue;
+        const veces = caidos.filter((k) => (typeof k === 'string' ? k : k?.victim) === c.nombre).length;
+        if (!veces) continue;
+        porClave.get(claveCrono(c)).push({ atMs: sm.at ?? 0, veces });
+      }
+    }
+    for (const [k, peleas] of porClave) {
+      const muertes = peleas.reduce((n, p) => n + p.veces, 0);
+      // n peleas con muerte suya dejan n−1 huecos entre peleas. Nunca negativo.
+      out[k] = { muertes, observaciones: Math.max(0, peleas.length - 1) };
+    }
+    return out;
+  }
+
   encDeaths() { return this.enc?.deaths(this.self) ?? null; }
   encProgress() { return this.enc?.progress() ?? null; }
   encCounts() { return this.enc?.counts() ?? null; }

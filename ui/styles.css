@@ -2054,3 +2054,15 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
   cursor: pointer; border: 1px solid var(--line, #cfc7b8); border-radius: 6px;
   background: transparent; color: inherit;
 }
+
+/* El recuento de observaciones va antes de la explicación y con su propio peso:
+   es el dato, y lo de al lado es el motivo de que no haya cifra. */
+.cro-f-obs { font-variant-numeric: tabular-nums; color: var(--bone-dim); flex: none; }
+
+/* La fila de procedencia tiene ahora TRES piezas —rótulo, recuento y motivo— y
+   con las tres en la misma línea el motivo quedaba en 96 px de ancho y 82 de
+   alto: seis renglones en una columna estrecha. Lo vio `bin/ui-volcar`, que
+   mide la caja de cada elemento; leyendo el CSS no aparece.
+   El motivo baja a su propio renglón, sangrado bajo el rótulo. */
+.cro-f { flex-wrap: wrap; }
+.cro-f-obs + .cro-f-ret { flex: 1 0 100%; margin-left: 8.5em; margin-top: 2px; }

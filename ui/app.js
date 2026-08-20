@@ -5870,6 +5870,11 @@ async function renderCronos(snap, cajaSec) {
   // La última muerte se pregunta cada vez que se pinta: el registro está vivo y
   // una marca cacheada dejaría el crono contando desde una muerte vieja.
   const muertes = claves.length ? (await window.eql.ultimaMuerte?.(claves)) ?? {} : {};
+  /**
+   * CUÁNTAS OBSERVACIONES LLEVA CADA UNO. Se pregunta al pintar, como las
+   * muertes: el registro está vivo y un recuento cacheado envejece solo.
+   */
+  const obs = claves.length ? (await window.eql.observacionesDe?.(claves)) ?? {} : {};
   const ahora = Math.floor(Date.now() / 1000);
 
   /**
@@ -5959,13 +5964,31 @@ async function renderCronos(snap, cajaSec) {
      */
     const linea = ({ clave, valor, manda }) => {
       const rot = esc(t(`cro.src.${clave}`));
+      /**
+       * LO NUESTRO VA PRIMERO, Y ANTES DE MIRAR SI HAY VALOR.
+       *
+       * Estaba detrás del `if (!valor)`, y como `medido` es siempre null —nadie
+       * lo escribe— esta rama **era inalcanzable**: la fila decía «aún no»
+       * SIEMPRE, y `cro.retenido` era una cadena muerta. Es el mismo caso que
+       * los dos rótulos de procedencia que se retiraron.
+       *
+       * Y «aún no» era lo peor que podía decir, porque significa a la vez «voy
+       * acumulando» y «no estoy guardando nada». Un fallo y un estado legítimo,
+       * idénticos en pantalla. Ahora dice **cuántas observaciones lleva**, que
+       * distingue las dos cosas de un vistazo.
+       */
+      if (clave === 'nuestro') {
+        const o = obs[k] ?? { muertes: 0, observaciones: 0 };
+        const n = o.observaciones;
+        const cuenta = n === 0 ? t('cro.obs0') : n === 1 ? t('cro.obs1') : t('cro.obsN', { n });
+        // Con una sola no se da cifra: un intervalo suelto no es una medida.
+        const nota = n < 2 ? t('cro.obsPocas') : t('cro.retenido');
+        return `<div class="cro-f"><span class="cro-f-rot">${rot}</span>`
+          + `<span class="cro-f-obs">${esc(cuenta)}</span>`
+          + `<span class="cro-f-ret">${esc(nota)}</span></div>`;
+      }
       if (!valor) return `<div class="cro-f"><span class="cro-f-rot">${rot}</span>`
         + `<span class="cro-f-no">${esc(t('cro.sinDato'))}</span></div>`;
-      // Lo NUESTRO no enseña su número: se dice que lo hay y no se pone.
-      if (clave === 'nuestro') {
-        return `<div class="cro-f"><span class="cro-f-rot">${rot}</span>`
-          + `<span class="cro-f-ret">${esc(t('cro.retenido'))}</span></div>`;
-      }
       const pag = valor.pagina
         ? `<span class="cro-f-pag" title="${esc(valor.pagina)}">${esc(t('cro.segun', {
           pagina: String(valor.pagina).replace(/^https?:\/\//, ''),

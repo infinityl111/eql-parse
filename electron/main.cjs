@@ -565,6 +565,7 @@ ipcMain.handle('enc:loot', () => engine.encLoot());
 ipcMain.handle('enc:deaths', () => engine.encDeaths());
 ipcMain.handle('cronos:ultimaMuerte', (_e, { nombres }) => engine.ultimaMuerte(nombres));
 ipcMain.handle('cronos:multiplicidad', (_e, { claves }) => engine.multiplicidadDe(claves));
+ipcMain.handle('cronos:observaciones', (_e, { claves }) => engine.observacionesDe(claves));
 ipcMain.handle('enc:progress', () => engine.encProgress());
 ipcMain.handle('enc:fights', (_e, q) => engine.encFights(q ?? {}));
 ipcMain.handle('enc:counts', () => engine.encCounts());

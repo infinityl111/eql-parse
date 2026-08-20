@@ -106,6 +106,42 @@ console.log('\nvarias claves de golpe, que es como la llama la pantalla');
     && r[claveCrono(a)] !== r[claveCrono(b)], 'las dos resuelven, y a marcas distintas');
 }
 
+console.log('OBS: cuántas observaciones lleva cada clave — el rótulo que decía «aún no»');
+{
+  /**
+   * QUÉ CUENTA UNA OBSERVACIÓN, dicho antes de comprobar el número: un
+   * intervalo entre dos muertes de esa clave EN PELEAS DISTINTAS. Dos muertes
+   * del mismo nombre dentro de una pelea son dos individuos, no un intervalo
+   * de reaparición — un muerto no vuelve a mitad del combate.
+   */
+  const d2 = { nombre: 'a kobold king', base: "Nagafen's Lair", diff: 2, mode: null };
+  const d3 = { nombre: 'a kobold king', base: "Nagafen's Lair", diff: 3, mode: null };
+  const r = motor(store).observacionesDe([d2, d3]);
+  ok(r[claveCrono(d2)].muertes === 2 && r[claveCrono(d2)].observaciones === 1,
+    'dos peleas con muerte suya dan 1 observación', JSON.stringify(r[claveCrono(d2)]));
+  ok(r[claveCrono(d3)].muertes === 1 && r[claveCrono(d3)].observaciones === 0,
+    'una sola pelea da 0 observaciones', 'no es un fallo: aún no ha vuelto a morir');
+
+  // Dos muertes del MISMO nombre en UNA pelea: multiplicidad, no intervalo.
+  const T2 = 1787000000000 + 10800e3;
+  store.append({
+    zone: "Nagafen's Lair 2 (Adaptive)", zoneBase: "Nagafen's Lair", diff: 2, diffTag: null,
+    duration: 60, total: 1000, start: Math.round(T2 / 1000),
+    kills: ['a kobold king', 'a kobold king'],
+    killTimes: [{ name: 'a kobold king', t: 5 }, { name: 'a kobold king', t: 40 }],
+    rows: [{ name: 'Campeon', side: 'ally' }, { name: 'a kobold king', side: 'enemy' }],
+  }, T2);
+  const r2 = motor(store).observacionesDe([d2]);
+  ok(r2[claveCrono(d2)].muertes === 4, 'las cuatro muertes se cuentan', JSON.stringify(r2[claveCrono(d2)]));
+  ok(r2[claveCrono(d2)].observaciones === 2,
+    'pero la pelea nueva suma UNA observación, no dos',
+    'dos muertes en la misma pelea no son un intervalo de reaparición');
+
+  const nunca = { nombre: 'a kobold emperor', base: "Nagafen's Lair", diff: 2, mode: null };
+  ok(motor(store).observacionesDe([nunca])[claveCrono(nunca)].observaciones === 0,
+    'y quien no ha muerto nunca lleva 0');
+}
+
 console.log('\nCONTROL POSITIVO: con la forma REAL del fallo, la prueba se pone roja');
 {
   /**

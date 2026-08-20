@@ -90,8 +90,16 @@
  *
  * Si esto se reabre, HAY QUE VOLVER A ESCRIBIRLOS. Está anotado también en
  * la condición de reapertura del estudio, que es donde se mirará.
- * Se siguen calculando y se guardan al lado, y el día que haya muestra
- * suficiente se contrastarán con el suyo; hoy no.
+ * CORREGIDO EL 20/08/2026: aquí decía «se siguen calculando y se guardan al
+ * lado». **Era falso.** Nadie escribía `crono.medido` en ninguna parte del
+ * árbol, así que no se calculaba ni se guardaba nada, y la fila de «lo que
+ * vamos viendo» decía «aún no» para siempre — y `cro.retenido`, que era su
+ * otra rama, resultó ser una cadena muerta e inalcanzable.
+ *
+ * Ahora sí se cuenta —`engine.observacionesDe()`— y la pantalla dice cuántas
+ * observaciones lleva cada clave. Lo que sigue sin salir es la CIFRA, y eso es
+ * lo que decide este bloque; que no salga un número no es excusa para no decir
+ * si hay algo detrás.
  *
  * El motivo no es prudencia, es un veredicto medido: EL PERIODO DE
  * REAPARICIÓN DE ZONA NO ESTÁ MEDIDO. El criterio que produce esos números es
