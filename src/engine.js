@@ -1764,7 +1764,25 @@ export class Engine extends EventEmitter {
       .filter((c) => c.nombre);
     const out = {};
     for (const c of pide) out[claveCrono(c)] = null;
-    if (!pide.size || !this.store) return out;
+    /**
+     * `pide` ES UN ARRAY, Y UN ARRAY NO TIENE `.size`.
+     *
+     * Estaba escrito `!pide.size`, que vale `!undefined` = **true siempre**, así
+     * que esta función salía por aquí sin mirar el índice ni una vez y devolvía
+     * todo a `null`. Entró con el primer commit del temporizador, así que el
+     * crono NUNCA SE HA REINICIADO desde que existe: matabas al bicho y la
+     * cuenta seguía como estaba.
+     *
+     * No se delataba por ninguna parte. `null` es un valor legítimo aquí —«no ha
+     * muerto nunca»— y la pantalla lo pinta como «esperando su primera muerte»,
+     * que es una frase que existe y tiene sentido. Y las pruebas de `cronos.js`
+     * le pasan la marca de muerte YA RESUELTA, así que ninguna llega hasta aquí.
+     *
+     * Un `.size` sobre un array es del mismo tipo que `scrollHeight` sobre un
+     * contenedor: la expresión es válida, devuelve algo, y ese algo no es lo que
+     * el nombre promete.
+     */
+    if (!pide.length || !this.store) return out;
 
     // Del más reciente al más viejo: en cuanto una clave aparece, ya es la suya.
     const idx = [...(this.store.index ?? [])].sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
