@@ -27,11 +27,17 @@ export async function puertoLibre() {
 }
 
 /** Lanza la aplicación con el puerto de depuración abierto. */
-export function lanzar() {
+/**
+ * @param {string[]} extra  argumentos de mas para Electron.
+ *   `--user-data-dir=<ruta>` es el que permite levantar la aplicacion sobre una
+ *   carpeta de datos preparada sin tocar la de nadie. Es un conmutador de
+ *   Chromium, asi que no hace falta cambiar nada de la aplicacion.
+ */
+export function lanzar(extra = []) {
   // El binario directo, no `npx`: en Windows, Node 24 se niega a lanzar un
   // `.cmd` sin shell y devuelve EINVAL. El paquete `electron` exporta la ruta.
   const bin = createRequire(import.meta.url)('electron');
-  return spawn(bin, ['.', `--remote-debugging-port=${PUERTO}`], { stdio: 'ignore', detached: false });
+  return spawn(bin, ['.', `--remote-debugging-port=${PUERTO}`, ...extra], { stdio: 'ignore', detached: false });
 }
 
 /** Espera a que la ventana principal esté disponible y devuelve su ficha. */
