@@ -165,7 +165,7 @@ fs.writeFileSync(path.join(DATOS, 'config.json'), JSON.stringify({
   // `bin/panel-vivo.js`, que exigia ver un temporizador CONTANDO y nunca lo
   // veia: una sonda que pide mas destapa lo que la de al lado daba por bueno.
   ...JSON.parse(fs.readFileSync(REAL, 'utf8')), lang: 'es', cronos: CRONOS,
-  logPath: LOG, path: LOG,
+  logPath: LOG,
 }, null, 1));
 
 // ── 2 · Las claves a vigilar ───────────────────────────────────────────────

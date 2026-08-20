@@ -142,7 +142,7 @@ export async function tramo(ruta, desde, hasta, tope = TOPE) {
   } catch (err) {
     return { ok: false, motivo: 'error', error: err.message };
   } finally {
-    await fh?.close().catch(() => {});
+    await fh?.close().catch(() => { /* cerrar dos veces no es un fallo */ });
   }
 }
 

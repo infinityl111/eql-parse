@@ -359,7 +359,19 @@ async function boot() {
   if (cfg.logPath && fs.existsSync(cfg.logPath)) {
     // Al arrancar se reanuda por donde iba; la relectura completa sólo ocurre
     // si la pides a mano, o sola la primera vez (lo decide engine.attach).
-    engine.attach(cfg.logPath, { ...cfg, fromStart: false }).catch(() => {});
+    /**
+     * SI ENGANCHAR FALLA, SE DICE. Este era el peor silencio del arbol.
+     *
+     * Sin motor no hay peleas, no hay muertes y no hay temporizadores — y la
+     * aplicacion se ve exactamente igual que la de alguien que acaba de
+     * instalarla. Es el mismo estado en el que `bin/rotulos.js` estuvo midiendo
+     * durante meses sin que nada lo dijera.
+     */
+    engine.attach(cfg.logPath, { ...cfg, fromStart: false }).catch((e) => {
+      engine.status = 'error';
+      engine.error = e?.message ?? String(e);
+      console.error('[EQL Parse] no se pudo enganchar al registro:', engine.error);
+    });
   }
 
   globalShortcut.register('Control+Alt+O', () => {

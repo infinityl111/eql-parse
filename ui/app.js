@@ -6985,7 +6985,15 @@ function showUpdate(u) {
 }
 
 window.eql.onUpdate?.(showUpdate);
-window.eql.getUpdate?.().then((u) => { if (u) showUpdate(u); }).catch(() => {});
+/**
+ * SI LA COMPROBACION DE VERSION FALLA, SE DICE — al registro, no en pantalla.
+ *
+ * Un cartel por no poder mirar si hay version nueva seria peor que el problema:
+ * se soluciona solo a la siguiente. Pero tragarselo del todo deja «nunca hay
+ * actualizaciones» y «no puedo preguntar» con la misma cara.
+ */
+window.eql.getUpdate?.().then((u) => { if (u) showUpdate(u); })
+  .catch((e) => console.warn('[EQL Parse] no se pudo comprobar la version:', e?.message ?? e));
 
 window.eql.getConfig().then((c) => {
   state.cfg = c;

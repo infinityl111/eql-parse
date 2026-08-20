@@ -217,7 +217,7 @@ export async function descargar(info, onProgreso = null, señal = null) {
     }
     await new Promise((res, rej) => salida.end((e) => (e ? rej(e) : res())));
   } catch (err) {
-    await fsp.rm(parcial, { force: true }).catch(() => {});
+    await fsp.rm(parcial, { force: true }).catch(() => { /* si no existe, ya esta */ });
     return { ok: false, motivo: err.name === 'AbortError' ? 'cancelado' : 'error', error: err.message };
   }
 
@@ -225,10 +225,10 @@ export async function descargar(info, onProgreso = null, señal = null) {
   // se llama `.parcial` y no puede confundirse con uno bueno.
   const hash = await sha512De(parcial);
   if (hash !== info.sha512) {
-    await fsp.rm(parcial, { force: true }).catch(() => {});
+    await fsp.rm(parcial, { force: true }).catch(() => { /* si no existe, ya esta */ });
     return { ok: false, motivo: 'no-cuadra' };
   }
-  await fsp.rm(ruta, { force: true }).catch(() => {});
+  await fsp.rm(ruta, { force: true }).catch(() => { /* si no existe, ya esta */ });
   await fsp.rename(parcial, ruta);
   return { ok: true, ruta };
 }

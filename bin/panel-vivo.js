@@ -85,7 +85,7 @@ fs.writeFileSync(path.join(DATOS, 'config.json'), JSON.stringify({
   // engancharse al registro. Con la clave equivocada el motor no lee nada y
   // el almacen se queda vacio SIN FALLAR — los cronos salen «esperando su
   // primera muerte» teniendo su muerte escrita tres lineas mas arriba.
-  lang: 'es', cronos: CRONOS, logPath: LOG, path: LOG, overlay: true,
+  lang: 'es', cronos: CRONOS, logPath: LOG,
 }, null, 2));
 
 const hijo = lanzar([`--user-data-dir=${DATOS}`]);
@@ -120,6 +120,26 @@ if (!ficha) {
  * veces con contenido y otras vacio — y un vacio asi es indistinguible de un
  * panel roto. Se espera a que haya algo, con plazo.
  */
+/**
+ * ANTES DE MEDIR NADA: ¿ENGANCHO EL MOTOR?
+ *
+ * Sembrar la configuracion no garantiza que la aplicacion la lea. Con la
+ * clave equivocada esta sonda arrancaba, pintaba, medía y daba su informe
+ * sobre una aplicacion SIN DATOS, y no fallo ni una vez.
+ *
+ * La pregunta buena es justo la que estaba rota: ¿sabe la aplicacion cuando
+ * murio un bicho que muere en el registro de prueba? Si no lo sabe, el motor
+ * no ha leido nada y lo que venga despues no mide lo que dice medir.
+ */
+async function motorEnganchado(lee) {
+  const js = `window.eql.ultimaMuerte([{ nombre: "vencido", base: ${JSON.stringify(BASE)}, diff: 2, mode: null }]).then((r) => Object.values(r ?? {}).filter(Boolean).length)`;
+  for (let i = 0; i < 40; i++) {
+    const n = await lee(js, true);
+    if (n > 0) return true;
+    await espera(500);
+  }
+  return false;
+}
 async function esperaEstable(lee) {
   let previo = null;
   let iguales = 0;
@@ -142,10 +162,21 @@ const cli = cdp(ficha.webSocketDebuggerUrl);
 await cli.listo;
 
 
-const lee = async (js) => {
-  const r = await cli.manda('Runtime.evaluate', { expression: js, returnByValue: true });
+const lee = async (js, esperaPromesa = false) => {
+  const r = await cli.manda('Runtime.evaluate', {
+    expression: js, returnByValue: true, awaitPromise: esperaPromesa,
+  });
   return r?.result?.value;
 };
+
+if (!await motorEnganchado(lee)) {
+  console.error('\nEL MOTOR NO ENGANCHO.');
+  console.error('La aplicacion no sabe cuando murio «vencido», y esa muerte esta en');
+  console.error('el registro de prueba. Todo lo que midiera esta sonda a partir de');
+  console.error('aqui seria de una aplicacion vacia — que es exactamente lo que');
+  console.error('paso durante meses con bin/rotulos.js.\n');
+  fin(1);
+}
 
 if (!await esperaEstable(lee)) {
   console.error('\nEl panel nunca se quedo quieto en 20 s.');

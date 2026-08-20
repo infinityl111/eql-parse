@@ -159,7 +159,7 @@ export class LogTailer extends EventEmitter {
       if (err.code === 'ENOENT') this.emit('waiting', this.path);
       else this.emit('error', err);
     } finally {
-      if (fh) await fh.close().catch(() => {});
+      if (fh) await fh.close().catch(() => { /* cerrar dos veces no es un fallo */ });
       this.busy = false;
     }
   }
