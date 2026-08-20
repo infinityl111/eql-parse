@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<title>Reapariciones — prototipo</title>
+<style>
+:root{
+  --fondo:#14110d; --alto:#1c1813; --linea:#2f2921; --linea2:#3d3529;
+  --tinta:#efe7d8; --tinta2:#b3a793; --tenue:#7d7263;
+  --acento:#d9a441; --gema:#63b083; --alarma:#c9603a; --frio:#5b8fb9;
+  --r:7px; --f:13px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fondo);color:var(--tinta);
+  font:var(--f)/1.45 "Segoe UI",system-ui,sans-serif}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:.2px}
+.marco{max-width:1180px;margin:0 auto;padding:18px 22px 60px}
+
+/* ── PIEZA 1 · pestañas DENTRO de la sección ─────────────────────────── */
+.pest{display:flex;gap:2px;border-bottom:1px solid var(--linea);margin:14px 0 0}
+.pest button{background:none;border:0;border-bottom:2px solid transparent;color:var(--tenue);
+  font:600 12px/1 inherit;padding:9px 14px;cursor:pointer;letter-spacing:.3px}
+.pest button:hover{color:var(--tinta2)}
+.pest button[aria-selected=true]{color:var(--tinta);border-bottom-color:var(--acento)}
+.pest .cuenta{color:var(--tenue);font-weight:400;margin-left:5px}
+
+/* ── PIEZA 2 · barra de control: buscador + agrupar + densidad ───────── */
+.barra{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  padding:10px 0;border-bottom:1px solid var(--linea)}
+.buscar{flex:1 1 220px;min-width:170px;position:relative}
+.buscar input{width:100%;background:var(--alto);border:1px solid var(--linea2);
+  border-radius:var(--r);color:var(--tinta);font:inherit;padding:7px 10px 7px 28px}
+.buscar input:focus{outline:0;border-color:var(--acento)}
+.buscar::before{content:"⌕";position:absolute;left:9px;top:6px;color:var(--tenue);font-size:15px}
+select{background:var(--alto);border:1px solid var(--linea2);border-radius:var(--r);
+  color:var(--tinta);font:inherit;padding:7px 8px}
+.dens{display:flex;gap:0;border:1px solid var(--linea2);border-radius:var(--r);overflow:hidden}
+.dens button{background:none;border:0;color:var(--tenue);font:600 11px/1 inherit;
+  padding:8px 10px;cursor:pointer}
+.dens button[aria-pressed=true]{background:var(--linea);color:var(--tinta)}
+
+/* ── PIEZA 3 · pastillas de filtro, encendidas/apagadas y a la vista ─── */
+.pastillas{display:flex;gap:6px;flex-wrap:wrap;padding:9px 0}
+.pastilla{background:none;border:1px solid var(--linea2);border-radius:99px;
+  color:var(--tenue);font:600 11px/1 inherit;padding:5px 11px;cursor:pointer;
+  display:inline-flex;gap:5px;align-items:center}
+.pastilla:hover{border-color:var(--tenue)}
+.pastilla[aria-pressed=true]{background:var(--acento);border-color:var(--acento);color:#1a1408}
+.pastilla .n{opacity:.7;font-weight:400}
+
+/* ── PIEZA 4 · filas plegables ───────────────────────────────────────── */
+.filas{border:1px solid var(--linea);border-radius:var(--r);overflow:hidden;margin-top:10px}
+.fila{border-bottom:1px solid var(--linea)}
+.fila:last-child{border-bottom:0}
+.fila>summary{display:grid;align-items:center;gap:10px;padding:7px 11px;cursor:pointer;
+  list-style:none;grid-template-columns:14px 1fr auto auto auto}
+.fila>summary::-webkit-details-marker{display:none}
+.fila>summary:hover{background:var(--alto)}
+.fila[open]>summary{background:var(--alto);border-bottom:1px solid var(--linea)}
+.giro{color:var(--tenue);transition:transform .12s;font-size:10px}
+.fila[open] .giro{transform:rotate(90deg)}
+.cuerpo{padding:9px 11px 12px 35px;background:#181410;font-size:12px;color:var(--tinta2)}
+.compacta .fila>summary{padding:3px 11px;font-size:12px}
+.compacta .barrita{height:3px}
+
+/* ── PIEZA 5 · etiquetas compactas en vez de texto largo ─────────────── */
+.et{display:inline-block;border-radius:4px;padding:1px 6px;font:600 10px/1.6 inherit;
+  letter-spacing:.3px;white-space:nowrap}
+.et.tuyo{background:#3a2f14;color:var(--acento)}
+.et.zona{background:#16303a;color:var(--frio)}
+.et.enem{background:#3a1f16;color:var(--alarma)}
+.et.masc{background:#241f2f;color:#9b8ec7}
+.et.ok{background:#16301f;color:var(--gema)}
+.et.gris{background:var(--linea);color:var(--tinta2)}
+.num{font-variant-numeric:tabular-nums}
+.barrita{height:5px;border-radius:3px;background:var(--linea);overflow:hidden;min-width:52px}
+.barrita i{display:block;height:100%;background:var(--acento)}
+.fila.ene .barrita i{background:var(--alarma)}
+
+/* ── El armazón del antes/después ─────────────────────────────────────── */
+.conmutador{display:flex;gap:6px;margin:0 0 6px}
+.conmutador button{background:var(--alto);border:1px solid var(--linea2);border-radius:var(--r);
+  color:var(--tinta2);font:700 12px/1 inherit;padding:9px 16px;cursor:pointer}
+.conmutador button[aria-pressed=true]{background:var(--acento);border-color:var(--acento);color:#1a1408}
+.nota{background:#1a1610;border:1px solid var(--linea);border-left:3px solid var(--acento);
+  border-radius:var(--r);padding:11px 14px;margin:14px 0;color:var(--tinta2);font-size:12.5px}
+.nota b{color:var(--tinta)}
+.antes{border:1px dashed var(--linea2);border-radius:var(--r);padding:20px;background:#171310}
+.vacio{color:var(--tenue);text-align:center;padding:70px 0;font-style:italic}
+.pie{color:var(--tenue);font-size:11.5px;margin-top:34px;border-top:1px solid var(--linea);padding-top:12px}
+.mini{color:var(--tenue);font-size:11px}
+</style>
+</head><body><div class="marco">
+
+<h1>Reapariciones</h1>
+<p class="mini">Prototipo A · la sección <b>vacía</b>. Contenido real: 1 temporizador abierto.</p>
+
+<div class="conmutador">
+  <button aria-pressed="true" onclick="document.getElementById('pa').hidden=false;document.getElementById('pd').hidden=true">ANTES</button>
+  <button aria-pressed="false" onclick="document.getElementById('pa').hidden=true;document.getElementById('pd').hidden=false">DESPUÉS</button>
+</div>
+
+<div id="pa">
+  <div class="antes">
+    <h2 style="font-size:19px">Temporizadores de reaparición</h2>
+    <p class="mini">Se abren y se cierran a mano. Ninguna muerte los enciende sola.</p>
+    <div style="display:flex;gap:6px;margin:14px 0">
+      <input placeholder="Nombre del enemigo, tal como sale en el registro"
+        style="flex:1;max-width:420px;background:#1c1813;border:1px solid #3d3529;border-radius:6px;color:#efe7d8;padding:7px 9px">
+      <button style="background:#1c1813;border:1px solid #3d3529;border-radius:6px;color:#efe7d8;padding:7px 12px">Vigilar un enemigo</button>
+    </div>
+    <div style="border:1px solid #2f2921;border-radius:7px;padding:13px;max-width:310px">
+      <div style="display:flex;justify-content:space-between"><b>Hoptor Thaggelum</b>
+        <span class="mini">Cerrar</span></div>
+      <div class="mini">The Ruins of Old Guk · D3</div>
+      <div style="font-size:30px;margin:6px 0">10:35</div>
+      <div class="mini">tuyo — aún no</div>
+      <div class="mini">la zona repuebla en — 22:00</div>
+      <div class="mini">lo que vamos viendo — 2 observaciones</div>
+    </div>
+    <div class="vacio">— y aquí acaba la pantalla —<br><br>
+      el 90 % del alto, vacío, con un temporizador abierto</div>
+  </div>
+</div>
+
+<div id="pd" hidden data-panel-host>
+  <div class="pest">
+    <button data-ir="activos" aria-selected="true">Contando <span class="cuenta" data-cuenta="#lista-activos">1</span></button>
+    <button data-ir="listos" aria-selected="false">Ya deberían estar <span class="cuenta">0</span></button>
+    <button data-ir="poner" aria-selected="false">Añadir</button>
+  </div>
+
+  <div data-panel="activos">
+    <div class="barra">
+      <label class="buscar"><input placeholder="Buscar enemigo o zona…"></label>
+      <select><option>Agrupar por: zona</option><option>Agrupar por: dificultad</option>
+        <option>Agrupar por: estado</option><option>Sin agrupar</option></select>
+      <div class="dens"><button data-d="baja" aria-pressed="true">CÓMODA</button>
+        <button data-d="alta" aria-pressed="false">DENSA</button></div>
+    </div>
+    <div class="pastillas">
+      <button class="pastilla" data-et="contando" aria-pressed="true">contando <span class="n">1</span></button>
+      <button class="pastilla" data-et="vencido" aria-pressed="true">vencidos <span class="n">0</span></button>
+      <button class="pastilla" data-et="sinmuerte" aria-pressed="true">sin muerte aún <span class="n">0</span></button>
+    </div>
+    <div class="filas" id="lista-activos">
+      
+<details class="fila" data-busca="hoptor thaggelum the ruins of old guk" data-et="contando">
+  <summary>
+    <span class="giro">▶</span>
+    <span><b>Hoptor Thaggelum</b> <span class="et zona">The Ruins of Old Guk D3</span></span>
+    <span class="num" style="color:var(--acento);font-weight:700">10:35</span>
+    <span class="barrita" style="width:90px"><i style="width:48%"></i></span>
+    <span class="mini num">2 obs</span>
+  </summary>
+  <div class="cuerpo">
+    <div><span class="et tuyo">tuyo</span> aún no ·
+      <span class="et zona">la zona repuebla en</span> <b class="num">22:00</b>
+      <span class="mini">según eqlwiki.com/Nagafen's_Lair</span></div>
+    <div style="margin-top:6px"><span class="et gris">lo que vamos viendo</span>
+      <b class="num">2 obs</b> — un intervalo suelto no es una medida.</div>
+  </div>
+</details>
+    </div>
+    <div class="nota"><b>El hueco se llena con lo que ya sabemos.</b> Debajo, los enemigos
+      de tu última pelea que <b>todavía no tienen temporizador</b>, con sus observaciones.
+      Un clic los vigila. Es una propuesta: hoy hay que teclear el nombre a mano.</div>
+    <div class="pastillas">
+      <button class="pastilla" data-et="cand" aria-pressed="true">de tu última pelea <span class="n">14</span></button>
+      <button class="pastilla" data-et="nunca" aria-pressed="false">nunca vigilados</button>
+    </div>
+    <div class="filas">
+      <details class="fila ene" data-busca="orc legionnaire" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>orc legionnaire <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">182</span></div></details><details class="fila ene" data-busca="marrowbane" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>Marrowbane <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">175</span></div></details><details class="fila ene" data-busca="emperor crush" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>Emperor Crush <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">76</span></div></details><details class="fila ene" data-busca="lord darish" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>Lord Darish <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">56</span></div></details><details class="fila ene" data-busca="an orc thaumaturgist" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>an orc thaumaturgist <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">42</span></div></details><details class="fila ene" data-busca="bonefire" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>Bonefire <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">16</span></div></details><details class="fila ene" data-busca="ambassador d`vinn" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>Ambassador D`Vinn <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">11</span></div></details><details class="fila ene" data-busca="orc oracle" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>orc oracle <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">4</span></div></details><details class="fila ene" data-busca="orc emissary" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>orc emissary <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">1</span></div></details><details class="fila ene" data-busca="orc taskmaster" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>orc taskmaster <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">0</span></div></details><details class="fila ene" data-busca="orc centurion" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>orc centurion <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">0</span></div></details><details class="fila ene" data-busca="royal guard" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>royal guard <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">0</span></div></details><details class="fila ene" data-busca="orc scoutsman" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>orc scoutsman <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">0</span></div></details><details class="fila ene" data-busca="orc slaver" data-et="cand">
+        <summary><span class="giro">▶</span>
+          <span>orc slaver <span class="et enem">Clan Crushbone 4 (Refined)</span></span>
+          <span class="mini">sin temporizador</span>
+          <span class="barrita" style="width:60px"><i style="width:0"></i></span>
+          <span class="mini">vigilar</span>
+        </summary>
+        <div class="cuerpo">Murió en <b>an orc thaumaturgist ×3, orc centurion ×…</b> ·
+          daño recibido <span class="num">0</span></div></details>
+    </div>
+  </div>
+  <div data-panel="listos" hidden><div class="vacio">Ninguno ha vencido todavía.</div></div>
+  <div data-panel="poner" hidden>
+    <div class="barra"><label class="buscar"><input placeholder="Nombre del enemigo…"></label></div>
+    <p class="mini">Y desde una pelea, en Escena, con el botón «Poner temporizador».</p>
+  </div>
+</div>
+
+<div class="nota"><b>Qué cambia, en corto.</b> Pestañas dentro de la sección
+(contando / vencidos / añadir) · buscador siempre visible · agrupar por zona,
+dificultad o estado · pastillas de filtro encendidas y apagadas · fichas
+convertidas en filas plegables —una línea cada una, se abre la que interesa— ·
+etiquetas compactas en vez de tres renglones de texto · densidad a elegir ·
+y el hueco relleno con candidatos reales en vez de aire.</div>
+
+<p class="pie">Prototipo de diseño · 20 de agosto de 2026 · <b>las cifras son REALES</b>, sacadas de
+<code>C:/Users/ferna/AppData/Roaming/eql-parse/fights.ndjson</code> el 2026-08-20T12:42. No es fuente de datos y no se empaqueta.
+Generado por <code>gen-prototipos.mjs</code>: se vuelve a generar, no se edita a mano.</p>
+</div><script>
+// Las piezas del kit, en crudo: pestañas, pastillas, densidad y buscador.
+// Aquí funcionan para poder TOCARLAS; en la aplicación serían un módulo.
+document.addEventListener('click', (e) => {
+  const p = e.target.closest('.pest button');
+  if (p) {
+    for (const b of p.parentElement.children) b.setAttribute('aria-selected', b === p);
+    const caja = p.closest('[data-panel-host]');
+    for (const s of caja.querySelectorAll('[data-panel]')) {
+      s.hidden = s.dataset.panel !== p.dataset.ir;
+    }
+  }
+  const t = e.target.closest('.pastilla, .dens button, .conmutador button');
+  if (t) {
+    const grupo = t.closest('.dens, .conmutador');
+    if (grupo) for (const b of grupo.children) b.setAttribute('aria-pressed', b === t);
+    else t.setAttribute('aria-pressed', t.getAttribute('aria-pressed') !== 'true');
+    aplica(t.closest('[data-panel-host]') || document);
+  }
+});
+document.addEventListener('input', (e) => {
+  if (e.target.matches('.buscar input, select')) aplica(e.target.closest('[data-panel-host]') || document);
+});
+function aplica(raiz) {
+  const q = (raiz.querySelector('.buscar input')?.value || '').toLowerCase().trim();
+  const apagadas = [...raiz.querySelectorAll('.pastilla[aria-pressed=false]')].map((b) => b.dataset.et);
+  const compacta = raiz.querySelector('.dens button[aria-pressed=true]')?.dataset.d === 'alta';
+  for (const lista of raiz.querySelectorAll('.filas')) lista.classList.toggle('compacta', !!compacta);
+  for (const f of raiz.querySelectorAll('.fila')) {
+    const texto = f.dataset.busca || '';
+    const ets = (f.dataset.et || '').split(' ').filter(Boolean);
+    const fuera = ets.some((x) => apagadas.includes(x));
+    f.hidden = fuera || (q && !texto.includes(q));
+  }
+  for (const c of raiz.querySelectorAll('[data-cuenta]')) {
+    const lista = raiz.querySelector(c.dataset.cuenta);
+    if (lista) c.textContent = [...lista.querySelectorAll('.fila')].filter((f) => !f.hidden).length;
+  }
+}
+document.addEventListener('DOMContentLoaded', () => aplica(document));
+</script></body></html>
