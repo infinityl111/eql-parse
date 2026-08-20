@@ -1592,16 +1592,72 @@ function devuelveFoco(host, f) {
   try { el.setSelectionRange(f.ini, f.fin); } catch { /* no todo campo lo admite */ }
 }
 
+/**
+ * LA IDENTIDAD DE UN CAMPO, para poder devolverle lo suyo tras reconstruir.
+ *
+ * Su `id` si lo tiene; si no, el atributo que lo distingue de sus hermanos.
+ * NUNCA la posicion: la cola de temporizadores se reordena sola -manda el que
+ * antes vuelve- y el tercer campo de antes no es el tercero de ahora.
+ */
+function identidadDeCampo(e) {
+  if (e.id) return `#${e.id}`;
+  for (const a of ['man', 'set', 'quita', 'et', 'campo']) {
+    if (e.dataset?.[a] != null) return `${a}=${e.dataset[a]}`;
+  }
+  return null;
+}
+
+/**
+ * LO QUE EL JUGADOR HA TOCADO NO LO PISA EL MODELO.
+ *
+ * `devuelveFoco` conserva UN campo: el que tuviera el foco. Eso deja fuera el
+ * caso normal — escribir, mover el raton, y que el siguiente repintado devuelva
+ * el campo a su valor de siempre.
+ *
+ * Medido sobre las quince secciones con `bin/campos-todos.js`: de veintidos
+ * campos, uno perdia lo escrito. Y no se quedaba en blanco, que se veria: volvia
+ * a «30:00», el valor del modelo. **Un campo que vuelve a un valor plausible es
+ * peor que uno que se borra**, porque el segundo se nota.
+ */
+function tocados(host) {
+  const out = new Map();
+  for (const e of host.querySelectorAll('[data-sucio="1"]')) {
+    const k = identidadDeCampo(e);
+    if (k) out.set(k, e.value);
+  }
+  return out;
+}
+
+function devuelveTocados(host, guardados) {
+  if (!guardados?.size) return;
+  for (const e of host.querySelectorAll('input, textarea, select')) {
+    const k = identidadDeCampo(e);
+    if (k == null || !guardados.has(k)) continue;
+    e.value = guardados.get(k);
+    e.dataset.sucio = '1';
+  }
+}
+
 function pintaEstable(host, construye, refresca, clave = 'sigEstable') {
   if (!host) return 'sin hueco';
+  // Marcar lo tocado se cuelga UNA vez por hueco: el escuchador es delegado y
+  // sobrevive a que le reescriban los hijos.
+  if (host.dataset.moSucio !== '1') {
+    host.dataset.moSucio = '1';
+    host.addEventListener('input', (e) => {
+      if (e.target.matches?.('input, textarea, select')) e.target.dataset.sucio = '1';
+    });
+  }
   const firma = construye(false);
   if (host.dataset[clave] === firma && host.firstElementChild) {
     refresca?.(host);
     return 'refrescado';
   }
   const foco = focoDentroDe(host);
+  const suyos = tocados(host);
   host.innerHTML = construye(true);
   host.dataset[clave] = firma;
+  devuelveTocados(host, suyos);
   devuelveFoco(host, foco);
   return 'reconstruido';
 }

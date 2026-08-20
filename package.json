@@ -12,6 +12,8 @@
     "ui:check": "node bin/ui-check.js",
     "ui:volcar": "node bin/ui-volcar.js",
     "ui:teclear": "node bin/ui-teclear.js",
+    "campos": "node bin/campos-todos.js",
+    "panel": "node bin/panel-vivo.js",
     "capturas": "electron bin/capturas.cjs",
     "pliegue": "electron bin/pliegue.cjs",
     "vacios": "node bin/vacios.js",
