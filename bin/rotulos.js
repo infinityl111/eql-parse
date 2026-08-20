@@ -115,6 +115,16 @@ fs.writeFileSync(LOG, [
   '[Tue Aug 04 11:04:20 2026] You have slain contando!',
   '',
 ].join('\r\n'));
+/**
+ * Y EL ALMACÉN VA SELLADO CON SU VERSIÓN — la cuarta causa, y la última.
+ *
+ * Sin el sello, la aplicación cree que el histórico es de un formato viejo y
+ * saca el cartel de «tu histórico se guardó con cifras incorrectas», que se
+ * come la vista entera. `ui-volcar` no lo sufre porque usa el `userData` REAL,
+ * ya sellado — y comparar los dos arranques es lo que lo señaló, igual que
+ * antes lo señaló listar la carpeta. Deducir no lo habría dado.
+ */
+store.stamp();
 const cfg = { ...JSON.parse(fs.readFileSync(REAL, 'utf8')), lang: 'es', cronos: CRONOS, path: LOG };
 fs.writeFileSync(path.join(DATOS, 'config.json'), JSON.stringify(cfg, null, 1));
 
@@ -149,7 +159,7 @@ try {
 
   for (const sec of ['cronos', 'escena']) {
     await evalua(`document.querySelector('[data-sec=${sec}]')?.click()`);
-    await espera(2500);
+    await espera(5000);
     if (sec === 'escena') {
       await evalua("document.querySelector('#croEscBtn')?.click()");
       await espera(1200);
@@ -174,7 +184,7 @@ try {
 } catch (e) { console.error('\n', e?.message ?? e, '\n'); }
 
 // ── 4. El veredicto ────────────────────────────────────────────────────────
-const norm = (s) => String(s).replace(/\{[^}]*\}/g, '\u0001').replace(/\s+/g, ' ').trim();
+const norm = (s) => String(s).replace(/\{[^}]*\}/g, '\u0001').replace(/\s+/g, ' ').trim().toLowerCase();
 const cuerpo = norm(visto);
 const vivas = [], muertas = [];
 for (const k of CLAVES) {
@@ -220,14 +230,40 @@ if (!vivas.some(([k]) => k === CANARIO)) {
   console.error('Si sale muerto, las fichas no se han pintado y el recuento de abajo');
   console.error('no vale. NO se publica ese número.\n');
   console.error('Lo que se vio en pantalla, en crudo:');
-  console.error(JSON.stringify(cuerpo.slice(0, 300)));
+  console.error(JSON.stringify(cuerpo.slice(0, 700)));
   console.error('');
   fin(1);
 }
 
-console.log(`\n${vivas.length} de ${CLAVES.length} rótulos SALEN a pantalla con los casos que sé producir\n`);
-console.log(`${muertas.length} SIN NINGÚN CASO QUE LOS GENERE:`);
-for (const [k, t] of muertas) console.log(`   ${k.padEnd(22)} «${t}»`);
-console.log('\nCada uno de ésos o falta por implementar, o sobra por retirar.');
-console.log('Lo que NO puede es seguir sin distinguirse de los vivos.\n');
+/**
+ * TRES CUBOS Y NO DOS. «No alcanzado» y «muerto» no son lo mismo, y mezclarlos
+ * es la misma familia que todo lo de hoy: un rotulo que esta sonda no ejercita
+ * —porque no abre el panel de Escena, o porque nunca se queda sin cronos— no
+ * esta muerto, esta SIN PROBAR. Llamarlo muerto invitaria a retirarlo.
+ *
+ * Lo que la sonda no ejercita va declarado aqui, con su motivo, para que la
+ * lista de muertos sea de verdad la lista de muertos.
+ */
+const NO_EJERCITADOS = {
+  'cro.escBoton': 'el panel de Escena necesita una pelea abierta; el registro de prueba no la tiene',
+  'cro.escTitulo': 'idem', 'cro.escSub': 'idem', 'cro.escNoMurio': 'idem',
+  'cro.escYaEsta': 'idem', 'cro.escDosVeces': 'idem', 'cro.escMurio': 'idem',
+  'cro.escEncantado': 'idem', 'cro.escPoner': 'idem', 'cro.escVacio': 'idem',
+  'cro.vacio': 'hace falta CERO temporizadores; la sonda abre ocho a proposito',
+};
+const sinProbar = muertas.filter(([k]) => k in NO_EJERCITADOS);
+const sinCaso = muertas.filter(([k]) => !(k in NO_EJERCITADOS));
+
+console.log(`
+${vivas.length} de ${CLAVES.length} rotulos SALEN a pantalla
+`);
+console.log(`${sinProbar.length} que esta sonda NO EJERCITA (no es lo mismo que muertos):`);
+for (const [k] of sinProbar) console.log(`   ${k.padEnd(22)} ${NO_EJERCITADOS[k]}`);
+console.log(`
+${sinCaso.length} SIN NINGUN CASO QUE LOS GENERE — estos son los sospechosos:`);
+for (const [k, t] of sinCaso) console.log(`   ${k.padEnd(22)} «${t}»`);
+console.log(`
+Cada uno de esos o falta por implementar, o sobra por retirar.`);
+console.log(`Lo que NO puede es seguir sin distinguirse de los vivos.
+`);
 fin(0);
