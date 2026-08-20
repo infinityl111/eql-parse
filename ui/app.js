@@ -4,6 +4,8 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets, ensureIdentidad } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
+import { construye as construyeCronos } from './cronos-vista.js';
+import { conectar as conectarPiezas, desplegadas } from './piezas.js';
 import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION, enemigosDeLaPelea, MIN_OBS_DISCREPA, puedeAfirmarDiscrepancia } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
@@ -5974,106 +5976,52 @@ async function renderCronos(snap, cajaSec) {
    * repintaría NUNCA y no habría ningún síntoma. Generando el mismo HTML dos
    * veces, la firma no se puede desincronizar de lo que se pinta.
    */
-  const filasDe = (conNumero) => orden.map(({ crono: c, clave: k, estado: st }, i) => {
-    const v = st.valor;
-    // Donde no hay valor suyo NO se pone un número peor. Se dice que no se
-    // sabe y cuántas observaciones van: la marca de «poco fiable» no funciona,
-    // porque se lee el número y no la marca.
-    const sinNumero = v.segundos == null
-      ? (st.estado === ESTADO.SIN_MUERTE && !st.transcurrido ? t('cro.esperando')
-        : t('cro.aunNo', { n: c.muertes ?? 0 }))
-      : t('cro.esperando');
-    const cuerpo = st.estado === ESTADO.SIN_MUERTE
-      ? `<div class="cro-espera">${esc(sinNumero)}</div>`
-      : st.estado === ESTADO.CONTANDO
-        ? `<div class="cro-num" data-num="${i}">${conNumero ? cronoRestante(st.restante, v.precision) : ''}</div>`
-        : `<div class="cro-num cro-cero">${esc(t('cro.disponible'))}</div>`;
+  /**
+   * EL PINTOR NO CONSTRUYE HTML. Reúne los datos, los formatea, y se los da al
+   * CONSTRUCTOR —`ui/cronos-vista.js`—, que es puro y se prueba sin navegador.
+   *
+   * Aquí es donde se formatea y en ningún otro sitio: el constructor no sabe de
+   * `cronoRestante` ni de `labelDiff`, y por eso se puede llamar desde una
+   * prueba sin arrancar nada. Lo vigila `test/contrato-pintores.js`.
+   */
+  const modelo = {
     /**
-     * LAS TRES PROCEDENCIAS, SIEMPRE LAS TRES, con hueco donde no hay dato.
+     * LA PESTAÑA Y LA LEYENDA SE LEEN DE DONDE ESTÁN, no de una variable.
      *
-     * Decisión de Campeón. No se esconde la que falta: «aún no» también
-     * informa, y una línea que aparece y desaparece según el caso obliga a
-     * recordar cuáles había. La que manda va marcada, no reordenada — el
-     * orden fijo es lo que deja leer la ficha sin volver a aprenderla.
+     * Las mueve el jugador pulsando, y `pintaEstable` reconstruye desde el
+     * modelo: si el modelo no dijera en cuál está, cada reconstrucción lo
+     * devolvería a la primera pestaña. La pestaña viva la sabe el DOM; la
+     * leyenda, que sobrevive a cerrar la aplicación, la configuración.
      */
-    const linea = ({ clave, valor, manda }) => {
-      const rot = esc(t(`cro.src.${clave}`));
-      /**
-       * LO NUESTRO VA PRIMERO, Y ANTES DE MIRAR SI HAY VALOR.
-       *
-       * Estaba detrás del `if (!valor)`, y como `medido` es siempre null —nadie
-       * lo escribe— esta rama **era inalcanzable**: la fila decía «aún no»
-       * SIEMPRE, y `cro.retenido` era una cadena muerta. Es el mismo caso que
-       * los dos rótulos de procedencia que se retiraron.
-       *
-       * Y «aún no» era lo peor que podía decir, porque significa a la vez «voy
-       * acumulando» y «no estoy guardando nada». Un fallo y un estado legítimo,
-       * idénticos en pantalla. Ahora dice **cuántas observaciones lleva**, que
-       * distingue las dos cosas de un vistazo.
-       */
-      if (clave === 'nuestro') {
-        const o = obs[k] ?? { muertes: 0, observaciones: 0 };
-        const n = o.observaciones;
-        const cuenta = n === 0 ? t('cro.obs0') : n === 1 ? t('cro.obs1') : t('cro.obsN', { n });
-        // Con una sola no se da cifra: un intervalo suelto no es una medida.
-        const nota = n < 2 ? t('cro.obsPocas') : t('cro.retenido');
-        return `<div class="cro-f"><span class="cro-f-rot">${rot}</span>`
-          + `<span class="cro-f-obs">${esc(cuenta)}</span>`
-          + `<span class="cro-f-ret">${esc(nota)}</span></div>`;
-      }
-      if (!valor) return `<div class="cro-f"><span class="cro-f-rot">${rot}</span>`
-        + `<span class="cro-f-no">${esc(t('cro.sinDato'))}</span></div>`;
-      const pag = valor.pagina
-        ? `<span class="cro-f-pag" title="${esc(valor.pagina)}">${esc(t('cro.segun', {
-          pagina: String(valor.pagina).replace(/^https?:\/\//, ''),
-        }))}</span>` : '';
-      return `<div class="cro-f${manda ? ' manda' : ''}">`
-        + `<span class="cro-f-rot">${rot}</span>`
-        + `<span class="cro-f-val">${cronoRestante(valor.segundos, valor.precision)}</span>`
-        + `${pag}</div>`;
-    };
-    const fuente = `<div class="cro-fuentes">${(v.fuentes ?? []).map(linea).join('')}</div>`;
-
-    // Y si discrepan, se dice. En segundos y sin decir quién acierta.
-    const dis = [
-      v.discrepa != null && v.fuente === 'manual' ? t('cro.discrepa', {
-        tuyo: cronoRestante(v.segundos), n: obs[k]?.observaciones ?? 0,
-      }) : null,
-      v.discrepaWiki != null ? t('cro.discrepaWiki', {
-        wiki: cronoRestante(v.fuentes?.find((f) => f.clave === 'wiki')?.valor?.segundos),
-        nuestro: cronoRestante(v.otro.segundos), dif: cronoRestante(v.discrepaWiki),
-      }) : null,
-    ].filter(Boolean);
-    const discrepa = dis.length ? `<div class="cro-dif">${dis.map(esc).join('<br>')}</div>` : '';
-    const aviso = st.aviso === 'quizá-no-vemos-su-muerte'
-      ? `<div class="cro-avi">${esc(t('cro.sospecha', { n: PERIODOS_SOSPECHA }))}</div>` : '';
-    const varios = c.aviso === 'varios-a-la-vez' ? `<div class="cro-avi">${esc(t('cro.varios'))}</div>`
-      : c.aviso === 'probablemente-varios' ? `<div class="cro-avi">${esc(t('cro.quizaVarios', { n: c.muertes ?? 0 }))}</div>` : '';
-    // La zona va SIEMPRE a la vista, no en un desplegable: sin ella la ficha no
-    // dice a qué se refiere el número, y dos fichas del mismo bicho en dos zonas
-    // se verían idénticas con dos cuentas atrás distintas.
-    const donde = c.base
-      ? `<div class="cro-zona">${esc(c.base)}${c.mode ? ` · ${esc(c.mode)}` : ''}${c.diff ? ` · ${esc(labelDiff(c.diff))}` : ''}</div>`
-      : `<div class="cro-zona cro-sinzona">${esc(t('cro.sinZona'))}</div>`;
-    return `<div class="cro" data-cro="${i}">
-      <div class="cro-cab"><b>${esc(c.nombre)}</b>
-        <button class="cro-x" data-quita="${i}">${esc(t('cro.close'))}</button></div>
-      ${donde}
-      ${cuerpo}${fuente}${discrepa}${varios}${aviso}
-      <div class="cro-man"><input class="cro-in" data-man="${i}"
-        placeholder="${esc(t('cro.manualPh'))}" value="${c.manual != null ? cronoRestante(c.manual) : ''}">
-        <button data-set="${i}">${esc(t('cro.setManual'))}</button></div>
-    </div>`;
-  }).join('');
-
-  const paginaDe = (conNumero) => {
-    const filas = filasDe(conNumero);
-    return `<h2>${esc(t('cro.title'))}</h2>
-    <p class="sub">${esc(t('cro.sub'))}</p>
-    <div class="cro-add"><input id="croNuevo" placeholder="${esc(t('cro.addPh'))}">
-      <button id="croAdd">${esc(t('cro.add'))}</button></div>
-    <div class="cro-lista">${filas || `<p class="sub">${esc(t('cro.vacio'))}</p>`}</div>`;
+    vista: host.querySelector('.pz-pest button[aria-selected="true"]')?.dataset.ir || 'vig',
+    // Y qué filas dejó desplegadas, por la misma razón y con más motivo: el
+    // campo de poner tiempo vive dentro de una.
+    abiertas: desplegadas(host),
+    leyendaAbierta: state.cfg?.croLeyenda === true,
+    fichas: orden.map(({ crono: c, estado: st }) => ({
+      crono: {
+        ...c,
+        manualTxt: c.manual != null ? cronoRestante(c.manual) : '',
+        zonaTxt: c.base ? `${c.base}${c.mode ? ` · ${c.mode}` : ''}${
+          c.diff != null ? ` · ${labelDiff(c.diff, c.diffTag)}` : ''}` : null,
+      },
+      estado: {
+        ...st,
+        restanteTxt: cronoRestante(st.restante, st.valor?.precision),
+        valor: {
+          ...st.valor,
+          segundosTxt: st.valor?.segundos != null ? cronoRestante(st.valor.segundos, st.valor.precision) : null,
+          zonaTxt: (() => {
+            const w = (st.valor?.fuentes ?? []).find((f) => f.clave === 'wiki')?.valor;
+            return w?.segundos != null ? cronoRestante(w.segundos, w.precision) : null;
+          })(),
+          pagina: (st.valor?.fuentes ?? []).find((f) => f.clave === 'wiki')?.valor?.pagina ?? null,
+        },
+      },
+      obs: obs[claveCrono(c)] ?? { observaciones: 0, muertes: 0 },
+    })),
   };
+  const paginaDe = (conNumero) => construyeCronos(modelo, conNumero);
 
   /**
    * EL TIC NO RECONSTRUYE LA SECCIÓN. La guarda es `pintaEstable`, que está
@@ -6097,6 +6045,16 @@ async function renderCronos(snap, cajaSec) {
   // Los escuchadores se cuelgan tras una reconstrucción y sólo tras ella: si no
   // la hubo, los nodos de antes siguen vivos y con los suyos puestos.
   if (modo === 'refrescado') return;
+
+  // Pestañas, pastillas, buscador y densidad son del módulo y los cablea él.
+  // La leyenda se recuerda entre sesiones, así que su memoria es la
+  // configuración y no una variable que muere al cerrar.
+  conectarPiezas(host, {
+    memoria: {
+      leer: () => state.cfg?.croLeyenda === true,
+      guardar: (_k, v) => { state.cfg.croLeyenda = v; window.eql.setFlag('croLeyenda', v); },
+    },
+  });
 
   const guardar = async (l) => {
     await window.eql.setFlag('cronos', l);

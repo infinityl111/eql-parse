@@ -1944,82 +1944,17 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
    del todo, no pegada al borde. */
 .enlapagina { scroll-margin-top: 12px; }
 
-/* ── Temporizadores de reaparición ────────────────────────────────────────
-   Nueve clases sin una sola regla: la sección salía como una pila de divs sin
-   caja ni separación. Se destapó volcando la vista con `bin/ui-volcar.js`, y
-   no leyendo el código, porque el HTML era correcto.
 
-   Convenciones de la casa y no invento: la caja es la misma que `.rp-tiempo`
-   —`slate-850` sobre `slate-700`, radio 2—, la cabecera es la de `.enc-h`, y
-   la procedencia usa las fichas de `.trig-proc`, que ya separan lo vivo de lo
-   que sólo lo parece. */
-.cro-add { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 18px; }
-.cro-add input { flex: 1 1 280px; max-width: 420px; }
+/* ── Temporizadores de reaparicion ────────────────────────
+   LA FICHA VIEJA SE RETIRA ENTERA, no se adapta.
 
-/* Una cuadrícula y no una lista: los cronos se miran DE UN VISTAZO mientras se
-   juega, y una columna obliga a desplazarse en cuanto hay cuatro. */
-.cro-lista { display: grid; gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-.cro { background: var(--slate-850); border: 1px solid var(--slate-700);
-  border-radius: 2px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+   Era una cuadricula de tarjetas con la procedencia en tres renglones
+   dentro. La seccion vive ahora sobre `ui/piezas.js` -filas plegables,
+   con las tres fuentes en la propia fila-, asi que ni una sola de sus
+   dieciseis clases la escribe ya nadie. Dejarlas costaria cero, y esa es
+   justamente la trampa: CSS que nadie borra porque nada se rompe.
 
-/* El nombre a la izquierda y el cierre a la derecha, no pegado al nombre: si
-   el botón sigue al texto, su posición baila con la longitud del nombre y se
-   pulsa por error. */
-.cro-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.cro-cab b { color: var(--bone); font-size: 13px; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; }
-.cro-x { flex: none; font-size: 10px; padding: 3px 8px; }
-
-/* LA ZONA VA SIEMPRE VISIBLE, no en un desplegable. La clave del crono es
-   nombre+zona+dificultad, así que dos fichas del mismo bicho en dos zonas se
-   verían idénticas con dos cuentas atrás distintas. */
-.cro-zona { font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--bone-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cro-sinzona { color: var(--t-fire); text-transform: none; letter-spacing: 0; white-space: normal; }
-
-/* La cuenta atrás es lo único que se lee de lejos, y por eso es lo único
-   grande. En cifras tabulares: sin ellas el número da saltos cada segundo al
-   cambiar de dígito, y un número que se mueve se lee peor que uno quieto. */
-.cro-num { font-family: var(--mono); font-size: 30px; line-height: 1.1; color: var(--bone);
-  font-variant-numeric: tabular-nums; }
-.cro-cero { color: var(--t-good, #7FB77E); font-size: 19px; }
-.cro-espera { font-size: 12px; color: var(--bone-dim); line-height: 1.45; }
-
-/* La procedencia va PEGADA a la cifra y nunca escondida: un número sin decir
-   de dónde sale es la mitad de un dato. */
-.cro-src { font-size: 10.5px; color: var(--bone-faint); }
-
-/* LAS TRES PROCEDENCIAS, siempre las tres y en orden fijo. Con hueco donde no
-   hay dato: «aún no» también informa, y una línea que aparece y desaparece
-   obliga a recordar cuáles había. La que manda va MARCADA y no reordenada —
-   el orden fijo es lo que deja leer la ficha sin volver a aprenderla. */
-.cro-fuentes { display: grid; gap: 2px; font-size: 10.5px; }
-.cro-f { display: flex; align-items: baseline; gap: 6px; color: var(--bone-faint); }
-.cro-f-rot { flex: none; min-width: 8.5em; }
-.cro-f-val { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--bone-dim); }
-/* La que mueve la cuenta atrás se distingue por PESO y no por color: el color
-   ya está diciendo otra cosa en esta ficha —lo retenido va en ámbar— y dos
-   significados en el mismo canal no se leen. */
-.cro-f.manda { color: var(--bone-dim); }
-.cro-f.manda .cro-f-val { color: var(--bone); font-weight: 600; }
-/* La página va SIEMPRE con el número de la wiki, no en un desplegable: una
-   cifra declarada sin su fuente no se puede ir a comprobar, y entonces no se
-   distingue de una inventada. */
-.cro-f-pag { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .75; }
-.cro-f-no { opacity: .5; font-style: italic; }
-.cro-f-ret { color: var(--t-fire); opacity: .8; }
-.cro-ret { color: var(--t-fire); line-height: 1.45; }
-.cro-dif { font-size: 11px; color: var(--t-fire); line-height: 1.45; }
-.cro-avi { font-size: 11px; line-height: 1.45; padding: 6px 8px; border-radius: 4px;
-  background: var(--slate-700); border-left: 2px solid var(--bone-faint); color: var(--bone-dim); }
-
-/* Lo que escribe el jugador va abajo del todo y separado por una línea: manda
-   sobre lo nuestro, pero no es lo que se viene a mirar. */
-.cro-man { display: flex; gap: 6px; margin-top: auto; padding-top: 9px;
-  border-top: 1px solid var(--slate-700); }
-.cro-in { flex: 1 1 auto; min-width: 0; }
-.cro-man button { flex: none; font-size: 10px; padding: 4px 9px; }
+   Lo que sobrevive vive abajo, con el modulo. */
 
 /* ── Poner temporizador desde la pelea ─────────────────────────────────────
    Vive en Escena, debajo de la cabecera. El botón está SIEMPRE y el panel se
@@ -2055,14 +1990,157 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
   background: transparent; color: inherit;
 }
 
-/* El recuento de observaciones va antes de la explicación y con su propio peso:
-   es el dato, y lo de al lado es el motivo de que no haya cifra. */
-.cro-f-obs { font-variant-numeric: tabular-nums; color: var(--bone-dim); flex: none; }
 
-/* La fila de procedencia tiene ahora TRES piezas —rótulo, recuento y motivo— y
-   con las tres en la misma línea el motivo quedaba en 96 px de ancho y 82 de
-   alto: seis renglones en una columna estrecha. Lo vio `bin/ui-volcar`, que
-   mide la caja de cada elemento; leyendo el CSS no aparece.
-   El motivo baja a su propio renglón, sangrado bajo el rótulo. */
-.cro-f { flex-wrap: wrap; }
-.cro-f-obs + .cro-f-ret { flex: 1 0 100%; margin-left: 8.5em; margin-top: 2px; }
+
+
+/* ══ EL MÓDULO DE PIEZAS · ui/piezas.js ═══════════════════
+   Las cinco piezas que comparten las quince secciones, más la procedencia.
+   El prototipo de Campeón traía su propia paleta a pelo; aquí van sobre las
+   variables de la aplicación, que es lo que hace que el tema claro siga
+   funcionando. Los tres colores de procedencia SÍ son nuevos: son
+   vocabulario, no decoración, y valen lo mismo en las quince pantallas. */
+:root {
+  --pz-tuyo:  #D9A441;   /* lo escribiste tú */
+  --pz-zona:  #6FA8D0;   /* lo declara eqlwiki, y es de la ZONA entera */
+  --pz-visto: #63B083;   /* lo que llevamos observado */
+  --pz-tuyo-b:  #5C4A1E;
+  --pz-zona-b:  #2B4A5E;
+  --pz-visto-b: #264C37;
+  --pz-tuyo-t:  #1A1408;
+  --pz-zona-t:  #0D1A22;
+  --pz-visto-t: #0C1A12;
+}
+:root[data-theme="light"] {
+  --pz-tuyo:  #8A5E12;
+  --pz-zona:  #1F5E86;
+  --pz-visto: #2C6B48;
+  --pz-tuyo-b:  #C4A46A;
+  --pz-zona-b:  #9FBDD2;
+  --pz-visto-b: #A6C7B3;
+  --pz-tuyo-t:  #FFF8E8;
+  --pz-zona-t:  #F2F8FC;
+  --pz-visto-t: #F1FAF4;
+}
+
+/* PIEZA 1 · pestañas: cambian de VISTA, nunca filtran */
+.pz-pest { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 14px 0 0; }
+.pz-pest button { background: none; border: 0; border-bottom: 2px solid transparent;
+  color: var(--bone-faint); font: 600 12px/1 var(--body); padding: 9px 14px; cursor: pointer; }
+.pz-pest button[aria-selected="true"] { color: var(--bone); border-bottom-color: var(--pz-tuyo); }
+.pz-pest .pz-n { color: var(--bone-faint); font-weight: 400; margin-left: 5px; }
+
+/* PIEZA 2 · barra de control */
+.pz-barra { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 10px 0; border-bottom: 1px solid var(--line); }
+.pz-buscar { flex: 1 1 200px; min-width: 160px; position: relative; }
+.pz-buscar input { width: 100%; background: var(--slate-800); border: 1px solid var(--slate-600);
+  border-radius: 7px; color: var(--bone); font: inherit; padding: 7px 10px 7px 28px; }
+.pz-buscar input:focus { outline: 0; border-color: var(--pz-tuyo); }
+.pz-buscar::before { content: "⌕"; position: absolute; left: 9px; top: 5px;
+  color: var(--bone-faint); font-size: 15px; }
+.pz-agrupar { background: var(--slate-800); border: 1px solid var(--slate-600);
+  border-radius: 7px; color: var(--bone); font: inherit; padding: 7px 8px; }
+.pz-dens { display: flex; border: 1px solid var(--slate-600); border-radius: 7px; overflow: hidden; }
+.pz-dens button { background: none; border: 0; color: var(--bone-faint);
+  font: 600 11px/1 var(--body); padding: 8px 10px; cursor: pointer; }
+.pz-dens button[aria-pressed="true"] { background: var(--slate-700); color: var(--bone); }
+
+/* PIEZA 3 · pastillas: filtran DENTRO de la vista, y llevan su recuento */
+.pz-pastillas { display: flex; gap: 6px; flex-wrap: wrap; padding: 9px 0; }
+.pz-pastilla { background: none; border: 1px solid var(--slate-600); border-radius: 99px;
+  color: var(--bone-faint); font: 600 11px/1 var(--body); padding: 5px 11px; cursor: pointer; }
+.pz-pastilla[aria-pressed="true"] { background: var(--pz-tuyo); border-color: var(--pz-tuyo);
+  color: var(--pz-tuyo-t); }
+.pz-pastilla .pz-n { font-weight: 400; margin-left: 4px; opacity: .75; }
+
+/* PIEZA 4 · filas plegables */
+.pz-filas { border: 1px solid var(--line); border-radius: 7px; overflow: hidden; margin-top: 8px; }
+.pz-grupo { background: var(--slate-850); border-bottom: 1px solid var(--line);
+  padding: 5px 11px; font: 600 11px/1 var(--body); color: var(--bone-dim); letter-spacing: .4px; }
+.pz-grupo .pz-n { color: var(--bone-faint); font-weight: 400; }
+.pz-fila { border-bottom: 1px solid var(--line); }
+.pz-fila:last-child { border-bottom: 0; }
+.pz-fila > summary { display: grid; align-items: center; gap: 10px; padding: 6px 11px;
+  cursor: pointer; list-style: none; }
+.pz-fila > summary::-webkit-details-marker { display: none; }
+.pz-fila > summary:hover,
+.pz-fila[open] > summary { background: var(--slate-800); }
+.pz-giro { color: var(--bone-faint); font-size: 10px; }
+.pz-fila[open] .pz-giro { transform: rotate(90deg); display: inline-block; }
+.pz-cuerpo { padding: 8px 11px 11px 33px; background: var(--slate-850);
+  font-size: 12px; color: var(--bone-dim); }
+.pz-compacta .pz-fila > summary { padding: 2px 11px; }
+.pz-vacio { color: var(--bone-faint); text-align: center; padding: 48px 0; font-style: italic; }
+
+/* PIEZA 5 · etiquetas compactas. TODA fila lleva la suya: la ausencia no
+   comunica nada, y sin ella «a fire elemental» junto a otro igual etiquetado
+   «enemigo» se lee como un fallo. */
+.pz-et { display: inline-block; border-radius: 4px; padding: 1px 6px;
+  font: 600 10px/1.6 var(--body); white-space: nowrap; }
+.pz-tuyo      { background: var(--slate-700); color: var(--bone-dim); }
+.pz-enemigo   { background: #3A1F16; color: var(--t-fire); }
+.pz-mascota   { background: #241F2F; color: var(--t-magic); }
+.pz-encantado { background: #2A2438; color: var(--t-dot); }
+.pz-soltado   { background: #3A1F16; color: var(--t-ds); }
+:root[data-theme="light"] .pz-enemigo   { background: #F3DDD0; }
+:root[data-theme="light"] .pz-mascota   { background: #E1DCF0; }
+:root[data-theme="light"] .pz-encantado { background: #EEDCE8; }
+:root[data-theme="light"] .pz-soltado   { background: #F3D6D9; }
+
+/* ══ PROCEDENCIA · lo único irrenunciable ═════════════════
+   Las tres fuentes SIEMPRE a la vista, en la fila y sin desplegar. La que
+   manda va rellena; las otras, perfiladas. La prueba que decide si el
+   rediseño vale: mirando la pantalla hay que saber qué cifra es medida, cuál
+   es de la wiki y cuál la escribió Campeón. */
+.pz-proc { display: inline-flex; gap: 4px; align-items: center; }
+.pz-f { display: inline-flex; gap: 4px; align-items: baseline; border: 1px solid;
+  border-radius: 4px; padding: 1px 6px; font: 600 10px/1.7 var(--body);
+  white-space: nowrap; background: transparent; }
+.pz-f .pz-v { font-variant-numeric: tabular-nums; font-weight: 700; }
+.pz-f-tuyo  { border-color: var(--pz-tuyo-b);  color: var(--pz-tuyo); }
+.pz-f-zona  { border-color: var(--pz-zona-b);  color: var(--pz-zona); }
+.pz-f-visto { border-color: var(--pz-visto-b); color: var(--pz-visto); }
+.pz-f-tuyo.pz-manda  { background: var(--pz-tuyo);  color: var(--pz-tuyo-t);  border-color: var(--pz-tuyo); }
+.pz-f-zona.pz-manda  { background: var(--pz-zona);  color: var(--pz-zona-t);  border-color: var(--pz-zona); }
+.pz-f-visto.pz-manda { background: var(--pz-visto); color: var(--pz-visto-t); border-color: var(--pz-visto); }
+.pz-sin { opacity: .45; }
+
+/* La leyenda: PLEGABLE. Con un solo temporizador debajo ocupaba más alto que
+   el contenido y se leía como relleno. Se explica una vez y se pliega. */
+.pz-leyenda { background: var(--slate-850); border: 1px solid var(--line);
+  border-radius: 7px; margin-top: 10px; font-size: 11px; color: var(--bone-dim); }
+.pz-leyenda > summary { padding: 6px 11px; cursor: pointer; color: var(--bone-faint);
+  list-style: none; }
+.pz-leyenda > summary::-webkit-details-marker { display: none; }
+.pz-leyenda > summary::before { content: "▶ "; font-size: 9px; }
+.pz-leyenda[open] > summary::before { content: "▼ "; }
+.pz-leyenda-c { display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  padding: 0 11px 9px; }
+.pz-mini { color: var(--bone-faint); }
+
+/* ── Reapariciones, lo suyo propio ─────────────────────── */
+.cro-caja { text-align: right; }
+.cro-num { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.cro-num.cro-cero { font-size: 12px; font-weight: 600; color: var(--bone-dim); }
+.cro-dequien { font-size: 10px; font-weight: 700; letter-spacing: .4px;
+  display: block; margin-top: 1px; color: var(--bone-faint); }
+.cro-obs, .cro-pag, .cro-avi, .cro-dif { margin-bottom: 5px; }
+.cro-avi { color: var(--t-fire); }
+.cro-pag { font-size: 11px; color: var(--bone-faint); word-break: break-all; }
+.cro-x { background: none; border: 1px solid var(--slate-600); border-radius: 7px;
+  color: var(--bone-faint); font: 600 11px/1 var(--body); padding: 5px 11px;
+  cursor: pointer; margin-top: 4px; }
+.cro-add { display: flex; gap: 6px; padding: 10px 0; }
+.cro-add input { flex: 1; background: var(--slate-800); border: 1px solid var(--slate-600);
+  border-radius: 7px; color: var(--bone); font: inherit; padding: 7px 10px; }
+
+/* Lo que escribe el jugador va al final del cuerpo y separado por una linea:
+   manda sobre las otras dos fuentes, pero no es lo que se viene a mirar. */
+.cro-man { display: flex; gap: 6px; margin-top: 9px; padding-top: 9px;
+  border-top: 1px solid var(--slate-700); }
+.cro-in { flex: 1 1 auto; min-width: 0; background: var(--slate-800);
+  border: 1px solid var(--slate-600); border-radius: 7px; color: var(--bone);
+  font: inherit; padding: 5px 9px; }
+.cro-man button { flex: none; background: none; border: 1px solid var(--slate-600);
+  border-radius: 7px; color: var(--bone-dim); font: 600 10px/1 var(--body);
+  padding: 5px 10px; cursor: pointer; }

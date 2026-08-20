@@ -94,11 +94,45 @@ const sinComentarios = (txt) => txt
   .replace(/\/\*[\s\S]*?\*\//g, ' ')
   .replace(/^\s*\/\/.*$/gm, ' ');
 
-/** Las que reescriben DOM con un campo editable dentro. */
+/**
+ * LOS CONSTRUCTORES QUE PRODUCEN CAMPOS, para poder seguirles el rastro.
+ *
+ * Al partir una sección en constructor puro y pintor delgado, el `<input>` se
+ * MUDA al constructor. El pintor sigue reescribiendo el DOM sobre un campo
+ * —igual de mortal que antes— pero mirando sólo su cuerpo ya no se ve ninguno,
+ * así que el detector dejaba de contarlo como candidata.
+ *
+ * Lo cazó el control positivo de abajo: la forma enferma seguía siendo enferma
+ * y salió «NO CAZÓ NADA». Es exactamente lo que un control positivo existe para
+ * ver — una prueba que se queda en verde porque su objeto se ha mudado.
+ *
+ *     AL MIGRAR ALGO, LA VIGILANCIA TIENE QUE MIGRAR CON ELLO.
+ */
+function constructoresConCampo(txt) {
+  const dir = path.join(DIR, '..', 'ui');
+  const conCampo = new Set(fs.readdirSync(dir)
+    .filter((f) => f.endsWith('-vista.js'))
+    .filter((f) => EDITABLE.test(fs.readFileSync(path.join(dir, f), 'utf8')))
+    .map((f) => `./${f}`));
+  const alias = [];
+  for (const m of txt.matchAll(/import {([^}]*)} from '([^']*-vista\.js)'/g)) {
+    if (!conCampo.has(m[2])) continue;
+    for (const parte of m[1].split(',')) {
+      const n = parte.trim().split(/\s+as\s+/).pop().trim();
+      if (n) alias.push(n);
+    }
+  }
+  return alias;
+}
+
+/** Las que reescriben DOM con un campo editable dentro —propio o del constructor al que llaman—. */
 function conCampoEditable(txt) {
+  const via = constructoresConCampo(txt);
+  const llamaAConstructorConCampo = (c) => via.some((n) => new RegExp(`\\b${n}\\s*\\(`).test(c));
   return funciones(txt)
     .map((f) => ({ ...f, limpio: sinComentarios(f.cuerpo) }))
-    .filter((f) => REESCRIBE.test(f.limpio) && EDITABLE.test(f.limpio))
+    .filter((f) => REESCRIBE.test(f.limpio)
+      && (EDITABLE.test(f.limpio) || llamaAConstructorConCampo(f.limpio)))
     // El propio ayudante reescribe y es quien guarda: no se vigila a sí mismo.
     .filter((f) => f.nombre !== 'pintaEstable');
 }

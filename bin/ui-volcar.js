@@ -114,7 +114,7 @@ try {
   })()`);
 
   const clases = new Set();
-  for (const e of datos.dentro) for (const c of e.clase.split(/\\s+/)) if (c) clases.add(c);
+  for (const e of datos.dentro) for (const c of e.clase.split(/\s+/)) if (c) clases.add(c);
   const huerfanas = [...clases].filter((c) => !css.some((s) => s.includes(`.${c}`)));
 
   const f = path.join(SALIDA, `${SEC}.html`);
@@ -122,7 +122,7 @@ try {
 
   const t = path.join(SALIDA, `${SEC}.txt`);
   const filas = datos.dentro.filter((e) => e.w || e.h || e.txt).map((e) => {
-    const q = `${e.tag}${e.id ? `#${e.id}` : ''}${e.clase ? `.${e.clase.split(/\\s+/).join('.')}` : ''}`;
+    const q = `${e.tag}${e.id ? `#${e.id}` : ''}${e.clase ? `.${e.clase.split(/\s+/).join('.')}` : ''}`;
     return `${String(e.y).padStart(5)} ${String(e.x).padStart(4)} ${String(e.w).padStart(5)}×${String(e.h).padStart(4)}  `
       + `${q.padEnd(38).slice(0, 38)}  ${e.fuente.padStart(6)} ${e.color.padEnd(20).slice(0, 20)}`
       + `${(e.borde || e.pad ? `[${e.borde}${e.borde && e.pad ? ' ' : ''}${e.pad}]` : '').padEnd(22)}${e.txt}`;

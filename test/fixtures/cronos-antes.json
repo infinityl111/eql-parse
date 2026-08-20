@@ -1,0 +1,32 @@
+{
+ "capturado": "2026-08-20T14:34",
+ "nota": "Claves que la seccion produce ANTES de migrarla al modulo. Control de regresion.",
+ "vivas": [
+  "cro.add",
+  "cro.addPh",
+  "cro.aunNo",
+  "cro.close",
+  "cro.discrepa",
+  "cro.discrepaWiki",
+  "cro.disponible",
+  "cro.esperando",
+  "cro.manualPh",
+  "cro.obs0",
+  "cro.obs1",
+  "cro.obsN",
+  "cro.obsPocas",
+  "cro.quizaVarios",
+  "cro.retenido",
+  "cro.segun",
+  "cro.setManual",
+  "cro.sinDato",
+  "cro.sinZona",
+  "cro.sospecha",
+  "cro.src.manual",
+  "cro.src.nuestro",
+  "cro.src.wiki",
+  "cro.sub",
+  "cro.title",
+  "cro.varios"
+ ]
+}

@@ -89,6 +89,7 @@ export function filas({ grupos = [], vacio = null } = {}) {
   return `<div class="pz-filas">${grupos.map((g) => `${g.rotulo
     ? `<div class="pz-grupo">${esc(g.rotulo)} <span class="pz-n">${(g.filas ?? []).length}</span></div>` : ''}
     ${(g.filas ?? []).map((f) => `<details class="pz-fila"
+      data-id="${esc(f.id ?? '')}"${f.abierta ? ' open' : ''}
       data-busca="${esc(String(f.busca ?? '').toLowerCase())}" data-et="${esc((f.et ?? []).join(' '))}">
       <summary style="grid-template-columns:${esc(f.columnas ?? '14px 1fr auto')}">
         <span class="pz-giro">▶</span>${(f.celdas ?? []).join('')}
@@ -138,10 +139,38 @@ export function leyendaProcedencia({ abierta = false } = {}) {
     </div></details>`;
 }
 
+/**
+ * QUÉ FILAS ESTÁN DESPLEGADAS, para poder devolverlas así.
+ *
+ * `pintaEstable` reconstruye desde el modelo, y una fila plegada es ESTADO DEL
+ * JUGADOR, no del modelo: si no viaja de vuelta, al primer suceso la fila se
+ * cierra sola — con el campo de poner tiempo dentro y el cursor puesto. Es el
+ * fallo del campo que no dejaba escribir, por la puerta de al lado.
+ *
+ * Por eso se identifican por `data-id` y no por posición: la cola se reordena
+ * sola —manda «el que antes vuelve»— y con la posición se abriría otra fila.
+ */
+export function desplegadas(host) {
+  if (!host) return new Set();
+  return new Set([...host.querySelectorAll('.pz-fila[open][data-id]')].map((d) => d.dataset.id));
+}
 /* ── EL CABLEADO ──────────────────────────────────────────────────────────
  * Lo único que toca el navegador. Todo lo de arriba se prueba sin DOM. */
+/**
+ * SE LLAMA DESPUÉS DE CADA RECONSTRUCCIÓN, y por eso está partida en dos.
+ *
+ * Los escuchadores delegados van en `host`, que sobrevive a que le reescriban
+ * los hijos: ésos se cuelgan UNA vez y volver a colgarlos los duplicaría. Pero
+ * la leyenda y `aplica` sí son de los nodos nuevos, y si esta función se
+ * plantara entera en la segunda llamada, tras cada reconstrucción la leyenda
+ * dejaría de recordarse y las pastillas se quedarían sin recuento.
+ *
+ * Es la misma trampa que el `dataset` de `pintaEstable`, del otro lado: allí se
+ * evita reconstruir de más, aquí se evita cablear de menos.
+ */
 export function conectar(host, { onCambio = null, memoria = null } = {}) {
-  if (!host || host.dataset.pzConectado === '1') return;
+  if (!host) return;
+  const primera = host.dataset.pzConectado !== '1';
   host.dataset.pzConectado = '1';
 
   // La leyenda recuerda cómo la dejaste. Sin memoria, plegarla no sirve de nada:
@@ -152,29 +181,31 @@ export function conectar(host, { onCambio = null, memoria = null } = {}) {
     d.addEventListener('toggle', () => memoria?.guardar?.(k, d.open));
   }
 
-  host.addEventListener('click', (e) => {
-    const p = e.target.closest('.pz-pest button');
-    if (p) {
-      for (const b of p.parentElement.children) b.setAttribute('aria-selected', String(b === p));
-      for (const s of host.querySelectorAll('[data-vista]')) s.hidden = s.dataset.vista !== p.dataset.ir;
-      aplica(host); onCambio?.();
-      return;
-    }
-    const d = e.target.closest('.pz-dens button');
-    if (d) {
-      for (const b of d.parentElement.children) b.setAttribute('aria-pressed', String(b === d));
-      aplica(host); onCambio?.();
-      return;
-    }
-    const f = e.target.closest('.pz-pastilla');
-    if (f) {
-      f.setAttribute('aria-pressed', String(f.getAttribute('aria-pressed') !== 'true'));
-      aplica(host); onCambio?.();
-    }
-  });
-  host.addEventListener('input', (e) => {
-    if (e.target.matches('.pz-buscar input, .pz-agrupar')) { aplica(host); onCambio?.(); }
-  });
+  if (primera) {
+    host.addEventListener('click', (e) => {
+      const p = e.target.closest('.pz-pest button');
+      if (p) {
+        for (const b of p.parentElement.children) b.setAttribute('aria-selected', String(b === p));
+        for (const s of host.querySelectorAll('[data-vista]')) s.hidden = s.dataset.vista !== p.dataset.ir;
+        aplica(host); onCambio?.();
+        return;
+      }
+      const d = e.target.closest('.pz-dens button');
+      if (d) {
+        for (const b of d.parentElement.children) b.setAttribute('aria-pressed', String(b === d));
+        aplica(host); onCambio?.();
+        return;
+      }
+      const f = e.target.closest('.pz-pastilla');
+      if (f) {
+        f.setAttribute('aria-pressed', String(f.getAttribute('aria-pressed') !== 'true'));
+        aplica(host); onCambio?.();
+      }
+    });
+    host.addEventListener('input', (e) => {
+      if (e.target.matches('.pz-buscar input, .pz-agrupar')) { aplica(host); onCambio?.(); }
+    });
+  }
   aplica(host);
 }
 

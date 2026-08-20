@@ -62,7 +62,7 @@ export function clavesDeAviso(st, crono = {}) {
 }
 
 /** Una ficha, como fila plegable del módulo. */
-function fichaDe({ crono, estado, obs = {}, i }) {
+function fichaDe({ crono, estado, obs = {}, i, conNumero = true, abierta = false }) {
   const v = estado?.valor ?? {};
   const n = obs.observaciones ?? 0;
   const { cuenta, nota } = clavesDeObservacion(n);
@@ -79,8 +79,18 @@ function fichaDe({ crono, estado, obs = {}, i }) {
   const textoCuerpo = cuerpoClave === 'cro.aunNo'
     ? t(cuerpoClave, { n: obs.muertes ?? crono.muertes ?? 0 })
     : t(cuerpoClave ?? 'cro.disponible');
+  /**
+   * `conNumero` EN FALSE VACÍA LA CUENTA ATRÁS, y no es un detalle de estilo.
+   *
+   * `pintaEstable` usa esta misma llamada como FIRMA de la sección. Si la
+   * cuenta atrás entrara en ella, la firma cambiaría cada segundo, la sección
+   * se reconstruiría entera cada segundo y el campo de poner tiempo volvería a
+   * destruirse mientras se escribe — que es el fallo que trajo Campeón.
+   *
+   * Lo volátil se vacía aquí y lo repone el pintor tocando `textContent`.
+   */
   const numero = estado?.estado === ESTADO.CONTANDO
-    ? `<span class="cro-num" data-num="${i}">${esc(estado.restanteTxt ?? '')}</span>`
+    ? `<span class="cro-num" data-num="${i}">${conNumero ? esc(estado.restanteTxt ?? '') : ''}</span>`
     : `<span class="cro-num cro-cero">${esc(textoCuerpo)}</span>`;
 
   const deQuien = manda
@@ -93,6 +103,15 @@ function fichaDe({ crono, estado, obs = {}, i }) {
   if (v.discrepaWiki != null) dis.push(t('cro.discrepaWiki', { n }));
 
   return {
+    /**
+     * LA IDENTIDAD DE LA FILA ES SU CLAVE, no su sitio en la cola.
+     *
+     * La cola se ordena por «el que antes vuelve», así que las posiciones
+     * bailan solas cada vez que uno muere. Guardando el despliegue por posición
+     * se reabriría la fila de otro bicho.
+     */
+    id: `${crono.nombre}|${crono.base ?? ''}|${crono.diff ?? ''}|${crono.mode ?? ''}`,
+    abierta,
     busca: `${crono.nombre} ${crono.base ?? ''}`,
     et: [estado?.estado === ESTADO.CONTANDO ? 'contando' : 'vencido'],
     columnas: '14px 1fr auto auto',
@@ -114,6 +133,15 @@ function fichaDe({ crono, estado, obs = {}, i }) {
       ...avisos.map((k) => `<div class="cro-avi">${esc(
         k === 'cro.sospecha' ? t(k, { n: PERIODOS_SOSPECHA })
           : k === 'cro.quizaVarios' ? t(k, { n: crono.muertes ?? 0 }) : t(k))}</div>`),
+      /**
+       * PONER TIEMPO A MANO. Se cayó al migrar y lo cazó el control de
+       * regresión: estaba en la sección vieja y no en la nueva, y sin él el
+       * jugador no puede escribir el tiempo que sabe — que es justo la fuente
+       * que MANDA sobre las otras dos.
+       */
+      `<div class="cro-man"><input class="cro-in" data-man="${i}"
+        placeholder="${esc(t('cro.manualPh'))}" value="${esc(crono.manualTxt ?? '')}">
+        <button data-set="${i}">${esc(t('cro.setManual'))}</button></div>`,
       `<button class="cro-x" data-quita="${i}">${esc(t('cro.close'))}</button>`,
     ].filter(Boolean).join(''),
   };
@@ -124,14 +152,18 @@ function fichaDe({ crono, estado, obs = {}, i }) {
  * atrás: es la firma que usa `pintaEstable` para no reconstruir en cada tic.
  */
 export function construye(modelo = {}, conNumero = true) {
-  const { fichas = [], vista = 'vig', leyendaAbierta = false, sugerencias = [] } = modelo;
+  const {
+    fichas = [], vista = 'vig', leyendaAbierta = false, sugerencias = [],
+    abiertas = new Set(),
+  } = modelo;
   const porZona = new Map();
   fichas.forEach((f, i) => {
     const k = f.crono.base
       ? `${f.crono.base}${f.crono.diff != null ? ` · D${f.crono.diff}` : ''}`
       : t('cro.sinZona');
     if (!porZona.has(k)) porZona.set(k, []);
-    porZona.get(k).push(fichaDe({ ...f, i, conNumero }));
+    const ficha = fichaDe({ ...f, i, conNumero });
+    porZona.get(k).push({ ...ficha, abierta: abiertas.has(ficha.id) });
   });
 
   const cab = pestañas({
@@ -180,5 +212,6 @@ export const CLAVES = [
   'cro.esperando', 'cro.disponible', 'cro.aunNo',
   'cro.obs0', 'cro.obs1', 'cro.obsN', 'cro.obsPocas', 'cro.retenido',
   'cro.segun', 'cro.sinZona', 'cro.varios', 'cro.quizaVarios', 'cro.sospecha',
+  'cro.manualPh', 'cro.setManual',
   'cro.discrepa', 'cro.discrepaWiki', 'cro.escVacio',
 ];

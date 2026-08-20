@@ -150,6 +150,32 @@ console.log('\nla discrepancia no se afirma sin poder afirmarla');
     'CONTROL: y multiplicidad 0 no es «hay uno», es «no se ha demostrado que haya más»');
 }
 
+console.log('\nla firma no lleva dentro lo que cambia cada segundo');
+{
+  /**
+   * ESTO ES LA GUARDA DEL CAMPO QUE NO DEJABA ESCRIBIR, ahora comprobable.
+   *
+   * `pintaEstable` usa `construye(modelo, false)` como firma y reconstruye la
+   * sección cuando cambia. Si la cuenta atrás entrara en ella, cambiaría cada
+   * segundo y el campo se destruiría mientras se escribe — el fallo que trajo
+   * Campeón, de vuelta por la puerta de atrás de la migración.
+   *
+   * Antes esto sólo se podía ver levantando Electron y tecleando. Ahora es una
+   * comparación de cadenas, porque el constructor es puro.
+   */
+  const enElInstante = (seg) => ({
+    fichas: [ficha({ estado: { restante: seg, restanteTxt: `0${Math.floor(seg / 60)}:00` } })],
+  });
+  ok(V.construye(enElInstante(600), false) === V.construye(enElInstante(120), false),
+    'dos instantes distintos dan la MISMA firma', 'la sección no se reconstruye al tic');
+  ok(V.construye(enElInstante(600), true) !== V.construye(enElInstante(120), true),
+    'CONTROL: y con los números puestos sí se distinguen',
+    'si no, el verde de arriba sería el de una plantilla que no imprime nada');
+  ok(V.construye(enElInstante(600), false)
+    !== V.construye({ fichas: [ficha(), ficha({ crono: { nombre: 'otro' } })] }, false),
+    'y un crono más SÍ cambia la firma', 'lo que no es volátil tiene que reconstruir');
+}
+
 console.log('\nla procedencia se ve sin desplegar');
 {
   const html = V.construye({ fichas: [ficha()] });
