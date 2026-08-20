@@ -18,9 +18,12 @@
  * Reintenta mientras Cloudflare propaga; no da por bueno el primer intento.
  */
 import fs from 'node:fs';
-import { md } from '../web/build.mjs';
+import { md, mitad } from '../web/build.mjs';
 
 const DOM = 'https://eqlparse.com';
+/** La valla de markdown, construida y no escrita: suelta abriria un bloque. */
+const VALLA = new RegExp(String.fromCharCode(96).repeat(3), 'g');
+const RAIZ_NOTAS = new URL('../web/notas', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const IDIOMAS = ['es', 'en', 'de', 'fr', 'pt'];
 
 /**
@@ -70,12 +73,50 @@ const MB = Math.round(NUEVA.bytes / 1024 / 1024);
  * dentro es el nombre de un bicho, escrito como lo escribe el juego.
  */
 const sinPre = (h) => h.replace(/<pre>[\s\S]*?<\/pre>/g, '');
-const ESPERADO = REG.reduce((a, r) => {
-  const h = md(r.cuerpo ?? '', r.tag);
-  a.pres += (h.match(/<pre>/g) ?? []).length;
-  a.graves += (sinPre(h).match(/`/g) ?? []).length;
-  return a;
-}, { pres: 0, graves: 0 });
+
+/**
+ * ── LAS VALLAS: UN INVARIANTE, NO UN RECUENTO ─────────────────────────────
+ *
+ * Aqui habia un total: «13 <pre>, esperaba 13». Y llevaba **dias en rojo sin
+ * bloquear nada**, diciendo 7 donde esperaba 13.
+ *
+ * La causa no era la web: era esta comprobacion. Sumaba los bloques del
+ * **cuerpo entero** de cada release, y los cuerpos son **bilingues** -espanol
+ * e ingles en el mismo texto, separados por su encabezado-. La pagina pinta
+ * **una mitad**. Trece contra siete es exactamente eso, y no hay nada roto
+ * al otro lado.
+ *
+ * Un total ademas no dice nada util cuando falla: «faltan seis» no senala
+ * ninguna nota. Lo que importa es esto, y no envejece:
+ *
+ *     TODA NOTA CUYO MARKDOWN LLEVE UNA VALLA TIENE QUE PRODUCIR SU BLOQUE.
+ *     NINGUNA LO PIERDE.
+ *
+ * Se mira **nota a nota y en su idioma**, contra la fuente exacta que la
+ * pagina usa para esa nota: su fichero propio si lo tiene, y si no, la mitad
+ * del cuerpo que le toca. El total se sigue imprimiendo -para ver la deriva-
+ * pero **no pone nada rojo por si solo**.
+ *
+ * Y de ahi la regla: una comprobacion que lleva dias roja sin bloquear nada
+ * ha dejado de ser una comprobacion. Entrena a ignorar el rojo.
+ */
+const NOTAS = new Map();
+for (const l of IDIOMAS) {
+  NOTAS.set(l, REG.map((r) => {
+    const version = r.tag.replace(/^v/, '');
+    const propia = `${RAIZ_NOTAS}/${version}.${l}.md`;
+    const texto = fs.existsSync(propia)
+      ? fs.readFileSync(propia, 'utf8')
+      : mitad(r.cuerpo ?? '', l, r.tag).texto;
+    return { tag: r.tag, vallas: ((texto.match(VALLA) ?? []).length / 2) | 0 };
+  }));
+}
+const ESPERADO = {
+  pres: Object.fromEntries(IDIOMAS.map((l) => [
+    l, NOTAS.get(l).reduce((a, n) => a + n.vallas, 0)])),
+  graves: REG.reduce((a, r) => a
+    + (sinPre(md(mitad(r.cuerpo ?? '', 'es', r.tag).texto, r.tag)).match(/`/g) ?? []).length, 0),
+};
 
 const HUELLA = Object.fromEntries(IDIOMAS.map((l) => {
   const p = new URL(`../web/notas/${VERSION}.${l}.md`, import.meta.url);
@@ -90,6 +131,25 @@ const baja = async (u) => {
   const r = await fetch(u, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
   return { ok: r.ok, code: r.status, texto: await r.text() };
 };
+
+/**
+ * Las notas que llevan valla y no pintan bloque, en esta pagina y este idioma.
+ *
+ * Los articulos salen en el mismo orden que `REG`, asi que se parten por su
+ * etiqueta de apertura y se mira cada uno contra las vallas de SU fuente.
+ */
+function vallasPerdidas(lang, html) {
+  const trozos = html.split('<article class="version">').slice(1);
+  const out = [];
+  for (const [k, n] of NOTAS.get(lang).entries()) {
+    if (!n.vallas) continue;
+    const dentro = ((trozos[k] ?? '').match(/<pre>/g) ?? []).length;
+    if (dentro < n.vallas) {
+      out.push(`${lang}: ${n.tag} lleva ${n.vallas} valla(s) y la pagina pinta ${dentro} bloque(s)`);
+    }
+  }
+  return out;
+}
 
 async function ronda() {
   const fallos = [];
@@ -111,12 +171,22 @@ async function ronda() {
     // legítimo y no es lo mismo que haberlo verificado.
     const enSuIdioma = HUELLA[l] === null ? null : primero.includes(HUELLA[l]);
 
-    filas.push({ l, ver, boton, peso, arts, pres, graves, enSuIdioma, idxCode: idx.code, novCode: nov.code });
+    filas.push({
+      l, ver, boton, peso, arts, pres, graves, enSuIdioma,
+      presEsperados: ESPERADO.pres[l], idxCode: idx.code, novCode: nov.code,
+      html: nov.texto,
+    });
     if (!ver) fallos.push(`${l}: la portada no declara ${VERSION}`);
     if (!boton) fallos.push(`${l}: el botón no apunta al .exe de la ${VERSION}`);
     if (!peso) fallos.push(`${l}: el tamaño no dice ${MB} MB`);
     if (arts !== REG.length) fallos.push(`${l}: ${arts} artículos, esperaba ${REG.length}`);
-    if (pres !== ESPERADO.pres) fallos.push(`${l}: ${pres} <pre>, esperaba ${ESPERADO.pres}`);
+    /**
+     * NOTA A NOTA. Los articulos salen en el mismo orden que `REG`, asi que
+     * se parten por su etiqueta de apertura y se mira cada uno contra las
+     * vallas de SU fuente. Una nota con valla y sin bloque es el fallo; el
+     * total sobrante o faltante, no.
+     */
+    fallos.push(...vallasPerdidas(l, nov.texto));
     if (graves !== ESPERADO.graves) fallos.push(`${l}: ${graves} acentos graves fuera de un <pre>, esperaba ${ESPERADO.graves}`);
     if (enSuIdioma === false) fallos.push(`${l}: la nota de la ${VERSION} NO sale en su idioma`);
   }
@@ -134,12 +204,34 @@ for (let intento = 1; intento <= 6; intento++) {
 
 console.log('');
 console.log(`comprobando la ${VERSION}: ${MB} MB, ${REG.length} versiones publicadas`);
-console.log(`idioma  portada  botón  ${MB}MB  artículos  <pre>  graves  nota en su idioma`);
+console.log(`idioma  portada  botón  ${MB}MB  artículos  <pre>/vallas  graves  nota en su idioma`);
 for (const f of r.filas) {
   // Tres estados y no dos: «sí», «NO», y «—» cuando esta versión no trae notas
   // propias y por tanto no hay nada que comprobar. Un «NO» ahí sería mentira.
   const idioma = f.enSuIdioma === null ? '— ' : (f.enSuIdioma ? 'sí' : 'NO');
-  console.log(`  ${f.l}       ${f.ver ? 'sí ' : 'NO '}     ${f.boton ? 'sí ' : 'NO '}   ${f.peso ? 'sí ' : 'NO '}  ${String(f.arts).padStart(6)}     ${String(f.pres).padStart(4)}  ${String(f.graves).padStart(5)}   ${idioma}`);
+  console.log(`  ${f.l}       ${f.ver ? 'sí ' : 'NO '}     ${f.boton ? 'sí ' : 'NO '}   ${f.peso ? 'sí ' : 'NO '}  ${String(f.arts).padStart(6)}     ${String(f.pres).padStart(4)}/${String(f.presEsperados).padEnd(2)}  ${String(f.graves).padStart(5)}   ${idioma}`);
+}
+
+/**
+ * ── CONTROL POSITIVO, sobre la pagina de verdad ───────────────────────────
+ *
+ * A la que acaba de bajarse se le quitan los bloques y se exige que la
+ * comprobacion los eche de menos. Sin esto, el «7/7» de arriba podria estar
+ * saliendo de una comprobacion que no mira nada -que es exactamente lo que
+ * pasaba con el recuento que habia antes, trece contra siete durante dias-.
+ */
+{
+  const con = r.filas.find((f) => f.html && NOTAS.get(f.l).some((n) => n.vallas));
+  if (!con) {
+    console.log('\nCONTROL: ninguna nota lleva valla; no hay nada que controlar');
+  } else {
+    const mutilada = con.html.replace(/<pre>[\s\S]*?<\/pre>/g, '');
+    const cazadas = vallasPerdidas(con.l, mutilada);
+    console.log(cazadas.length
+      ? `\nCONTROL: quitandole los bloques a /${con.l}/, se echan de menos ${cazadas.length}`
+      : '\nCONTROL FALLIDO: sin bloques tampoco se queja — esta comprobacion no mira nada');
+    if (!cazadas.length) process.exitCode = 1;
+  }
 }
 
 // Y que la URL del botón responda de verdad, no que sólo esté escrita.
