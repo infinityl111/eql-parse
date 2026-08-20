@@ -2124,7 +2124,16 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .cro-num.cro-cero { font-size: 12px; font-weight: 600; color: var(--bone-dim); }
 .cro-dequien { font-size: 10px; font-weight: 700; letter-spacing: .4px;
   display: block; margin-top: 1px; color: var(--bone-faint); }
-.cro-obs, .cro-pag, .cro-avi, .cro-dif { margin-bottom: 5px; }
+.cro-obs, .cro-pag, .cro-avi, .cro-dif, .cro-visto, .cro-cotapor { margin-bottom: 5px; }
+
+/* LA COTA VA PEGADA AL NUMERO, y su recuento de huecos debajo: una cota de un
+   hueco es cierta y floja, y quien la mira necesita saberlo sin desplegar. */
+.cro-cota { display: block; font-size: 10px; color: var(--bone-dim);
+  font-variant-numeric: tabular-nums; margin-top: 2px; }
+.cro-huecos { display: block; font-size: 9px; color: var(--bone-faint); }
+.cro-cotapor { font-size: 11px; color: var(--bone-faint); font-style: italic; }
+/* El visto es lo unico de la ficha que habla del PRESENTE. */
+.cro-visto { color: var(--pz-visto); }
 .cro-avi { color: var(--t-fire); }
 .cro-pag { font-size: 11px; color: var(--bone-faint); word-break: break-all; }
 .cro-x { background: none; border: 1px solid var(--slate-600); border-radius: 7px;

@@ -6,6 +6,7 @@ import { mergePets, mergeOwnerPets, ownerPets, ensureIdentidad } from '../src/ag
 import { fightToChat } from '../src/share.js';
 import { construye as construyeCronos } from './cronos-vista.js';
 import { conectar as conectarPiezas, desplegadas } from './piezas.js';
+import { SUELO_COTA } from '../src/cronos.js';
 import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION, enemigosDeLaPelea, MIN_OBS_DISCREPA, puedeAfirmarDiscrepancia } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
@@ -5883,6 +5884,18 @@ async function renderCronos(snap, cajaSec) {
    * posterior, y un valor congelado seguiria diciendo lo viejo.
    */
   const mult = claves.length ? (await window.eql.multiplicidadDe?.(claves)) ?? {} : {};
+  /**
+   * CUANDO SE LE VIO POR ULTIMA VEZ. Cualquier linea que lo nombre prueba que
+   * existe: hay 145 de esas por cada una que dice que ha muerto, y el 97% de
+   * las reapariciones vienen anunciadas por una antes de la muerte siguiente,
+   * con un minuto de adelanto mediano.
+   *
+   * Es lo que retira el «lleva N periodos a cero, puede que ya este ahi»: ya no
+   * hay que suponerlo.
+   */
+  const visto = claves.length ? (await window.eql.vistoDe?.(claves)) ?? {} : {};
+  /** Y la cota superior, que es aritmetica y no depende de nada estadistico. */
+  const cotas = claves.length ? (await window.eql.cotaDe?.(claves)) ?? {} : {};
   const ahora = Math.floor(Date.now() / 1000);
 
   /**
@@ -6007,6 +6020,44 @@ async function renderCronos(snap, cajaSec) {
         manualTxt: c.manual != null ? cronoRestante(c.manual) : '',
         zonaTxt: c.base ? `${c.base}${c.mode ? ` · ${c.mode}` : ''}${
           c.diff != null ? ` · ${labelDiff(c.diff, c.diffTag)}` : ''}` : null,
+        /**
+         * LA COTA Y EL VISTO SE FORMATEAN AQUI, que es donde estan los relojes.
+         * El constructor recibe cadenas ya hechas y por eso se puede probar sin
+         * levantar nada.
+         */
+        cota: (() => {
+          const k = cotas[claveCrono(c)];
+          return k ? { txt: cronoRestante(k.segundos), huecos: k.huecos, origen: k.origen } : null;
+        })(),
+        visto: (() => {
+          const v = visto[claveCrono(c)];
+          /**
+           * SIN NINGUNA MENCION POSTERIOR A SU MUERTE, la referencia es la
+           * muerte. Y ESE es el caso util, no una laguna: «su techo son 10m19s
+           * y llevas 12m sin verlo» dice que deberia estar ahi y no lo has
+           * visto. Lo enseno el volcado — el unico crono abierto no tenia
+           * ninguna mencion, porque en todas sus peleas muere.
+           */
+          if (!v?.t) {
+            const m = Math.max(muertes[claveCrono(c)] ?? 0, c.desde ?? 0) || null;
+            if (!m) return null;
+            const k = cotas[claveCrono(c)];
+            const d = Math.max(0, ahora - m);
+            return { desdeTxt: cronoRestante(d), pasado: k ? d > k.segundos : false };
+          }
+          const desde = Math.max(0, ahora - v.t);
+          // RECIEN VISTO ES «ESTA AHI»; visto hace rato es «no se le ve desde».
+          // El corte no es una corazonada: es el mismo p90 de duracion de pelea
+          // que usa la cota, porque es el tiempo que puede pasar sin que el
+          // registro lo nombre estando delante.
+          if (desde <= SUELO_COTA) return { txt: cronoRestante(desde), esta: true };
+          return {
+            desdeTxt: cronoRestante(desde),
+            // Y esto es la lectura conjunta: si lleva sin verse mas que su
+            // techo, deberia estar ahi y no lo has visto.
+            pasado: cotas[claveCrono(c)] ? desde > cotas[claveCrono(c)].segundos : false,
+          };
+        })(),
       },
       estado: {
         ...st,

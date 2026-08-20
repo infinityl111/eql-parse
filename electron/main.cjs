@@ -565,6 +565,9 @@ ipcMain.handle('enc:loot', () => engine.encLoot());
 ipcMain.handle('enc:deaths', () => engine.encDeaths());
 ipcMain.handle('cronos:ultimaMuerte', (_e, { nombres }) => engine.ultimaMuerte(nombres));
 ipcMain.handle('cronos:multiplicidad', (_e, { claves }) => engine.multiplicidadDe(claves));
+// CUALQUIER linea que lo nombre prueba que existe: 145 por cada muerte.
+ipcMain.handle('cronos:visto', (_e, { claves }) => engine.vistoDe(claves));
+ipcMain.handle('cronos:cota', (_e, { claves }) => engine.cotaDe(claves));
 ipcMain.handle('cronos:observaciones', (_e, { claves }) => engine.observacionesDe(claves));
 ipcMain.handle('enc:progress', () => engine.encProgress());
 ipcMain.handle('enc:fights', (_e, q) => engine.encFights(q ?? {}));

@@ -68,6 +68,25 @@ function todoElHtml() {
       },
     })],
   }));                                                            // discrepa y discrepaWiki
+  // LA COTA, con un hueco y con varios: son dos rotulos distintos.
+  trozos.push(V.construye({
+    fichas: [ficha({ crono: { cota: { txt: '10:19', huecos: 1 } } })],
+  }));
+  trozos.push(V.construye({
+    fichas: [ficha({ crono: { cota: { txt: '10:19', huecos: 10 } } })],
+  }));
+  // EL VISTO, en sus tres lecturas.
+  trozos.push(V.construye({
+    fichas: [ficha({ crono: { visto: { txt: '3s', esta: true } } })],
+  }));
+  trozos.push(V.construye({
+    fichas: [ficha({ crono: { visto: { desdeTxt: '12m' } } })],
+  }));
+  trozos.push(V.construye({
+    fichas: [ficha({
+      crono: { cota: { txt: '10:19', huecos: 10 }, visto: { desdeTxt: '12m', pasado: true } },
+    })],
+  }));
   trozos.push(V.construye({ fichas: [], vista: 'sug', sugerencias: [] }));
   return trozos.join('\n');
 }
@@ -133,8 +152,11 @@ console.log('\nlas decisiones son funciones, no ramas dentro de una plantilla');
     && V.clavesDeObservacion(9).cuenta === 'cro.obsN', 'el recuento elige su forma');
   ok(V.clavesDeObservacion(1).nota === 'cro.obsPocas' && V.clavesDeObservacion(2).nota === 'cro.retenido',
     'con menos de dos observaciones no se da cifra');
-  ok(V.clavesDeAviso({ aviso: 'quizá-no-vemos-su-muerte' }, {}).includes('cro.sospecha'),
-    'el aviso de sospecha sale de una función');
+  ok(!V.clavesDeAviso({ aviso: 'quizá-no-vemos-su-muerte' }, {}).length,
+    'el aviso de sospecha ya NO sale',
+    'era una suposición, y el visto es un hecho que la sustituye');
+  ok(!V.CLAVES.includes('cro.sospecha'), 'y no queda declarado',
+    'una clave declarada que nadie produce es un rótulo muerto');
 }
 
 console.log('\nla discrepancia no se afirma sin poder afirmarla');

@@ -52,6 +52,22 @@ const RENOMBRADAS = {
   'cro.sinDato': 'pz.sinDato',
 };
 
+/**
+ * LO QUE SE RETIRA NO ES LO MISMO QUE LO QUE SE RENOMBRA, y por eso va aparte.
+ *
+ * Un renombrado necesita su SUSTITUTO —y arriba se comprueba que existe—. Una
+ * retirada no tiene sustituto: necesita un MOTIVO, y el motivo se escribe aqui
+ * porque dentro de seis meses nadie se acuerda de por que falta un rotulo.
+ *
+ * Meter una retirada en la lista de arriba seria mentir sobre lo que paso.
+ */
+const RETIRADAS = {
+  'cro.sospecha': 'era una SUPOSICION —«lleva N periodos a cero, puede que ya '
+    + 'este ahi»— y ahora hay un hecho que la sustituye: el registro nombra a '
+    + 'cada bicho 145 veces por cada muerte, y el 97% de las reapariciones '
+    + 'vienen anunciadas antes de la muerte siguiente. No hay que suponerlo.',
+};
+
 console.log('\nel control se capturó ANTES de vaciar nada');
 ok(Array.isArray(antes.vivas) && antes.vivas.length > 20,
   'hay un «antes» que comparar', `${antes.vivas.length} claves, capturadas el ${antes.capturado}`);
@@ -59,7 +75,8 @@ ok(Array.isArray(antes.vivas) && antes.vivas.length > 20,
 console.log('\nninguna decisión de la sección vieja se cae en la migración');
 {
   const ahora = new Set(V.CLAVES);
-  const perdidas = antes.vivas.filter((k) => !ahora.has(k) && !(k in RENOMBRADAS));
+  const perdidas = antes.vivas.filter(
+    (k) => !ahora.has(k) && !(k in RENOMBRADAS) && !(k in RETIRADAS));
   ok(perdidas.length === 0, 'todo lo que producía la vieja lo produce la nueva',
     perdidas.length ? perdidas.join(', ') : `${antes.vivas.length} comprobadas`);
 }
@@ -68,6 +85,12 @@ console.log('\ny lo renombrado tiene sustituto de verdad, no una excusa');
 for (const [viejo, nuevo] of Object.entries(RENOMBRADAS)) {
   const v = t(nuevo);
   ok(!!v && v !== nuevo, `${viejo} → ${nuevo}`, `«${v}»`);
+}
+console.log('\ny lo retirado tiene MOTIVO, no sustituto');
+for (const [k, porque] of Object.entries(RETIRADAS)) {
+  ok(!V.CLAVES.includes(k), `${k} retirada de verdad`, porque.slice(0, 88) + '…');
+  ok(t(k) === k, 'y también del diccionario',
+    'un rótulo retirado de la vista y vivo en i18n vuelve solo en la sección siguiente');
 }
 ok(Object.keys(RENOMBRADAS).length <= 6, 'la lista de renombradas sigue siendo corta',
   `${Object.keys(RENOMBRADAS).length} — si crece, es que se está tirando y llamándolo renombrar`);

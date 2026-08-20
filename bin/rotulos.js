@@ -115,11 +115,39 @@ if (!REAL) {
   process.exit(3);
 }
 /** Y el registro pequeño: con el de 114 MB el motor no engancha antes de mirar. */
+/** La hora de ahora en el formato del registro: «Tue Aug 04 11:04:10 2026». */
+const AHORA_LOG = (() => {
+  const d = new Date(Date.now() - 30_000);
+  const DIA = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = d.toTimeString().slice(0, 8);
+  return `${DIA[d.getDay()]} ${MES[d.getMonth()]} ${dd} ${hh} ${d.getFullYear()}`;
+})();
 const LOG = path.join(DATOS, 'eqlog_Prueba_erudin.txt');
 fs.writeFileSync(LOG, [
   "[Tue Aug 04 11:04:10 2026] Logging to 'eqlog.txt' is now *ON*.",
   `[Tue Aug 04 11:04:15 2026] You have entered ${BASE} 2 (Adaptive).`,
   '[Tue Aug 04 11:04:20 2026] You have slain contando!',
+  /**
+   * MUERE Y LUEGO VUELVE A SALIR NOMBRADO, que es la rama de «visto hace X».
+   * Sin una linea posterior a su muerte, vistoDe() no tiene nada que decir
+   * los cinco rotulos del visto salen muertos sin estarlo — que es justo el
+   * error que ya se cometio con cro.aunNo: darlo por muerto de memoria
+   * vez de construirle su caso.
+   */
+  '[Tue Aug 04 11:14:20 2026] vencido hits YOU for 42 points of damage.',
+  '[Tue Aug 04 11:14:22 2026] You slash vencido for 88 points of damage.',
+  /**
+   * Y UNA MENCION RECIENTE DE VERDAD, con la hora de AHORA.
+   *
+   * Con la fecha fija del resto del registro, «visto hace X» salia siempre
+   * por la rama de «no se le ve desde hace dieciseis dias», y los tres
+   * rotulos de «esta ahi» quedaban sin caso. Un rotulo que la sonda no
+   * puede hacer aparecer no se distingue de uno muerto — y ya paso con
+   * cro.aunNo, que se dio por muerto de memoria estando vivo.
+   */
+  `[${AHORA_LOG}] conObs hits YOU for 7 points of damage.`,
   '',
 ].join('\r\n'));
 /** Y el almacén SELLADO: sin sello sale el cartel de histórico viejo y tapa todo. */

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { claveCrono } from './cronos.js';
+import { claveCrono, mejorCota } from './cronos.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -695,6 +695,7 @@ export class Engine extends EventEmitter {
       const cut = ev.t - this.windowSec;
       while (this.recent.length && this.recent[0].t < cut) this.recent.shift();
     }
+    this.#anotaVisto(ev);
     this.casteos.feed(ev);
     this.tracker.feed(ev);
     this.session?.feed(ev);
@@ -1841,6 +1842,181 @@ export class Engine extends EventEmitter {
    * ES «HAY UNO»: es «no se ha demostrado que haya más», que es otra cosa y por
    * eso el aviso calla en vez de afirmar que está solo.
    */
+  /**
+   * LA ULTIMA VEZ QUE EL REGISTRO NOMBRO A CADA BICHO, y en que clase de linea.
+   *
+   * CUALQUIER linea que lo nombre prueba que existe: un golpe, un fallo, un
+   * hechizo, un tropiezo. No hace falta que sea su muerte — de hecho su muerte
+   * es lo contrario, y por eso se guarda aparte.
+   *
+   * Se lleva en memoria y no en disco a proposito: la pregunta que contesta es
+   * «¿esta ahi AHORA?», y una respuesta guardada de anteayer no la contesta.
+   * Al leer el registro entero al arrancar se rellena sola.
+   *
+   * La clave incluye la zona: el mismo nombre en dos sitios son dos bichos, y
+   * esa distincion es la misma que la del temporizador.
+   */
+  #anotaVisto(ev) {
+    if (!ev || !ev.t) return;
+    const yo = this.self ?? 'You';
+    const zona = this.parser?.zone ?? null;
+    for (const quien of [ev.source, ev.target, ev.victim]) {
+      if (!quien || quien === yo || quien === 'You' || this.parser?.pets?.has(quien)) continue;
+      const k = `${quien}\u0000${zona ?? ''}`;
+      // Su muerte NO cuenta como visto: es justo lo contrario.
+      if (ev.kind === 'death' && ev.victim === quien) {
+        this.vistos?.delete(k);
+        // Se abre el hueco: lo cerrara la primera linea que lo vuelva a nombrar.
+        if (!this.pendienteVisto) this.pendienteVisto = new Map();
+        this.pendienteVisto.set(k, ev.t);
+        continue;
+      }
+      if (!this.vistos) this.vistos = new Map();
+      this.vistos.set(k, { t: ev.t, kind: ev.kind });
+      /**
+       * Y EL HUECO MUERTE → PRIMERA MENCION, que es la cota mas apretada.
+       *
+       * Se acumula aqui porque es lo unico que hay que recordar: al morir se
+       * anota el instante, y la PRIMERA linea que lo vuelva a nombrar cierra
+       * el hueco. Una linea, un `Map`, sin recorrer nada.
+       */
+      const pend = this.pendienteVisto?.get(k);
+      if (pend != null && ev.t > pend) {
+        if (!this.huecosVisto) this.huecosVisto = new Map();
+        const l = this.huecosVisto.get(k) ?? [];
+        l.push(ev.t - pend);
+        this.huecosVisto.set(k, l);
+        this.pendienteVisto.delete(k);
+      }
+    }
+  }
+
+  /**
+   * Para cada clave, cuando se le vio por ultima vez y en que clase de linea.
+   *
+   * Devuelve `{ clave: { t, kind } }`. Sin entrada = no lo hemos nombrado desde
+   * su ultima muerte, que es un hecho y no una sospecha.
+   */
+  vistoDe(claves = []) {
+    const out = {};
+    if (!this.vistos) return out;
+    for (const c of claves) {
+      if (!c?.nombre) continue;
+      // La zona del crono es la BASE; la del registro trae la dificultad
+      // dentro. Se casa por prefijo, que es lo unico que las relaciona sin
+      // volver a analizar el nombre de la zona.
+      let mejor = null;
+      for (const [k, v] of this.vistos) {
+        const [nombre, zona] = k.split('\u0000');
+        if (nombre !== c.nombre) continue;
+        if (c.base && zona && !zona.startsWith(c.base)) continue;
+        if (!mejor || v.t > mejor.t) mejor = v;
+      }
+      /**
+       * Y SI NO HAY LINEA, EL ALMACEN. Ver la cabecera de este bloque: el mapa
+       * de arriba nace vacio en cada apertura porque la aplicacion no relee el
+       * registro. La ultima pelea en que aparecio es mas vieja que una linea,
+       * pero es cierta y esta ahi desde el primer fotograma.
+       *
+       * Se marca de donde sale —`kind`— porque no son la misma afirmacion:
+       * una linea dice «lo nombro el registro»; una pelea dice «estuvo en un
+       * combate». Mezclarlas seria mezclar dos procedencias.
+       */
+      if (!mejor) {
+        for (const sm of this.store?.index ?? []) {
+          if (!sm.at || !(sm.foes ?? []).includes(c.nombre)) continue;
+          if (c.base != null && (sm.zoneBase ?? null) !== c.base) continue;
+          if (c.diff != null && (sm.diff ?? null) !== c.diff) continue;
+          // Su muerte no cuenta como visto: si cayo en esa pelea, no prueba
+          // que este ahora.
+          if ((sm.kills ?? []).some((k) => (typeof k === 'string' ? k : k?.victim) === c.nombre)) continue;
+          const t = Math.floor(sm.at / 1000) + (sm.duration ?? 0);
+          if (!mejor || t > mejor.t) mejor = { t, kind: 'pelea' };
+        }
+      }
+      if (mejor) out[claveCrono(c)] = mejor;
+    }
+    return out;
+  }
+
+  /**
+   * LA COTA SUPERIOR DEL PERIODO, para cada clave.
+   *
+   * El razonamiento y las tres condiciones estan en `mejorCota`, en
+   * `src/cronos.js`. Aqui solo se REUNEN los huecos, que es lo que este objeto
+   * puede dar y la funcion pura no:
+   *
+   *  · MUERTE → MUERTE, del indice del almacen. La VISITA se deduce del propio
+   *    orden: cambia cuando cambia (zona base, dificultad). Es la condicion que
+   *    mas cuesta y la que mas quita — sin ella la cobertura parecia el doble,
+   *    porque juntaba dos entradas a la misma instancia, y en una instancia
+   *    nueva el bicho no ha reaparecido: ha nacido.
+   *
+   *  · MUERTE → PRIMERA MENCION, acumulados al leer en `#anotaVisto`. Esos ya
+   *    vienen dentro de una visita por construccion: una mencion pendiente se
+   *    cierra con la primera linea que lo nombre, y si te fuiste de la zona sin
+   *    que lo nombrara, se queda abierta y no produce hueco.
+   *
+   * Medido sobre el historico: 95 claves con cota, mediana 8m 49s por mencion
+   * y 10m 29s por muerte, y de las 50 que tienen las dos, 47 mas apretadas por
+   * mencion, 3 iguales y NINGUNA mas floja.
+   */
+  cotaDe(claves = []) {
+    const pide = claves.filter((c) => c?.nombre);
+    const out = {};
+    if (!pide.length || !this.store) return out;
+
+    const mult = this.multiplicidadDe(pide);
+
+    // Las muertes por clave, con su visita, en una sola pasada por el indice.
+    const idx = [...(this.store.index ?? [])].sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+    let visita = 0;
+    let anterior = null;
+    const muertes = new Map();
+    for (const sm of idx) {
+      const z = `${sm.zoneBase ?? ''}\u0000${sm.diff ?? ''}`;
+      if (z !== anterior) { visita += 1; anterior = z; }
+      const at = sm.at ? Math.floor(sm.at / 1000) : null;
+      if (!at) continue;
+      for (const k of new Set((sm.kills ?? []).map((x) => (typeof x === 'string' ? x : x?.victim)))) {
+        if (!k) continue;
+        for (const c of pide) {
+          if (c.nombre !== k) continue;
+          if (c.base != null && (sm.zoneBase ?? null) !== c.base) continue;
+          if (c.diff != null && (sm.diff ?? null) !== c.diff) continue;
+          const cl = claveCrono(c);
+          if (!muertes.has(cl)) muertes.set(cl, []);
+          muertes.get(cl).push({ t: at, visita });
+        }
+      }
+    }
+
+    for (const c of pide) {
+      const cl = claveCrono(c);
+      const ms = muertes.get(cl) ?? [];
+      const huecosMuerte = [];
+      for (let i = 0; i + 1 < ms.length; i += 1) {
+        // La condicion de la VISITA, que es la que no se me ocurrio razonando.
+        if (ms[i + 1].visita === ms[i].visita && ms[i + 1].t > ms[i].t) {
+          huecosMuerte.push(ms[i + 1].t - ms[i].t);
+        }
+      }
+      // Los de mencion se guardan por nombre+zona del REGISTRO, que trae la
+      // dificultad dentro; la clave del crono lleva la base. Se casa por
+      // prefijo, igual que en `vistoDe`.
+      const huecosVisto = [];
+      for (const [k, v] of this.huecosVisto ?? []) {
+        const [nombre, zona] = k.split('\u0000');
+        if (nombre !== c.nombre) continue;
+        if (c.base && zona && !zona.startsWith(c.base)) continue;
+        huecosVisto.push(...v);
+      }
+      const cota = mejorCota({ huecosMuerte, huecosVisto, multiplicidad: mult[cl] ?? 0 });
+      if (cota) out[cl] = cota;
+    }
+    return out;
+  }
+
   multiplicidadDe(claves = []) {
     const pide = claves.filter((c) => c?.nombre)
       .map((c) => (typeof c === 'string' ? { nombre: c, base: null, diff: null } : c));

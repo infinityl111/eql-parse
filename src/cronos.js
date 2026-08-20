@@ -370,6 +370,128 @@ export function valorDe({
  *   - medido, heredado  segundos, o null
  * @returns {{estado, restante, transcurrido, valor, aviso}}
  */
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA COTA SUPERIOR DEL PERIODO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * No es una estimacion. Es aritmetica:
+ *
+ *     hueco observado = periodo + lo que Campeon tarda en volver a verlo
+ *     esa espera nunca es negativa
+ *     ⇒  periodo ≤ hueco observado
+ *
+ * Luego el MINIMO hueco valido acota el periodo por arriba, **siempre**. No
+ * depende de racimos, ni de remuestreo, ni de que nada se distinga del azar.
+ * Una sola observacion ya la hace cierta; lo que cambia con mas huecos no es su
+ * validez, es **cuanto aprieta**. Por eso el numero de huecos va SIEMPRE al
+ * lado: una cota de un hueco es cierta y floja, y quien la mira necesita
+ * saberlo.
+ *
+ * Y por eso esto NO contradice el veredicto de `REAPARICION`: alli se cerro la
+ * puerta a la ESTIMACION PUNTUAL, que exigia distinguir senal de ruido. Una
+ * cota no estima. Acota.
+ *
+ * ── LAS TRES CONDICIONES, Y DOS SALIERON MIDIENDO ─────────────────────────
+ *
+ * Un hueco solo acota si los dos extremos son EL MISMO BICHO:
+ *
+ *   a · SIN MULTIPLICIDAD DEMOSTRADA. Si el mismo nombre ha caido dos veces en
+ *       una sola pelea, son dos individuos y el hueco no acota nada.
+ *
+ *   b · LOS DOS EXTREMOS, EN LA MISMA VISITA A LA ZONA. Con dificultad ≥ 1 la
+ *       zona es una instancia: al salir y volver a entrar el bicho no ha
+ *       reaparecido, **ha nacido con la instancia nueva**. Sin esta condicion
+ *       la cobertura parecia el doble.
+ *
+ *   c · UN HUECO CORTO SE REFUTA SOLO. Medido, sin esta condicion salian cotas
+ *       de tres segundos —«Noclin's Pet ≤ 0m 03s»—. Tres segundos no es un
+ *       periodo corto: es la PRUEBA de que eran dos bichos distintos, que es
+ *       justo lo que (a) no ve cuando murieron en peleas distintas.
+ *
+ *       El suelo no se elige a ojo: es el p90 de la duracion de una pelea. Por
+ *       debajo de eso no da tiempo ni a matarlo, buscarlo y volver.
+ *
+ * ── DOS ORIGENES, Y SE PUBLICA EL MAS APRETADO ────────────────────────────
+ *
+ * · MUERTE → MUERTE. El hueco lleva dentro el periodo, lo que tarda en volver
+ *   Y lo que tarda en matarlo.
+ * · MUERTE → PRIMERA MENCION. Cualquier linea que lo nombre prueba que existe.
+ *   Ese hueco no lleva lo que tarda en matarlo, asi que es **estrictamente mas
+ *   apretado**, y valido por el mismo argumento.
+ *
+ * Medido sobre el historico: de las 50 claves que tienen las dos, **47 mas
+ * apretadas, 3 iguales, 0 mas flojas** — y el «nunca mas floja» es la
+ * aritmetica, no la suerte. Pero la de mencion se refuta 3,6 veces mas por el
+ * suelo, y la de muerte cubre 15 claves donde no hay mencion valida.
+ *
+ * Asi que no hay una principal y otra de respaldo: **se publica la mas
+ * apretada de las validas**, que es lo que una cota superior tiene que ser.
+ */
+
+/** El suelo: por debajo de esto, el hueco demuestra dos bichos, no un periodo. */
+export const SUELO_COTA = 161;
+
+/**
+ * Los huecos validos de una serie de sucesos de la MISMA clave.
+ *
+ * `sucesos` es `[{ t, visita, tipo }]` con `tipo` 'muerte' o 'visto', en orden.
+ * Devuelve `{ segundos, huecos, origen }` o `null` si no hay ninguno valido.
+ */
+export function mejorCota({
+  huecosMuerte = [], huecosVisto = [], multiplicidad = 0, suelo = SUELO_COTA,
+} = {}) {
+  // (a) — con varios individuos demostrados no se acota nada.
+  if ((multiplicidad ?? 0) >= 2) return null;
+
+  /**
+   * (c) — UN SOLO HUECO POR DEBAJO DEL SUELO REFUTA LA SERIE ENTERA. No se
+   * descarta ese hueco y se sigue con los demas: si ahi habia dos bichos,
+   * tampoco sabemos cual volvio en los otros. Medido, esto tumba 51 series de
+   * menciones y 14 de muertes — y sin ello salian cotas de tres segundos.
+   */
+  const valida = (h) => (h.length && Math.min(...h) >= suelo ? h : null);
+  const vM = valida(huecosMuerte);
+  const vV = valida(huecosVisto);
+
+  const cand = [];
+  if (vV) cand.push({ segundos: Math.min(...vV), huecos: vV.length, origen: 'visto' });
+  if (vM) cand.push({ segundos: Math.min(...vM), huecos: vM.length, origen: 'muerte' });
+  if (!cand.length) return null;
+  // La mas apretada de las validas. Con empate manda la de mas huecos.
+  cand.sort((a, b) => a.segundos - b.segundos || b.huecos - a.huecos);
+  return cand[0];
+}
+
+/**
+ * La misma cota a partir de una serie de sucesos `[{ t, visita, tipo }]`.
+ *
+ * Es la forma comoda de probarla y de calcularla donde estan los sucesos; el
+ * nucleo es `mejorCota`, que solo necesita los huecos ya recogidos.
+ */
+export function cotaDe(sucesos = [], { multiplicidad = 0, suelo = SUELO_COTA } = {}) {
+  const orden = [...sucesos].filter((x) => x && x.t != null).sort((a, b) => a.t - b.t);
+  const muertes = orden.filter((x) => x.tipo === 'muerte');
+  const vistos = orden.filter((x) => x.tipo === 'visto');
+
+  const recoge = (siguiente) => {
+    const h = [];
+    for (const m of muertes) {
+      const s = siguiente(m);
+      // (b) — el otro extremo, en la MISMA visita.
+      if (s && s.visita === m.visita && s.t > m.t) h.push(s.t - m.t);
+    }
+    return h;
+  };
+
+  return mejorCota({
+    huecosMuerte: recoge((m) => muertes.find((x) => x.t > m.t)),
+    huecosVisto: recoge((m) => vistos.find((x) => x.t > m.t)),
+    multiplicidad,
+    suelo,
+  });
+}
+
 export function estadoCrono(crono, ctx = {}) {
   const { ahora = 0, ultimaMuerte = null } = ctx;
   const valor = valorDe({

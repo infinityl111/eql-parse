@@ -52,10 +52,18 @@ export function clavesDeObservacion(n = 0) {
   return { cuenta, nota: n < 2 ? 'cro.obsPocas' : 'cro.retenido' };
 }
 
-/** Los avisos de una ficha. Devuelve CLAVES, no texto. */
+/**
+ * Los avisos de una ficha. Devuelve CLAVES, no texto.
+ *
+ * AQUI VIVIA `cro.sospecha` — «lleva N periodos a cero, puede que ya este ahi y
+ * no lo hayas visto». Se retira, y no por sitio: **era una suposicion, y ahora
+ * hay un hecho que la sustituye**. El registro nombra a cada bicho 145 veces
+ * por cada vez que dice que ha muerto, y el 97% de las reapariciones vienen
+ * anunciadas por una de esas lineas. Asi que no hay que suponer si esta: se
+ * mira si lo hemos nombrado.
+ */
 export function clavesDeAviso(st, crono = {}) {
   const out = [];
-  if (st?.aviso === 'quizá-no-vemos-su-muerte') out.push('cro.sospecha');
   if (crono.aviso === 'varios-a-la-vez') out.push('cro.varios');
   else if (crono.aviso === 'probablemente-varios') out.push('cro.quizaVarios');
   return out;
@@ -96,6 +104,27 @@ function fichaDe({ crono, estado, obs = {}, i, conNumero = true, abierta = false
   const deQuien = manda
     ? `<span class="cro-dequien">${esc(t(`pz.src.${manda}`))}</span>` : '';
 
+  /**
+   * LA COTA Y EL VISTO, que es lo que hace util el temporizador.
+   *
+   * La cota es un TECHO medido, no un periodo: «no mas de 10m19s». Su numero
+   * de huecos va SIEMPRE al lado, porque una cota de un hueco es cierta y
+   * floja — y de las 95 claves que la tienen, 46 son de uno solo.
+   *
+   * Y el visto contesta lo que la cota no puede: si esta ahi AHORA. Las dos
+   * juntas son las que dicen algo que ninguna dice sola:
+   *
+   *     techo 10m19s + visto hace 3s        → esta ahi
+   *     techo 10m19s + sin verlo hace 12m   → deberia estar, y no lo has visto
+   */
+  const cota = crono.cota ?? null;
+  const visto = crono.visto ?? null;
+  const cotaHtml = cota
+    ? `<span class="cro-cota">${esc(t('cro.cota', { t: cota.txt }))}
+       <span class="cro-huecos">${esc(cota.huecos === 1
+    ? t('cro.cotaH1') : t('cro.cotaHn', { n: cota.huecos }))}</span></span>`
+    : '';
+
   const dis = [];
   if (v.discrepa != null && v.fuente === 'manual') {
     dis.push(t('cro.discrepa', { tuyo: esc(v.segundosTxt ?? ''), n }));
@@ -123,10 +152,18 @@ function fichaDe({ crono, estado, obs = {}, i, conNumero = true, abierta = false
         visto: n ? String(n) : null,
         manda,
       }),
-      `<span class="cro-caja">${numero}${deQuien}</span>`,
+      `<span class="cro-caja">${numero}${deQuien}${cotaHtml}</span>`,
     ],
     cuerpo: [
       `<div class="cro-obs"><b>${esc(t(cuenta, { n }))}</b> — ${esc(t(nota))}</div>`,
+      cota ? `<div class="cro-cotapor">${esc(t('cro.cotaPor'))}</div>` : '',
+      visto?.txt
+        ? `<div class="cro-visto"><b>${esc(t('cro.visto', { t: visto.txt }))}</b> — ${
+          esc(t('cro.vistoTipo'))}${visto.esta ? ` · <b>${esc(t('cro.vistoEsta'))}</b>` : ''}</div>`
+        : (visto?.desdeTxt
+          ? `<div class="cro-visto">${esc(t('cro.sinVer', { t: visto.desdeTxt }))}${
+            cota && visto.pasado ? ` — ${esc(t('cro.sinVerCota', { t: cota.txt }))}` : ''}</div>`
+          : ''),
       v.pagina ? `<div class="cro-pag">${esc(t('cro.segun', { pagina: v.pagina }))}</div>` : '',
       crono.base ? '' : `<div class="cro-avi">${esc(t('cro.sinZona'))}</div>`,
       ...dis.map((x) => `<div class="cro-dif">${esc(x)}</div>`),
@@ -232,7 +269,9 @@ export const CLAVES = [
   'cro.title', 'cro.sub', 'cro.add', 'cro.addPh', 'cro.close', 'cro.vacio',
   'cro.esperando', 'cro.disponible', 'cro.aunNo',
   'cro.obs0', 'cro.obs1', 'cro.obsN', 'cro.obsPocas', 'cro.retenido',
-  'cro.segun', 'cro.sinZona', 'cro.varios', 'cro.quizaVarios', 'cro.sospecha',
+  'cro.segun', 'cro.sinZona', 'cro.varios', 'cro.quizaVarios',
+  'cro.cota', 'cro.cotaH1', 'cro.cotaHn', 'cro.cotaPor',
+  'cro.visto', 'cro.vistoTipo', 'cro.vistoEsta', 'cro.sinVer', 'cro.sinVerCota',
   'cro.manualPh', 'cro.setManual',
   'cro.agrZona', 'cro.agrNada', 'cro.filContando', 'cro.filDisponible',
   'cro.discrepa', 'cro.discrepaWiki', 'cro.escVacio',
