@@ -10,7 +10,8 @@ determinista. La regla era: en un proyecto donde cada número viaja con su
 procedencia, un número plausible y falso es el peor que puede haber, porque
 dentro de un mes alguien lo cita creyendo que se midió.
 
-**Los del 20 de agosto llevan cifras REALES**, y es decisión de Campeón: un
+**Los del 20 de agosto llevan cifras REALES. Aprobado por Campeón el 20/08/2026.**
+El motivo: un
 antes y un después sólo se pueden comparar con el mismo contenido, y con datos
 inventados no se ve si la pantalla aguanta lo que de verdad hay —23 combatientes
 con sus mascotas, o un solo temporizador y el resto vacío.
@@ -63,3 +64,29 @@ necesitan, no es de ninguna de las dos:
 
 En la aplicación serían **un módulo**, no dos copias. Lo que aquí está duplicado
 es la prueba de que hace falta.
+
+## Y la pelea se elige para que EJERCITE lo que se enseña
+
+La más poblada del histórico —23 filas en Clan Crushbone— no servía: no tenía
+ni incertidumbre ni tipos de daño, así que con ella el prototipo no podía
+enseñar «lo que esta pelea no sabe» ni la barra segmentada. **Enseñar la maqueta
+de una función con una pelea que no la tiene es inventarse el caso**, que es lo
+mismo que inventarse el número por otra puerta.
+
+`contenido-real.mjs` puntúa las 1.986 peleas del almacén y coge la que más
+ejercita: hoy sale **Najena, 15 combatientes, 493 s**, con 58 de daño sin
+atribuir y 1.703 de un encantado soltado.
+
+## La procedencia no se negocia
+
+Regla de Campeón del 20/08/2026, y es la prueba que decide si un rediseño vale:
+
+> **Si al mirar la pantalla nueva no se sabe qué cifra es medida, cuál es de la
+> wiki y cuál la escribió Campeón, el rediseño ha fallado por mucho que quepa
+> más.**
+
+Y su corolario: **una cosa escondida detrás de un clic, en la práctica, no
+existe**. La procedencia tiene que verse SIN desplegar. En el prototipo se
+resuelve con tres pastillas siempre visibles —`tuyo` · `zona` · `visto`—, la que
+manda rellena, el número grande rotulado con de quién es, y la leyenda una sola
+vez arriba.

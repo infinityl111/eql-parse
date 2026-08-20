@@ -1,786 +1,478 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8">
-<title>Escena — prototipo</title>
+<html lang="es"><head><meta charset="utf-8"><title>Escena — prototipo v2</title>
 <style>
 :root{
   --fondo:#14110d; --alto:#1c1813; --linea:#2f2921; --linea2:#3d3529;
   --tinta:#efe7d8; --tinta2:#b3a793; --tenue:#7d7263;
-  --acento:#d9a441; --gema:#63b083; --alarma:#c9603a; --frio:#5b8fb9;
-  --r:7px; --f:13px;
+  --tuyo:#d9a441; --zona:#5b8fb9; --visto:#63b083; --alarma:#c9603a;
+  --r:7px;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--fondo);color:var(--tinta);
-  font:var(--f)/1.45 "Segoe UI",system-ui,sans-serif}
-h1,h2,h3{margin:0;font-weight:650;letter-spacing:.2px}
+  font:13px/1.45 "Segoe UI",system-ui,sans-serif}
+h1{margin:0;font-size:21px;font-weight:650}
 .marco{max-width:1180px;margin:0 auto;padding:18px 22px 60px}
+.mini{color:var(--tenue);font-size:11px}
+.num{font-variant-numeric:tabular-nums}
 
-/* ── PIEZA 1 · pestañas DENTRO de la sección ─────────────────────────── */
+/* PIEZA 1 · pestañas: cambian de VISTA, nunca filtran */
 .pest{display:flex;gap:2px;border-bottom:1px solid var(--linea);margin:14px 0 0}
 .pest button{background:none;border:0;border-bottom:2px solid transparent;color:var(--tenue);
-  font:600 12px/1 inherit;padding:9px 14px;cursor:pointer;letter-spacing:.3px}
-.pest button:hover{color:var(--tinta2)}
-.pest button[aria-selected=true]{color:var(--tinta);border-bottom-color:var(--acento)}
-.pest .cuenta{color:var(--tenue);font-weight:400;margin-left:5px}
+  font:600 12px/1 inherit;padding:9px 14px;cursor:pointer}
+.pest button[aria-selected=true]{color:var(--tinta);border-bottom-color:var(--tuyo)}
 
-/* ── PIEZA 2 · barra de control: buscador + agrupar + densidad ───────── */
-.barra{display:flex;gap:8px;align-items:center;flex-wrap:wrap;
-  padding:10px 0;border-bottom:1px solid var(--linea)}
-.buscar{flex:1 1 220px;min-width:170px;position:relative}
+/* PIEZA 2 · barra de control */
+.barra{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;
+  border-bottom:1px solid var(--linea)}
+.buscar{flex:1 1 200px;min-width:160px;position:relative}
 .buscar input{width:100%;background:var(--alto);border:1px solid var(--linea2);
   border-radius:var(--r);color:var(--tinta);font:inherit;padding:7px 10px 7px 28px}
-.buscar input:focus{outline:0;border-color:var(--acento)}
-.buscar::before{content:"⌕";position:absolute;left:9px;top:6px;color:var(--tenue);font-size:15px}
+.buscar input:focus{outline:0;border-color:var(--tuyo)}
+.buscar::before{content:"⌕";position:absolute;left:9px;top:5px;color:var(--tenue);font-size:15px}
 select{background:var(--alto);border:1px solid var(--linea2);border-radius:var(--r);
   color:var(--tinta);font:inherit;padding:7px 8px}
-.dens{display:flex;gap:0;border:1px solid var(--linea2);border-radius:var(--r);overflow:hidden}
-.dens button{background:none;border:0;color:var(--tenue);font:600 11px/1 inherit;
-  padding:8px 10px;cursor:pointer}
+.dens{display:flex;border:1px solid var(--linea2);border-radius:var(--r);overflow:hidden}
+.dens button{background:none;border:0;color:var(--tenue);font:600 11px/1 inherit;padding:8px 10px;cursor:pointer}
 .dens button[aria-pressed=true]{background:var(--linea);color:var(--tinta)}
 
-/* ── PIEZA 3 · pastillas de filtro, encendidas/apagadas y a la vista ─── */
+/* PIEZA 3 · pastillas: filtran DENTRO de la vista */
 .pastillas{display:flex;gap:6px;flex-wrap:wrap;padding:9px 0}
-.pastilla{background:none;border:1px solid var(--linea2);border-radius:99px;
-  color:var(--tenue);font:600 11px/1 inherit;padding:5px 11px;cursor:pointer;
-  display:inline-flex;gap:5px;align-items:center}
-.pastilla:hover{border-color:var(--tenue)}
-.pastilla[aria-pressed=true]{background:var(--acento);border-color:var(--acento);color:#1a1408}
-.pastilla .n{opacity:.7;font-weight:400}
+.pastilla{background:none;border:1px solid var(--linea2);border-radius:99px;color:var(--tenue);
+  font:600 11px/1 inherit;padding:5px 11px;cursor:pointer}
+.pastilla[aria-pressed=true]{background:var(--tuyo);border-color:var(--tuyo);color:#1a1408}
 
-/* ── PIEZA 4 · filas plegables ───────────────────────────────────────── */
-.filas{border:1px solid var(--linea);border-radius:var(--r);overflow:hidden;margin-top:10px}
+/* PIEZA 4 · filas plegables */
+.filas{border:1px solid var(--linea);border-radius:var(--r);overflow:hidden;margin-top:8px}
+.grupo{background:#191510;border-bottom:1px solid var(--linea);padding:5px 11px;
+  font:600 11px/1 inherit;color:var(--tinta2);letter-spacing:.4px}
+.grupo .n{color:var(--tenue);font-weight:400}
 .fila{border-bottom:1px solid var(--linea)}
 .fila:last-child{border-bottom:0}
-.fila>summary{display:grid;align-items:center;gap:10px;padding:7px 11px;cursor:pointer;
-  list-style:none;grid-template-columns:14px 1fr auto auto auto}
+.fila>summary{display:grid;align-items:center;gap:10px;padding:6px 11px;cursor:pointer;list-style:none}
 .fila>summary::-webkit-details-marker{display:none}
 .fila>summary:hover{background:var(--alto)}
-.fila[open]>summary{background:var(--alto);border-bottom:1px solid var(--linea)}
-.giro{color:var(--tenue);transition:transform .12s;font-size:10px}
-.fila[open] .giro{transform:rotate(90deg)}
-.cuerpo{padding:9px 11px 12px 35px;background:#181410;font-size:12px;color:var(--tinta2)}
-.compacta .fila>summary{padding:3px 11px;font-size:12px}
-.compacta .barrita{height:3px}
+.fila[open]>summary{background:var(--alto)}
+.giro{color:var(--tenue);font-size:10px}
+.fila[open] .giro{transform:rotate(90deg);display:inline-block}
+.cuerpo{padding:8px 11px 11px 33px;background:#181410;font-size:12px;color:var(--tinta2)}
+.compacta .fila>summary{padding:2px 11px}
 
-/* ── PIEZA 5 · etiquetas compactas en vez de texto largo ─────────────── */
-.et{display:inline-block;border-radius:4px;padding:1px 6px;font:600 10px/1.6 inherit;
-  letter-spacing:.3px;white-space:nowrap}
-.et.tuyo{background:#3a2f14;color:var(--acento)}
-.et.zona{background:#16303a;color:var(--frio)}
+/* PIEZA 5 · etiquetas compactas */
+.et{display:inline-block;border-radius:4px;padding:1px 6px;font:600 10px/1.6 inherit;white-space:nowrap}
+.et.gris{background:var(--linea);color:var(--tinta2)}
 .et.enem{background:#3a1f16;color:var(--alarma)}
 .et.masc{background:#241f2f;color:#9b8ec7}
-.et.ok{background:#16301f;color:var(--gema)}
-.et.gris{background:var(--linea);color:var(--tinta2)}
-.num{font-variant-numeric:tabular-nums}
-.barrita{height:5px;border-radius:3px;background:var(--linea);overflow:hidden;min-width:52px}
-.barrita i{display:block;height:100%;background:var(--acento)}
-.fila.ene .barrita i{background:var(--alarma)}
 
-/* ── El armazón del antes/después ─────────────────────────────────────── */
+/* ══ PROCEDENCIA · la pieza que Campeón no deja negociar ══════════════════
+   Las tres fuentes SIEMPRE a la vista, en la misma fila y sin desplegar.
+   La que manda va rellena; las otras, perfiladas. El color es el mismo en
+   toda la aplicación y se explica UNA vez, en la leyenda de arriba. */
+.proc{display:inline-flex;gap:4px;align-items:center}
+.f{display:inline-flex;gap:4px;align-items:baseline;border:1px solid;border-radius:4px;
+  padding:1px 6px;font:600 10px/1.7 inherit;white-space:nowrap;background:transparent}
+.f .v{font-variant-numeric:tabular-nums;font-weight:700}
+.f.tuyo{border-color:#5c4a1e;color:var(--tuyo)}
+.f.zona{border-color:#2b4a5e;color:var(--zona)}
+.f.visto{border-color:#264c37;color:var(--visto)}
+.f.manda.tuyo{background:var(--tuyo);color:#1a1408;border-color:var(--tuyo)}
+.f.manda.zona{background:var(--zona);color:#0d1a22;border-color:var(--zona)}
+.f.manda.visto{background:var(--visto);color:#0c1a12;border-color:var(--visto)}
+.f.no{opacity:.45}
+.leyenda{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:8px 11px;
+  background:#191510;border:1px solid var(--linea);border-radius:var(--r);margin-top:10px;
+  font-size:11px;color:var(--tinta2)}
+.cuenta-g{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.deQuien{font-size:10px;font-weight:700;letter-spacing:.4px;display:block;margin-top:1px}
+
+/* Barra segmentada por TIPO de daño */
+.seg{display:flex;height:7px;border-radius:3px;overflow:hidden;background:var(--linea);min-width:90px}
+.seg i{display:block;height:100%}
+.t-melee{background:#c9a227}.t-magic{background:#7f6bd6}.t-fire{background:#c9603a}
+.t-cold{background:#5b8fb9}.t-poison{background:#63b083}.t-disease{background:#8a7a4a}
+.t-ds{background:#a4553f}.t-dot{background:#b06fa0}.t-unresistable{background:#9aa0a6}
+.t-otro{background:#5a5248}
+
+/* «Lo que esta pelea no sabe» — SIEMPRE a la vista, nunca tras un clic */
+.noSabe{border:1px solid var(--linea);border-left:3px solid var(--alarma);border-radius:var(--r);
+  background:#1a1410;padding:9px 12px;margin-top:10px;font-size:12px;color:var(--tinta2)}
+.noSabe b{color:var(--tinta)}
+.noSabe .h{font:700 10px/1 inherit;letter-spacing:.5px;color:var(--alarma);display:block;margin-bottom:5px}
+
 .conmutador{display:flex;gap:6px;margin:0 0 6px}
 .conmutador button{background:var(--alto);border:1px solid var(--linea2);border-radius:var(--r);
   color:var(--tinta2);font:700 12px/1 inherit;padding:9px 16px;cursor:pointer}
-.conmutador button[aria-pressed=true]{background:var(--acento);border-color:var(--acento);color:#1a1408}
-.nota{background:#1a1610;border:1px solid var(--linea);border-left:3px solid var(--acento);
+.conmutador button[aria-pressed=true]{background:var(--tuyo);border-color:var(--tuyo);color:#1a1408}
+.nota{background:#1a1610;border:1px solid var(--linea);border-left:3px solid var(--tuyo);
   border-radius:var(--r);padding:11px 14px;margin:14px 0;color:var(--tinta2);font-size:12.5px}
 .nota b{color:var(--tinta)}
 .antes{border:1px dashed var(--linea2);border-radius:var(--r);padding:20px;background:#171310}
-.vacio{color:var(--tenue);text-align:center;padding:70px 0;font-style:italic}
+.vacio{color:var(--tenue);text-align:center;padding:60px 0;font-style:italic}
 .pie{color:var(--tenue);font-size:11.5px;margin-top:34px;border-top:1px solid var(--linea);padding-top:12px}
-.mini{color:var(--tenue);font-size:11px}
-</style>
-</head><body><div class="marco">
+</style></head><body><div class="marco">
 
 <h1>Escena</h1>
-<p class="mini">Prototipo B · la sección <b>densa</b>. Contenido real:
-<b>Clan Crushbone 4 (Refined)</b> · 23 combatientes · 185 s ·
-23.368 de daño.</p>
+<p class="mini">Prototipo v2 · la sección <b>densa</b> · contenido real:
+<b>Najena</b> · 15 combatientes · 493 s.</p>
 
 <div class="conmutador">
-  <button aria-pressed="true" onclick="document.getElementById('ea').hidden=false;document.getElementById('ed').hidden=true">ANTES</button>
-  <button aria-pressed="false" onclick="document.getElementById('ea').hidden=true;document.getElementById('ed').hidden=false">DESPUÉS</button>
+  <button aria-pressed="true" onclick="ea.hidden=false;ed.hidden=true">ANTES</button>
+  <button aria-pressed="false" onclick="ea.hidden=true;ed.hidden=false">DESPUÉS</button>
 </div>
 
 <div id="ea"><div class="antes">
-  <h2 style="font-size:19px">an orc thaumaturgist ×3, orc centurion ×5, orc legionnaire ×9, bonefire, lord Da…</h2>
-  <p class="mini">Clan Crushbone 4 (Refined) · 185s</p>
-  <table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:10px">
-    <tr style="color:#7d7263;text-align:left"><th>Combatiente</th><th>Daño</th><th>DPS</th><th>Recibido</th><th>Curado</th></tr>
-    <tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Campeon</td><td class="num">16.184</td>
-      <td class="num">87</td><td class="num">199</td>
-      <td class="num">917</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Lasantik</td><td class="num">7184</td>
-      <td class="num">39</td><td class="num">401</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc legionnaire</td><td class="num">182</td>
-      <td class="num">1</td><td class="num">6218</td>
-      <td class="num">57</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Marrowbane</td><td class="num">175</td>
-      <td class="num">1</td><td class="num">1339</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Emperor Crush</td><td class="num">76</td>
-      <td class="num">0</td><td class="num">1631</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Lord Darish</td><td class="num">56</td>
-      <td class="num">0</td><td class="num">1227</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">an orc thaumaturgist</td><td class="num">42</td>
-      <td class="num">0</td><td class="num">2560</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">an orc thaumaturgist pet</td><td class="num">25</td>
-      <td class="num">0</td><td class="num">200</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Bonefire</td><td class="num">16</td>
-      <td class="num">0</td><td class="num">2170</td>
-      <td class="num">828</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Ambassador D`Vinn</td><td class="num">11</td>
-      <td class="num">0</td><td class="num">1213</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc legionnaire pet</td><td class="num">9</td>
-      <td class="num">0</td><td class="num">162</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc oracle</td><td class="num">4</td>
-      <td class="num">0</td><td class="num">880</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Bonefire pet</td><td class="num">2</td>
-      <td class="num">0</td><td class="num">0</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc emissary</td><td class="num">1</td>
-      <td class="num">0</td><td class="num">737</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">royal guard pet</td><td class="num">1</td>
-      <td class="num">0</td><td class="num">319</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc taskmaster</td><td class="num">0</td>
-      <td class="num">0</td><td class="num">522</td>
-      <td class="num">20</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc centurion</td><td class="num">0</td>
-      <td class="num">0</td><td class="num">1545</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">royal guard</td><td class="num">0</td>
-      <td class="num">0</td><td class="num">856</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Ambassador D`Vinn pet</td><td class="num">0</td>
-      <td class="num">0</td><td class="num">244</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">Emperor Crush pet</td><td class="num">0</td>
-      <td class="num">0</td><td class="num">244</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc oracle pet</td><td class="num">0</td>
-      <td class="num">0</td><td class="num">144</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc scoutsman</td><td class="num">0</td>
-      <td class="num">0</td><td class="num">673</td>
-      <td class="num">0</td></tr><tr style="border-top:1px solid #2f2921">
-      <td style="padding:4px 0">orc slaver</td><td class="num">0</td>
-      <td class="num">0</td><td class="num">484</td>
-      <td class="num">0</td></tr>
+  <table style="width:100%;border-collapse:collapse;font-size:12px">
+    <tr style="color:#7d7263;text-align:left"><th>Combatiente</th><th>Daño</th><th>DPS</th><th>Recibido</th></tr>
+    <tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">Campeon</td>
+      <td class="num">5621</td><td class="num">11</td><td class="num">1391</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">a fire elemental</td>
+      <td class="num">2058</td><td class="num">4</td><td class="num">938</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">a magician</td>
+      <td class="num">1551</td><td class="num">3</td><td class="num">1669</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">a fire elemental</td>
+      <td class="num">879</td><td class="num">2</td><td class="num">1005</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">Gibaner</td>
+      <td class="num">705</td><td class="num">1</td><td class="num">199</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">a magician pet</td>
+      <td class="num">539</td><td class="num">1</td><td class="num">548</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">a large skeleton</td>
+      <td class="num">266</td><td class="num">1</td><td class="num">1788</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">a magician</td>
+      <td class="num">260</td><td class="num">1</td><td class="num">506</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">a mist elemental</td>
+      <td class="num">253</td><td class="num">1</td><td class="num">920</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">an ogre guard</td>
+      <td class="num">202</td><td class="num">0</td><td class="num">550</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">Skellos</td>
+      <td class="num">152</td><td class="num">0</td><td class="num">83</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">an ogre guard</td>
+      <td class="num">141</td><td class="num">0</td><td class="num">645</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">an earth elemental</td>
+      <td class="num">134</td><td class="num">0</td><td class="num">1768</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">a greater skeleton</td>
+      <td class="num">131</td><td class="num">0</td><td class="num">967</td></tr><tr style="border-top:1px solid #2f2921"><td style="padding:4px 0">Valeria</td>
+      <td class="num">27</td><td class="num">0</td><td class="num">0</td></tr>
   </table>
-  <p class="mini" style="margin-top:14px">23 filas seguidas, todas del mismo tamaño,
-  sin ordenar, sin filtrar, sin agrupar y sin poder plegar ninguna. Las mascotas
-  ocupan lo mismo que Campeón.</p>
+  <p class="mini" style="margin-top:12px">15 filas iguales, sin ordenar ni filtrar,
+  la barra sin tipos, y «lo que esta pelea no sabe» en un bloque aparte más abajo.</p>
 </div></div>
 
-<div id="ed" hidden data-panel-host>
+<div id="ed" hidden data-host>
   <div class="pest">
-    <button data-ir="comb" aria-selected="true">Combatientes <span class="cuenta" data-cuenta="#lista-comb">23</span></button>
-    <button data-ir="botin" aria-selected="false">Botín <span class="cuenta">12</span></button>
+    <button data-ir="comb" aria-selected="true">Combatientes <span class="mini" data-cuenta="#l-comb">15</span></button>
+    <button data-ir="botin" aria-selected="false">Botín <span class="mini">11</span></button>
     <button data-ir="linea" aria-selected="false">Línea de tiempo</button>
   </div>
   <div data-panel="comb">
+    <div class="noSabe"><span class="h">LO QUE ESTA PELEA NO SABE</span>
+  <div><b class="num">58</b> de daño <b>sin atribuir</b>: entró y no consta de quién.</div>
+  <div><b class="num">1703</b> en <b class="num">117</b> golpes de un <b>encantado soltado</b> — deducido, no medido.</div>
+  <div><b class="num">7</b> hechizos tuyos <b>resistidos</b>.</div>
+  <div class="mini" style="margin-top:4px">Las cifras de arriba no cuentan esto. Se dice aquí en vez de repartirlo.</div>
+</div>
     <div class="barra">
       <label class="buscar"><input placeholder="Buscar combatiente…"></label>
-      <select><option>Agrupar por: bando</option><option>Agrupar por: tipo</option>
-        <option>Ordenar por: daño</option><option>Ordenar por: dps</option>
-        <option>Ordenar por: recibido</option></select>
-      <div class="dens"><button data-d="baja" aria-pressed="false">CÓMODA</button>
-        <button data-d="alta" aria-pressed="true">DENSA</button></div>
+      <select><option>Ordenar por: daño</option><option>Ordenar por: dps</option><option>Ordenar por: recibido</option></select>
+      <div class="dens"><button data-d="baja" aria-pressed="false">CÓMODA</button><button data-d="alta" aria-pressed="true">DENSA</button></div>
     </div>
     <div class="pastillas">
-      <button class="pastilla" data-et="aliado" aria-pressed="true">tuyos <span class="n">2</span></button>
-      <button class="pastilla" data-et="enemigo" aria-pressed="true">enemigos <span class="n">21</span></button>
-      <button class="pastilla" data-et="mascota" aria-pressed="false">mascotas <span class="n">7</span></button>
+      <button class="pastilla" data-et="aliado" aria-pressed="true">tuyos</button>
+      <button class="pastilla" data-et="enemigo" aria-pressed="true">enemigos</button>
+      <button class="pastilla" data-et="mascota" aria-pressed="false">mascotas</button>
     </div>
-    <div class="filas" id="lista-comb"><details class="fila "
-    data-busca="campeon" data-et="aliado entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Campeon
-        
-        <span class="et tuyo">tuyo</span>
-        </span>
-      <span class="num" style="font-weight:700">87<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:100%"></i></span>
-      <span class="num mini">16.184</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">199</b> ·
-      curado <b class="num">917</b> ·
-      precisión <b class="num">82%</b> ·
-      críticos <b class="num">7</b> ·
-      mayor golpe <b class="num">673</b>
-      
+    <div class="leyenda">
+      <b style="color:var(--tinta)">Tipo de daño:</b>
+      <span><i class="t-magic" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px"></i> magic</span><span><i class="t-melee" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px"></i> melee</span><span><i class="t-fire" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px"></i> fire</span><span><i class="t-unresistable" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px"></i> unresistable</span><span><i class="t-cold" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px"></i> cold</span><span><i class="t-ds" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px"></i> ds</span><span><i class="t-dot" style="display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px"></i> dot</span>
+      <span class="mini">la barra de cada fila va partida por tipo</span>
     </div>
-  </details><details class="fila "
-    data-busca="lasantik" data-et="aliado entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Lasantik
-        
-        <span class="et tuyo">tuyo</span>
-        </span>
-      <span class="num" style="font-weight:700">39<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:44%"></i></span>
-      <span class="num mini">7184</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">401</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">100%</b> ·
-      críticos <b class="num">9</b> ·
-      mayor golpe <b class="num">234</b>
-      
+    <div class="filas" id="l-comb">
+      <div class="grupo">Najena · 493s <span class="n">15</span></div>
+      <details class="fila" data-busca="campeon"
+        data-et="aliado entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>Campeon </span>
+          <span class="num" style="font-weight:700">11<span class="mini"> dps</span></span>
+          <span class="seg" style="width:100%;min-width:60px"><i class="t-magic" style="width:49.4%" title="magic 2776"></i><i class="t-melee" style="width:38.3%" title="melee 2155"></i><i class="t-fire" style="width:5.2%" title="fire 293"></i><i class="t-unresistable" style="width:4.0%" title="unresistable 225"></i><i class="t-cold" style="width:3.1%" title="cold 172"></i></span>
+          <span class="num mini">5621</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">1391</b> · curado <b class="num">706</b> ·
+          precisión <b class="num">51%</b> · críticos <b class="num">17</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-magic" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> magic <span class="num">2776</span></span> <span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">2155</span></span> <span class="et gris"><i class="t-fire" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> fire <span class="num">293</span></span> <span class="et gris"><i class="t-unresistable" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> unresistable <span class="num">225</span></span> <span class="et gris"><i class="t-cold" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> cold <span class="num">172</span></span></div>
+        </div></details><details class="fila" data-busca="a fire elemental"
+        data-et="aliado entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>a fire elemental </span>
+          <span class="num" style="font-weight:700">4<span class="mini"> dps</span></span>
+          <span class="seg" style="width:37%;min-width:60px"><i class="t-melee" style="width:79.0%" title="melee 1625"></i><i class="t-magic" style="width:21.0%" title="magic 433"></i></span>
+          <span class="num mini">2058</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">938</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">100%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">1625</span></span> <span class="et gris"><i class="t-magic" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> magic <span class="num">433</span></span></div>
+        </div></details><details class="fila" data-busca="a magician"
+        data-et="enemigo entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>a magician <span class="et enem">enemigo</span></span>
+          <span class="num" style="font-weight:700">3<span class="mini"> dps</span></span>
+          <span class="seg" style="width:28%;min-width:60px"><i class="t-magic" style="width:59.7%" title="magic 926"></i><i class="t-melee" style="width:31.8%" title="melee 493"></i><i class="t-ds" style="width:7.7%" title="ds 120"></i><i class="t-fire" style="width:0.8%" title="fire 12"></i></span>
+          <span class="num mini">1551</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">1669</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">68%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-magic" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> magic <span class="num">926</span></span> <span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">493</span></span> <span class="et gris"><i class="t-ds" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> ds <span class="num">120</span></span> <span class="et gris"><i class="t-fire" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> fire <span class="num">12</span></span></div>
+        </div></details><details class="fila" data-busca="a fire elemental"
+        data-et="enemigo entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>a fire elemental <span class="et enem">enemigo</span></span>
+          <span class="num" style="font-weight:700">2<span class="mini"> dps</span></span>
+          <span class="seg" style="width:16%;min-width:60px"><i class="t-melee" style="width:42.2%" title="melee 371"></i><i class="t-magic" style="width:30.3%" title="magic 266"></i><i class="t-ds" style="width:22.8%" title="ds 200"></i><i class="t-cold" style="width:4.8%" title="cold 42"></i></span>
+          <span class="num mini">879</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">1005</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">73%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">371</span></span> <span class="et gris"><i class="t-magic" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> magic <span class="num">266</span></span> <span class="et gris"><i class="t-ds" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> ds <span class="num">200</span></span> <span class="et gris"><i class="t-cold" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> cold <span class="num">42</span></span></div>
+        </div></details><details class="fila" data-busca="gibaner"
+        data-et="aliado entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>Gibaner </span>
+          <span class="num" style="font-weight:700">1<span class="mini"> dps</span></span>
+          <span class="seg" style="width:13%;min-width:60px"><i class="t-melee" style="width:79.1%" title="melee 558"></i><i class="t-cold" style="width:20.9%" title="cold 147"></i></span>
+          <span class="num mini">705</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">199</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">55%</b> · críticos <b class="num">1</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">558</span></span> <span class="et gris"><i class="t-cold" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> cold <span class="num">147</span></span></div>
+        </div></details><details class="fila" data-busca="a magician pet"
+        data-et="enemigo mascota">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>a magician pet <span class="et masc">mascota</span><span class="et enem">enemigo</span></span>
+          <span class="num" style="font-weight:700">1<span class="mini"> dps</span></span>
+          <span class="seg" style="width:10%;min-width:60px"><i class="t-melee" style="width:70.7%" title="melee 381"></i><i class="t-dot" style="width:21.5%" title="dot 116"></i><i class="t-ds" style="width:7.8%" title="ds 42"></i></span>
+          <span class="num mini">539</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">548</b> · curado <b class="num">65</b> ·
+          precisión <b class="num">66%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">381</span></span> <span class="et gris"><i class="t-dot" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> dot <span class="num">116</span></span> <span class="et gris"><i class="t-ds" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> ds <span class="num">42</span></span></div>
+        </div></details><details class="fila" data-busca="a large skeleton"
+        data-et="enemigo entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>a large skeleton <span class="et enem">enemigo</span></span>
+          <span class="num" style="font-weight:700">1<span class="mini"> dps</span></span>
+          <span class="seg" style="width:5%;min-width:60px"><i class="t-melee" style="width:100.0%" title="melee 266"></i></span>
+          <span class="num mini">266</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">1788</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">55%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">266</span></span></div>
+        </div></details><details class="fila" data-busca="a magician"
+        data-et="aliado entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>a magician </span>
+          <span class="num" style="font-weight:700">1<span class="mini"> dps</span></span>
+          <span class="seg" style="width:5%;min-width:60px"><i class="t-melee" style="width:42.3%" title="melee 110"></i><i class="t-magic" style="width:32.3%" title="magic 84"></i><i class="t-ds" style="width:25.4%" title="ds 66"></i></span>
+          <span class="num mini">260</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">506</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">100%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">110</span></span> <span class="et gris"><i class="t-magic" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> magic <span class="num">84</span></span> <span class="et gris"><i class="t-ds" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> ds <span class="num">66</span></span></div>
+        </div></details><details class="fila" data-busca="a mist elemental"
+        data-et="enemigo entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>a mist elemental <span class="et enem">enemigo</span></span>
+          <span class="num" style="font-weight:700">1<span class="mini"> dps</span></span>
+          <span class="seg" style="width:5%;min-width:60px"><i class="t-melee" style="width:73.9%" title="melee 187"></i><i class="t-ds" style="width:26.1%" title="ds 66"></i></span>
+          <span class="num mini">253</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">920</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">57%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">187</span></span> <span class="et gris"><i class="t-ds" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> ds <span class="num">66</span></span></div>
+        </div></details><details class="fila" data-busca="an ogre guard"
+        data-et="aliado entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>an ogre guard </span>
+          <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
+          <span class="seg" style="width:4%;min-width:60px"><i class="t-ds" style="width:56.4%" title="ds 114"></i><i class="t-melee" style="width:43.6%" title="melee 88"></i></span>
+          <span class="num mini">202</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">550</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">100%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-ds" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> ds <span class="num">114</span></span> <span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">88</span></span></div>
+        </div></details><details class="fila" data-busca="skellos"
+        data-et="aliado entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>Skellos </span>
+          <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
+          <span class="seg" style="width:4%;min-width:60px"><i class="t-dot" style="width:86.8%" title="dot 132"></i><i class="t-magic" style="width:13.2%" title="magic 20"></i></span>
+          <span class="num mini">152</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">83</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">0%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-dot" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> dot <span class="num">132</span></span> <span class="et gris"><i class="t-magic" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> magic <span class="num">20</span></span></div>
+        </div></details><details class="fila" data-busca="an ogre guard"
+        data-et="enemigo entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>an ogre guard <span class="et enem">enemigo</span></span>
+          <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
+          <span class="seg" style="width:4%;min-width:60px"><i class="t-melee" style="width:100.0%" title="melee 141"></i></span>
+          <span class="num mini">141</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">645</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">48%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">141</span></span></div>
+        </div></details><details class="fila" data-busca="an earth elemental"
+        data-et="enemigo entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>an earth elemental <span class="et enem">enemigo</span></span>
+          <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
+          <span class="seg" style="width:4%;min-width:60px"><i class="t-melee" style="width:77.6%" title="melee 104"></i><i class="t-ds" style="width:22.4%" title="ds 30"></i></span>
+          <span class="num mini">134</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">1768</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">47%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">104</span></span> <span class="et gris"><i class="t-ds" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> ds <span class="num">30</span></span></div>
+        </div></details><details class="fila" data-busca="a greater skeleton"
+        data-et="enemigo entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>a greater skeleton <span class="et enem">enemigo</span></span>
+          <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
+          <span class="seg" style="width:4%;min-width:60px"><i class="t-melee" style="width:100.0%" title="melee 131"></i></span>
+          <span class="num mini">131</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">967</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">69%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-melee" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> melee <span class="num">131</span></span></div>
+        </div></details><details class="fila" data-busca="valeria"
+        data-et="aliado entero">
+        <summary style="grid-template-columns:14px 1fr auto 130px auto">
+          <span class="giro">▶</span>
+          <span>Valeria </span>
+          <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
+          <span class="seg" style="width:4%;min-width:60px"><i class="t-dot" style="width:100.0%" title="dot 27"></i></span>
+          <span class="num mini">27</span>
+        </summary>
+        <div class="cuerpo">
+          recibido <b class="num">0</b> · curado <b class="num">0</b> ·
+          precisión <b class="num">0%</b> · críticos <b class="num">0</b>
+          <div style="margin-top:5px"><span class="et gris"><i class="t-dot" style="display:inline-block;width:7px;height:7px;border-radius:2px"></i> dot <span class="num">27</span></span></div>
+        </div></details>
     </div>
-  </details><details class="fila ene"
-    data-busca="orc legionnaire" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc legionnaire
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 9×</span></span>
-      <span class="num" style="font-weight:700">1<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:1%"></i></span>
-      <span class="num mini">182</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">6218</b> ·
-      curado <b class="num">57</b> ·
-      precisión <b class="num">13%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">10</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="marrowbane" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Marrowbane
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">1<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:1%"></i></span>
-      <span class="num mini">175</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">1339</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">36%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">25</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="emperor crush" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Emperor Crush
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">76</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">1631</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">43%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">20</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="lord darish" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Lord Darish
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">56</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">1227</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">8</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="an orc thaumaturgist" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>an orc thaumaturgist
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 3×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">42</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">2560</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">40%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">8</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="an orc thaumaturgist pet" data-et="enemigo mascota">
-    <summary>
-      <span class="giro">▶</span>
-      <span>an orc thaumaturgist pet
-        <span class="et masc">mascota</span>
-        <span class="et enem">enemigo</span>
-        </span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">25</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">200</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">13%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">8</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="bonefire" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Bonefire
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">16</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">2170</b> ·
-      curado <b class="num">828</b> ·
-      precisión <b class="num">33%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">16</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="ambassador d`vinn" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Ambassador D`Vinn
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">11</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">1213</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">17%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">9</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="orc legionnaire pet" data-et="enemigo mascota">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc legionnaire pet
-        <span class="et masc">mascota</span>
-        <span class="et enem">enemigo</span>
-        </span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">9</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">162</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">22%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">7</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="orc oracle" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc oracle
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">4</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">880</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">50%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">4</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="bonefire pet" data-et="enemigo mascota">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Bonefire pet
-        <span class="et masc">mascota</span>
-        <span class="et enem">enemigo</span>
-        </span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">2</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">0</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">33%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">1</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="orc emissary" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc emissary
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">1</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">737</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">25%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">1</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="royal guard pet" data-et="enemigo mascota">
-    <summary>
-      <span class="giro">▶</span>
-      <span>royal guard pet
-        <span class="et masc">mascota</span>
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">1</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">319</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">33%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">1</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="orc taskmaster" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc taskmaster
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">0</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">522</b> ·
-      curado <b class="num">20</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">0</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="orc centurion" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc centurion
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 5×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">0</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">1545</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">0</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="royal guard" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>royal guard
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">0</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">856</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">0</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="ambassador d`vinn pet" data-et="enemigo mascota">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Ambassador D`Vinn pet
-        <span class="et masc">mascota</span>
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">0</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">244</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">0</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="emperor crush pet" data-et="enemigo mascota">
-    <summary>
-      <span class="giro">▶</span>
-      <span>Emperor Crush pet
-        <span class="et masc">mascota</span>
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">0</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">244</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">0</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="orc oracle pet" data-et="enemigo mascota">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc oracle pet
-        <span class="et masc">mascota</span>
-        <span class="et enem">enemigo</span>
-        </span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">0</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">144</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">0</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="orc scoutsman" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc scoutsman
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">0</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">673</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">0</b>
-      
-    </div>
-  </details><details class="fila ene"
-    data-busca="orc slaver" data-et="enemigo entero">
-    <summary>
-      <span class="giro">▶</span>
-      <span>orc slaver
-        
-        <span class="et enem">enemigo</span>
-        <span class="et gris">murió 1×</span></span>
-      <span class="num" style="font-weight:700">0<span class="mini"> dps</span></span>
-      <span class="barrita" style="width:110px"><i style="width:0%"></i></span>
-      <span class="num mini">0</span>
-    </summary>
-    <div class="cuerpo">
-      recibido <b class="num">484</b> ·
-      curado <b class="num">0</b> ·
-      precisión <b class="num">0%</b> ·
-      críticos <b class="num">0</b> ·
-      mayor golpe <b class="num">0</b>
-      
-    </div>
-  </details></div>
   </div>
   <div data-panel="botin" hidden>
-    <div class="barra"><label class="buscar"><input placeholder="Buscar objeto…"></label>
-      <select><option>Agrupar por: de quién cayó</option><option>Sin agrupar</option></select></div>
-    <div class="filas"><details class="fila" data-busca="cloth gloves +4">
-      <summary><span class="giro">▶</span><span>Cloth Gloves +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">orc centurion</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 1 gold, 8 silver and 6 copper. · segundo 18 de la pelea</div>
-    </details><details class="fila" data-busca="legionnaire's bracer +4">
-      <summary><span class="giro">▶</span><span>Legionnaire's Bracer +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">orc legionnaire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 2 gold, 2 silver and 9 copper. · segundo 20 de la pelea</div>
-    </details><details class="fila" data-busca="crushbone shoulderpads +4">
-      <summary><span class="giro">▶</span><span>Crushbone Shoulderpads +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">orc legionnaire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 1 gold and 7 copper. · segundo 22 de la pelea</div>
-    </details><details class="fila" data-busca="legionnaire's bracer +4">
-      <summary><span class="giro">▶</span><span>Legionnaire's Bracer +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">orc legionnaire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 2 gold, 2 silver and 9 copper. · segundo 30 de la pelea</div>
-    </details><details class="fila" data-busca="bronze long sword +4">
-      <summary><span class="giro">▶</span><span>Bronze Long Sword +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">orc legionnaire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 2 platinum, 2 gold, 8 silver and 6 copper. · segundo 33 de la pelea</div>
-    </details><details class="fila" data-busca="headsplitter +4">
-      <summary><span class="giro">▶</span><span>Headsplitter +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">Bonefire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 12 platinum, 8 gold, 5 silver and 7 copper. · segundo 46 de la pelea</div>
-    </details><details class="fila" data-busca="master crushbone cell key">
-      <summary><span class="giro">▶</span><span>Master Crushbone Cell Key
-        <span class="et ok">vendido</span></span>
-        <span class="mini">Bonefire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por free. · segundo 46 de la pelea</div>
-    </details><details class="fila" data-busca="legionnaire's bracer +4">
-      <summary><span class="giro">▶</span><span>Legionnaire's Bracer +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">orc legionnaire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 2 gold, 2 silver and 9 copper. · segundo 47 de la pelea</div>
-    </details><details class="fila" data-busca="raw-hide tunic +4">
-      <summary><span class="giro">▶</span><span>Raw-Hide Tunic +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">orc legionnaire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 9 gold, 2 silver and 9 copper. · segundo 49 de la pelea</div>
-    </details><details class="fila" data-busca="rusty long sword +4">
-      <summary><span class="giro">▶</span><span>Rusty Long Sword +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">orc legionnaire</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 1 gold, 4 silver and 3 copper. · segundo 54 de la pelea</div>
-    </details><details class="fila" data-busca="crushbone battle plans">
-      <summary><span class="giro">▶</span><span>Crushbone Battle Plans
-        <span class="et ok">vendido</span></span>
-        <span class="mini">Lord Darish</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por free. · segundo 70 de la pelea</div>
-    </details><details class="fila" data-busca="torn elvish tapestry +4">
-      <summary><span class="giro">▶</span><span>Torn Elvish Tapestry +4
-        <span class="et ok">vendido</span></span>
-        <span class="mini">Lord Darish</span><span></span><span class="num mini">×1</span></summary>
-      <div class="cuerpo">Vendido por 7 platinum and 5 gold. · segundo 70 de la pelea</div>
-    </details></div>
+    <div class="barra"><label class="buscar"><input placeholder="Buscar objeto…"></label></div>
+    <div class="filas"><details class="fila" data-busca="mote of infinitesimal potential">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Mote of Infinitesimal Potential</span><span class="mini">a large skeleton</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Recogido · segundo 30</div></details><details class="fila" data-busca="mote of infinitesimal potential">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Mote of Infinitesimal Potential</span><span class="mini">a large skeleton</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Recogido · segundo 62</div></details><details class="fila" data-busca="rusty long sword">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Rusty Long Sword</span><span class="mini">an ogre guard</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Vendido por 1 gold, 4 silver and 3 copper. · segundo 187</div></details><details class="fila" data-busca="rusty short sword +1">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Rusty Short Sword +1</span><span class="mini">a greater skeleton</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Vendido por 2 silver and 1 copper. · segundo 209</div></details><details class="fila" data-busca="small piece of ore">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Small Piece of Ore</span><span class="mini">an earth elemental</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Vendido por 1 silver and 6 copper. · segundo 297</div></details><details class="fila" data-busca="small piece of ore">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Small Piece of Ore</span><span class="mini">an earth elemental</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Vendido por 1 silver and 6 copper. · segundo 316</div></details><details class="fila" data-busca="swirling mist">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Swirling Mist</span><span class="mini">a mist elemental</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Recogido · segundo 335</div></details><details class="fila" data-busca="jasper">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Jasper</span><span class="mini">a fire elemental</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Vendido por 5 gold, 3 silver and 6 copper. · segundo 361</div></details><details class="fila" data-busca="swirling mist">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Swirling Mist</span><span class="mini">a mist elemental</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Recogido · segundo 413</div></details><details class="fila" data-busca="mote of infinitesimal potential">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Mote of Infinitesimal Potential</span><span class="mini">a mist elemental</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Recogido · segundo 413</div></details><details class="fila" data-busca="cloth wristband +1">
+      <summary style="grid-template-columns:14px 1fr auto auto"><span class="giro">▶</span>
+        <span>Cloth Wristband +1</span><span class="mini">a magician</span>
+        <span class="num mini">×1</span></summary>
+      <div class="cuerpo">Vendido por 1 gold, 2 silver and 9 copper. · segundo 492</div></details></div>
   </div>
-  <div data-panel="linea" hidden><div class="vacio">La línea de tiempo va aquí, en su pestaña,
-    en vez de empujar la tabla hacia abajo.</div></div>
+  <div data-panel="linea" hidden><div class="vacio">La línea de tiempo, en su pestaña.</div></div>
 </div>
 
-<div class="nota"><b>Qué cambia, en corto.</b> Las tres vistas de la pelea pasan a
-<b>pestañas dentro de la sección</b> en vez de tres entradas de la barra lateral ·
-buscador siempre visible · ordenar y agrupar por lo que quieras · las mascotas
-<b>apagadas por defecto</b> con una pastilla para encenderlas ·
-23 filas de una línea, y se abre la que interesa ·
-etiquetas compactas —<span class="et masc">mascota</span>
-<span class="et enem">enemigo</span>— en vez de renglones de texto · densidad a elegir.</div>
+<div class="nota"><b>Lo que se corrigió.</b> «Lo que esta pelea no sabe» va
+<b>arriba y siempre a la vista</b> —58 sin atribuir, 1.703 de un encantado soltado—,
+no en un bloque que se pierde al fondo. Y la barra de cada fila va
+<b>partida por tipo de daño</b>, con su leyenda una sola vez. Lo demás se mantiene:
+mascotas apagadas por defecto, filas de una línea, buscador y densidad.</div>
 
-<p class="pie">Prototipo de diseño · 20 de agosto de 2026 · <b>las cifras son REALES</b>, sacadas de
-<code>C:/Users/ferna/AppData/Roaming/eql-parse/fights.ndjson</code> el 2026-08-20T12:42. No es fuente de datos y no se empaqueta.
-Generado por <code>gen-prototipos.mjs</code>: se vuelve a generar, no se edita a mano.</p>
+<p class="pie">Prototipo de diseño · 20 de agosto de 2026 · <b>cifras REALES</b>, de
+<code>C:/Users/ferna/AppData/Roaming/eql-parse/fights.ndjson</code> el 2026-08-20T13:22.
+Se GENERAN con <code>gen-prototipos.mjs</code>; no se editan a mano. No es fuente de datos.</p>
 </div><script>
-// Las piezas del kit, en crudo: pestañas, pastillas, densidad y buscador.
-// Aquí funcionan para poder TOCARLAS; en la aplicación serían un módulo.
 document.addEventListener('click', (e) => {
   const p = e.target.closest('.pest button');
   if (p) {
     for (const b of p.parentElement.children) b.setAttribute('aria-selected', b === p);
-    const caja = p.closest('[data-panel-host]');
-    for (const s of caja.querySelectorAll('[data-panel]')) {
-      s.hidden = s.dataset.panel !== p.dataset.ir;
-    }
+    const caja = p.closest('[data-host]');
+    for (const s of caja.querySelectorAll('[data-panel]')) s.hidden = s.dataset.panel !== p.dataset.ir;
   }
   const t = e.target.closest('.pastilla, .dens button, .conmutador button');
   if (t) {
-    const grupo = t.closest('.dens, .conmutador');
-    if (grupo) for (const b of grupo.children) b.setAttribute('aria-pressed', b === t);
+    const g = t.closest('.dens, .conmutador');
+    if (g) for (const b of g.children) b.setAttribute('aria-pressed', b === t);
     else t.setAttribute('aria-pressed', t.getAttribute('aria-pressed') !== 'true');
-    aplica(t.closest('[data-panel-host]') || document);
+    aplica(t.closest('[data-host]') || document);
   }
 });
 document.addEventListener('input', (e) => {
-  if (e.target.matches('.buscar input, select')) aplica(e.target.closest('[data-panel-host]') || document);
+  if (e.target.matches('.buscar input, select')) aplica(e.target.closest('[data-host]') || document);
 });
 function aplica(raiz) {
-  const q = (raiz.querySelector('.buscar input')?.value || '').toLowerCase().trim();
-  const apagadas = [...raiz.querySelectorAll('.pastilla[aria-pressed=false]')].map((b) => b.dataset.et);
-  const compacta = raiz.querySelector('.dens button[aria-pressed=true]')?.dataset.d === 'alta';
-  for (const lista of raiz.querySelectorAll('.filas')) lista.classList.toggle('compacta', !!compacta);
-  for (const f of raiz.querySelectorAll('.fila')) {
-    const texto = f.dataset.busca || '';
+  const vista = raiz.querySelector('[data-panel]:not([hidden])') || raiz;
+  const q = (vista.querySelector('.buscar input')?.value || '').toLowerCase().trim();
+  const off = [...vista.querySelectorAll('.pastilla[aria-pressed=false]')].map((b) => b.dataset.et);
+  const compacta = vista.querySelector('.dens button[aria-pressed=true]')?.dataset.d === 'alta';
+  for (const l of vista.querySelectorAll('.filas')) l.classList.toggle('compacta', !!compacta);
+  for (const f of vista.querySelectorAll('.fila')) {
     const ets = (f.dataset.et || '').split(' ').filter(Boolean);
-    const fuera = ets.some((x) => apagadas.includes(x));
-    f.hidden = fuera || (q && !texto.includes(q));
+    f.hidden = ets.some((x) => off.includes(x)) || (q && !(f.dataset.busca || '').includes(q));
   }
-  for (const c of raiz.querySelectorAll('[data-cuenta]')) {
-    const lista = raiz.querySelector(c.dataset.cuenta);
-    if (lista) c.textContent = [...lista.querySelectorAll('.fila')].filter((f) => !f.hidden).length;
+  // Un grupo sin filas visibles se esconde entero: una cabecera sola es ruido.
+  for (const g of vista.querySelectorAll('.grupo')) {
+    let n = 0;
+    for (let s = g.nextElementSibling; s && s.classList.contains('fila'); s = s.nextElementSibling) {
+      if (!s.hidden) n++;
+    }
+    g.hidden = n === 0;
+    const c = g.querySelector('.n'); if (c) c.textContent = n;
+  }
+  for (const c of vista.querySelectorAll('[data-cuenta]')) {
+    const l = vista.querySelector(c.dataset.cuenta);
+    if (l) c.textContent = [...l.querySelectorAll('.fila')].filter((f) => !f.hidden).length;
   }
 }
-document.addEventListener('DOMContentLoaded', () => aplica(document));
+addEventListener('DOMContentLoaded', () => aplica(document));
 </script></body></html>
