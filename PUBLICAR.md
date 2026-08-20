@@ -125,13 +125,51 @@ Sale en `dist/`. **Instálalo y ábrelo antes de seguir.**
 
 Que el árbol estuviera limpio **no demuestra qué se empaquetó**. Lo que lo
 demuestra es construir desde el commit etiquetado, aislado de tu copia de
-trabajo:
+trabajo.
 
-```
-git worktree add --detach ../eql-build <commit>
+> **LA CARPETA SE CREA Y SE RETIRA EN ESTE MISMO PASO. No son dos.**
+>
+> Estaba escrito como «al terminar, `git worktree remove`» al final del
+> párrafo, y **no se hizo ni una sola vez**: el 20/08/2026 quedaban en `D:`
+> tres carpetas de construcción de versiones ya publicadas —`eql-build-1.16.0`,
+> `eql-build-1161`, `eql-build-2547b99`— ocupando **2 GB** y mezcladas con las
+> carpetas de juegos del usuario.
+>
+> No es desorden: una carpeta de construcción vieja **se parece a la copia de
+> trabajo**, tiene el mismo aspecto y un `package.json` con una versión
+> plausible dentro. La siguiente persona que entre ahí a mirar algo estará
+> mirando código de hace tres versiones sin saberlo.
+
+Un paso, con su retirada dentro:
+
+```sh
+# 1. crear, siempre con la VERSIÓN en el nombre para que se sepa de qué es
+git worktree add --detach ../eql-build-<versión> <commit>
+
+# 2. construir
+cd ../eql-build-<versión> && npm ci && npm run dist
+
+# 3. comprobar el contenido (el apartado de abajo) e instalar
+
+# 4. RETIRAR — en cuanto el instalador esté subido y comprobado
+cd -
+git worktree remove --force ../eql-build-<versión>
+git worktree list        # tiene que quedar sólo tu copia de trabajo
 ```
 
-Y ahí `npm ci && npm run dist`. Al terminar, `git worktree remove`.
+**Antes de retirar, la comprobación que hace que retirar sea seguro:** que el
+commit siga vivo sin la carpeta. Una carpeta de trabajo mantiene vivo su commit;
+si ese commit no está en `main` ni etiquetado, al quitarla queda colgando y un
+`git gc` se lo lleva — y entonces lo «regenerable» deja de serlo.
+
+```sh
+git merge-base --is-ancestor <commit> main && echo vivo
+```
+
+**Y no se retira antes de tiempo:** el instalador vive dentro de esa carpeta
+hasta que está subido a la release. El orden es construir → comprobar → subir →
+retirar. Mientras la release esté en prelanzamiento y sin instalar, la carpeta
+se queda.
 
 #### COMPRUEBA QUE LO EMPAQUETADO ES LO QUE CREES, por hash y por contenido
 

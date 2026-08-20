@@ -30,7 +30,8 @@
     "web:peso": "node bin/web-peso.js",
     "imposibles": "node bin/imposibles.js",
     "reproductor": "node bin/reproductor.js",
-    "estado": "node bin/estado.js"
+    "estado": "node bin/estado.js",
+    "obras": "node bin/obras.js"
   },
   "build": {
     "appId": "dev.miguelangelfernandez.eqlparse",
