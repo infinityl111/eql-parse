@@ -1923,7 +1923,22 @@ export class Engine extends EventEmitter {
     for (const [k, peleas] of porClave) {
       const muertes = peleas.reduce((n, p) => n + p.veces, 0);
       // n peleas con muerte suya dejan n−1 huecos entre peleas. Nunca negativo.
-      out[k] = { muertes, observaciones: Math.max(0, peleas.length - 1) };
+      const orden = peleas.slice().sort((x, y) => x.atMs - y.atMs);
+      const intervalos = [];
+      for (let i = 1; i < orden.length; i++) {
+        intervalos.push(Math.round((orden[i].atMs - orden[i - 1].atMs) / 1000));
+      }
+      /**
+       * EL MÍNIMO, y sólo para CONTRASTAR con lo que escribió Campeón — nunca
+       * para enseñarlo. `NUESTRO_NO_SALE` sigue en pie: el criterio que produce
+       * este número es indistinguible del azar, así que no sale a pantalla.
+       * Lo único que se hace con él es decir SI discrepa de lo suyo.
+       */
+      out[k] = {
+        muertes,
+        observaciones: intervalos.length,
+        minimo: intervalos.length ? Math.min(...intervalos) : null,
+      };
     }
     return out;
   }

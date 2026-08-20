@@ -271,6 +271,18 @@ export const PERIODOS_SOSPECHA = 3;
  *   - wiki, wikiPagina          segundos y la URL de donde salió
  *   - medido/heredado + margen  lo nuestro, que hoy no sale
  */
+/**
+ * CUÁNTAS OBSERVACIONES HACEN FALTA PARA DECIR «NO COINCIDE».
+ *
+ * Con una no se dice nada —un intervalo suelto no es una medida— y con dos
+ * tampoco: dos puntos son dos puntos. Tres es el suelo mínimo por debajo del
+ * cual afirmar una discrepancia sería afirmar ruido.
+ *
+ * Y no se dice CUÁNTO discrepa, ni cuál es lo nuestro: `NUESTRO_NO_SALE` sigue
+ * en pie y decir la diferencia revelaría nuestro número por resta.
+ */
+export const MIN_OBS_DISCREPA = 3;
+
 export function valorDe({
   manual = null, manualMargen = null,
   wiki = null, wikiPagina = null,

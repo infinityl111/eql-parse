@@ -4,7 +4,7 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets, ensureIdentidad } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
-import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION, enemigosDeLaPelea } from '../src/cronos.js';
+import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION, enemigosDeLaPelea, MIN_OBS_DISCREPA } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
 import { parseZone, labelDiff } from '../src/zones.js';
@@ -5899,7 +5899,21 @@ async function renderCronos(snap, cajaSec) {
        * ver y sigue reiniciándose con las muertes que vengan después.
        */
       ultimaMuerte: Math.max(muertes[claveCrono(c)] ?? 0, c.desde ?? 0) || null,
-      medido: c.medido ?? null, heredado: c.heredado ?? null,
+      /**
+       * LO NUESTRO ENTRA AQUI, y solo para CONTRASTAR.
+       *
+       * `valorDe` nunca deja que `medido` mande el numero —`manda` es manual o
+       * wiki, jamas lo nuestro— asi que enchufarlo no lo saca a pantalla. Lo
+       * unico que habilita es la comparacion, que llevaba escrita desde
+       * siempre y sin entrada: al retirar `medido` como concepto se quedo
+       * calculando contra `null` para siempre y nadie lo comprobo.
+       *
+       * Con menos de `MIN_OBS_DISCREPA` no se pasa: afirmar que algo no
+       * coincide con dos observaciones seria afirmar ruido.
+       */
+      medido: (obs[claveCrono(c)]?.observaciones ?? 0) >= MIN_OBS_DISCREPA
+        ? (obs[claveCrono(c)]?.minimo ?? null) : null,
+      heredado: null,
       // La wiki se consulta AL PINTAR y no se guarda con el crono: la tabla se
       // corrige con una versión nueva, y un valor congelado en la configuración
       // seguiría diciendo lo viejo sin que nadie lo supiera.
@@ -6003,7 +6017,7 @@ async function renderCronos(snap, cajaSec) {
     // Y si discrepan, se dice. En segundos y sin decir quién acierta.
     const dis = [
       v.discrepa != null && v.fuente === 'manual' ? t('cro.discrepa', {
-        tuyo: cronoRestante(v.segundos), nuestro: cronoRestante(v.otro.segundos), dif: cronoRestante(v.discrepa),
+        tuyo: cronoRestante(v.segundos), n: obs[k]?.observaciones ?? 0,
       }) : null,
       v.discrepaWiki != null ? t('cro.discrepaWiki', {
         wiki: cronoRestante(v.fuentes?.find((f) => f.clave === 'wiki')?.valor?.segundos),

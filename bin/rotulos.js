@@ -71,6 +71,18 @@ pelea(48 * 3600, ['vencido'], [{ name: 'vencido', t: 5 }]);
 pelea(2 * 3600, ['variosDemostrado', 'variosDemostrado'],
   [{ name: 'variosDemostrado', t: 5 }, { name: 'variosDemostrado', t: 40 }]);
 for (const h of [20, 16, 12, 8]) pelea(h * 3600, ['conObs'], [{ name: 'conObs', t: 5 }]);
+/**
+ * Y UNA MUERTE EN UNA ZONA SIN TIEMPO DECLARADO, para el caso «murió y no
+ * sabemos su tiempo por ninguna fuente». `The Plane of Sky` no lo declara —lo
+ * dice `wiki-zonas.js`— y sin este caso la rama de `cro.aunNo` no se toca
+ * NUNCA: la sonda lo daba por muerto sin haberlo ejercitado.
+ */
+store.append({
+  zone: 'The Plane of Sky', zoneBase: 'The Plane of Sky', diff: null, diffTag: null,
+  duration: 60, total: 500, start: AHORA - 5400,
+  kills: ['sinTiempoDeZona'], killTimes: [{ name: 'sinTiempoDeZona', t: 5 }],
+  rows: [{ name: 'Campeon', side: 'ally' }, { name: 'sinTiempoDeZona', side: 'enemy' }],
+}, (AHORA - 5400) * 1000);
 
 const CRONOS = [
   { nombre: 'contando', base: BASE, diff: 2, mode: null },
@@ -80,7 +92,16 @@ const CRONOS = [
   { nombre: 'quizaVarios', base: BASE, diff: 2, mode: null, aviso: 'probablemente-varios', muertes: 14 },
   { nombre: 'conObs', base: BASE, diff: 2, mode: null },
   { nombre: 'conManual', base: BASE, diff: 2, mode: null, manual: 900 },
+  /**
+   * DISCREPANCIA: tiempo escrito a mano que NO coincide con lo observado, y con
+   * observaciones de sobra para poder afirmarlo. `conObs` tiene cuatro peleas
+   * —tres intervalos, el suelo de `MIN_OBS_DISCREPA`— asi que este crono sobre
+   * la misma clave puede decir que no cuadra.
+   */
+  { nombre: 'conObs', base: BASE, diff: 2, mode: 'discrepante', manual: 60 },
   { nombre: 'sinZona', base: null, diff: null, mode: null },
+  // Murió, y ni la wiki ni él dan tiempo: es la rama de `cro.aunNo`.
+  { nombre: 'sinTiempoDeZona', base: 'The Plane of Sky', diff: null, mode: null, muertes: 1 },
 ];
 
 /** La configuración se COPIA de la real: escrita de cero, sale el asistente. */
