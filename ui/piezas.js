@@ -57,9 +57,22 @@ export function pestañas({ items = [], activa = null } = {}) {
 
 /* ── PIEZA 2 · BARRA DE CONTROL ───────────────────────────────────────────
  * Buscador SIEMPRE visible, agrupación elegida por quien mira, y densidad. */
-export function barraControl({ buscarPh = null, agrupar = [], densidad = 'baja' } = {}) {
-  const sel = agrupar.length ? `<select class="pz-agrupar">${agrupar
-    .map((o) => `<option value="${esc(o.id)}">${esc(o.rotulo)}</option>`).join('')}</select>` : '';
+export function barraControl({
+  buscarPh = null, agrupar = [], agruparPor = null, densidad = 'baja',
+} = {}) {
+  /**
+   * LA ELEGIDA VIAJA EN EL HTML, no en el navegador.
+   *
+   * `pintaEstable` reconstruye desde el modelo, asi que un `<select>` sin su
+   * `selected` puesto vuelve a la primera opcion en cada reconstruccion. Es lo
+   * mismo que le pasaba a la pestana viva y a las filas desplegadas.
+   *
+   * Y un desplegable con UNA opcion no se pinta: un control que no puede
+   * cambiar nada es peor que no tenerlo, porque promete que si.
+   */
+  const sel = agrupar.length > 1 ? `<select class="pz-agrupar">${agrupar
+    .map((o) => `<option value="${esc(o.id)}"${
+      o.id === agruparPor ? ' selected' : ''}>${esc(o.rotulo)}</option>`).join('')}</select>` : '';
   return `<div class="pz-barra">
     <label class="pz-buscar"><input type="search" placeholder="${esc(buscarPh ?? t('pz.buscarPh'))}"></label>
     ${sel}

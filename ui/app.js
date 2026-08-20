@@ -5997,6 +5997,9 @@ async function renderCronos(snap, cajaSec) {
     // Y qué filas dejó desplegadas, por la misma razón y con más motivo: el
     // campo de poner tiempo vive dentro de una.
     abiertas: desplegadas(host),
+    // Agrupar SÍ es estructura y no se puede aplicar sobre el DOM ya pintado:
+    // vuelve al modelo y la sección se reconstruye agrupada de otra manera.
+    agruparPor: host.querySelector('.pz-agrupar')?.value || 'zona',
     leyendaAbierta: state.cfg?.croLeyenda === true,
     fichas: orden.map(({ crono: c, estado: st }) => ({
       crono: {

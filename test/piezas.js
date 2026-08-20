@@ -65,8 +65,15 @@ console.log('\nlas cinco piezas construyen lo que dicen');
   ok(/aria-selected="true"[^>]*>B|data-ir="b" aria-selected="true"/.test(p), 'las pestañas marcan la activa');
   ok(P.pestañas({ items: [] }) === '', 'y sin elementos no pintan nada');
 
-  const b = P.barraControl({ agrupar: [{ id: 'z', rotulo: 'Z' }] });
-  ok(b.includes('type="search"') && b.includes('<select'), 'la barra trae buscador y agrupación');
+  const b = P.barraControl({
+    agrupar: [{ id: 'z', rotulo: 'Z' }, { id: 'n', rotulo: 'N' }], agruparPor: 'n',
+  });
+  ok(b.includes('type="search"') && b.includes('<select'), 'la barra trae buscador y agrupaci'+String.fromCharCode(243)+'n');
+  ok(/value="n" selected/.test(b), 'y el desplegable marca la agrupacion elegida',
+    'sin selected, cada reconstruccion lo devuelve a la primera opcion');
+  ok(!P.barraControl({ agrupar: [{ id: 'z', rotulo: 'Z' }] }).includes('<select'),
+    'con UNA sola opcion no se pinta desplegable',
+    'un control que no puede cambiar nada es peor que no tenerlo: promete que si');
 
   const pa = P.pastillas({ items: [{ et: 'x', rotulo: 'X', n: 7 }] });
   ok(pa.includes('data-cuenta-et="x"') && pa.includes('>7<'),

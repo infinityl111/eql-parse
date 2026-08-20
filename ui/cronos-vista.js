@@ -154,16 +154,25 @@ function fichaDe({ crono, estado, obs = {}, i, conNumero = true, abierta = false
 export function construye(modelo = {}, conNumero = true) {
   const {
     fichas = [], vista = 'vig', leyendaAbierta = false, sugerencias = [],
-    abiertas = new Set(),
+    abiertas = new Set(), agruparPor = 'zona',
   } = modelo;
-  const porZona = new Map();
+  /**
+   * EL PERIODO ES DE LA ZONA, asi que agrupar por zona es lo que contesta «que
+   * me queda por aqui». Pero con temporizadores de cuatro sitios distintos, un
+   * grupo por ficha es una cabecera por linea: por eso se puede quitar.
+   *
+   * Las cabeceras llevan lo que seria igual en todas sus filas, que es la
+   * regla de la pieza: una columna con el mismo valor en todas no es
+   * informacion, es ruido con forma de dato.
+   */
+  const grupos = new Map();
   fichas.forEach((f, i) => {
-    const k = f.crono.base
+    const k = agruparPor === 'nada' ? '' : (f.crono.base
       ? `${f.crono.base}${f.crono.diff != null ? ` · D${f.crono.diff}` : ''}`
-      : t('cro.sinZona');
-    if (!porZona.has(k)) porZona.set(k, []);
+      : t('cro.sinZona'));
+    if (!grupos.has(k)) grupos.set(k, []);
     const ficha = fichaDe({ ...f, i, conNumero });
-    porZona.get(k).push({ ...ficha, abierta: abiertas.has(ficha.id) });
+    grupos.get(k).push({ ...ficha, abierta: abiertas.has(ficha.id) });
   });
 
   const cab = pestañas({
@@ -175,17 +184,29 @@ export function construye(modelo = {}, conNumero = true) {
   });
 
   const lista = `<div data-vista="vig"${vista === 'vig' ? '' : ' hidden'}>
-    ${barraControl({ agrupar: [{ id: 'zona', rotulo: t('cro.title') }] })}
+    ${barraControl({
+    agruparPor,
+    agrupar: [
+      { id: 'zona', rotulo: t('cro.agrZona') },
+      { id: 'nada', rotulo: t('cro.agrNada') },
+    ],
+  })}
     ${pastillas({
+    /**
+     * LOS ROTULOS DE LAS PASTILLAS SON CORTOS Y CIERTOS, y no valian los del
+     * cuerpo de la ficha. «Esperando su primera muerte» ocupaba 242 px y
+     * ademas MENTIA: un temporizador que esta contando no espera su primera
+     * muerte, ya la vio. Lo enseno el volcado, midiendo la caja.
+     */
     items: [
-      { et: 'contando', rotulo: t('cro.esperando') },
-      { et: 'vencido', rotulo: t('cro.disponible') },
+      { et: 'contando', rotulo: t('cro.filContando') },
+      { et: 'vencido', rotulo: t('cro.filDisponible') },
     ],
   })}
     ${leyendaProcedencia({ abierta: leyendaAbierta })}
     ${filas({
     vacio: t('cro.vacio'),
-    grupos: [...porZona].map(([rotulo, fs]) => ({ rotulo, filas: fs })),
+    grupos: [...grupos].map(([rotulo, fs]) => ({ rotulo, filas: fs })),
   })}</div>`;
 
   const alta = `<div data-vista="sug"${vista === 'sug' ? '' : ' hidden'}>
@@ -213,5 +234,6 @@ export const CLAVES = [
   'cro.obs0', 'cro.obs1', 'cro.obsN', 'cro.obsPocas', 'cro.retenido',
   'cro.segun', 'cro.sinZona', 'cro.varios', 'cro.quizaVarios', 'cro.sospecha',
   'cro.manualPh', 'cro.setManual',
+  'cro.agrZona', 'cro.agrNada', 'cro.filContando', 'cro.filDisponible',
   'cro.discrepa', 'cro.discrepaWiki', 'cro.escVacio',
 ];
