@@ -1883,8 +1883,8 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
   padding: 2px 7px; border-radius: 3px; border: 1px solid transparent; white-space: nowrap; }
 .tag-tmpl { color: var(--bone-faint); border-color: var(--slate-600); }
 .tag-mine { color: var(--t-cold); border-color: var(--t-cold); }
-.tag-viva { color: var(--t-good, #7FB77E); border-color: currentColor; }
-.tag-muerta { color: var(--t-bad, #B0555F); border-color: currentColor; }
+.tag-viva { color: var(--t-poison); border-color: currentColor; }
+.tag-muerta { color: var(--t-ds); border-color: currentColor; }
 .tag-ej { color: var(--bone-faint); border-color: var(--slate-600); margin-right: 5px; }
 .trig-note { border-left: 2px solid var(--slate-600); padding-left: 9px; margin-bottom: 12px; }
 .trig-aviso { margin: 0 0 8px; padding: 7px 9px; border-radius: 4px;
@@ -1962,14 +1962,14 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .croesc-cab { margin: 10px 0 0; }
 .croesc-btn {
   font: inherit; font-size: 11px; padding: 6px 12px; cursor: pointer;
-  border: 1px solid var(--line, #cfc7b8); border-radius: 6px;
-  background: var(--raised, #f6f2ea); color: inherit;
+  border: 1px solid var(--slate-600); border-radius: 6px;
+  background: var(--slate-800); color: var(--bone);
 }
 .croesc-btn:disabled { opacity: .45; cursor: default; }
 .croesc {
   margin: 8px 0 4px; padding: 12px 14px;
-  border: 1px solid var(--line, #cfc7b8); border-radius: 8px;
-  background: var(--raised, #f6f2ea);
+  border: 1px solid var(--slate-600); border-radius: 8px;
+  background: var(--slate-850);
 }
 .croesc-tit { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
 .croesc-zona { font-size: 10.5px; opacity: .7; margin-bottom: 6px; }
@@ -1986,7 +1986,7 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .croesc-dos { font-weight: 600; }
 .croesc-pon {
   margin-top: 8px; font: inherit; font-size: 11px; padding: 5px 11px;
-  cursor: pointer; border: 1px solid var(--line, #cfc7b8); border-radius: 6px;
+  cursor: pointer; border: 1px solid var(--slate-600); border-radius: 6px;
   background: transparent; color: inherit;
 }
 
