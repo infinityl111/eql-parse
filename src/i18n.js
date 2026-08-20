@@ -4569,6 +4569,23 @@ export function t(key, vars = null, lang = current) {
   }
   let s = DICTS[lang]?.[k] ?? EN[k] ?? ES[k] ?? DICTS[lang]?.[key] ?? EN[key] ?? ES[key] ?? key;
   if (vars) s = s.replace(/\{(\w+)\}/g, (_, v) => (vars[v] ?? ''));
+  /**
+   * ── EL GANCHO DE LA COMPROBACIÓN DE RÓTULOS ─────────────────────────────
+   *
+   * Apagado salvo que alguien ponga el cesto, así que en uso normal cuesta una
+   * comparación por llamada y nada más.
+   *
+   * POR QUÉ EXISTE: `bin/rotulos.js` decide qué rótulos están vivos, y
+   * emparejaba **por texto**. Eso no puede funcionar: el CSS pone los botones en
+   * mayúsculas, y un rótulo con interpolación —`según {pagina}`— sale a pantalla
+   * con un valor dentro que no está en el diccionario, así que **jamás** casa.
+   * Normalizar más es perseguir al traductor.
+   *
+   * Aquí se anota la CLAVE junto al texto que de verdad se produjo. Emparejar
+   * por clave es comparar por identidad; comparar el texto es comparar
+   * apariencias.
+   */
+  if (globalThis.__ROTULOS__) globalThis.__ROTULOS__.push([key, s]);
   return s;
 }
 
