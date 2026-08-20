@@ -2,6 +2,7 @@ import { t, setLang } from '../src/i18n.js';
 import { fightToChat } from '../src/share.js';
 import { copiarAlPortapapeles } from './clip.js';
 import { jefesDe } from '../src/raid.js';
+import { parseZone } from '../src/zones.js';
 
 /**
  * El overlay va combate a combate.
@@ -31,6 +32,19 @@ const esc = (x) => String(x ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const n0 = (v) => Math.round(v || 0).toLocaleString();
 const secs = (s) => (s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`);
 const $ = (id) => document.getElementById(id);
+
+/** La zona en la que estas, guardada del ultimo snapshot.
+ *   dentro de  es la SESION, no el snapshot: usarla aqui
+ *  habria dado siempre  sin fallar. */
+/**
+ * LA ZONA EN LA QUE ESTAS, guardada del ultimo snapshot.
+ *
+ * Dentro de onSnapshot hay una variable S que es la SESION, no el snapshot.
+ * Usarla para leer la zona habria dado siempre undefined SIN FALLAR: el crono
+ * se habria abierto sin zona ni dificultad, que es justo lo que lo distingue
+ * de otro con el mismo nombre en otro sitio.
+ */
+let zonaActual = null;
 
 const KIND = { 'físico': 'fisico', 'mágico': 'magico', equilibrado: 'equilibrado' };
 
@@ -118,7 +132,21 @@ function detail(r, live) {
   const abil = (r.abilities ?? []).slice(0, 6).map((a) => `<div class="ov-det-l">
       <span><i class="seg ${typeClass(a.type)}" style="display:inline-block;width:6px;height:6px;margin-right:5px"></i>${esc(a.name)}</span>
       <b>${n0(a.sum)}</b><span class="dim">×${a.n}</span></div>`).join('');
-  return `<div class="ov-det"><div class="ov-det-kv">${kv.replace(/(<\/b>)(?=\S)/g, '$1 ')}</div>${abil}</div>`;
+  /**
+   * EL BOTON DE TEMPORIZADOR, y solo para enemigos.
+   *
+   * Aparece al desplegar la fila, que es «pulsar un enemigo». Y AQUI EL BICHO
+   * SUELE ESTAR VIVO: no se bloquea. El crono se abre igual y se queda en
+   * «esperando su primera muerte» hasta que caiga.
+   *
+   * Bloquearlo mientras vive seria pedirle a Campeon que vuelva justo en el
+   * momento de la muerte, que es cuando menos va a acordarse — y ese momento
+   * es exactamente el que el temporizador existe para no tener que recordar.
+   */
+  const crono = r.side === 'enemy'
+    ? `<button class="ov-crono" data-crono="${esc(r.name)}">${esc(t('cro.escBoton'))}</button>`
+    : '';
+  return `<div class="ov-det"><div class="ov-det-kv">${kv.replace(/(<\/b>)(?=\S)/g, '$1 ')}</div>${abil}${crono}</div>`;
 }
 
 function rowHTML(r, rank, self, dead, maxDmg, fightKey, live) {
@@ -235,6 +263,28 @@ function wire(host, repintar, cabeza = false) {
       el.classList.remove('ok', 'bad');
     }, 1600);
   }));
+  /**
+   * LA ZONA Y LA DIFICULTAD SE COGEN DEL SITIO DONDE ESTAS, no se preguntan.
+   * Son parte de lo que distingue un temporizador de otro, y desde el overlay
+   * no hay forma de escribirlas.
+   */
+  host.querySelectorAll('[data-crono]').forEach((el) => el.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const nombre = el.dataset.crono;
+    const z = zonaActual ? parseZone(zonaActual) : null;
+    const alta = {
+      nombre, base: z?.base ?? null, diff: z?.diff ?? null, mode: z?.mode ?? null, manual: null,
+    };
+    const cfg = (await window.eql.getConfig?.()) ?? {};
+    const lista = cfg.cronos ?? [];
+    const clave = (c) => `${c.nombre}|${c.base ?? ''}|${c.diff ?? ''}|${c.mode ?? ''}`;
+    if (lista.some((c) => clave(c) === clave(alta))) { el.textContent = t('cro.escYaEsta'); return; }
+    await window.eql.setFlag('cronos', [...lista, alta]);
+    window.eql.panelCronos?.(lista.length + 1);
+    el.textContent = t('cro.escYaEsta');
+    el.disabled = true;
+  }));
+
   host.querySelectorAll('.ov-row').forEach((el) => el.addEventListener('click', (e) => {
     e.stopPropagation();
     const k = rowKey(el.closest('.ovf').dataset.key, el.dataset.name);
@@ -329,6 +379,7 @@ function renderSession(S, self) {
 }
 
 window.eql.onSnapshot((snap) => {
+  zonaActual = snap.zone ?? zonaActual;
   const live = snap.current;
   renderKill(snap.lastKill);
   dpsMap = snap.sessionDps ?? {};

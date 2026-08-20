@@ -48,6 +48,88 @@ let cfg = { ...DEFAULTS };
 let triggerDefs = [];
 let mainWin = null;
 let overlayWin = null;
+/**
+ * LOS OVERLAYS, POR IDENTIFICADOR.
+ *
+ * `createOverlay` sabia de UNA ventana y guardaba sus medidas en
+ * `cfg.overlayBounds`. Con dos ya no vale, y con tres seria peor: cada overlay
+ * tiene las suyas y las guarda bajo su nombre.
+ */
+const overlays = new Map();
+
+/** Lo que cada overlay recuerda. Sin entrada, los de por defecto del suyo. */
+function marcoDe(id, porDefecto) {
+  cfg.overlays = cfg.overlays ?? {};
+  const g = cfg.overlays[id] ?? {};
+  return {
+    x: g.x ?? porDefecto.x, y: g.y ?? porDefecto.y,
+    width: g.width ?? porDefecto.width, height: g.height ?? porDefecto.height,
+    opacidad: g.opacidad ?? 1,
+  };
+}
+
+function guardaMarco(id, parcial) {
+  cfg.overlays = cfg.overlays ?? {};
+  cfg.overlays[id] = { ...(cfg.overlays[id] ?? {}), ...parcial };
+  saveConfig(cfg);
+}
+
+/**
+ * ESCALONADOS AL ABRIR VARIOS. Dos ventanas nuevas en el mismo sitio se tapan y
+ * parece que solo se abrio una.
+ */
+function escalonado(base, n) {
+  return { ...base, x: base.x + n * 28, y: base.y + n * 28 };
+}
+
+function creaOverlay(id, fichero, porDefecto) {
+  const ya = overlays.get(id);
+  if (ya && !ya.isDestroyed()) { ya.show(); return ya; }
+  const m = marcoDe(id, escalonado(porDefecto, overlays.size));
+  const win = new BrowserWindow({
+    x: m.x, y: m.y, width: m.width, height: m.height,
+    frame: false, transparent: true, resizable: true, skipTaskbar: true, icon: ICON,
+    alwaysOnTop: true, hasShadow: false, focusable: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false },
+  });
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  win.setOpacity(m.opacidad);
+  win.loadFile(path.join(__dirname, '..', 'ui', fichero));
+  const recuerda = () => {
+    if (win.isDestroyed()) return;
+    const b = win.getBounds();
+    guardaMarco(id, { x: b.x, y: b.y, width: b.width, height: b.height });
+  };
+  win.on('moved', recuerda);
+  win.on('resized', recuerda);
+  win.on('closed', () => overlays.delete(id));
+  overlays.set(id, win);
+  return win;
+}
+
+/** El panel de temporizadores: uno solo, con todos dentro. */
+function creaPanelCronos() {
+  return creaOverlay('cronos', 'overlay-cronos.html',
+    { x: 60, y: 60, width: 320, height: 260 });
+}
+
+/**
+ * EL PANEL SE ABRE CON EL PRIMER TEMPORIZADOR Y SE CIERRA CON EL ULTIMO.
+ *
+ * Con cero no hay panel que ensenar: dejarlo abierto y vacio seria una ventana
+ * pidiendo sitio a cambio de nada, y encima siempre encima del juego.
+ */
+function ajustaPanelCronos() {
+  if ((cfg.cronos ?? []).length > 0) creaPanelCronos();
+  else cierraOverlay('cronos');
+}
+
+function cierraOverlay(id) {
+  const w = overlays.get(id);
+  if (w && !w.isDestroyed()) w.destroy();
+  overlays.delete(id);
+}
 let pushTimer = null;
 let wiki = null;      // cliente de la wiki
 let latest = null;    // { version, url } si hay una versión más nueva publicada
@@ -164,7 +246,9 @@ function applyClickThrough() {
 }
 
 function send(channel, payload) {
-  for (const w of [mainWin, overlayWin]) {
+  // Y a TODOS los overlays, no solo al principal: el panel de temporizadores
+  // vive del mismo snapshot y sin esto se quedaria congelado.
+  for (const w of [mainWin, overlayWin, ...overlays.values()]) {
     if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
   }
 }
@@ -254,6 +338,15 @@ async function boot() {
     if (overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send('alert', { ...a, speak: null });
   });
   createMain();
+  // Y el panel de temporizadores, si habia alguno guardado.
+  //
+  // Al arrancar hay que decidirlo AQUI: lo pedia , que solo
+  // corre si estas mirando Reapariciones — asi que con dos cronos guardados el
+  // panel no se abria. Y ademas corria cuatro veces por segundo.
+  //
+  // Lo enseño , que es lo unico que puede ver si una
+  // ventana existe: el constructor llevaba verde desde el primer minuto.
+  ajustaPanelCronos();
   setTimeout(checkUpdate, 4000);            // sin retrasar el arranque
   setInterval(checkUpdate, 6 * 3600e3);
   startPush();
@@ -568,6 +661,42 @@ ipcMain.handle('cronos:multiplicidad', (_e, { claves }) => engine.multiplicidadD
 // CUALQUIER linea que lo nombre prueba que existe: 145 por cada muerte.
 ipcMain.handle('cronos:visto', (_e, { claves }) => engine.vistoDe(claves));
 ipcMain.handle('cronos:cota', (_e, { claves }) => engine.cotaDe(claves));
+
+/**
+ * EL MARCO. Mover una ventana solo puede hacerlo el proceso principal, asi que
+ * el arrastre por las esquinas viaja por aqui. `id` viene del propio overlay.
+ */
+ipcMain.handle('marco:bounds', (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  return w && !w.isDestroyed() ? w.getBounds() : null;
+});
+ipcMain.handle('marco:mueve', (e, b) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (!w || w.isDestroyed() || !b) return false;
+  w.setBounds({
+    x: Math.round(b.x), y: Math.round(b.y),
+    width: Math.round(b.width), height: Math.round(b.height),
+  });
+  return true;
+});
+ipcMain.handle('marco:opacidad', (e, { id, v }) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (!w || w.isDestroyed()) return false;
+  const n = Math.min(1, Math.max(0.25, Number(v) || 1));
+  // `setOpacity` de la VENTANA y no `opacity` de CSS: el overlay ya usa esa
+  // propiedad para atenuarse cuando no lo miras, y dos cosas en el mismo canal
+  // se pisan.
+  w.setOpacity(n);
+  if (id) guardaMarco(id, { opacidad: n });
+  return true;
+});
+
+/** El panel de temporizadores se abre y se cierra solo, segun cuantos haya. */
+ipcMain.handle('cronos:panel', (_e, { hay }) => {
+  if (hay > 0) creaPanelCronos();
+  else cierraOverlay('cronos');
+  return true;
+});
 ipcMain.handle('cronos:observaciones', (_e, { claves }) => engine.observacionesDe(claves));
 ipcMain.handle('enc:progress', () => engine.encProgress());
 ipcMain.handle('enc:fights', (_e, q) => engine.encFights(q ?? {}));
@@ -619,7 +748,21 @@ ipcMain.handle('encounter:export', async (_e, enc) => {
 // Ficha del objeto. Devuelve null si la wiki no lo tiene o no hay red.
 ipcMain.handle('pet:dismiss', (_e, n) => engine.dismissPet(n));
 
-ipcMain.handle('cfg:flag', (_e, { key, value }) => { cfg[key] = value; saveConfig(cfg); return true; });
+/**
+ * Y SE AVISA A TODAS LAS VENTANAS. Sin esto, el panel de temporizadores no se
+ * entera de que se ha abierto uno nuevo desde la ventana principal: leeria su
+ * copia de la configuracion hasta que lo cerraran.
+ */
+ipcMain.handle('cfg:flag', (_e, { key, value }) => {
+  cfg[key] = value;
+  saveConfig(cfg);
+  send('flags', cfg);
+  // Y si lo que cambio fue la lista de temporizadores, el panel se abre o se
+  // cierra solo. Aqui y no en la seccion: la seccion solo corre si la estas
+  // mirando, y ademas corre cuatro veces por segundo.
+  if (key === 'cronos') ajustaPanelCronos();
+  return true;
+});
 
 // Aquí vivía `pets:names`, que hacía exactamente esto mismo pero sin avisar al
 // analizador y sin que lo llamara nadie. Dos puertas para la misma decisión son

@@ -28,7 +28,18 @@ const ok = (cond, label, extra = '') => {
 
 // ── Qué usa la interfaz ───────────────────────────────────────────────────
 const usadas = new Set();
-for (const f of ['ui/app.js', 'ui/overlay.js', 'ui/triggers.js', 'ui/alerts.js']) {
+/**
+ * LOS CONSUMIDORES SE LISTAN, y la lista se queda corta sola.
+ *
+ * Al anadir el panel de temporizadores -otro renderizador con su propio
+ * fichero- cuatro funciones del puente salieron «expuestas y sin usar»
+ * estandolo. La prueba tenia razon en ponerse roja: no las veia.
+ *
+ * Es la misma familia que «al migrar codigo, la vigilancia migra con el»:
+ * un detector que mira una lista fija de sitios deja de mirar en cuanto
+ * aparece uno nuevo.
+ */
+for (const f of ['ui/app.js', 'ui/overlay.js', 'ui/overlay-cronos.js', 'ui/triggers.js', 'ui/alerts.js']) {
   for (const m of leer(f).matchAll(/window\.eql\.([A-Za-z0-9_]+)/g)) usadas.add(m[1]);
 }
 

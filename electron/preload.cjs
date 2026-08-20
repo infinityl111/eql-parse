@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld('eql', {
   spellIcons: (names) => ipcRenderer.invoke('wiki:spellIcons', names),
   foePortraits: (names) => ipcRenderer.invoke('wiki:foePortraits', names),
   onSnapshot: (fn) => ipcRenderer.on('snapshot', (_e, s) => fn(s)),
+  onFlags: (fn) => ipcRenderer.on('flags', (_e, c) => fn(c)),
   onOverlayState: (fn) => ipcRenderer.on('overlay:state', (_e, s) => fn(s)),
 
   // Fusión de mascotas. La interfaz la llamaba sin `?.`, así que el conmutador
@@ -106,6 +107,11 @@ contextBridge.exposeInMainWorld('eql', {
   multiplicidadDe: (claves) => ipcRenderer.invoke('cronos:multiplicidad', { claves }),
   vistoDe: (claves) => ipcRenderer.invoke('cronos:visto', { claves }),
   cotaDe: (claves) => ipcRenderer.invoke('cronos:cota', { claves }),
+  // EL MARCO, comun a todos los overlays.
+  marcoBounds: () => ipcRenderer.invoke('marco:bounds'),
+  marcoMueve: (b) => ipcRenderer.invoke('marco:mueve', b),
+  marcoOpacidad: (id, v) => ipcRenderer.invoke('marco:opacidad', { id, v }),
+  panelCronos: (hay) => ipcRenderer.invoke('cronos:panel', { hay }),
   observacionesDe: (claves) => ipcRenderer.invoke('cronos:observaciones', { claves }),
   encProgress: () => ipcRenderer.invoke('enc:progress'),
   encFights: (q) => ipcRenderer.invoke('enc:fights', q),

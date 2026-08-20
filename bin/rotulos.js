@@ -153,7 +153,19 @@ fs.writeFileSync(LOG, [
 /** Y el almacén SELLADO: sin sello sale el cartel de histórico viejo y tapa todo. */
 store.stamp();
 fs.writeFileSync(path.join(DATOS, 'config.json'), JSON.stringify({
-  ...JSON.parse(fs.readFileSync(REAL, 'utf8')), lang: 'es', cronos: CRONOS, path: LOG,
+  // LA CLAVE ES `logPath`, NO `path`.
+  //
+  // El arranque mira `cfg.logPath` para engancharse al registro, asi que con
+  // `path` el motor no leia NADA: el almacen se quedaba vacio sin fallar y los
+  // temporizadores salian «esperando su primera muerte» teniendo su muerte
+  // escrita en el propio registro de prueba.
+  //
+  // Esta sonda llevaba asi desde que se escribio -era la tercera de sus cinco
+  // causas, «el motor no engancha»- y se creyo arreglada. Lo destapo
+  // `bin/panel-vivo.js`, que exigia ver un temporizador CONTANDO y nunca lo
+  // veia: una sonda que pide mas destapa lo que la de al lado daba por bueno.
+  ...JSON.parse(fs.readFileSync(REAL, 'utf8')), lang: 'es', cronos: CRONOS,
+  logPath: LOG, path: LOG,
 }, null, 1));
 
 // ── 2 · Las claves a vigilar ───────────────────────────────────────────────
