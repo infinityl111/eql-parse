@@ -202,6 +202,40 @@ La regla general, que vale para cualquier guarda: **comprobar que lo que NO debe
 estar no está es sólo la mitad; la otra es que lo que SÍ debe estar, está.** Un
 `grep` a cero no distingue «lo quitamos a propósito» de «se perdió».
 
+### 5 bis. UN NÚMERO DE VERSIÓN NO SE REUTILIZA NUNCA
+
+> **En cuanto ese número ha existido como ejecutable INSTALADO, está gastado.**
+> Aunque no se haya publicado. Aunque el prelanzamiento se retire y nadie lo
+> haya visto.
+
+El instalador se prueba antes de publicar —paso 5— y probarlo significa que hay
+un `.exe` con ese número **en un disco de verdad**. Si luego se corrige algo y
+se reconstruye con el mismo número, quedan **dos binarios distintos llamándose
+igual**, y uno de ellos está instalado en la máquina de quien lo probó.
+
+A partir de ahí nada de lo que diga esa máquina es fiable: «me pasa X en la
+1.19.0» deja de identificar un código. Y el actualizador tampoco lo arregla —
+compara números, así que no ve ninguna diferencia entre los dos.
+
+**Los números son gratis.** Se retira el prelanzamiento sin publicarlo, se borra
+su etiqueta, y sale el siguiente.
+
+```sh
+gh release delete v<versión> --yes --cleanup-tag
+git push origin :refs/tags/v<versión>    # por si la etiqueta sobrevive
+git tag -d v<versión>
+```
+
+**Y sus notas se van con ella.** El paso 11 exige que toda versión con notas en
+`web/notas/` tenga su release, y hace bien: unas notas escritas y sin publicar
+son algo redactado para alguien que no lo ha leído. Lo que decían **se dobla
+dentro de las notas del número nuevo**, que es quien va a llegar al usuario.
+
+*Cicatriz, 20/08/2026:* la 1.19.0 llegó a instalarse para probarla y luego
+apareció que el temporizador no se había reiniciado nunca. Reconstruir la 1.19.0
+con el arreglo dentro habría dejado dos «1.19.0» distintas, una de ellas en el
+disco de Campeón. Salió la 1.19.1.
+
 ### 6. Crea la release COMO PRELANZAMIENTO
 
 ```
