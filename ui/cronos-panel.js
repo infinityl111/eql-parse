@@ -40,7 +40,7 @@ const esc = (s) => String(s ?? '')
  * `restante` en `null` o `<= 0` es «ya debería estar». `transcurrido` desempata
  * entre vencidos: el que lleva más tiempo esperando va antes.
  */
-export const RANGO = { vencido: 0, contando: 1, esperando: 2 };
+export const RANGO = { vencido: 0, sinEstimacion: 1, contando: 2, esperando: 3 };
 
 /**
  * TRES ESTADOS Y NO DOS. Un crono sin ninguna muerte suya en el registro no
@@ -52,6 +52,12 @@ export const RANGO = { vencido: 0, contando: 1, esperando: 2 };
  */
 export function estadoDe(f) {
   if (f.esperando) return 'esperando';
+  /**
+   * SIN ESTIMACION NO ES VENCIDO. Sabemos cuando murio y no sabemos cuanto
+   * tarda: decir «ya deberia estar» seria afirmar algo que no tenemos con que
+   * afirmar. Lo que si se puede decir es el reloj — `+16m 50s` desde su muerte.
+   */
+  if (!f.conEstimacion) return 'sinEstimacion';
   return f.restante == null || f.restante <= 0 ? 'vencido' : 'contando';
 }
 
@@ -64,6 +70,9 @@ export function ordena(fichas = []) {
     // el que antes vuelve. Los que esperan no tienen con que ordenarse.
     if (ra === RANGO.vencido) return (b.transcurrido ?? 0) - (a.transcurrido ?? 0);
     if (ra === RANGO.contando) return (a.restante ?? 0) - (b.restante ?? 0);
+    // Sin estimacion se ordenan por lo que llevan esperando, que es lo unico
+    // que tienen. Los que ni han muerto no tienen ni eso.
+    if (ra === RANGO.sinEstimacion) return (b.transcurrido ?? 0) - (a.transcurrido ?? 0);
     return 0;
   });
 }
@@ -91,7 +100,8 @@ function lineaDe(f) {
   return `<li class="pan-l pan-${est}${vencido ? ' pan-ya' : ''}" data-i="${f.i}">
     <span class="pan-n">${esc(f.nombre)}</span>
     <span class="pan-t">${est === 'esperando' ? esc(t('cro.esperando'))
-    : vencido ? esc(t('cro.disponible')) : esc(f.restanteTxt ?? '')}</span>
+    : est === 'sinEstimacion' ? esc(t('cro.desdeMuerte', { t: f.transcurridoTxt ?? '' }))
+      : vencido ? esc(t('cro.disponible')) : esc(f.restanteTxt ?? '')}</span>
     ${huecos}
     <button class="pan-x" data-quita="${f.i}" title="${esc(t('cro.close'))}">×</button>
   </li>`;
@@ -126,6 +136,7 @@ export function construye(modelo = {}, conNumero = true) {
  * es una declaración que miente.
  */
 export const CLAVES = [
-  'cro.title', 'cro.disponible', 'cro.esperando', 'cro.close', 'cro.vacio',
+  'cro.title', 'cro.disponible', 'cro.esperando', 'cro.desdeMuerte',
+  'cro.close', 'cro.vacio',
   'cro.cotaH1', 'cro.cotaHn', 'pan.fueraDeZona', 'mo.opacidad',
 ];

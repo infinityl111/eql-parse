@@ -96,9 +96,16 @@ async function refresca(snap) {
        * afirmacion inventada sobre un bicho que quiza sigue vivo delante.
        */
       esperando: st.estado === ESTADO.SIN_MUERTE,
+      /**
+       * Y SIN ESTIMACION TAMPOCO ES VENCIDO. Murio, sabemos cuando, y no
+       * sabemos cuanto tarda. Lo unico que se puede decir es el reloj:
+       * `+16:50 desde que murio`. Es un hecho, no una estimacion.
+       */
+      conEstimacion: st.valor?.segundos != null,
       restante: st.estado === ESTADO.CONTANDO ? st.restante : 0,
       restanteTxt: reloj(st.restante),
       transcurrido: st.transcurrido ?? 0,
+      transcurridoTxt: reloj(st.transcurrido),
       cota: cotas[claveCrono(c)] ?? null,
     });
   });

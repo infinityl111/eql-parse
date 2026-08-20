@@ -96,10 +96,25 @@ for (const s of SONDAS) {
     huerfanas.length ? `NADIE LEE: ${huerfanas.join(', ')}` : 'todas se leen');
 }
 
-console.log('\ny toda sonda siembra logPath, que es de lo que depende que mida algo');
+console.log('\ny toda sonda tiene su logPath: propio o heredado de la pieza');
+/**
+ * O LO SIEMBRA ELLA, O LO DELEGA EN `bin/sonda.js`.
+ *
+ * Esta comprobación exigía que cada sonda escribiera `logPath` de su puño.
+ * Al sacar la preparación a una pieza común, la que la usa dejó de escribirlo
+ * — y la prueba se puso roja teniendo razón en el sitio equivocado.
+ *
+ * Es «al migrar código, la vigilancia migra con él», otra vez: un detector que
+ * mira una forma fija deja de mirar en cuanto la forma cambia.
+ */
+ok(/\blogPath\s*:/.test(lee('bin/sonda.js')), 'la pieza común lo siembra',
+  'de ella lo heredan las que la usan');
 for (const s of SONDAS) {
-  ok(/\blogPath\s*:/.test(lee(s)), `${s} siembra logPath`,
-    'sin ella el motor no engancha y la sonda mide una aplicación vacía');
+  const src = lee(s);
+  const propio = /\blogPath\s*:/.test(src);
+  const heredado = /arrancaListo\s*\(/.test(src);
+  ok(propio || heredado, `${s}`,
+    propio ? 'lo siembra ella' : heredado ? 'lo hereda de bin/sonda.js' : 'NI PROPIO NI HEREDADO');
 }
 
 console.log('\nCONTROL POSITIVO sobre una sonda real');

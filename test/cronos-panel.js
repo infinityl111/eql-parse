@@ -14,8 +14,15 @@ const ok = (c, m, extra = '') => {
 };
 setLang('es');
 
+/**
+ * La ficha de por defecto TIENE estimacion. `conEstimacion` no se daba por
+ * hecho antes porque no existia: al aparecer el cuarto estado, una ficha sin
+ * el campo cae en «sin estimacion», y eso es lo correcto — pero obliga a que
+ * las fijaciones digan cual son.
+ */
 const f = (i, over = {}) => ({
-  i, nombre: `bicho ${i}`, restante: 600, restanteTxt: '10:00', transcurrido: 0, ...over,
+  i, nombre: `bicho ${i}`, restante: 600, restanteTxt: '10:00', transcurrido: 0,
+  conEstimacion: true, ...over,
 });
 
 console.log('\nlos que ya deberían estar van ARRIBA');
@@ -35,23 +42,30 @@ console.log('\nlos que ya deberían estar van ARRIBA');
     'CONTROL: restante en null cuenta como vencido, no como cero segundos');
 }
 
-console.log('\ntres estados y no dos: esperando no es vencido');
+console.log('\ncuatro estados, y ninguno afirma mas de lo que sabe');
 {
   ok(P.estadoDe({ esperando: true, restante: 0 }) === 'esperando',
-    'sin muerte es ESPERANDO, aunque no le quede tiempo',
-    'decir «ya debería estar» de un bicho del que no sabemos ni cuándo murió es inventarlo');
-  ok(P.estadoDe({ restante: 0 }) === 'vencido', 'con muerte y a cero, vencido');
-  ok(P.estadoDe({ restante: 90 }) === 'contando', 'y con tiempo, contando');
+    'sin muerte: ESPERANDO su primera muerte',
+    'decir «ya deberia estar» de un bicho del que no sabemos ni cuando murio es inventarlo');
+  ok(P.estadoDe({ conEstimacion: false, restante: 0 }) === 'sinEstimacion',
+    'con muerte y SIN estimacion: sin estimacion, no vencido',
+    'sabemos cuando murio y no cuanto tarda: el reloj es lo unico que se puede decir');
+  ok(P.estadoDe({ conEstimacion: true, restante: 0 }) === 'vencido',
+    'con muerte y con estimacion, a cero: vencido');
+  ok(P.estadoDe({ conEstimacion: true, restante: 90 }) === 'contando',
+    'y con tiempo por delante: contando');
 
   const o = P.ordena([
     f(1, { esperando: true }),
     f(2, { restante: 300 }),
-    f(3, { restante: 0, transcurrido: 60 }),
+    f(3, { conEstimacion: false, transcurrido: 900 }),
+    f(4, { restante: 0, transcurrido: 60 }),
   ]);
-  ok(o.map((x) => x.i).join() === '3,2,1',
-    'el orden es vencido, contando, esperando',
+  ok(o.map((x) => x.i).join() === '4,3,2,1',
+    'el orden es vencido, sin estimacion, contando, esperando',
     'lo accionable primero; lo que ni ha empezado, al final');
 }
+
 
 console.log('\nun filtro que vacía dice qué dejó fuera');
 {
@@ -71,6 +85,7 @@ console.log('\nla sección declara qué produce, y lo produce');
     P.construye({ fichas: [], total: 4 }),
     P.construye({ fichas: [f(0), f(1, { restante: 0 })], total: 2, zona: 'Old Guk' }),
     P.construye({ fichas: [f(0, { esperando: true })] }),
+    P.construye({ fichas: [f(0, { conEstimacion: false, transcurridoTxt: '16:50' })] }),
     P.construye({ fichas: [f(0, { cota: { huecos: 1 } })] }),
     P.construye({ fichas: [f(0, { cota: { huecos: 9 } })] }),
   ].join('\n');

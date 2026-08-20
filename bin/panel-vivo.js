@@ -2,149 +2,71 @@
 /**
  * ¿SE ABRE EL PANEL DE TEMPORIZADORES, Y QUÉ PINTA DENTRO?
  *
- * El panel es OTRA VENTANA, así que `bin/ui-volcar.js` no lo ve: aquel busca el
- * objetivo cuya URL lleva `index.html`. Aquí se busca `overlay-cronos.html`.
+ * El panel es OTRA VENTANA, así que `bin/ui-volcar.js` no lo ve: aquél busca el
+ * objetivo cuya URL lleva `index.html`. Aquí se pide `overlay-cronos.html`.
  *
- * Y esto comprueba lo que ninguna prueba pura puede: que la ventana **exista**.
- * El constructor está verde desde el primer minuto —`test/cronos-panel.js`— y
- * eso no dice nada de si alguien lo abre. Es la misma distinción de siempre:
- * producir no es pintar, y pintar no es tener ventana.
+ * Y esto comprueba lo que ninguna prueba pura puede: **que la ventana exista**.
+ * El constructor estaba verde desde el primer minuto y el panel no se abría —
+ * lo pedía `renderCronos`, que sólo corre si estás mirando esa sección.
  *
- * Uso:  node bin/panel-vivo.js
+ *     PRODUCIR NO ES PINTAR, Y PINTAR NO ES TENER VENTANA.
+ *
+ * La preparación —carpeta de datos, configuración real, `logPath`, almacén
+ * sellado, esperas y la comprobación de que el motor enganchó— vive en
+ * `bin/sonda.js`, porque tres sondas tropezaron con lo mismo y la cuarta
+ * también lo habría hecho.
+ *
+ * Uso:  npm run panel  ·  node bin/panel-vivo.js
  */
-import path from 'node:path';
-import fs from 'node:fs';
-import os from 'node:os';
-import { fileURLToPath } from 'node:url';
-import { lanzar, espera, cdp, puertoLibre, PUERTO } from './cdp.js';
-
-const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DATOS = path.join(os.tmpdir(), 'eql-panel-vivo');
-
-/** Lo mismo que hace `bin/rotulos.js`: partir de la configuración REAL. */
-const REAL = [
-  path.join(os.homedir(), 'AppData', 'Roaming', 'eql-parse', 'config.json'),
-  path.join(os.homedir(), 'AppData', 'Roaming', 'EQL Parse', 'config.json'),
-].find((f) => fs.existsSync(f));
-if (!REAL) {
-  console.error('\nSin configuración real de la que partir, la aplicación arranca en');
-  console.error('el asistente y esta comprobación no mide nada.\n');
-  process.exit(3);
-}
-
-fs.rmSync(DATOS, { recursive: true, force: true });
-fs.mkdirSync(DATOS, { recursive: true });
+import { arrancaListo, hace, espera } from './sonda.js';
 
 const BASE = "Nagafen's Lair";
-/**
- * LA MUERTE TIENE QUE SER RECIENTE, o los dos salen vencidos y el orden no
- * prueba nada.
- *
- * Con la fecha fija que llevaba antes -4 de agosto- los dos temporizadores
- * estaban vencidos desde hacia dos semanas, asi que la fila que CUENTA no se
- * podia ejercitar. Es la misma trampa que en `bin/rotulos.js` con el visto:
- * una fijacion con fecha muerta no puede producir un estado vivo.
- */
-const DIA = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const hace = (seg) => {
-  const d = new Date(Date.now() - seg * 1000);
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${DIA[d.getDay()]} ${MES[d.getMonth()]} ${dd} ${d.toTimeString().slice(0, 8)} ${d.getFullYear()}`;
-};
-
-const LOG = path.join(DATOS, 'eqlog_Panel_erudin.txt');
-fs.writeFileSync(LOG, [
-  `[${hace(7200)}] Logging to 'eqlog.txt' is now *ON*.`,
-  `[${hace(7195)}] You have entered ${BASE} 2 (Adaptive).`,
-  // CADA MUERTE NECESITA SU COMBATE: sin dano el motor no abre pelea, y sin
-  // pelea la muerte no llega al indice, que es de donde se leen.
-  `[${hace(7010)}] You slash vencido for 120 points of damage.`,
-  `[${hace(7000)}] You have slain vencido!`,
-  `[${hace(5010)}] You slash vencido for 118 points of damage.`,
-  `[${hace(5000)}] You have slain vencido!`,
-  // `contando` acaba de morir y su tiempo es largo: sale CONTANDO.
-  `[${hace(70)}] You slash contando for 240 points of damage.`,
-  `[${hace(60)}] You have slain contando!`,
-  '',
-].join('\r\n'));
 
 /**
- * DOS CRONOS Y NO UNO: con uno solo, el orden no se puede comprobar, y el orden
+ * DOS CRONOS Y NO UNO: con uno solo el orden no se puede comprobar, y el orden
  * —los vencidos arriba— es la mitad de lo que hace útil el panel.
+ *
+ * `vencido` murió hace rato y su tiempo es corto: sale VENCIDO.
+ * `contando` acaba de morir y su tiempo es largo: sale CONTANDO.
  */
 const CRONOS = [
   { nombre: 'contando', base: BASE, diff: 2, mode: null, manual: 3600 },
   { nombre: 'vencido', base: BASE, diff: 2, mode: null, manual: 60 },
 ];
 
-fs.writeFileSync(path.join(DATOS, 'config.json'), JSON.stringify({
-  ...JSON.parse(fs.readFileSync(REAL, 'utf8')),
-  // LA CLAVE ES logPath, no path: el arranque mira cfg.logPath para
-  // engancharse al registro. Con la clave equivocada el motor no lee nada y
-  // el almacen se queda vacio SIN FALLAR — los cronos salen «esperando su
-  // primera muerte» teniendo su muerte escrita tres lineas mas arriba.
-  lang: 'es', cronos: CRONOS, logPath: LOG,
-}, null, 2));
-
-const hijo = lanzar([`--user-data-dir=${DATOS}`]);
-const fin = (c) => { try { hijo.kill(); } catch { /* ya no está */ } process.exit(c); };
-
-/** El objetivo del PANEL, no el de la ventana principal. */
-async function esperaPanel() {
-  for (let i = 0; i < 60; i++) {
-    try {
-      const lista = await (await fetch(`http://127.0.0.1:${PUERTO}/json/list`)).json();
-      const p = lista.find((x) => x.url.includes('overlay-cronos.html'));
-      if (p) return p;
-    } catch { /* todavía no */ }
-    await espera(500);
-  }
-  return null;
-}
-
-const ficha = await esperaPanel();
-if (!ficha) {
-  console.error('\nEL PANEL NO SE ABRIÓ.');
-  console.error('Con dos temporizadores en la configuración tenía que abrirse solo.');
-  console.error('Eso es el fallo: el constructor puede estar perfecto y no tener ventana.\n');
-  fin(1);
-}
+const { lee, fin } = await arrancaListo({
+  nombre: 'eql-panel-vivo',
+  ventana: 'overlay-cronos.html',
+  vivo: 'vencido',
+  registro: [
+    `[${hace(7200)}] Logging to 'eqlog.txt' is now *ON*.`,
+    `[${hace(7195)}] You have entered ${BASE} 2 (Adaptive).`,
+    // CADA MUERTE NECESITA SU COMBATE: sin daño el motor no abre pelea, y sin
+    // pelea la muerte no llega al índice, que es de donde se leen.
+    `[${hace(7010)}] You slash vencido for 120 points of damage.`,
+    `[${hace(7000)}] You have slain vencido!`,
+    `[${hace(5010)}] You slash vencido for 118 points of damage.`,
+    `[${hace(5000)}] You have slain vencido!`,
+    `[${hace(70)}] You slash contando for 240 points of damage.`,
+    `[${hace(60)}] You have slain contando!`,
+  ],
+  config: { cronos: CRONOS },
+});
 
 /**
  * LA PRIMERA RESPUESTA NO VALE COMO RESPUESTA.
  *
- * El panel se abre, carga su modulo, pregunta la configuracion y las muertes
- * por el puente, y solo entonces pinta. Leyendo a los tres segundos salia unas
- * veces con contenido y otras vacio — y un vacio asi es indistinguible de un
- * panel roto. Se espera a que haya algo, con plazo.
+ * El panel se abre, carga su módulo, pregunta la configuración y las muertes
+ * por el puente, y sólo entonces pinta. Leyendo a los tres segundos salía unas
+ * veces con contenido y otras vacío — y un vacío así es indistinguible de un
+ * panel roto. Se espera a que **deje de cambiar**, no a que diga lo que quiero:
+ * esperar a ver lo que espero sería una prueba que se aprueba sola.
  */
-/**
- * ANTES DE MEDIR NADA: ¿ENGANCHO EL MOTOR?
- *
- * Sembrar la configuracion no garantiza que la aplicacion la lea. Con la
- * clave equivocada esta sonda arrancaba, pintaba, medía y daba su informe
- * sobre una aplicacion SIN DATOS, y no fallo ni una vez.
- *
- * La pregunta buena es justo la que estaba rota: ¿sabe la aplicacion cuando
- * murio un bicho que muere en el registro de prueba? Si no lo sabe, el motor
- * no ha leido nada y lo que venga despues no mide lo que dice medir.
- */
-async function motorEnganchado(lee) {
-  const js = `window.eql.ultimaMuerte([{ nombre: "vencido", base: ${JSON.stringify(BASE)}, diff: 2, mode: null }]).then((r) => Object.values(r ?? {}).filter(Boolean).length)`;
-  for (let i = 0; i < 40; i++) {
-    const n = await lee(js, true);
-    if (n > 0) return true;
-    await espera(500);
-  }
-  return false;
-}
-async function esperaEstable(lee) {
+async function esperaEstable() {
   let previo = null;
   let iguales = 0;
   for (let i = 0; i < 40; i++) {
-    const ahora = await lee("document.getElementById('pan').innerHTML");
+    const ahora = await lee(`document.getElementById('pan').innerHTML`);
     const hay = /pan-l|pan-vacio/.test(ahora ?? '');
     if (hay && ahora === previo) {
       iguales += 1;
@@ -158,29 +80,9 @@ async function esperaEstable(lee) {
   return false;
 }
 
-const cli = cdp(ficha.webSocketDebuggerUrl);
-await cli.listo;
-
-
-const lee = async (js, esperaPromesa = false) => {
-  const r = await cli.manda('Runtime.evaluate', {
-    expression: js, returnByValue: true, awaitPromise: esperaPromesa,
-  });
-  return r?.result?.value;
-};
-
-if (!await motorEnganchado(lee)) {
-  console.error('\nEL MOTOR NO ENGANCHO.');
-  console.error('La aplicacion no sabe cuando murio «vencido», y esa muerte esta en');
-  console.error('el registro de prueba. Todo lo que midiera esta sonda a partir de');
-  console.error('aqui seria de una aplicacion vacia — que es exactamente lo que');
-  console.error('paso durante meses con bin/rotulos.js.\n');
-  fin(1);
-}
-
-if (!await esperaEstable(lee)) {
-  console.error('\nEl panel nunca se quedo quieto en 20 s.');
-  console.error('Un panel vacio y sin decir por que es indistinguible de uno roto.\n');
+if (!await esperaEstable()) {
+  console.error('\nEl panel nunca se quedó quieto en 20 s.');
+  console.error('Un panel vacío y sin decir por qué es indistinguible de uno roto.\n');
   fin(1);
 }
 
@@ -197,7 +99,6 @@ const datos = await lee(`(() => {
     esquinas: h.querySelectorAll('[data-esq]').length,
     deslizador: !!h.querySelector('.mo-op input'),
     vacio: h.querySelector('.pan-vacio')?.textContent ?? null,
-    largo: h.innerHTML.length,
   };
 })()`);
 
@@ -212,7 +113,8 @@ const ok = (c, m, extra = '') => {
 
 console.log('  filas pintadas:');
 for (const f of datos.filas) {
-  console.log(`     ${f.ya ? '▲' : ' '} ${String(f.nombre).padEnd(12)} ${String(f.tiempo).padEnd(18)} ${f.huecos ?? ''}`);
+  console.log(`     ${f.ya ? '▲' : ' '} ${String(f.nombre).padEnd(12)} ${
+    String(f.tiempo).padEnd(18)} ${f.huecos ?? ''}`);
 }
 if (datos.vacio) console.log(`     (vacío: «${datos.vacio}»)`);
 console.log('');
@@ -225,5 +127,6 @@ ok(datos.filas.some((f) => f.tiempo && /\d:\d\d/.test(f.tiempo)), 'y el que cuen
 ok(datos.esquinas === 4, 'las cuatro esquinas de redimensión están puestas');
 ok(datos.deslizador, 'y el deslizador de transparencia');
 
-console.log(`\n${mal ? `${mal} MAL` : 'todo ok'}\n`);
+// EL DENOMINADOR, siempre: «falla una» y «sólo miré una» se leen igual.
+console.log(`\n${mal} de 5 comprobaciones fallan\n`);
 fin(mal ? 1 : 0);
