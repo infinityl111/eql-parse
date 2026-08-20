@@ -473,3 +473,29 @@ export function ordenCola(filas = []) {
     || dentro(a.estado) - dentro(b.estado)
     || String(a.crono?.nombre ?? '').localeCompare(String(b.crono?.nombre ?? '')));
 }
+
+export function enemigosDeLaPelea(f) {
+  const muertes = new Map();
+  for (const k of (f?.killTimes ?? [])) {
+    if (!k?.name) continue;
+    const arr = muertes.get(k.name) ?? [];
+    arr.push((f.start ?? 0) + (k.t ?? 0));
+    muertes.set(k.name, arr);
+  }
+  return (f?.rows ?? [])
+    .filter((r) => r.side === 'enemy')
+    // Caso 2: las mascotas enemigas, fuera.
+    .filter((r) => !r.petOf && !/ pet$/i.test(r.name))
+    .map((r) => {
+      const ts = (muertes.get(r.name) ?? []).slice().sort((a, b) => a - b);
+      return {
+        nombre: r.name,
+        veces: ts.length,
+        // Caso 4: la última.
+        cuando: ts.length ? ts[ts.length - 1] : null,
+        charmed: r.charmed === true,
+      };
+    })
+    // Los que se pueden seguir, primero; dentro, por nombre.
+    .sort((a, b) => (b.veces > 0) - (a.veces > 0) || a.nombre.localeCompare(b.nombre));
+}

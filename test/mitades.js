@@ -4,7 +4,7 @@
  * ── EL FALLO, MEDIDO ANTES DE ARREGLARLO ──────────────────────────────────
  *
  * Cuando no hay nota propia en `web/notas/`, la página cae al `cuerpo` de la
- * release. Y 18 DE LAS 40 RELEASES traen el cuerpo bilingüe: «## Español» con
+ * release. Y BUENA PARTE DE LAS RELEASES traen el cuerpo bilingüe: «## Español» con
  * la nota entera y detrás «## English» con la nota entera otra vez. El
  * respaldo volcaba LAS DOS MITADES en LAS CINCO páginas. En caracteres:
  *
@@ -197,8 +197,28 @@ console.log('\nsobre releases.json de verdad');
       try { if (mitad(r.cuerpo, lang, r.tag).marcada) marcadas++; } catch { paradas++; }
     }
   }
-  ok(bilingues === 18, 'las 18 releases bilingües medidas siguen siendo 18', bilingues);
-  ok(sueltas === rel.length - 18, 'y las demás no llevan encabezado', sueltas);
+  /**
+   * AQUÍ SE COMPRUEBA UNA PARTICIÓN, NO SE CUENTA UNA POBLACIÓN.
+   *
+   * Esto decía `bilingues === 18` y `sueltas === rel.length - 18`. Eran las
+   * cifras del día en que se escribió, con 40 releases. **Una expectativa así
+   * envejece con cada publicación**: al salir la 1.18.0 pasaron a 41 y 19, y la
+   * prueba se puso roja sin que nada estuviera mal. Una prueba que hay que
+   * editar en cada release es una prueba que se acaba acallando, y entonces deja
+   * de vigilar lo que sí importa.
+   *
+   * Lo que sí es invariante —y es lo que esta batería existe para proteger— es
+   * que **ninguna release está a medias**: o trae las dos mitades o no trae
+   * encabezado ninguno. Eso no depende de cuántas haya.
+   *
+   * Y va con su CONTROL DE NO VACUIDAD al lado, porque una partición se cumple
+   * sola sobre un fichero vacío: tiene que haber de las dos clases.
+   */
+  ok(bilingues + sueltas === rel.length,
+    'toda release es bilingüe entera o sin encabezado entera: ninguna a medias',
+    `${bilingues} + ${sueltas} = ${rel.length}`);
+  ok(bilingues > 0, 'CONTROL: hay releases bilingües, la partición no se cumple por vacío', bilingues);
+  ok(sueltas > 0, 'CONTROL: y hay releases sin encabezado', sueltas);
   ok(paradas === 0, 'ninguna release real dispara la guarda: ninguna está a medias', paradas);
   ok(marcadas > 0, 'y hay notas que se marcan como no traducidas', marcadas);
   console.log(`       (${rel.length} releases · ${bilingues} bilingües · ${marcadas} notas marcadas en total)`);

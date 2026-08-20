@@ -4,7 +4,7 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets, ensureIdentidad } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
-import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION } from '../src/cronos.js';
+import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION, enemigosDeLaPelea } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
 import { parseZone, labelDiff } from '../src/zones.js';
@@ -720,8 +720,6 @@ function renderFightList(snap) {
 
   const html = parts.join('');
   const list = $('fightList');
-  if (list.dataset.sig === html) return;
-
   /**
    * EL FOCO SOBREVIVE AL REPINTADO, y sin esto no sobrevivía.
    *
@@ -731,29 +729,18 @@ function renderFightList(snap) {
    * lista se actualizaba, y la cuarta se perdía: había que volver a pinchar en
    * el campo para seguir. Desde fuera parece que el buscador «se cansa».
    *
-   * Se guarda el foco, el cursor Y EL TEXTO. El texto hace falta porque el
-   * campo se vuelve a pintar con `state.filter.foe`, que va un rebote por
-   * detrás de lo que has escrito: lo tecleado durante esos 350 ms no está
-   * todavía en el estado y se habría perdido al restaurar.
+   * ESTO ERA LA CUARTA COPIA A MANO de la misma guarda —asistente,
+   * configuración, Reapariciones y aquí—, cada una escrita entera y ninguna
+   * enterada de las otras. Ahora la hace `pintaEstable`, que conserva foco,
+   * valor y cursor. El texto hace falta porque el campo se vuelve a pintar con
+   * `state.filter.foe`, que va un rebote por detrás de lo tecleado: lo escrito
+   * durante esos 350 ms no está todavía en el estado y se perdería al
+   * restaurar sólo la posición.
+   *
+   * Aquí no hay parte volátil: la lista entera ES la firma, así que el
+   * constructor devuelve lo mismo con números y sin ellos.
    */
-  const activo = document.activeElement;
-  const foco = activo && list.contains(activo) && activo.id
-    ? { id: activo.id, valor: activo.value, ini: activo.selectionStart, fin: activo.selectionEnd }
-    : null;
-
-  list.dataset.sig = html;
-  list.innerHTML = html;
-
-  if (foco) {
-    const el = $(foco.id);
-    if (el) {
-      if (foco.valor !== undefined && el.value !== foco.valor) el.value = foco.valor;
-      el.focus();
-      // No todos los controles admiten cursor —un <select> no— y pedírselo
-      // revienta. El foco ya está puesto, que es lo que importaba.
-      try { if (foco.ini !== null) el.setSelectionRange(foco.ini, foco.fin); } catch { /* nada */ }
-    }
-  }
+  if (pintaEstable(list, () => html, null, 'sig') === 'refrescado') return;
 
   $('fltRange')?.addEventListener('change', (e) => { state.filter.range = e.target.value; refreshFights(); });
   $('fltMates')?.addEventListener('click', (e) => {
@@ -1526,6 +1513,94 @@ function pinta(caja, trozos) {
   const html = trozos.filter(Boolean).join('');
   caja.style.display = html ? 'block' : 'none';
   if (html) caja.innerHTML = html;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PINTAR SIN DESTRUIR LO QUE SE ESTÁ ESCRIBIENDO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * EL FALLO, TRES VECES: el motor empuja un snapshot **cada 250 ms**. Una
+ * sección que reescribe su `innerHTML` en cada pasada destruye y recrea sus
+ * `<input>` cuatro veces por segundo, y entonces **no se puede escribir en
+ * ellos**: la letra recién tecleada se va con el nodo viejo.
+ *
+ * Pasó en el asistente, pasó en la pantalla de configuración y pasó en
+ * Reapariciones. Las dos primeras se arreglaron **con un comentario y una
+ * guarda a mano en cada sitio**, y la tercera no las copió — porque copiar un
+ * patrón exige acordarse de que existe. La cuarta tampoco se acordaría.
+ *
+ * ASÍ QUE LA GUARDA ES ESTA FUNCIÓN, y no un patrón. Se llama, y ya está.
+ *
+ * ── EL CONTRATO ───────────────────────────────────────────────────────────
+ *
+ * `construye(conVolatil)` devuelve el HTML de la sección. Con `false` devuelve
+ * **el mismo HTML sin las partes que cambian solas** —los relojes, las cuentas
+ * atrás, las barras—, y eso es la FIRMA.
+ *
+ * Que la firma se genere con el mismo constructor es la parte que importa. Una
+ * firma escrita a mano —una lista de los campos que afectan al HTML— es más
+ * barata y se queda coja en cuanto la sección cambie: bastaría con añadir un
+ * rótulo y olvidarse de meterlo en la lista para que ese rótulo **no se
+ * repintara nunca**, sin ningún síntoma. Generando el mismo HTML dos veces, la
+ * firma no se puede desincronizar de lo que se pinta.
+ *
+ * `refresca(host)` actualiza a mano lo volátil sobre el DOM que ya está puesto.
+ * Se llama SÓLO cuando la firma no ha cambiado, así que puede dar por hecho que
+ * la estructura es la que dejó.
+ *
+ * Devuelve `'refrescado'` o `'reconstruido'`. Los escuchadores se cuelgan tras
+ * una reconstrucción y sólo tras ella: los nodos de antes siguen vivos y con
+ * los suyos puestos.
+ *
+ * ── Y CUANDO SÍ HAY QUE RECONSTRUIR ───────────────────────────────────────
+ *
+ * Se conserva **foco, valor y posición del cursor**. No sobra: reordenar una
+ * cola mientras escribes también te quita el campo de debajo. Y conservar sólo
+ * el valor no basta —el cursor salta al final y la selección se pierde—, que es
+ * justo lo que `bin/ui-teclear.js` distingue mirando si el NODO es el mismo.
+ *
+ * Lo vigila `test/campos-editables.js`, que lee este fichero y exige que toda
+ * función que reescriba DOM con un campo editable dentro pase por aquí.
+ */
+function focoDentroDe(host) {
+  const el = document.activeElement;
+  if (!el || !host.contains(el)) return null;
+  if (!el.matches?.('input, textarea, [contenteditable]')) return null;
+  const campos = [...host.querySelectorAll('input, textarea, [contenteditable]')];
+  return {
+    id: el.id || null,
+    // La posición entre los campos es el respaldo cuando no hay `id`: un entero
+    // no tiene nada que un parser pueda estropear, que es la lección del
+    // ` ` en un atributo.
+    idx: campos.indexOf(el),
+    valor: el.value,
+    ini: el.selectionStart, fin: el.selectionEnd,
+  };
+}
+
+function devuelveFoco(host, f) {
+  if (!f) return;
+  const campos = [...host.querySelectorAll('input, textarea, [contenteditable]')];
+  const el = (f.id && host.querySelector(`#${CSS.escape(f.id)}`)) || campos[f.idx];
+  if (!el) return;
+  if (f.valor !== undefined && el.value !== undefined) el.value = f.valor;
+  el.focus();
+  try { el.setSelectionRange(f.ini, f.fin); } catch { /* no todo campo lo admite */ }
+}
+
+function pintaEstable(host, construye, refresca, clave = 'sigEstable') {
+  if (!host) return 'sin hueco';
+  const firma = construye(false);
+  if (host.dataset[clave] === firma && host.firstElementChild) {
+    refresca?.(host);
+    return 'refrescado';
+  }
+  const foco = focoDentroDe(host);
+  host.innerHTML = construye(true);
+  host.dataset[clave] = firma;
+  devuelveFoco(host, foco);
+  return 'reconstruido';
 }
 
 /**
@@ -2992,6 +3067,7 @@ function renderEscena(snap, cajaSec) {
     host.innerHTML = '<div class="sec-title eyebrow" id="escenaTit"></div>'
       + '<div id="fightHead"></div><div id="clsPrompt"></div>'
       + '<div id="petHint"></div>'
+      + '<div id="croEsc"></div>'
       + '<div class="charm-note" id="escenaNota" style="display:none"></div>'
       + '<div id="rpView"></div>';
   }
@@ -3004,6 +3080,144 @@ function renderEscena(snap, cajaSec) {
   renderPetHint(snap);
   const f = withPets(fightFor(snap));
   pinta($('escenaNota'), [charmHTML(f), incertidumbreHTML(f)]);
+  renderCroEscena(f, $('croEsc'));
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * PONER UN TEMPORIZADOR DESDE LA PELEA, que es donde están los datos
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Desde Reapariciones sólo se puede escribir un NOMBRE, y con eso el crono nace
+ * cojo: la zona se coge de donde estés AHORA —que puede no ser donde murió— y
+ * la dificultad y el modo, que son parte de la clave, no se pueden poner de
+ * ninguna manera.
+ *
+ * Desde una pelea vienen los cuatro gratis y correctos:
+ *
+ *   · el NOMBRE tal y como lo escribió el registro, sin teclearlo
+ *   · la ZONA, el MODO y la DIFICULTAD de esa pelea — las tres partes de la
+ *     clave que desde el otro sitio faltaban
+ *   · el INSTANTE EXACTO de la muerte de ESE enemigo en ESTE combate, que no es
+ *     lo mismo que «la última vez que murió ese nombre»
+ *
+ * ── LOS CUATRO CASOS QUE NO SE INVENTAN ───────────────────────────────────
+ *
+ * 1. UN ENEMIGO QUE NO MURIÓ NO PUEDE LLEVAR CRONO: no hay instante desde el
+ *    que contar. Sale en la lista, marcado y sin poder marcarse — no escondido,
+ *    porque no verlo se lee como que no estuvo.
+ * 2. LAS MASCOTAS ENEMIGAS SE QUEDAN FUERA. Una mascota no reaparece por
+ *    temporizador: la invoca su dueño. Se van por `petOf` y por el sufijo
+ *    ` pet`, que son las dos formas en que llegan.
+ * 3. LOS QUE YA TIENEN CRONO ABIERTO van marcados, para no abrir el mismo dos
+ *    veces. La comparación es por CLAVE COMPLETA —nombre + zona + modo +
+ *    dificultad—, que es la misma que usa la sección.
+ * 4. SI EL MISMO NOMBRE MUERE DOS VECES EN LA MISMA PELEA SON DOS INDIVIDUOS,
+ *    y se dice con todas las letras. Se usa la ÚLTIMA muerte, porque es desde
+ *    la que queda menos por esperar y es la que el jugador acaba de ver.
+ *    `killTimes` conserva las dos; `dead` no —es un mapa por nombre y se queda
+ *    con una—, así que aquí se lee `killTimes` y no `dead`.
+ */
+/** La hora de una muerte, en el idioma de la aplicación y sin am/pm. */
+const horaCorta = (seg) => (seg
+  ? new Date(seg * 1000).toLocaleTimeString(langInfo().code, { hour12: false })
+  : '');
+
+function renderCroEscena(f, caja) {
+  if (!caja) return;
+  if (!f) { caja.innerHTML = ''; caja.dataset.croEscSig = ''; return; }
+
+  const lista = state.cfg?.cronos ?? [];
+  /**
+   * LA CLAVE SE VUELVE A PARSEAR DESDE `f.zone`, y no se cogen los campos ya
+   * guardados.
+   *
+   * Medido sobre el almacén: hay peleas viejas cuyo `zoneBase` dice
+   * «The Ruins of Old Guk 3» —con el dígito dentro—, mientras que `parseZone`
+   * de hoy devuelve «The Ruins of Old Guk» y saca el 3 a `diff`. Guardar la
+   * clave con el dígito pegado la haría IMPOSIBLE DE CASAR con la que calcula
+   * Reapariciones, y el crono nacería duplicado y sin reiniciarse nunca.
+   *
+   * Así que manda el texto original de la zona, que es el dato crudo, y los
+   * campos guardados sólo son el respaldo de cuando no lo hay.
+   */
+  const z = f.zone ? parseZone(f.zone) : null;
+  const base = z?.base ?? f.zoneBase ?? null;
+  const diff = z?.diff ?? f.diff ?? null;
+  const mode = z?.mode ?? f.zoneMode ?? null;
+  const tag = z?.tag ?? f.diffTag ?? null;
+  const abiertas = new Set(lista.map((c) => claveCrono(c)));
+  const enemigos = enemigosDeLaPelea(f).map((e) => ({
+    ...e,
+    ya: abiertas.has(claveCrono({ nombre: e.nombre, base, diff, mode })),
+  }));
+  const abierto = caja.dataset.abierto === '1';
+
+  const construye = () => {
+    const cab = `<div class="croesc-cab"><button id="croEscBtn" class="croesc-btn"${
+      enemigos.length ? '' : ' disabled'}>${esc(t('cro.escBoton'))}</button></div>`;
+    if (!abierto) return cab;
+    if (!enemigos.length) return `${cab}<div class="croesc"><p class="sub">${esc(t('cro.escVacio'))}</p></div>`;
+
+    const donde = base
+      ? `${esc(base)}${mode ? ` · ${esc(mode)}` : ''}${diff != null ? ` · ${esc(labelDiff(diff, tag))}` : ''}`
+      : esc(t('cro.sinZona'));
+
+    const filas = enemigos.map((e, i) => {
+      const puede = e.veces > 0 && !e.ya;
+      const nota = e.veces === 0 ? `<span class="croesc-no">${esc(t('cro.escNoMurio'))}</span>`
+        : e.ya ? `<span class="croesc-ya">${esc(t('cro.escYaEsta'))}</span>`
+          : e.veces > 1 ? `<span class="croesc-dos">${esc(t('cro.escDosVeces', { n: e.veces }))}</span>`
+            : `<span class="croesc-hora">${esc(t('cro.escMurio', { hora: horaCorta(e.cuando) }))}</span>`;
+      return `<label class="croesc-fila${puede ? '' : ' no'}">
+        <input type="checkbox" data-esc="${i}"${puede ? '' : ' disabled'}>
+        <b>${esc(e.nombre)}</b>${e.charmed ? ` <span class="croesc-ch">${esc(t('cro.escEncantado'))}</span>` : ''}
+        ${nota}</label>`;
+    }).join('');
+
+    return `${cab}<div class="croesc">
+      <div class="croesc-tit">${esc(t('cro.escTitulo'))}</div>
+      <div class="croesc-zona">${donde}</div>
+      <p class="sub">${esc(t('cro.escSub'))}</p>
+      ${filas}
+      <button id="croEscPon" class="croesc-pon">${esc(t('cro.escPoner'))}</button>
+    </div>`;
+  };
+
+  // Escena se repinta con el snapshot, cuatro veces por segundo. Sin esto, un
+  // clic en una casilla no llegaría nunca. Ver `pintaEstable`.
+  if (pintaEstable(caja, construye, null, 'croEscSig') === 'refrescado') return;
+
+  caja.querySelector('#croEscBtn')?.addEventListener('click', () => {
+    caja.dataset.abierto = abierto ? '0' : '1';
+    caja.dataset.croEscSig = '';        // que la próxima pasada reconstruya
+    renderCroEscena(f, caja);
+  });
+
+  caja.querySelector('#croEscPon')?.addEventListener('click', async () => {
+    const marcados = [...caja.querySelectorAll('input[data-esc]:checked')]
+      .map((el) => enemigos[+el.dataset.esc]).filter((e) => e && e.veces > 0 && !e.ya);
+    if (!marcados.length) return;
+    const nuevos = marcados.map((e) => ({
+      nombre: e.nombre, base, diff, mode,
+      /**
+       * EL INSTANTE VIAJA CON EL CRONO. Sin él, la cuenta arrancaría desde «la
+       * última muerte de ese nombre en esa clave», que puede ser otra copia y
+       * otro momento. Con él, arranca desde la muerte que el jugador acaba de
+       * ver, que es lo que ha pedido seguir.
+       */
+      desde: e.cuando,
+      // Y de dónde salió, porque un dato sin procedencia acaba leyéndose como
+      // un hecho: éste viene de una pelea concreta, no de teclearlo.
+      origen: 'pelea',
+      muertes: e.veces,
+    }));
+    const l = [...(state.cfg?.cronos ?? []), ...nuevos];
+    await window.eql.setFlag('cronos', l);
+    state.cfg.cronos = l;
+    caja.dataset.croEscSig = '';
+    renderCroEscena(f, caja);
+  });
 }
 
 /**
@@ -5668,7 +5882,18 @@ async function renderCronos(snap, cajaSec) {
     crono: c,
     clave: claveCrono(c),
     estado: estadoCrono(c, {
-      ahora, ultimaMuerte: muertes[claveCrono(c)] ?? null,
+      ahora,
+      /**
+       * EL INSTANTE QUE TRAE EL CRONO CUENTA COMO UNA MUERTE MÁS, y se coge el
+       * más reciente de los dos.
+       *
+       * `desde` lo pone quien abre el crono desde una pelea: es la muerte de
+       * ESE enemigo en ESE combate. El motor, en cambio, contesta «la última
+       * muerte de esa clave», que es lo correcto en cuanto vuelva a morir.
+       * Tomando el máximo, el crono arranca desde lo que el jugador acaba de
+       * ver y sigue reiniciándose con las muertes que vengan después.
+       */
+      ultimaMuerte: Math.max(muertes[claveCrono(c)] ?? 0, c.desde ?? 0) || null,
       medido: c.medido ?? null, heredado: c.heredado ?? null,
       // La wiki se consulta AL PINTAR y no se guarda con el crono: la tabla se
       // corrige con una versión nueva, y un valor congelado en la configuración
@@ -5697,7 +5922,20 @@ async function renderCronos(snap, cajaSec) {
    * que un parser pueda estropear.
    */
   const orden = ordenCola(conEstado);
-  const filas = orden.map(({ crono: c, clave: k, estado: st }, i) => {
+  /**
+   * SE CONSTRUYE DOS VECES A PROPÓSITO: con las cuentas atrás y sin ellas.
+   *
+   * La de sin números es la FIRMA de la sección. Ver el bloque «EL TIC NO
+   * RECONSTRUYE LA SECCIÓN» de más abajo, que explica por qué existe.
+   *
+   * Podría haberse escrito una firma declarativa —una lista de los campos que
+   * afectan al HTML— y sería más barata. No se ha hecho, y el motivo es que una
+   * firma escrita a mano se queda coja en cuanto la fila cambie: bastaría con
+   * añadir un rótulo nuevo y olvidarse de meterlo, y entonces ese rótulo no se
+   * repintaría NUNCA y no habría ningún síntoma. Generando el mismo HTML dos
+   * veces, la firma no se puede desincronizar de lo que se pinta.
+   */
+  const filasDe = (conNumero) => orden.map(({ crono: c, clave: k, estado: st }, i) => {
     const v = st.valor;
     // Donde no hay valor suyo NO se pone un número peor. Se dice que no se
     // sabe y cuántas observaciones van: la marca de «poco fiable» no funciona,
@@ -5709,7 +5947,7 @@ async function renderCronos(snap, cajaSec) {
     const cuerpo = st.estado === ESTADO.SIN_MUERTE
       ? `<div class="cro-espera">${esc(sinNumero)}</div>`
       : st.estado === ESTADO.CONTANDO
-        ? `<div class="cro-num">${cronoRestante(st.restante, v.precision)}</div>`
+        ? `<div class="cro-num" data-num="${i}">${conNumero ? cronoRestante(st.restante, v.precision) : ''}</div>`
         : `<div class="cro-num cro-cero">${esc(t('cro.disponible'))}</div>`;
     /**
      * LAS TRES PROCEDENCIAS, SIEMPRE LAS TRES, con hueco donde no hay dato.
@@ -5771,11 +6009,37 @@ async function renderCronos(snap, cajaSec) {
     </div>`;
   }).join('');
 
-  host.innerHTML = `<h2>${esc(t('cro.title'))}</h2>
+  const paginaDe = (conNumero) => {
+    const filas = filasDe(conNumero);
+    return `<h2>${esc(t('cro.title'))}</h2>
     <p class="sub">${esc(t('cro.sub'))}</p>
     <div class="cro-add"><input id="croNuevo" placeholder="${esc(t('cro.addPh'))}">
       <button id="croAdd">${esc(t('cro.add'))}</button></div>
     <div class="cro-lista">${filas || `<p class="sub">${esc(t('cro.vacio'))}</p>`}</div>`;
+  };
+
+  /**
+   * EL TIC NO RECONSTRUYE LA SECCIÓN. La guarda es `pintaEstable`, que está
+   * arriba en este mismo fichero con el relato entero: el snapshot llega cada
+   * 250 ms y esta sección reescribía su `innerHTML` en cada pasada, así que el
+   * campo del nombre se destruía cuatro veces por segundo.
+   *
+   * Aquí sólo se dice QUÉ es lo volátil: las cuentas atrás. Todo lo demás
+   * —comparar, conservar el foco, no tocar el DOM si nada cambió— lo hace ella.
+   */
+  const modo = pintaEstable(host, paginaDe, (h) => {
+    for (const nodo of h.querySelectorAll('.cro-num[data-num]')) {
+      const o = orden[+nodo.dataset.num];
+      // Sólo los que cuentan. Un cambio de estado altera la firma y no llega
+      // hasta aquí, así que esto no puede pisar el rótulo de «disponible».
+      if (o && o.estado.estado === ESTADO.CONTANDO) {
+        nodo.textContent = cronoRestante(o.estado.restante, o.estado.valor.precision);
+      }
+    }
+  }, 'croSig');
+  // Los escuchadores se cuelgan tras una reconstrucción y sólo tras ella: si no
+  // la hubo, los nodos de antes siguen vivos y con los suyos puestos.
+  if (modo === 'refrescado') return;
 
   const guardar = async (l) => {
     await window.eql.setFlag('cronos', l);
