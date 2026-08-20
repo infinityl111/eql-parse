@@ -32,16 +32,21 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { FightStore } = await import(`file://${RAIZ.replace(/\\/g, '/')}/src/store.js`);
 
 // ── 1. Un rincón propio: ni el almacén ni la configuración de nadie ────────
-const RAIZ_DATOS = fs.mkdtempSync(path.join(os.tmpdir(), 'eql-rotulos-'));
 /**
- * `--user-data-dir` es la carpeta PADRE, no la de la aplicación: Electron cuelga
- * de ella `app.getName()`. Escribiendo la configuración en la raíz, la
- * aplicación arrancaba en blanco y **los 39 rótulos salían muertos** — incluidos
- * los que acababa de ver en pantalla. Ese resultado imposible es lo que delató
- * al instrumento; si hubiera salido «35 de 39» me lo habría creído.
+ * LA CARPETA QUE SE LE PASA A `--user-data-dir` **ES** `userData`.
+ *
+ * Lo di por hecho al revés —que Electron colgaría de ella `app.getName()`— y
+ * escribí la configuración en `<carpeta>/eql-parse/config.json`. La aplicación
+ * la buscaba en `<carpeta>/config.json`, no la encontraba, y arrancaba en el
+ * asistente de bienvenida: **ninguna sección se pintaba y los 39 rótulos salían
+ * muertos**.
+ *
+ * No se resolvió razonando: se resolvió **listando qué había de verdad bajo esa
+ * carpeta después de arrancar**. Ahí estaban `store.json`, `Network/` y
+ * `Local Storage/` en la RAÍZ, y mi `eql-parse/config.json` intacto a un nivel
+ * de profundidad, sin que nadie lo hubiera leído.
  */
-const DATOS = path.join(RAIZ_DATOS, 'eql-parse');
-fs.mkdirSync(DATOS, { recursive: true });
+const DATOS = fs.mkdtempSync(path.join(os.tmpdir(), 'eql-rotulos-'));
 const AHORA = Math.floor(Date.now() / 1000);
 const BASE = "Nagafen's Lair";
 
@@ -125,7 +130,7 @@ for (const k of CLAVES) {
 
 // ── 3. Levantar la aplicación de verdad y mirar qué sale ───────────────────
 if (!(await puertoLibre())) { console.error(`\nPuerto ${PUERTO} ocupado.\n`); process.exit(2); }
-const hijo = lanzar([`--user-data-dir=${RAIZ_DATOS}`]);
+const hijo = lanzar([`--user-data-dir=${DATOS}`]);
 const pagina = await conecta();
 const { ws, manda, listo } = cdp(pagina.webSocketDebuggerUrl);
 await listo;
@@ -133,7 +138,7 @@ const evalua = evaluador(manda);
 const fin = (c) => {
   try { ws.close(); } catch { /* ya */ }
   hijo.kill();
-  try { fs.rmSync(RAIZ_DATOS, { recursive: true, force: true }); } catch { /* da igual */ }
+  try { fs.rmSync(DATOS, { recursive: true, force: true }); } catch { /* da igual */ }
   process.exit(c);
 };
 
@@ -149,7 +154,22 @@ try {
       await evalua("document.querySelector('#croEscBtn')?.click()");
       await espera(1200);
     }
-    visto += await evalua("document.body.innerText") + '\n';
+    /**
+     * NO BASTA CON `innerText`: varios rótulos viven en ATRIBUTOS —el
+     * `placeholder` de un campo, el `title` de un icono— y no son texto del
+     * documento. Buscándolos sólo en `innerText` salían muertos estando a la
+     * vista, que es exactamente el falso positivo que esta herramienta existe
+     * para no producir.
+     */
+    visto += await evalua(`(() => {
+      const t = [document.body.innerText];
+      for (const e of document.querySelectorAll('[placeholder],[title],[aria-label]')) {
+        t.push(e.getAttribute('placeholder') || '');
+        t.push(e.getAttribute('title') || '');
+        t.push(e.getAttribute('aria-label') || '');
+      }
+      return t.join(String.fromCharCode(10));
+    })()`) + '\n';
   }
 } catch (e) { console.error('\n', e?.message ?? e, '\n'); }
 
@@ -181,12 +201,24 @@ for (const k of CLAVES) {
  * tres daban el MISMO síntoma —«39 de 39 muertos»— que es justo el que no hay
  * que creerse.
  */
-const CANARIO = 'cro.title';
+/**
+ * DOS CANARIOS Y NO UNO, y el segundo es el que importa.
+ *
+ * `cro.title` sólo demuestra que la sección puso su encabezado. `cro.close` va
+ * en el botón «Cerrar» de CADA ficha, así que demuestra que las fichas se han
+ * pintado — que es donde vive casi todo lo que se está midiendo.
+ *
+ * Con un solo canario la herramienta daba «17 de 39» y se quedaba tan ancha,
+ * con `cro.add`, `cro.close` y `cro.setManual` en la lista de muertos estando
+ * los tres a la vista. Un encabezado sin fichas es media sección, y media
+ * sección da un recuento que parece bueno.
+ */
+const CANARIO = 'cro.close';
 if (!vivas.some(([k]) => k === CANARIO)) {
   console.error('\nESTA COMPROBACIÓN NO ESTÁ MIDIENDO NADA.\n');
-  console.error(`«${CANARIO}» es el encabezado de la sección y tiene que salir siempre.`);
-  console.error('Si sale muerto, la aplicación no ha llegado a pintar la sección y el');
-  console.error('recuento de abajo no vale. NO se publica ese número.\n');
+  console.error(`«${CANARIO}» va en el botón «Cerrar» de CADA ficha: si la sección pinta, sale.`);
+  console.error('Si sale muerto, las fichas no se han pintado y el recuento de abajo');
+  console.error('no vale. NO se publica ese número.\n');
   console.error('Lo que se vio en pantalla, en crudo:');
   console.error(JSON.stringify(cuerpo.slice(0, 300)));
   console.error('');
