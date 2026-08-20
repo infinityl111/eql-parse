@@ -70,10 +70,24 @@ const versionDe = (d) => {
 };
 
 let ultima = null;
+let etiquetas = null;
 try {
   const repo = /github\.com[/:]([^/]+\/[^/.]+)/.exec(git('remote', 'get-url', 'origin'))?.[1];
-  if (repo) ultima = execFileSync('gh', ['api', `repos/${repo}/releases/latest`, '--jq', '.tag_name'],
-    { encoding: 'utf8' }).trim();
+  if (repo) {
+    ultima = execFileSync('gh', ['api', `repos/${repo}/releases/latest`, '--jq', '.tag_name'],
+      { encoding: 'utf8' }).trim();
+    /**
+     * TAMBIÉN LAS QUE YA NO TIENEN RELEASE NINGUNA.
+     *
+     * Faltaba este caso y salió el mismo día: la 1.19.0 se retiró sin publicarse
+     * —llegó a instalarse, así que su número quedó gastado— y su obra se quedó
+     * ahí, con 791 MB, porque la única regla que había era «¿es la última
+     * publicada?» y la respuesta era no. Una obra de una versión que **no
+     * existe como release** no la espera nadie: o se retiró, o nunca llegó.
+     */
+    etiquetas = new Set(JSON.parse(execFileSync('gh',
+      ['api', `repos/${repo}/releases`, '--jq', '[.[].tag_name]'], { encoding: 'utf8' })));
+  }
 } catch { /* sin red o sin gh: se dice y no se decide por él */ }
 
 const lista = obras();
@@ -94,15 +108,20 @@ for (const w of lista) {
   const publicada = ultima && v && `v${v}` === ultima;
   const sucia = git('-C', w.dir, 'status', '--short').length > 0;
 
+  const sinRelease = etiquetas && v && !etiquetas.has(`v${v}`);
+
   const porQue = !vivo ? 'su commit NO está en main: al quitarla quedaría colgando'
     : sucia ? 'tiene cambios sin guardar dentro'
       : !ultima ? 'no sé si su versión está publicada'
-        : publicada ? null
+        : publicada || sinRelease ? null
           : `su versión (${v}) no es la última publicada: puede que aún esté sin instalar`;
+
+  const razonQuitar = publicada ? 'su versión ya es la última publicada'
+    : 'su versión NO EXISTE como release: o se retiró, o nunca llegó';
 
   console.log(`  ${porQue ? '·' : '▸'} ${w.dir}`);
   console.log(`      versión ${v ?? '?'}  ·  ${w.commit.slice(0, 8)}  ·  ${mb(tam(w.dir))}`);
-  console.log(`      ${porQue ? `SE QUEDA — ${porQue}` : 'se puede retirar: su versión ya es la última publicada'}\n`);
+  console.log(`      ${porQue ? `SE QUEDA — ${porQue}` : `se puede retirar: ${razonQuitar}`}\n`);
   if (!porQue) quitables.push(w);
 }
 
