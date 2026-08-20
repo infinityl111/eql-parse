@@ -283,6 +283,32 @@ export const PERIODOS_SOSPECHA = 3;
  */
 export const MIN_OBS_DISCREPA = 3;
 
+/**
+ * ¿SE PUEDE AFIRMAR QUE LO OBSERVADO NO COINCIDE CON LO QUE ESCRIBIÓ CAMPEÓN?
+ *
+ * Dos condiciones, y la segunda es la que de verdad manda.
+ *
+ * 1. **Suficientes observaciones.** Con una no se dice nada —un intervalo suelto
+ *    no es una medida— y con dos tampoco: dos puntos son dos puntos.
+ *
+ * 2. **Y que sea UN bicho.** «Lo observado no coincide» es una AFIRMACIÓN sobre
+ *    nuestra cifra aunque no la imprima, y hereda sus problemas. Tres
+ *    observaciones bastan para que no sea ruido de muestra, pero **no bastan si
+ *    son de individuos distintos**: de un nombre del que hay cuarenta no
+ *    sabemos cuál volvió, así que tampoco sabemos si SU tiempo discrepa del que
+ *    él escribió. Tres colisiones siguen siendo tres colisiones.
+ *
+ * Con multiplicidad demostrada no se afirma nada: se enseña el recuento de
+ * observaciones y se calla.
+ *
+ * `multiplicidad` es el máximo de individuos vistos a la vez. CERO NO ES «HAY
+ * UNO»: es «no se ha demostrado que haya más», y eso sí deja afirmar.
+ */
+export function puedeAfirmarDiscrepancia({ observaciones = 0, multiplicidad = 0 } = {}) {
+  if (observaciones < MIN_OBS_DISCREPA) return false;
+  return (multiplicidad ?? 0) <= 1;
+}
+
 export function valorDe({
   manual = null, manualMargen = null,
   wiki = null, wikiPagina = null,

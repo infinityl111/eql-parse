@@ -4,7 +4,7 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets, ensureIdentidad } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
-import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION, enemigosDeLaPelea, MIN_OBS_DISCREPA } from '../src/cronos.js';
+import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION, enemigosDeLaPelea, MIN_OBS_DISCREPA, puedeAfirmarDiscrepancia } from '../src/cronos.js';
 import { clasificaJefe, jefesDe } from '../src/raid.js';
 import { mismoNombre } from '../src/nombres.js';
 import { parseZone, labelDiff } from '../src/zones.js';
@@ -5875,6 +5875,12 @@ async function renderCronos(snap, cajaSec) {
    * muertes: el registro está vivo y un recuento cacheado envejece solo.
    */
   const obs = claves.length ? (await window.eql.observacionesDe?.(claves)) ?? {} : {};
+  /**
+   * LA MULTIPLICIDAD SE PREGUNTA AL PINTAR, no se coge la del dia que se abrio
+   * el crono: un nombre puede demostrar que hay varios en cualquier pelea
+   * posterior, y un valor congelado seguiria diciendo lo viejo.
+   */
+  const mult = claves.length ? (await window.eql.multiplicidadDe?.(claves)) ?? {} : {};
   const ahora = Math.floor(Date.now() / 1000);
 
   /**
@@ -5911,8 +5917,22 @@ async function renderCronos(snap, cajaSec) {
        * Con menos de `MIN_OBS_DISCREPA` no se pasa: afirmar que algo no
        * coincide con dos observaciones seria afirmar ruido.
        */
-      medido: (obs[claveCrono(c)]?.observaciones ?? 0) >= MIN_OBS_DISCREPA
-        ? (obs[claveCrono(c)]?.minimo ?? null) : null,
+      /**
+       * Y LA MULTIPLICIDAD MANDA SOBRE EL RECUENTO.
+       *
+       * «Lo observado no coincide» es una AFIRMACION sobre nuestra cifra aunque
+       * no la imprima, y hereda sus problemas. Tres observaciones bastan para
+       * que no sea ruido de muestra, pero **no bastan si son de bichos
+       * distintos**: de un nombre del que hay cuarenta no sabemos cual volvio,
+       * asi que tampoco sabemos si SU tiempo discrepa del que escribio Campeon.
+       *
+       * Con multiplicidad demostrada no se afirma nada: se ensena el recuento
+       * de observaciones y se calla. Es la misma linea de siempre.
+       */
+      medido: puedeAfirmarDiscrepancia({
+        observaciones: obs[claveCrono(c)]?.observaciones ?? 0,
+        multiplicidad: mult[claveCrono(c)] ?? 0,
+      }) ? (obs[claveCrono(c)]?.minimo ?? null) : null,
       heredado: null,
       // La wiki se consulta AL PINTAR y no se guarda con el crono: la tabla se
       // corrige con una versión nueva, y un valor congelado en la configuración
