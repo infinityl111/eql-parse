@@ -218,9 +218,28 @@ export function guion(f, lineas, Parser, self = null) {
       });
     } else if (ev.kind === 'cast' && ev.ability) {
       mete(s, { tipo: 'lanza', origen: ev.source, habilidad: ev.ability, cat: ev.castCat ?? null });
-      // Se anota abierto para poder cerrarlo con lo que pase después: así la
-      // barra sabe cuánto duró ESTA vez, y no sólo cuánto suele durar.
-      castOpen.set(`${ev.source}|${ev.ability}`, { s, ref: porSegundo.get(s).at(-1) });
+      /**
+       * SE ANOTA ABIERTO PARA PODER CERRARLO con lo que pase después: así la
+       * barra sabe cuánto duró ESTA vez, y no sólo cuánto suele durar.
+       *
+       * ── Y SÓLO SI `mete` LO HA METIDO ────────────────────────────────
+       *
+       * `mete` descarta lo que cae FUERA de la pelea —`s < 0` o `s > dur`—,
+       * así que en esas líneas `porSegundo.get(s)` no existe y esto reventaba
+       * con `Cannot read properties of undefined (reading 'at')`. La pelea
+       * entera se quedaba sin pista, y el reproductor sin nada que enseñar.
+       *
+       * Hoy no es alcanzable desde la aplicación —pide el tramo exacto,
+       * `[inicio, inicio+duración]`— pero la guarda no estaba y una sonda
+       * tropezó con ella a la primera pidiendo dos segundos de margen. Una
+       * función que revienta según qué ventana le den no puede depender de
+       * que su único llamador de hoy la pida bien.
+       *
+       * Lo que se hace con lo de fuera es NADA, que es lo mismo que hace
+       * `mete`: ni se dibuja ni se abre. Ver `test/reproduccion.js`.
+       */
+      const ref = porSegundo.get(s)?.at(-1);
+      if (ref) castOpen.set(`${ev.source}|${ev.ability}`, { s, ref });
     } else if (ev.kind === 'death' && ev.victim) {
       mete(s, { tipo: 'muere', destino: ev.victim, origen: ev.killer ?? null });
     } else if (ev.kind === 'interrupt' && ev.ability) {

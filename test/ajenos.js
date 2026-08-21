@@ -131,5 +131,46 @@ console.log('\nla guarda contesta lo mismo para los dos llamadores');
     'y la muerte del bicho de otro, no');
 }
 
+// ═══ N. UNA LÍNEA DE FUERA DE LA PELEA NO PUEDE TUMBAR EL GUION ═════════
+//
+// `mete` descarta lo que cae fuera de `[0, duración]` — y está bien—, pero la
+// rama del lanzamiento anotaba el suceso abierto leyendo lo que `mete` acababa
+// de NO meter: `porSegundo.get(s).at(-1)` sobre `undefined`. Resultado, la pista
+// entera por los suelos y el reproductor sin nada que enseñar.
+//
+// No era alcanzable desde la aplicación, que pide el tramo exacto; lo encontró
+// una sonda pidiendo dos segundos de margen. Una función que revienta según qué
+// ventana le den no puede depender de que su único llamador de hoy la pida bien.
+console.log('\nuna línea anterior al segundo cero no tumba la pista');
+{
+  const dentro = [
+    linea(1, 'Campeon slashes a rock golem for 120 points of damage.'),
+    linea(2, 'a rock golem hits Campeon for 40 points of damage.'),
+  ];
+  const fuera = [
+    // Un lanzamiento DOS SEGUNDOS ANTES de que empiece la pelea, y otro después
+    // del final: las dos puntas del mismo agujero.
+    { t: INICIO - 2, texto: 'Campeon begins casting Ancient Breath.' },
+    { t: INICIO + 500, texto: 'Campeon begins casting Ancient Breath.' },
+  ];
+  let reventó = null;
+  let g = null;
+  try { g = guion(PELEA, [...fuera, ...dentro], Parser, 'Campeon'); }
+  catch (e) { reventó = e.message; }
+  ok(!reventó, 'el guion se construye igual', reventó ?? 'sin excepción');
+  ok(g && g.sucesos > 0, 'y con los sucesos de dentro puestos', `${g?.sucesos ?? 0} sucesos`);
+
+  // Y lo de fuera NO se cuela: se descarta, que es lo que hace `mete`.
+  const dibujados = (g?.segundos ?? []).flat();
+  ok(!dibujados.some((x) => x.tipo === 'lanza'),
+    'y el lanzamiento de fuera no se dibuja', 'lo de fuera de la pelea se descarta, no se coloca en el borde');
+
+  // CONTROL POSITIVO: el mismo lanzamiento DENTRO sí se dibuja. Sin esto, el
+  // verde de arriba lo daría también un guion que no sabe leer lanzamientos.
+  const conDentro = guion(PELEA, [...dentro, linea(3, 'Campeon begins casting Ancient Breath.')], Parser, 'Campeon');
+  ok((conDentro.segundos ?? []).flat().some((x) => x.tipo === 'lanza'),
+    'CONTROL: el mismo lanzamiento dentro de la pelea SÍ se dibuja');
+}
+
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');
 process.exit(failed ? 1 : 0);
