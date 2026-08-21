@@ -89,6 +89,14 @@ function pelea() {
   engine.self = 'Campeon';
   engine.parser = parser;
   engine.tracker = tracker;
+  /**
+   * LA LINEA DE VISITAS, que en la aplicacion llena `#anotaVisto` con cada
+   * `You have entered`. Aqui se pone a mano porque este guion alimenta al
+   * tracker directamente y no pasa por `feedEvent` — y tiene que estar, o el
+   * campo `visita` de la pelea saldria siempre nulo y la huella no vigilaria
+   * ni su presencia ni su valor.
+   */
+  engine.entradas = [Math.floor(new Date(2026, 7, 4, 20, 59, 0).getTime() / 1000)];
   for (const [s, l] of GUION) tracker.feed(parser.parse(`${stamp(s)} ${l}`));
   return engine.snapshot().current;
 }
@@ -152,10 +160,23 @@ function estable(x) {
  *                         mecanismo de dudas. Arreglarlo exigiría releer el
  *                         registro; detectarlo es gratis. Ver `dudaCompa` en
  *                         `src/store.js`.
+ *   0228780530e1a8bf  v13 la visita: cada pelea guarda en qué visita a la zona
+ *                         ocurrió, contando las entradas del registro anteriores
+ *                         a su comienzo. Es lo único suyo que no se puede
+ *                         deducir leyendo lo guardado, y por eso ésta SÍ sube
+ *                         `RECONSTRUIR_DESDE`.
+ *
+ *                         Y LA HUELLA LLEVABA SIN ANOTARSE DESDE LA v9: entre
+ *                         la 10 y la 12 cambió lo guardado y nadie escribió la
+ *                         nueva, así que la guarda entraba siempre por la rama
+ *                         de «cambió y el número subió» —que no compara nada— y
+ *                         no habría cazado un cambio con el número quieto.
+ *                         Una guarda cuya anotación se salta se convierte en un
+ *                         mensaje informativo.
  */
 const ANOTADO = {
-  version: 9,
-  huella: 'fd0777ef4da59c0d',
+  version: 13,
+  huella: '0228780530e1a8bf',
 };
 
 console.log('\nel formato de lo guardado');

@@ -171,11 +171,75 @@ const leido = (txt, k) => new RegExp(
  *
  * Se pide la palabra y algo detrás: una anotación que sólo diga «dormida» no
  * dice cuándo deja de estarlo, y entonces es indistinguible de una excusa.
+ *
+ * ── Y LA ANOTACIÓN TIENE QUE NOMBRAR SU CAMPO, EN LA MISMA LÍNEA ──────────
+ *
+ * Esto miraba en una ventana de 600 caracteres alrededor de la palabra, así que
+ * **la anotación de un campo dormía al de al lado**: `modelo` está anotado como
+ * dormida y el campo `visita`, escrito veinte líneas más abajo, entraba en su
+ * ventana y quedaba exento sin que nadie lo hubiera anotado. Se vio con un
+ * control positivo: cegando a su lector de verdad, la prueba seguía en verde.
+ *
+ * Es la cuarta de la misma forma en este árbol —casar por cercanía o por
+ * apariencia en vez de por identidad—, y el arreglo es el de siempre: que la
+ * marca diga de QUIÉN es. Misma línea, con el nombre del campo dentro.
  */
-const dormida = (k) => {
-  const re = new RegExp(`DORMIDA[\\s\\S]{0,600}?\\b${k}\\b|\\b${k}\\b[\\s\\S]{0,600}?DORMIDA`);
-  return re.test(FUENTE);
+const dormida = (k) => new RegExp(`DORMIDA[^\\n]*\\b${k}\\b|\\b${k}\\b[^\\n]*DORMIDA`).test(FUENTE);
+
+/**
+ * LOS QUE LEE EL PROPIO MOTOR PARA PRODUCIR OTRA COSA, declarados uno a uno.
+ *
+ * El motor no cuenta como consumidor y está bien que no cuente: es quien
+ * escribe, y dejarlo entrar haría que cualquier campo se justificase solo. Pero
+ * hay campos que NO viajan a la pantalla y aun así llegan a alguien —el motor
+ * los usa para calcular algo que sí se enseña—, y para ésos «no lo lee nadie»
+ * sería falso.
+ *
+ * Se declaran aquí con QUIÉN los lee, y la declaración NO se cree: se comprueba
+ * que `src/engine.js` los lea de verdad. Una lista de excepciones que nadie
+ * verifica es una lista de excusas.
+ */
+const LEIDOS_POR_EL_MOTOR = {
+  // La visita en que ocurrió la pelea. No se enseña: la usa `cotaDe` para
+  // decidir si un hueco entre dos muertes acota algo —dentro de una visita— o
+  // cruza una reentrada, donde el bicho no volvió sino que nació con la copia.
+  visita: { en: 'cotaDe', lee: 'sm.visita' },
 };
+
+/**
+ * El cuerpo de un método de `src/engine.js`, por sus llaves.
+ *
+ * SE MIRA EL CUERPO Y NO EL FICHERO ENTERO, y no es puntillismo: el fichero que
+ * ESCRIBE el campo también lo nombra, así que buscarlo en todo `engine.js`
+ * casaba con la línea que lo produce y la comprobación no podía fallar nunca.
+ * Se vio con el control de abajo: cegando la lectura, seguía en verde.
+ */
+/**
+ * El mismo texto SIN COMENTARIOS: lo que el programa hace, no lo que cuenta.
+ *
+ * Hace falta y no es adorno: el bloque que explica por qué `cotaDe` lee
+ * `sm.visita` **contiene esa cadena**, así que la comprobación de abajo se
+ * cumplía sola leyendo la explicación en vez del código. Otra vez casar por
+ * apariencia; el control positivo lo cazó al ceñir la búsqueda al código.
+ */
+const sinComentarios = (txt) => txt
+  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+  .replace(/\/\/[^\n]*/g, ' ');
+
+function cuerpoDe(txt, metodo) {
+  const i = txt.indexOf(`
+  ${metodo}(`);
+  if (i < 0) return '';
+  let j = txt.indexOf('{', i);
+  if (j < 0) return '';
+  let n = 0;
+  for (let k = j; k < txt.length; k += 1) {
+    if (txt[k] === '{') n += 1;
+    if (txt[k] === '}') { n -= 1; if (n === 0) return txt.slice(j, k + 1); }
+  }
+  return '';
+}
+const MOTOR = lee('src/engine.js');
 
 console.log('\nlos campos que se calculan y no lee nadie');
 
@@ -189,6 +253,10 @@ for (const [nombre, fichero, ini, fin] of BLOQUES) {
   ok((lista?.length ?? 0) >= 5, `${nombre}: y saca campos`, `${lista?.length ?? 0}`);
   for (const k of lista ?? []) {
     if (leido(TEXTO, k) || dormida(k)) continue;
+    // Y los que lee el motor para producir otra cosa, si la declaración es
+    // cierta: se exige que `src/engine.js` lo lea de verdad.
+    const decl = LEIDOS_POR_EL_MOTOR[k];
+    if (decl && sinComentarios(cuerpoDe(MOTOR, decl.en)).includes(decl.lee)) continue;
     muertos.push(`${k} (${nombre})`);
   }
 }
@@ -205,6 +273,32 @@ if (muertos.length) {
   console.log('         DORMIDA junto al campo con el caso que lo despierta escrito.');
   console.log('       Dejarlo «por si acaso» es exactamente cómo se propagó esta familia:');
   console.log('       `f.duda` estuvo dos versiones calculándose bien y sin verla nadie.');
+}
+
+/**
+ * CONTROL POSITIVO DE LA EXENCIÓN, sobre el fichero real.
+ *
+ * La lista `LEIDOS_POR_EL_MOTOR` es una excepción, y una excepción que no puede
+ * fallar es una excusa. Aquí se le quita al motor la línea que de verdad lee el
+ * campo —la forma exacta, `sm.visita`— y se exige que el veredicto cambie.
+ *
+ * Dos veces entró en verde escribiéndolo: primero porque se buscaba en el
+ * fichero entero, donde también está la línea que ESCRIBE el campo; después
+ * porque el comentario que explica la lectura contiene la propia cadena. Las
+ * dos son la misma familia — casar por apariencia — y por eso este control se
+ * queda puesto.
+ */
+console.log('\nCONTROL POSITIVO: si el motor deja de leerlo, la exención cae');
+{
+  const cegado = MOTOR.replace('const visita = sm.visita ?? null;', 'const visita = null;');
+  ok(cegado !== MOTOR, 'se ha podido cegar la lectura en el fichero real',
+    cegado === MOTOR ? '`cotaDe` ha cambiado de forma: ACTUALIZA ESTE CONTROL' : '');
+  for (const [k, decl] of Object.entries(LEIDOS_POR_EL_MOTOR)) {
+    ok(!sinComentarios(cuerpoDe(cegado, decl.en)).includes(decl.lee),
+      `${k}: cegado, la exención ya no se concede`, `lee «${decl.lee}» en ${decl.en}()`);
+    ok(sinComentarios(cuerpoDe(MOTOR, decl.en)).includes(decl.lee),
+      `${k}: y sin cegar, sí — el motor lo lee de verdad`);
+  }
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

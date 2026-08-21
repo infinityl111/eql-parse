@@ -219,7 +219,12 @@ const logicalKey = (s) => claveSegura('logicalKey', s.at, s.total ?? 0, s.durati
  * Sube SIEMPRE que cambie lo que se escribe a disco. Sin excepciones y sin
  * ramas de escape: `test/formato.js` no deja publicar sin subirlo.
  */
-export const FORMATO_VERSION = 12;
+/**
+ * SUBE A 13 EN LA 1.23.0: LA VISITA. El resumen lleva un campo nuevo —`visita`—
+ * que se sella al leer el registro contando sus entradas de zona. No cambia
+ * ninguna cifra de combate; cambia lo que se escribe, así que el número sube.
+ */
+export const FORMATO_VERSION = 13;
 
 /**
  * Por debajo de esta generación, lo guardado NO se puede arreglar leyéndolo
@@ -421,7 +426,28 @@ export const FORMATO_VERSION = 12;
  * vieja se quedó corta a la mitad. Y la ventana NO se bloquea: 3.763 fotogramas
  * en 63 s, cero por encima de 100 ms.
  */
-export const RECONSTRUIR_DESDE = 12;
+/**
+ * SUBE A 13 EN LA 1.23.0, Y ES EL CASO EXACTO DE ESTA CONSTANTE: la visita no
+ * se puede recuperar leyendo lo guardado. Una entrada de zona sin pelea por el
+ * camino **no deja rastro en el almacén**, así que desde el índice salir y
+ * volver a la misma instancia es indistinguible de no haberse movido. La
+ * prueba está en el registro y en ningún otro sitio.
+ *
+ * QUÉ ARREGLA, medido antes de tocar nada sobre 2.118 peleas y 731 claves: la
+ * cota superior deducía la visita del propio índice —definición gruesa— y con
+ * ella publicaba 108 techos; con la visita del registro son 96. Los 12 que caen
+ * se apoyaban en huecos que CRUZAN una reentrada, donde el bicho no reapareció
+ * sino que nació con la copia nueva: uno decía «no más de 280 minutos» y su
+ * techo de verdad, por mención, son 9m 31s.
+ *
+ * Y el mismo agujero estaba en los huecos de mención, que sí se arreglan sin
+ * releer nada: 610 de 5.602 cruzaban una entrada, y 120 claves de 592 sacaban
+ * su mínimo —lo que se publica— de uno de ésos.
+ *
+ * NINGUNA CIFRA DE COMBATE SE MUEVE con esta reconstrucción. Lo que cambia es
+ * que las peleas pasan a saber en qué visita ocurrieron.
+ */
+export const RECONSTRUIR_DESDE = 13;
 
 const META = 'store.json';
 
@@ -934,6 +960,19 @@ export class FightStore {
       // La dificultad va también en el índice: el filtro y el expediente la
       // necesitan sin abrir cada pelea del disco.
       zoneBase: f.zoneBase ?? null, diff: f.diff ?? null, diffTag: f.diffTag ?? null,
+      /**
+       * LA VISITA, que es lo único de aquí que NO se puede deducir leyendo lo
+       * guardado. Sale de contar las entradas de zona del REGISTRO, y una
+       * entrada sin pelea por el camino no deja rastro en el almacén: desde
+       * aquí, salir y volver a la misma zona es indistinguible de no haberse
+       * movido.
+       *
+       * La necesita la cota superior: un hueco entre dos muertes sólo acota si
+       * las dos son del MISMO bicho, y al reentrar en una instancia el bicho
+       * no ha reaparecido, ha nacido con la copia. `null` es «no consta» y no
+       * acota nada.
+       */
+      visita: f.visita ?? null,
       // El nivel también: emparejar las mejores marcas sin él no significa nada.
       level: f.level ?? null,
       duration: f.duration, total: f.total, raidDps: f.raidDps,

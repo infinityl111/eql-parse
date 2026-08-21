@@ -35,6 +35,8 @@ import path from 'node:path';
 import { Engine } from '../src/engine.js';
 import { FightStore } from '../src/store.js';
 import { claveCrono } from '../src/cronos.js';
+import { Parser } from '../src/parser.js';
+import { EncounterTracker } from '../src/encounter.js';
 
 let mal = 0;
 const ok = (c, m, extra = '') => {
@@ -273,6 +275,73 @@ console.log('\nEL RESPALDO DEL «VISTO» CORRE CON LA APLICACIÓN RECIÉN ABIERT
   conLinea.vistos = new Map([[`a kobold king Nagafen's Lair 2 (Adaptive)`, { t: 9e9, kind: 'melee' }]]);
   ok(conLinea.vistoDe([clave])[claveCrono(clave)]?.kind === 'melee',
     'y una línea del registro manda sobre el respaldo', 'es más reciente y dice más');
+}
+
+console.log('\nLA LINEA DE VISITAS SALE DE LAS ENTRADAS DEL REGISTRO');
+{
+  /**
+   * El sello no vale de nada si nadie llena la lista. Aqui se le dan al motor
+   * DOS entradas a la MISMA zona —la reentrada, que es el caso que el indice no
+   * puede ver— y se comprueba que las cuenta como dos visitas distintas.
+   */
+  const e = new Engine();
+  e.self = 'Campeon';
+  e.parser = new Parser({ self: 'Campeon' });
+  e.tracker = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+  const linea = (h) => `[Tue Aug 04 ${h} 2026] You have entered Befallen 2 (Adaptive).`;
+  for (const h of ['21:00:00', '21:05:00']) {
+    const ev = e.parser.parse(linea(h));
+    if (ev) e.feedEvent(ev);
+  }
+  ok((e.entradas ?? []).length === 2,
+    'dos entradas a la MISMA zona son dos visitas, no una',
+    `${(e.entradas ?? []).length} entradas · es lo que el indice no puede ver`);
+  ok(e.entradas[1] - e.entradas[0] === 300, 'y con su instante, no con un contador suelto');
+}
+
+console.log('\nLA COTA SOLO CUENTA HUECOS DENTRO DE UNA MISMA VISITA');
+{
+  /**
+   * La visita ya no se deduce del índice: viaja en el resumen, sellada al leer
+   * el registro. Aquí se prueban las tres respuestas, que son tres y no dos:
+   *
+   *   misma visita   → el hueco acota
+   *   otra visita    → no acota: al reentrar el bicho no volvió, nació
+   *   sin sello      → NO CONSTA, que no es «la misma»
+   */
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'eql-cota-'));
+  const s = new FightStore(dir2);
+  s.self = 'Campeon';
+  const T = 1787100000000;
+  const pelea = (at, visita) => ({
+    zone: 'Befallen 2 (Adaptive)', zoneBase: 'Befallen', diff: 2, diffTag: 'Adaptive',
+    visita, duration: 60, total: 1000, start: Math.round(at / 1000),
+    kills: ['a greater skeleton'], killTimes: [{ name: 'a greater skeleton', t: 10 }],
+    rows: [{ name: 'Campeon', side: 'ally' }, { name: 'a greater skeleton', side: 'enemy' }],
+  });
+  const clave = { nombre: 'a greater skeleton', base: 'Befallen', diff: 2, mode: null };
+  const cotaCon = (peleas) => {
+    fs.rmSync(path.join(dir2, 'fights.ndjson'), { force: true });
+    fs.rmSync(path.join(dir2, 'fights.idx'), { force: true });
+    const st = new FightStore(dir2);
+    st.self = 'Campeon';
+    for (const [at, v] of peleas) st.append(pelea(at, v), at);
+    const leido = new FightStore(dir2);
+    leido.load();
+    return motor(leido).cotaDe([clave])[claveCrono(clave)] ?? null;
+  };
+
+  const dentro = cotaCon([[T, 7], [T + 400e3, 7]]);
+  ok(dentro?.segundos === 400, 'dos muertes de la MISMA visita acotan',
+    dentro ? `≤ ${dentro.segundos} s con ${dentro.huecos} hueco(s)` : 'NO ACOTA');
+  ok(cotaCon([[T, 7], [T + 400e3, 8]]) === null,
+    'y si entre medias hubo otra entrada, NO acota',
+    'al reentrar el bicho no ha reaparecido: ha nacido con la copia');
+  ok(cotaCon([[T, null], [T + 400e3, null]]) === null,
+    'sin sello de visita tampoco', '«no consta» no puede valer como «la misma»');
+  ok(cotaCon([[T, 7], [T + 400e3, null]]) === null,
+    'CONTROL: y basta con que le falte a UNO de los dos extremos');
+  fs.rmSync(dir2, { recursive: true, force: true });
 }
 
 console.log('\nCONTROL POSITIVO: con la forma REAL del fallo, la prueba se pone roja');

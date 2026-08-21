@@ -274,6 +274,9 @@ export class Engine extends EventEmitter {
     // cambia debajo. Ver `registro()` en `src/triggers.js`.
     this.triggers.registro(logPath);
     this.parser = new Parser({ self: this.self });
+    // La línea de visitas se rehace con cada lectura: sale del registro y no
+    // del almacén, así que no se hereda de la sesión anterior.
+    this.entradas = [];
     this.narrator.setSelf(this.self);
     this.narrator.setPets([]);
     // Lo que declaraste tuyo se le devuelve al analizador recién creado. El
@@ -1207,7 +1210,8 @@ export class Engine extends EventEmitter {
        * almacén: en cuanto una parte del histórico se corrige y otra no, una
        * marca global deja de describir lo que hay dentro. Ver `MODELO_MEDICION`.
        *
-       * GUARDA DORMIDA, y así la cazó `test/muertos.js`. Su único lector es
+       * GUARDA DORMIDA · campo `modelo`, y así lo cazó `test/muertos.js`. Su
+       * único lector es
        * `repararModelo` en `store.js`, que decide con él si una pelea vieja hay
        * que subirla al leerla; ninguna pantalla lo enseña.
        *
@@ -1228,6 +1232,20 @@ export class Engine extends EventEmitter {
       key: fightKey({ id: enc.id, start: enc.start }),
       zone: enc.zone,
       zoneBase: z.base, zoneMode: z.mode, diff: z.diff, diffTag: z.tag,
+      /**
+       * EN QUE VISITA A LA ZONA OCURRIO, contando las entradas del registro
+       * anteriores a su comienzo. Es lo unico de la pelea que NO se puede
+       * deducir despues leyendo lo guardado: una entrada sin pelea por el
+       * camino no deja rastro, asi que salir y volver a la misma instancia
+       * se ve igual que no haberse movido.
+       *
+       * Va aqui y no al cerrar por dos razones: se sella con el instante en
+       * que EMPEZO la pelea —si zonaste a mitad, la pelea es de la visita en
+       * que la peleaste— y asi entra en la huella de `test/formato.js`, que
+       * mira lo que produce este constructor. Un campo estampado despues
+       * seria invisible para la guarda del formato.
+       */
+      visita: this.#visitaEn(enc.start),
       // Nivel y clases de ESTA pelea. `null` significa que no se sabe, y se
       // enseña como tal: no se hereda del hito siguiente ni del actual.
       level: enc.level ?? null,
@@ -1856,8 +1874,55 @@ export class Engine extends EventEmitter {
    * La clave incluye la zona: el mismo nombre en dos sitios son dos bichos, y
    * esa distincion es la misma que la del temporizador.
    */
+  /**
+   * En qué visita cae un instante: cuántas entradas de zona lo preceden.
+   *
+   * `null` es «no consta», y es lo que se devuelve para lo que ocurrió ANTES
+   * de la primera entrada que hemos leído. No es una visita cero: es que de esa
+   * pelea no sabemos en qué visita cayó, y la cota trata las dos cosas
+   * distinto — «no consta» no acota nada.
+   */
+  #visitaEn(tSeg) {
+    const l = this.entradas ?? [];
+    if (tSeg == null || !l.length || tSeg < l[0]) return null;
+    let lo = 0;
+    let hi = l.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (l[m] <= tSeg) lo = m + 1; else hi = m; }
+    return lo;
+  }
+
   #anotaVisto(ev) {
     if (!ev || !ev.t) return;
+    /**
+     * ── AL ENTRAR EN UNA ZONA, LO PENDIENTE DEJA DE ACOTAR ────────────────
+     *
+     * Aquí decía el bloque de `cotaDe` que los huecos de mención «ya vienen
+     * dentro de una visita por construcción». **Era falso para la reentrada.**
+     * El pendiente se guarda en `nombre zona`, así que si sales y vuelves
+     * a la MISMA zona la clave es la misma, el pendiente sigue vivo, y la
+     * primera línea que lo nombre AL VOLVER cierra un hueco que cruza la
+     * reentrada. Y en una instancia, al volver el bicho no ha reaparecido: ha
+     * nacido con la copia nueva.
+     *
+     * Medido sobre el registro entero el 21/08/2026: **610 huecos de 5.602
+     * (11 %) cruzan una entrada de zona**, y **120 claves de 592** tienen su
+     * mínimo —que es justo lo que se publica como techo— sacado de uno de
+     * ésos, o no tienen ningún otro.
+     *
+     * Es la condición (b) de la cota, aplicada donde tenía que estar desde el
+     * principio. Y no cuesta nada: se tira el pendiente al entrar.
+     */
+    if (ev.kind === 'zone') {
+      this.pendienteVisto?.clear();
+      /**
+       * Y LA LÍNEA DE VISITAS, que es lo que el índice no puede ver: una
+       * entrada sin pelea por el camino no deja rastro en el almacén. Se
+       * acumula al leer y se estampa en cada pelea al cerrarla.
+       */
+      if (!this.entradas) this.entradas = [];
+      this.entradas.push(ev.t);
+      return;
+    }
     const yo = this.self ?? 'You';
     const zona = this.parser?.zone ?? null;
     for (const quien of [ev.source, ev.target, ev.victim]) {
@@ -2008,14 +2073,31 @@ export class Engine extends EventEmitter {
 
     const mult = this.multiplicidadDe(pide);
 
+    /**
+     * ── LA VISITA SE LEE, YA NO SE DEDUCE ─────────────────────────────────
+     *
+     * Aqui se deducia del propio indice: cambiaba cuando cambiaba (zona,
+     * dificultad) entre dos peleas guardadas. Es MAS GRUESA que la de verdad, y
+     * de una manera que no se puede arreglar mirando lo guardado: **salir y
+     * volver sin pelear por el camino no deja rastro en el almacen**, asi que
+     * dos entradas a la misma instancia parecian una sola y el hueco entre dos
+     * muertes cruzaba una reentrada. Ahi el bicho no ha reaparecido: ha nacido
+     * con la copia nueva, y ese hueco no acota nada.
+     *
+     * Ahora la visita viaja en el resumen —`sm.visita`, sellada al leer el
+     * registro— y `null` es «no consta», que no es una visita mas.
+     *
+     * MEDIDO ANTES DE APLICARLO, sobre las 2.118 peleas y 731 claves de hoy:
+     * la definicion gruesa daba 108 claves con cota y la del registro da 96.
+     * De las 12 que caen, 3 tienen cota valida por MENCION y mas apretada
+     * —`a ghoul savant` pasa de un techo de 280 minutos a 9m 31s—; las otras 9
+     * se quedan sin techo, que es lo correcto: no lo tenian.
+     */
     // Las muertes por clave, con su visita, en una sola pasada por el indice.
     const idx = [...(this.store.index ?? [])].sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
-    let visita = 0;
-    let anterior = null;
     const muertes = new Map();
     for (const sm of idx) {
-      const z = `${sm.zoneBase ?? ''}\u0000${sm.diff ?? ''}`;
-      if (z !== anterior) { visita += 1; anterior = z; }
+      const visita = sm.visita ?? null;
       const at = sm.at ? Math.floor(sm.at / 1000) : null;
       if (!at) continue;
       for (const k of new Set((sm.kills ?? []).map((x) => (typeof x === 'string' ? x : x?.victim)))) {
@@ -2037,6 +2119,9 @@ export class Engine extends EventEmitter {
       const huecosMuerte = [];
       for (let i = 0; i + 1 < ms.length; i += 1) {
         // La condicion de la VISITA, que es la que no se me ocurrio razonando.
+        // Y sin sello no hay hueco: «no consta en que visita fue» y «fue en la
+        // misma» no pueden valer lo mismo.
+        if (ms[i].visita == null || ms[i + 1].visita == null) continue;
         if (ms[i + 1].visita === ms[i].visita && ms[i + 1].t > ms[i].t) {
           huecosMuerte.push(ms[i + 1].t - ms[i].t);
         }
