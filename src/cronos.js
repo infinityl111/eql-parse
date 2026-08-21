@@ -701,3 +701,134 @@ export function enemigosDeLaPelea(f) {
     // Los que se pueden seguir, primero; dentro, por nombre.
     .sort((a, b) => (b.veces > 0) - (a.veces > 0) || a.nombre.localeCompare(b.nombre));
 }
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LOS CANDIDATOS DEL HISTÓRICO ENTERO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Hasta hoy había dos formas de abrir un temporizador y las dos miraban al
+ * PRESENTE: la pelea que tienes delante —que da la clave entera y correcta— y
+ * un campo de texto donde escribir un nombre a mano —que la da coja: la zona
+ * sale de donde estés AHORA, y la dificultad y el modo no se pueden poner—.
+ *
+ * Falta justo lo que uno quiere al sentarse a jugar: **la lista de todo lo que
+ * has matado alguna vez**, con su zona y su dificultad ya puestas. Es lo que
+ * hace esta función, y sale del ÍNDICE del almacén, que ya trae por pelea los
+ * nombres abatidos, la zona base y la dificultad. No abre ni un fichero.
+ *
+ * ── LA CLAVE ES LA MISMA O NO SIRVE DE NADA ───────────────────────────────
+ *
+ * Un candidato no es un nombre: es una CLAVE —nombre + zona + dificultad—, la
+ * misma que usan las cinco consultas del crono. Se construye con los campos
+ * del resumen tal y como los leen ellas, y no con una versión «mejorada» aquí:
+ * un candidato cuya clave no case con la que consulta `ultimaMuerte` nace
+ * ciego, y ciego se ve exactamente igual que «aún no ha muerto nunca».
+ *
+ * Esa cura está donde tiene que estar —`rehacerZona`, al leer el índice—, y no
+ * aquí. Medido antes de ponerla: 238 de 731 claves no habrían visto NINGUNA de
+ * sus muertes.
+ *
+ * ── LAS MASCOTAS FUERA, Y CON UNA RESERVA DICHA ───────────────────────────
+ *
+ * Una mascota no reaparece por temporizador: la invoca su dueño. Se van por el
+ * sufijo ` pet`, que es lo único que el índice permite mirar — `petOf` vive
+ * dentro de la pelea y no en el resumen. Así que este filtro es MÁS FLOJO que
+ * el de `enemigosDeLaPelea`, y se dice en vez de aparentar que son el mismo.
+ * Medido sobre el histórico real: 78 claves con el sufijo.
+ *
+ * ── QUÉ CUENTA CADA CIFRA, dicho antes de operar con ella ─────────────────
+ *
+ *   muertes    veces que ese nombre ha caído en esa zona y dificultad
+ *   peleas     en cuántos combates distintos — dos muertes en uno son dos
+ *              individuos, no dos reapariciones, y por eso van separadas
+ *   ultimaMs   el INSTANTE EN QUE EMPEZÓ la última pelea donde cayó, en
+ *              milisegundos. NO es el instante de su muerte: ése hay que ir a
+ *              buscarlo a la pelea, y lo hace `ultimaMuerte` para el que
+ *              abras. Sirve para ordenar y para decir el DÍA, no la hora.
+ *
+ * @param {Array} peleas   resúmenes del índice: { at, zoneBase, diff, kills }
+ * @param {Array} abiertos los cronos que ya existen, para marcarlos
+ */
+export function candidatosDe(peleas = [], { abiertos = [] } = {}) {
+  const ya = new Set((abiertos ?? []).filter(Boolean).map((c) => claveCrono(c)));
+  const porClave = new Map();
+
+  for (const sm of peleas ?? []) {
+    // `kills` viaja como nombres sueltos o como `{ victim }` según la versión
+    // que guardó la pelea. Las dos formas se leen aquí igual que en el motor.
+    const caidos = (sm?.kills ?? [])
+      .map((k) => (typeof k === 'string' ? k : k?.victim))
+      .filter(Boolean);
+    if (!caidos.length) continue;
+    const base = sm.zoneBase ?? null;
+    const diff = sm.diff ?? null;
+    const atMs = sm.at ?? null;
+
+    // Cuántas veces cayó cada nombre EN ESTA pelea: es lo que separa «muertes»
+    // de «peleas», y sin separarlas el recuento promete reapariciones que no ha
+    // visto.
+    const veces = new Map();
+    for (const n of caidos) {
+      if (/ pet$/i.test(n)) continue;
+      veces.set(n, (veces.get(n) ?? 0) + 1);
+    }
+
+    for (const [nombre, n] of veces) {
+      const c = { nombre, base, diff, mode: null };
+      const k = claveCrono(c);
+      let e = porClave.get(k);
+      if (!e) {
+        e = {
+          ...c, diffTag: sm.diffTag ?? null,
+          muertes: 0, peleas: 0, ultimaMs: null, ya: ya.has(k),
+        };
+        porClave.set(k, e);
+      }
+      e.muertes += n;
+      e.peleas += 1;
+      if (atMs != null && (e.ultimaMs == null || atMs > e.ultimaMs)) e.ultimaMs = atMs;
+      if (e.diffTag == null && sm.diffTag != null) e.diffTag = sm.diffTag;
+    }
+  }
+
+  /**
+   * EL ORDEN ES EL DE LA ÚLTIMA VEZ QUE LO MATASTE, y no el alfabético.
+   *
+   * Lo que buscas al abrir esta lista es casi siempre de donde vienes: la zona
+   * de anoche está arriba sin escribir nada. El alfabético no contesta ninguna
+   * pregunta que alguien tenga.
+   *
+   * Y el desempate es el nombre, siempre, por lo mismo que en la cola: sin él
+   * dos candidatos de la misma pelea bailan de sitio entre repintados.
+   */
+  return [...porClave.values()].sort((a, b) => (b.ultimaMs ?? 0) - (a.ultimaMs ?? 0)
+    || b.muertes - a.muertes
+    || String(a.nombre).localeCompare(String(b.nombre)));
+}
+
+/**
+ * LO QUE CASA CON LO ESCRITO, y CUÁNTO SE HA DEJADO FUERA.
+ *
+ * Dos cosas y no una, y la segunda es la que no se puede callar: una lista de
+ * cuarenta filas sacada de setecientas se lee como la lista entera. El recorte
+ * viaja en la respuesta —`ocultos`— para que la pantalla lo diga con un
+ * número, que es la misma regla del filtro que vacía.
+ *
+ * Se busca por NOMBRE Y POR ZONA a la vez: «Guk» tiene que traer lo de Old
+ * Guk, y quien escribe «Guk» no está pensando en la diferencia.
+ */
+export function filtraCandidatos(lista = [], { q = '', tope = 0 } = {}) {
+  const busca = String(q ?? '').trim().toLowerCase();
+  const casa = (c) => !busca
+    || String(c.nombre ?? '').toLowerCase().includes(busca)
+    || String(c.base ?? '').toLowerCase().includes(busca);
+  const casan = (lista ?? []).filter(casa);
+  const filas = tope > 0 ? casan.slice(0, tope) : casan;
+  return {
+    filas,
+    casan: casan.length,
+    total: (lista ?? []).length,
+    ocultos: casan.length - filas.length,
+  };
+}

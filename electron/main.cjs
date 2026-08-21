@@ -673,6 +673,9 @@ ipcMain.handle('cronos:multiplicidad', (_e, { claves }) => engine.multiplicidadD
 // CUALQUIER linea que lo nombre prueba que existe: 145 por cada muerte.
 ipcMain.handle('cronos:visto', (_e, { claves }) => engine.vistoDe(claves));
 ipcMain.handle('cronos:cota', (_e, { claves }) => engine.cotaDe(claves));
+// TODO lo que has matado alguna vez, para poder abrir un crono sin tenerlo
+// delante. `abiertos` sólo sirve para marcar los que ya tienen temporizador.
+ipcMain.handle('cronos:candidatos', (_e, { abiertos }) => engine.candidatosCrono(abiertos));
 
 /**
  * EL MARCO. Mover una ventana solo puede hacerlo el proceso principal, asi que

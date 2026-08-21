@@ -101,7 +101,21 @@ function analiza(txt) {
     }
     if (enPaleta) return;
 
-    const op = [...new Set(l.match(OPACO) ?? [])];
+    /**
+     * SÓLO EL LADO DEL VALOR, y esto es un arreglo del INSTRUMENTO.
+     *
+     * `\bwhite\b` casa dentro de `white-space`, que no pinta nada: el guion no
+     * es carácter de palabra, así que el límite cae ahí. De las 130 líneas con
+     * coincidencia en el fichero real, **35 eran sólo eso** —`white-space`,
+     * `text-overflow`, y hasta un comentario que dice «off-white»—.
+     *
+     * Se mira el trozo que va DESPUÉS de los dos puntos de cada declaración.
+     * Un nombre de propiedad no puede estar ahí, y un color siempre lo está.
+     */
+    const valores = l.split(';')
+      .map((d) => (d.includes(':') ? d.slice(d.indexOf(':') + 1) : ''))
+      .join(';');
+    const op = [...new Set(valores.match(OPACO) ?? [])];
     const ve = (l.match(VELO) ?? []).length;
     const bajoTema = BAJO_TEMA.test(selector) || BAJO_TEMA.test(enMedia);
     if (op.length) (bajoTema ? conTema : rotas).push({ linea: i + 1, selector, que: op });
@@ -130,8 +144,20 @@ for (const x of r.fantasmas) {
  * numero va escrito aqui, a la vista, que es lo contrario de esconderlo.
  *
  * SE BAJA, NUNCA SE SUBE. Si tienes que subirlo, es que has anadido una.
+ *
+ * ── BAJA DE 60 A 29 EL 21/08/2026, Y NO PORQUE SE HAYA ARREGLADO NADA ─────
+ *
+ * Ni una regla del CSS ha cambiado: lo que ha cambiado es QUIEN CUENTA. El
+ * detector casaba `white` dentro de `white-space`, que no pinta nada, y con eso
+ * se apuntaba 31 superficies que no existian. La deuda de verdad eran 29 desde
+ * el principio.
+ *
+ * Queda escrito porque un numero que baja se lee como un arreglo, y esto no lo
+ * es: una remedicion con la poblacion equivocada es PEOR que la cifra vieja,
+ * porque llega con sello de recien comprobada. Lo unico que se ha arreglado es
+ * el instrumento.
  */
-const DEUDA = 60;
+const DEUDA = 29;
 
 console.log('\n2 · COLOR OPACO EN UNA REGLA QUE NO ESTÁ BAJO NINGÚN TEMA');
 ok(r.rotas.length <= DEUDA, `${r.rotas.length} superficies fuera del tema (tope declarado: ${DEUDA})`,

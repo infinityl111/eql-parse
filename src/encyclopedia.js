@@ -48,8 +48,18 @@ import { parseZone, diffKey, labelDiff, DIFFS, SIN_MARCA, SIN_ZONA } from './zon
  *   3  el botín recogido SIN pelea entra en el recuento y se dice aparte. Pasa
  *      cuando el cadáver lo remató entero un compañero: ese combate nunca fue
  *      tuyo, pero recoger el objeto sí. Antes se descartaba en silencio.
+ *   4  LA ZONA, con el dígito de la dificultad ya fuera del nombre. Las fichas
+ *      plegadas antes del 19/08/2026 guardan la base con el dígito pegado
+ *      —«The Ruins of Old Guk 2»— y las de después, sin él, así que la misma
+ *      zona salía DOS VECES en la rejilla y `zoneFoes` no encontraba lo de la
+ *      otra mitad. Medido sobre un almacén real: 19 bases de 51 con el dígito
+ *      dentro. Se cura al leer el almacén —`rehacerZona`— y esta generación es
+ *      lo que obliga a plegar de nuevo lo que ya estaba contado.
+ *
+ * Rehacerla cuesta lo que cuesta leer el histórico, no lo que cuesta releer el
+ * registro: medido sobre 2.118 peleas, 1,5 s.
  */
-export const ENC_VERSION = 3;
+export const ENC_VERSION = 4;
 const FICHERO = 'encyclopedia.json';
 
 export class Encyclopedia {

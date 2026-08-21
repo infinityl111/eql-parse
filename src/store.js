@@ -728,7 +728,7 @@ function dudaCompa(f, mates) {
 }
 
 /**
- * La dificultad que falta, sacada de la zona que sí está guardada.
+ * La zona del resumen, releída de lo observado: base, dificultad y etiqueta.
  *
  * Hasta ahora, una zona sin modo ni etiqueta —«The Plane of Sky»— se guardaba
  * con `diff: null`, «no consta». Es que vale 0: en EQL el silencio sobre la
@@ -740,19 +740,41 @@ function dudaCompa(f, mates) {
  * hacía con el `uid` que faltaba en los índices viejos. Ningún fichero se toca,
  * y una reconstrucción posterior escribe exactamente lo mismo.
  *
- * Se recalcula SÓLO si falta. Lo que ya trae dificultad se respeta: puede venir
- * de una etiqueta que hoy no supiéramos leer.
+ * ── SE LLAMABA `rehacerDif` Y SALÍA POR LA PUERTA ANTES DE REHACER LA BASE ──
+ *
+ * La primera línea era `if (s.diff != null) return s`: con la dificultad ya
+ * puesta —que es el caso de CASI TODAS— la función se iba sin tocar
+ * `zoneBase`, así que la línea de abajo, la que dice que lo derivado se
+ * recalcula, no corría nunca donde hacía falta.
+ *
+ * QUÉ DEJABA EN EL ÍNDICE, medido sobre el almacén real el 21/08/2026:
+ * **1.026 de 1.899 peleas con muertes (54 %)** guardan `zoneBase` con el
+ * dígito pegado —«The Ruins of Old Guk 2»— mientras `parseZone` de hoy
+ * devuelve «The Ruins of Old Guk» y saca el 2 a `diff`. Las dos formas
+ * conviven en el mismo índice según el día en que se guardó cada pelea.
+ *
+ * Y NO ERA COSMÉTICO: la clave de un temporizador lleva la base LIMPIA —la
+ * escribe `parseZone` al abrirlo desde una pelea— y las cinco consultas del
+ * crono filtran el índice con `sm.zoneBase !== c.base`. O sea que un crono de
+ * Old Guk D2 **no veía ni una sola de sus muertes**: salía «esperando su
+ * primera muerte» para siempre, con cero observaciones y sin cota. Medido:
+ * **238 de 731 claves (33 %) no veían NINGUNA** de sus muertes y otras 44
+ * veían sólo una parte. Ningún síntoma: es un estado legítimo de la pantalla.
+ *
+ * Ahora la base se rehace SIEMPRE que haya zona observada. Lo que se sigue
+ * respetando es la dificultad ya guardada —puede venir de una etiqueta que hoy
+ * no supiéramos leer—, que es lo que decía la nota original.
  */
-function rehacerDif(s) {
-  if (!s || s.diff !== null && s.diff !== undefined) return s;
-  if (!s.zone) return s;                       // sin zona no se deduce nada
+function rehacerZona(s) {
+  if (!s || !s.zone) return s;                 // sin zona no se deduce nada
   const z = parseZone(s.zone);
-  s.diff = z.diff;
-  if (s.diffTag === null || s.diffTag === undefined) s.diffTag = z.tag;
   // Se persiste lo observado (`zone`) y se RECALCULA lo derivado (`zoneBase`).
   // Una interpretación guardada envejece sin avisar: ésta envejeció el
   // 19/08/2026, cuando el dígito pegado al nombre pasó a ser la dificultad.
   s.zoneBase = z.base;
+  if (s.diff !== null && s.diff !== undefined) return s;
+  s.diff = z.diff;
+  if (s.diffTag === null || s.diffTag === undefined) s.diffTag = z.tag;
   return s;
 }
 
@@ -952,7 +974,7 @@ export class FightStore {
           // Índices escritos antes de que `uid` existiera: el byte de inicio ya
           // estaba ahí, así que la migración no toca ningún fichero.
           if (s.uid === undefined) s.uid = s.off;
-          rehacerDif(s);
+          rehacerZona(s);
           const k = logicalKey(s);
           // La misma pelea guardada dos veces por una relectura del log. Se
           // queda la primera copia; el .ndjson no se toca.
@@ -1347,7 +1369,7 @@ export class FightStore {
       // dificultad, y el expediente del enemigo la lee de aquí. Y el modelo de
       // medición, por lo mismo: se arregla al leer porque se puede.
       const f = dudaCompa(aplicarDudas(aplicarTramos(
-        repararModelo(rehacerDif(JSON.parse(buf.toString('utf8')))), s.at, this.tramos),
+        repararModelo(rehacerZona(JSON.parse(buf.toString('utf8')))), s.at, this.tramos),
         s.at, this.dudas), this.companions);
       this.cache.set(uid, f);
       if (this.cache.size > 40) this.cache.delete(this.cache.keys().next().value);

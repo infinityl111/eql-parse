@@ -2143,6 +2143,22 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .cro-add input { flex: 1; background: var(--slate-800); border: 1px solid var(--slate-600);
   border-radius: 7px; color: var(--bone); font: inherit; padding: 7px 10px; }
 
+/* ── La lista de candidatos del histórico ───────────────────────────────
+   Las dos cifras van tenues y a la derecha: se leen al comparar dos filas,
+   no al buscar un nombre. Lo que se pulsa —«Seguir»— va al final y es lo
+   único con borde, que es la regla de los controles. */
+.cro-candn, .cro-candu { font-size: 10.5px; color: var(--bone-dim);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cro-candu { color: var(--bone-faint); }
+.cro-candpon { background: none; border: 1px solid var(--slate-600); border-radius: 6px;
+  color: var(--bone-dim); font: 600 10px/1 var(--body); padding: 4px 9px; cursor: pointer; }
+.cro-candpon:hover { color: var(--bone); border-color: var(--bone-faint); }
+.cro-candnota { font-size: 11px; color: var(--bone-faint); }
+/* El campo libre queda DEBAJO de la lista y separado: es la vía para lo que no
+   está en el histórico, no la primera opción. */
+.cro-mano { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--slate-700); }
+.cro-mano label { font-size: 11px; color: var(--bone-faint); }
+
 /* Lo que escribe el jugador va al final del cuerpo y separado por una linea:
    manda sobre las otras dos fuentes, pero no es lo que se viene a mirar. */
 .cro-man { display: flex; gap: 6px; margin-top: 9px; padding-top: 9px;

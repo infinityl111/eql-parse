@@ -39,8 +39,28 @@ const esc = (s) => String(s ?? '')
  *
  * `restante` en `null` o `<= 0` es «ya debería estar». `transcurrido` desempata
  * entre vencidos: el que lleva más tiempo esperando va antes.
+ *
+ * ── «SIN ESTIMACIÓN» ESTUVO DELANTE DE «CONTANDO», Y ESCONDÍA EL RELOJ ────
+ *
+ * Lo trajo Campeón el 21/08/2026 y se comprobó mirándolo con cinco cronos
+ * abiertos. Con el orden viejo, la lista salía así:
+ *
+ *     Ancient Croaker      Ya debería estar
+ *     a shin ghoul knight  +16:50 desde que murió
+ *     Kahaptra Z`Taj       +2:00 desde que murió
+ *     a greater skeleton   0:20            ← lo que iba a pasar, el cuarto
+ *     Lord Nagafen         8:40
+ *
+ * Un `+2:00` no es más accionable que un `0:20`: **es que no es accionable en
+ * absoluto**. Y hay una razón por la que ese grupo nunca puede ganar el sitio
+ * de arriba: se ordena por lo que LLEVA, que sólo crece y no cruza ningún
+ * umbral. Nada de lo que hay ahí va a pasar nunca. «Contando», en cambio, es
+ * el único grupo cuyo primero es el próximo suceso.
+ *
+ * Así que arriba va lo que el reloj dice —ya está, o va a estar— y abajo lo
+ * que no sabemos: sin estimación y sin muerte son las dos caras de eso.
  */
-export const RANGO = { vencido: 0, sinEstimacion: 1, contando: 2, esperando: 3 };
+export const RANGO = { vencido: 0, contando: 1, sinEstimacion: 2, esperando: 3 };
 
 /**
  * TRES ESTADOS Y NO DOS. Un crono sin ninguna muerte suya en el registro no

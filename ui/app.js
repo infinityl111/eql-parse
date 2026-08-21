@@ -5913,6 +5913,30 @@ const cronoParse = (txt) => {
  * volcar la vista a fichero con `bin/ui-volcar.js`, que es lo que había que
  * haber hecho antes de la primera de las cinco.
  */
+/**
+ * LOS CANDIDATOS DEL HISTÓRICO, PEDIDOS UNA VEZ Y NO CUATRO POR SEGUNDO.
+ *
+ * Recorrer el índice cuesta 4,4 ms y devuelve 657 fichas; el snapshot llega
+ * cada 250 ms. Pedirlo en cada pasada sería mover eso por el puente cuatro
+ * veces por segundo para enseñar una lista que cambia cuando matas algo.
+ *
+ * Así que se guarda, y se vuelve a pedir por dos motivos y sólo dos:
+ *
+ *   · han pasado cinco segundos —lo que tarda en aparecer un bicho recién
+ *     matado, y es lo único que puede cambiar la lista sola—
+ *   · o la lista de temporizadores ha cambiado, y entonces la marca de «ya lo
+ *     sigues» de cada fila está vieja. Eso NO se espera: lo invalida quien
+ *     guarda, que es donde se sabe.
+ */
+const CAND_TTL_MS = 5000;
+async function candidatosDelHistorico(lista) {
+  const c = state.croCand;
+  if (c && Date.now() - c.at < CAND_TTL_MS) return c.lista;
+  const l = (await window.eql.candidatosCrono?.(lista)) ?? [];
+  state.croCand = { at: Date.now(), lista: l };
+  return l;
+}
+
 async function renderCronos(snap, cajaSec) {
   const host = huecoSeccion(cajaSec);
   if (!host) return;
@@ -6053,6 +6077,27 @@ async function renderCronos(snap, cajaSec) {
    * `cronoRestante` ni de `labelDiff`, y por eso se puede llamar desde una
    * prueba sin arrancar nada. Lo vigila `test/contrato-pintores.js`.
    */
+  /**
+   * LA PESTAÑA VIVA SE LEE ANTES QUE EL MODELO, y no es un adelanto de estilo:
+   * con ella se decide si hace falta reunir los candidatos. Si estás mirando
+   * los temporizadores, la lista del histórico no se pide ni se construye.
+   */
+  const vistaViva = host.querySelector('.pz-pest button[aria-selected="true"]')?.dataset.ir || 'vig';
+  /**
+   * EL DÍA, NO LA HORA. `ultimaMs` es cuándo EMPEZÓ la última pelea en la que
+   * cayó, no el instante de su muerte —ése se lee al abrir el temporizador—,
+   * así que escribirlo con hora y minutos afirmaría una precisión que el dato
+   * no tiene. Es la misma regla que decide el formato de la cuenta atrás.
+   */
+  const diaCorto = (ms) => (ms
+    ? new Date(ms).toLocaleDateString(langInfo().code, { day: 'numeric', month: 'short' })
+    : '');
+  const candidatos = vistaViva !== 'sug' ? [] : (await candidatosDelHistorico(lista)).map((c) => ({
+    ...c,
+    diffLabel: c.diff != null ? labelDiff(c.diff, c.diffTag) : null,
+    ultimaTxt: diaCorto(c.ultimaMs),
+  }));
+
   const modelo = {
     /**
      * LA PESTAÑA Y LA LEYENDA SE LEEN DE DONDE ESTÁN, no de una variable.
@@ -6062,7 +6107,8 @@ async function renderCronos(snap, cajaSec) {
      * devolvería a la primera pestaña. La pestaña viva la sabe el DOM; la
      * leyenda, que sobrevive a cerrar la aplicación, la configuración.
      */
-    vista: host.querySelector('.pz-pest button[aria-selected="true"]')?.dataset.ir || 'vig',
+    vista: vistaViva,
+    candidatos,
     // Y qué filas dejó desplegadas, por la misma razón y con más motivo: el
     // campo de poner tiempo vive dentro de una.
     abiertas: desplegadas(host),
@@ -6152,11 +6198,23 @@ async function renderCronos(snap, cajaSec) {
       leer: () => state.cfg?.croLeyenda === true,
       guardar: (_k, v) => { state.cfg.croLeyenda = v; window.eql.setFlag('croLeyenda', v); },
     },
+    /**
+     * AL CAMBIAR DE PESTAÑA SE REPINTA EN EL ACTO, y no en el siguiente tic.
+     *
+     * La lista de candidatos sólo se reúne cuando su pestaña está viva, así que
+     * sin esto pulsarla enseñaría un hueco vacío hasta el siguiente snapshot —
+     * un cuarto de segundo de una lista vacía, que es indistinguible de no
+     * tener nada que enseñar.
+     */
+    onCambio: () => { renderCronos(snap, host); },
   });
 
   const guardar = async (l) => {
     await window.eql.setFlag('cronos', l);
     state.cfg.cronos = l;
+    // La marca de «ya lo sigues» de cada candidato sale de esta lista: cambiada
+    // la lista, lo guardado está viejo. Se tira aquí, que es donde se sabe.
+    state.croCand = null;
     await renderCronos(snap, host);
   };
 
@@ -6222,6 +6280,36 @@ async function renderCronos(snap, cajaSec) {
       aviso: avisoDeVarios(vistos, muertes),
     }]);
   });
+  /**
+   * ABRIR UN TEMPORIZADOR DESDE LA LISTA DEL HISTÓRICO.
+   *
+   * Aquí la clave viene ENTERA y correcta —nombre, zona, dificultad y modo son
+   * los de las peleas en las que cayó—, que es justo lo que el campo de texto
+   * no puede dar. No hay nada que deducir de dónde estés ahora.
+   *
+   * Y el recuento de muertes es el de ESTA CLAVE, contado sobre el índice. El
+   * del campo de texto se lo pide a la enciclopedia, que suma las muertes de
+   * todas las zonas de esa dificultad: aquí no hace falta ese rodeo.
+   */
+  host.querySelectorAll('[data-alta]').forEach((b) => b.addEventListener('click', async (e) => {
+    // El botón vive dentro del `summary` de su fila: sin esto, pulsarlo
+    // desplegaría además la fila, que no es lo que se ha pedido.
+    e.preventDefault();
+    const c = candidatos[+b.dataset.alta];
+    if (!c) return;
+    const alta = {
+      nombre: c.nombre, base: c.base ?? null, diff: c.diff ?? null, mode: c.mode ?? null,
+    };
+    if (lista.some((x) => claveCrono(x) === claveCrono(alta))) return;
+    // La rama FUERTE del aviso de «hay varios»: cuántos se han visto a la vez.
+    const vistos = ((await window.eql.multiplicidadDe?.([alta])) ?? {})[claveCrono(alta)] ?? null;
+    await guardar([...lista, {
+      ...alta, manual: null,
+      muertes: c.muertes, vistos,
+      aviso: avisoDeVarios(vistos, c.muertes),
+    }]);
+  }));
+
   // La posición es la de la lista ORDENADA, y la fila se resuelve por identidad
   // de objeto: `orden[i].crono` es literalmente el mismo objeto que está en
   // `lista`, así que el filtro no necesita comparar ninguna cadena.

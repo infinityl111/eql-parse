@@ -142,6 +142,91 @@ console.log('OBS: cuántas observaciones lleva cada clave — el rótulo que dec
     'y quien no ha muerto nunca lleva 0');
 }
 
+console.log('\nLA ZONA CON EL DÍGITO PEGADO, que es media histórico en disco');
+{
+  /**
+   * ── EL FALLO ──────────────────────────────────────────────────────────
+   *
+   * Las peleas guardadas antes del 19/08/2026 llevan `zoneBase` CON el dígito
+   * de la dificultad dentro —«The Ruins of Old Guk 2»— y las de después, sin
+   * él. La clave de un crono lleva la base LIMPIA, porque la escribe
+   * `parseZone` al abrirlo desde una pelea; y las cinco consultas del crono
+   * filtran el índice con `sm.zoneBase !== c.base`.
+   *
+   * O sea que un crono de Old Guk D2 no veía NI UNA de sus muertes y salía
+   * «esperando su primera muerte» para siempre. Medido sobre el almacén real
+   * el 21/08/2026: 1.026 de 1.899 peleas con muerte lo llevan pegado, y con
+   * ello 238 de 731 claves no veían ninguna.
+   *
+   * La cura es `rehacerZona`, AL LEER el índice. Por eso esta prueba relee el
+   * almacén del disco en vez de mirar el que quedó en memoria al escribirlo:
+   * el camino que se comprueba tiene que ser el que corre de verdad.
+   */
+  const T3 = 1787000000000 + 14400e3;
+  store.append({
+    zone: 'The Ruins of Old Guk 2 (Adaptive)', zoneBase: 'The Ruins of Old Guk 2',
+    diff: 2, diffTag: 'Adaptive', duration: 60, total: 1000,
+    start: Math.round(T3 / 1000),
+    kills: ['Ancient Croaker'], killTimes: [{ name: 'Ancient Croaker', t: 12 }],
+    rows: [{ name: 'Campeon', side: 'ally' }, { name: 'Ancient Croaker', side: 'enemy' }],
+  }, T3);
+
+  const clave = { nombre: 'Ancient Croaker', base: 'The Ruins of Old Guk', diff: 2, mode: null };
+  /**
+   * CONTROL DE QUE LA TRAMPA ESTÁ PUESTA: el resumen recién escrito —el que
+   * hay en disco— lleva el dígito. Sin esto, el verde de abajo podría venir
+   * de que la pelea se guardó ya limpia y aquí no se estuviera probando nada.
+   */
+  const crudo = store.index.find((s) => (s.kills ?? []).includes('Ancient Croaker'));
+  ok(crudo?.zoneBase === 'The Ruins of Old Guk 2',
+    'CONTROL: la pelea se ha escrito con el dígito pegado', crudo?.zoneBase);
+  ok(crudo?.zoneBase !== clave.base,
+    'CONTROL: y esa forma NO casa con la clave del crono', 'ésa era la avería');
+
+  const s2 = new FightStore(dir);
+  s2.load();
+  const v = motor(s2).ultimaMuerte([clave])[claveCrono(clave)];
+  ok(v === Math.round(T3 / 1000) + 12,
+    'al releer el índice, la base se rehace y la muerte se encuentra',
+    v === null ? 'NO LA ENCUENTRA: el crono nacería ciego' : new Date(v * 1000).toISOString());
+
+  // Y no contesta que sí a cualquier cosa: la dificultad sigue separando.
+  const otra = { nombre: 'Ancient Croaker', base: 'The Ruins of Old Guk', diff: 3, mode: null };
+  ok(motor(s2).ultimaMuerte([otra])[claveCrono(otra)] === null,
+    'CONTROL: y la D3 de la misma zona sigue sin tener nada');
+}
+
+console.log('\nLOS CANDIDATOS DEL HISTÓRICO ENTERO, desde el motor');
+{
+  const s2 = new FightStore(dir);
+  s2.load();
+  const abierto = { nombre: 'a kobold king', base: "Nagafen's Lair", diff: 2, mode: null };
+  const lista = motor(s2).candidatosCrono([abierto]);
+
+  ok(lista.length > 0, 'la lista no viene vacía', `${lista.length} candidatos`);
+  const croaker = lista.find((c) => c.nombre === 'Ancient Croaker');
+  ok(croaker?.base === 'The Ruins of Old Guk' && croaker?.diff === 2,
+    'y el candidato trae la clave ENTERA y con la base limpia',
+    `${croaker?.base} · D${croaker?.diff}`);
+
+  /**
+   * LA MISMA CLAVE QUE CONSULTA `ultimaMuerte`, y esto es lo que hace útil la
+   * lista: un candidato cuya clave no case nace ciego, y ciego se ve
+   * exactamente igual que «aún no ha muerto nunca».
+   */
+  const comoCrono = { nombre: croaker.nombre, base: croaker.base, diff: croaker.diff, mode: croaker.mode };
+  ok(motor(s2).ultimaMuerte([comoCrono])[claveCrono(comoCrono)] !== null,
+    'y abriéndolo tal cual, el motor encuentra su muerte');
+
+  const rey = lista.find((c) => c.nombre === 'a kobold king' && c.diff === 2);
+  ok(rey?.ya === true, 'el que ya tiene temporizador viene marcado');
+  ok(lista.find((c) => c.nombre === 'a kobold king' && c.diff === 3)?.ya === false,
+    'CONTROL: y el de la otra dificultad, que es otra clave, no');
+  ok(rey?.muertes === 4 && rey?.peleas === 3,
+    'las muertes y las peleas se cuentan aparte',
+    `${rey?.muertes} muertes en ${rey?.peleas} peleas — dos en un mismo combate son dos individuos`);
+}
+
 console.log('\nCONTROL POSITIVO: con la forma REAL del fallo, la prueba se pone roja');
 {
   /**

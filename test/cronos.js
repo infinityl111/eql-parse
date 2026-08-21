@@ -28,7 +28,8 @@
  */
 import {
   valorDe, estadoCrono, avisoDeVarios, debeReiniciar,
-  precisionDe, ESTADO, PERIODOS_SOSPECHA, PRECISION, claveCrono, mismaClave, ordenCola } from '../src/cronos.js';
+  precisionDe, ESTADO, PERIODOS_SOSPECHA, PRECISION, claveCrono, mismaClave, ordenCola,
+  candidatosDe } from '../src/cronos.js';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -469,6 +470,70 @@ console.log('\nel aviso de varios: la rama fuerte ya se puede disparar');
    */
   ok(avisoDeVarios(2, 50) === 'varios-a-la-vez',
     'CONTROL: con las dos cosas manda la demostrada, no la deducida');
+}
+
+console.log('\nlos candidatos del histórico entero');
+{
+  /**
+   * Resúmenes como los del índice. La clave de un candidato es la MISMA que
+   * consultan `ultimaMuerte` y las otras cuatro —nombre + zona base +
+   * dificultad—, y por eso se construye con los campos del resumen tal cual.
+   */
+  const pelea = (at, base, diff, kills) => ({ at, zoneBase: base, diff, diffTag: null, kills });
+  const D = 86400e3;
+  const T = 1787000000000;
+  const peleas = [
+    pelea(T, 'Befallen', 2, ['a greater skeleton', 'a greater skeleton']),
+    pelea(T + D, 'Befallen', 2, ['a greater skeleton']),
+    pelea(T + 2 * D, 'The Ruins of Old Guk', 3, ['Ancient Croaker', "Vroth`s pet"]),
+    pelea(T + 3 * D, 'Befallen', 3, ['a greater skeleton']),
+    pelea(T + 4 * D, 'Befallen', 2, []),
+  ];
+
+  const l = candidatosDe(peleas);
+  ok(l.length === 3, 'una entrada por CLAVE, no por nombre ni por pelea',
+    l.map((c) => `${c.nombre}·D${c.diff}`).join(' '));
+  ok(l[0].nombre === 'a greater skeleton' && l[0].diff === 3,
+    'el orden es el de la última vez que lo mataste', l.map((c) => c.nombre).join(' '));
+
+  const bef = l.find((c) => c.base === 'Befallen' && c.diff === 2);
+  ok(bef.muertes === 3 && bef.peleas === 2,
+    'las muertes y las peleas se cuentan por separado',
+    'dos muertes en un mismo combate son dos individuos, no dos reapariciones');
+  ok(bef.ultimaMs === T + D, 'la última es la más reciente de SU clave',
+    'y es cuándo empezó la pelea, no el instante de la muerte: por eso se enseña el día');
+
+  /**
+   * LA MISMA ZONA EN DOS DIFICULTADES SON DOS CANDIDATOS, por lo mismo que son
+   * dos cronos: el periodo es de la copia de la zona, no del bicho.
+   */
+  ok(l.filter((c) => c.nombre === 'a greater skeleton').length === 2,
+    'la dificultad parte la clave');
+
+  // Una mascota no reaparece por temporizador: la invoca su dueño.
+  ok(!l.some((c) => / pet$/i.test(c.nombre)), 'las mascotas se quedan fuera');
+  ok(peleas.some((p) => (p.kills ?? []).some((k) => / pet$/i.test(k))),
+    'CONTROL: y había una en la entrada — si no, el de arriba no diría nada');
+
+  // Los ya abiertos vienen marcados, y la marca es por clave entera.
+  const marcada = candidatosDe(peleas, {
+    abiertos: [{ nombre: 'a greater skeleton', base: 'Befallen', diff: 2, mode: null }],
+  });
+  ok(marcada.find((c) => c.base === 'Befallen' && c.diff === 2).ya === true, 'el abierto se marca');
+  ok(marcada.find((c) => c.base === 'Befallen' && c.diff === 3).ya === false,
+    'CONTROL: y el de la otra dificultad no, que es otra clave');
+
+  ok(candidatosDe([]).length === 0, 'sin histórico, lista vacía y sin reventar');
+  ok(candidatosDe([pelea(T, 'Befallen', 2, [])]).length === 0,
+    'y una pelea sin muertes no produce candidato', 'no hay desde cuándo contar');
+
+  /**
+   * `kills` VIAJA DE DOS FORMAS según la versión que guardó la pelea: nombres
+   * sueltos o `{ victim }`. Las dos se leen igual aquí que en el motor.
+   */
+  const conVictim = candidatosDe([{ at: T, zoneBase: 'Befallen', diff: 2, kills: [{ victim: 'a greater skeleton' }] }]);
+  ok(conVictim.length === 1 && conVictim[0].nombre === 'a greater skeleton',
+    'la forma `{ victim }` se entiende igual');
 }
 
 console.log(failed ? `\n${failed} MAL\n` : '\ntodo bien\n');

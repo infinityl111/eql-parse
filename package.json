@@ -1,6 +1,6 @@
 {
   "name": "eql-parse",
-  "version": "1.21.0",
+  "version": "1.22.0",
   "type": "module",
   "description": "Parser DPS en tiempo real para EverQuest Legends",
   "main": "electron/main.cjs",
@@ -14,6 +14,7 @@
     "ui:teclear": "node bin/ui-teclear.js",
     "campos": "node bin/campos-todos.js",
     "panel": "node bin/panel-vivo.js",
+    "candidatos": "node bin/candidatos-vivos.js",
     "capturas": "electron bin/capturas.cjs",
     "pliegue": "electron bin/pliegue.cjs",
     "vacios": "node bin/vacios.js",

@@ -185,12 +185,53 @@ function fichaDe({ crono, estado, obs = {}, i, conNumero = true, abierta = false
 }
 
 /**
+ * UNA FILA DE LA LISTA DE CANDIDATOS.
+ *
+ * Lleva las dos cifras que hacen falta para elegir —cuántas veces ha caído ahí
+ * y cuándo fue la última— y el botón que lo abre con la clave entera: nombre,
+ * zona y dificultad salen del histórico, no de dónde estés ahora.
+ *
+ * ── LAS DOS CIFRAS CUENTAN COSAS DISTINTAS, Y SE DICE EN EL CUERPO ────────
+ *
+ * «Muertes» son las veces que ha caído; «peleas», en cuántos combates. Dos
+ * muertes en un mismo combate son DOS INDIVIDUOS y no dos reapariciones, así
+ * que sumarlas como si midieran lo mismo sería prometer una muestra que no
+ * existe. Es la misma distinción que separa `observacionesDe` de
+ * `multiplicidadDe`, dicha donde se lee.
+ *
+ * Y la fecha es la de LA PELEA, no la del instante de la muerte: el índice
+ * guarda cuándo empezó el combate, y la hora exacta sólo se va a buscar al
+ * abrir el temporizador. Por eso se enseña el día y no la hora.
+ */
+function candidatoDe(c, i) {
+  const cuenta = c.muertes === 1
+    ? t('cro.candCuenta1', { p: c.peleas })
+    : t('cro.candCuenta', { n: c.muertes, p: c.peleas });
+  return {
+    id: `cand|${c.nombre}|${c.base ?? ''}|${c.diff ?? ''}|${c.mode ?? ''}`,
+    // Se busca por nombre Y por zona: quien escribe «Guk» no está pensando en
+    // la diferencia, y la cabecera de grupo no entra en el buscador.
+    busca: `${c.nombre} ${c.base ?? ''}`,
+    columnas: '14px 1fr auto auto auto',
+    celdas: [
+      `<span><b>${esc(c.nombre)}</b></span>`,
+      `<span class="cro-candn">${esc(cuenta)}</span>`,
+      `<span class="cro-candu">${esc(c.ultimaTxt ? t('cro.candUltima', { t: c.ultimaTxt }) : '')}</span>`,
+      c.ya
+        ? `<span class="croesc-ya">${esc(t('cro.candYa'))}</span>`
+        : `<button class="cro-candpon" data-alta="${i}">${esc(t('cro.candPoner'))}</button>`,
+    ],
+    cuerpo: `<div class="cro-candnota">${esc(t('cro.candNota'))}</div>`,
+  };
+}
+
+/**
  * EL CONSTRUCTOR. `conNumero` en false devuelve el mismo HTML sin las cuentas
  * atrás: es la firma que usa `pintaEstable` para no reconstruir en cada tic.
  */
 export function construye(modelo = {}, conNumero = true) {
   const {
-    fichas = [], vista = 'vig', leyendaAbierta = false, sugerencias = [],
+    fichas = [], vista = 'vig', leyendaAbierta = false, candidatos = [],
     abiertas = new Set(), agruparPor = 'zona',
   } = modelo;
   /**
@@ -216,7 +257,7 @@ export function construye(modelo = {}, conNumero = true) {
     activa: vista,
     items: [
       { id: 'vig', rotulo: t('cro.title'), n: fichas.length },
-      { id: 'sug', rotulo: t('cro.add'), n: sugerencias.length },
+      { id: 'sug', rotulo: t('cro.add'), n: candidatos.length },
     ],
   });
 
@@ -246,13 +287,42 @@ export function construye(modelo = {}, conNumero = true) {
     grupos: [...grupos].map(([rotulo, fs]) => ({ rotulo, filas: fs })),
   })}</div>`;
 
+  /**
+   * ── LA LISTA DE CANDIDATOS, agrupada por donde murieron ────────────────
+   *
+   * El orden lo trae ya hecha —`candidatosDe`, por la última vez que lo
+   * mataste—, así que aquí sólo se parte en grupos SIN reordenar: el `Map`
+   * conserva el orden de llegada, y con él la zona de anoche queda arriba.
+   *
+   * Y la cabecera lleva la zona y la dificultad, que es lo que sería igual en
+   * todas sus filas. La fila no las repite.
+   */
+  const gCand = new Map();
+  candidatos.forEach((c, i) => {
+    const k = c.base
+      ? `${c.base}${c.diff != null ? ` · ${c.diffLabel ?? `D${c.diff}`}` : ''}`
+      : t('cro.sinZona');
+    if (!gCand.has(k)) gCand.set(k, []);
+    gCand.get(k).push(candidatoDe(c, i));
+  });
+
+  /**
+   * EL CAMPO LIBRE SE QUEDA, Y DEBAJO DE LA LISTA. Es la única vía para un
+   * bicho que no está en el histórico —uno que nunca has matado—, y da la
+   * clave COJA: la zona sale de donde estés AHORA y la dificultad no se puede
+   * poner. Con la lista delante deja de ser lo primero que se ve, que es lo
+   * que era.
+   */
   const alta = `<div data-vista="sug"${vista === 'sug' ? '' : ' hidden'}>
-    <div class="cro-add"><input id="croNuevo" placeholder="${esc(t('cro.addPh'))}">
-      <button id="croAdd">${esc(t('cro.add'))}</button></div>
+    <p class="sub">${esc(t('cro.candSub'))}</p>
+    ${barraControl({ buscarPh: t('cro.candBuscarPh') })}
     ${filas({
-    vacio: t('cro.escVacio'),
-    grupos: sugerencias.length ? [{ rotulo: modelo.zonaActual ?? '', filas: sugerencias }] : [],
-  })}</div>`;
+    vacio: t('cro.candVacio'),
+    grupos: [...gCand].map(([rotulo, fs]) => ({ rotulo, filas: fs })),
+  })}
+    <div class="cro-mano"><label>${esc(t('cro.candMano'))}</label>
+      <div class="cro-add"><input id="croNuevo" placeholder="${esc(t('cro.addPh'))}">
+        <button id="croAdd">${esc(t('cro.add'))}</button></div></div></div>`;
 
   return `<h2>${esc(t('cro.title'))}</h2><p class="sub">${esc(t('cro.sub'))}</p>
     ${cab}${lista}${alta}`;
@@ -274,5 +344,8 @@ export const CLAVES = [
   'cro.visto', 'cro.vistoTipo', 'cro.vistoEsta', 'cro.sinVer', 'cro.sinVerCota',
   'cro.manualPh', 'cro.setManual',
   'cro.agrZona', 'cro.agrNada', 'cro.filContando', 'cro.filDisponible',
-  'cro.discrepa', 'cro.discrepaWiki', 'cro.escVacio',
+  'cro.discrepa', 'cro.discrepaWiki',
+  'cro.candSub', 'cro.candBuscarPh', 'cro.candVacio', 'cro.candMano',
+  'cro.candCuenta', 'cro.candCuenta1', 'cro.candUltima', 'cro.candPoner',
+  'cro.candYa', 'cro.candNota',
 ];

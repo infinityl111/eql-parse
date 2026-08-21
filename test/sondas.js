@@ -80,7 +80,7 @@ function claves(src) {
 }
 
 /** Las sondas que siembran una configuración de cero. */
-const SONDAS = ['bin/rotulos.js', 'bin/panel-vivo.js'];
+const SONDAS = ['bin/rotulos.js', 'bin/panel-vivo.js', 'bin/candidatos-vivos.js'];
 
 console.log('\nel vocabulario sale de quien lee, no de una lista escrita aquí');
 ok(VOCABULARIO.size > 15, `${VOCABULARIO.size} claves que la aplicación lee`);

@@ -88,7 +88,23 @@ function todoElHtml() {
       crono: { cota: { txt: '10:19', huecos: 10 }, visto: { desdeTxt: '12m', pasado: true } },
     })],
   }));
-  trozos.push(V.construye({ fichas: [], vista: 'sug', sugerencias: [] }));
+  // La pestaña de alta, VACÍA: el histórico sin una sola muerte.
+  trozos.push(V.construye({ fichas: [], vista: 'sug', candidatos: [] }));
+  /**
+   * Y CON CANDIDATOS. Los dos casos del recuento —una muerte y varias— y las
+   * dos formas de la última columna: el que se puede seguir y el que ya se
+   * sigue. Sin las cuatro, cuatro rótulos quedarían declarados y sin producir.
+   */
+  trozos.push(V.construye({
+    fichas: [],
+    vista: 'sug',
+    candidatos: [
+      { nombre: 'Ancient Croaker', base: 'The Ruins of Old Guk', diff: 2, mode: null,
+        diffLabel: 'D2 Adaptive', muertes: 5, peleas: 4, ultimaTxt: '20 ago', ya: false },
+      { nombre: 'a kobold king', base: null, diff: null, mode: null,
+        muertes: 1, peleas: 1, ultimaTxt: '11 ago', ya: true },
+    ],
+  }));
   return trozos.join('\n');
 }
 

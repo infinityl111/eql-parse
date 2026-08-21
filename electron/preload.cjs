@@ -107,6 +107,7 @@ contextBridge.exposeInMainWorld('eql', {
   multiplicidadDe: (claves) => ipcRenderer.invoke('cronos:multiplicidad', { claves }),
   vistoDe: (claves) => ipcRenderer.invoke('cronos:visto', { claves }),
   cotaDe: (claves) => ipcRenderer.invoke('cronos:cota', { claves }),
+  candidatosCrono: (abiertos) => ipcRenderer.invoke('cronos:candidatos', { abiertos }),
   // EL MARCO, comun a todos los overlays.
   marcoBounds: () => ipcRenderer.invoke('marco:bounds'),
   marcoMueve: (b) => ipcRenderer.invoke('marco:mueve', b),

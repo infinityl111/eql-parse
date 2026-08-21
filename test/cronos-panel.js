@@ -61,9 +61,26 @@ console.log('\ncuatro estados, y ninguno afirma mas de lo que sabe');
     f(3, { conEstimacion: false, transcurrido: 900 }),
     f(4, { restante: 0, transcurrido: 60 }),
   ]);
-  ok(o.map((x) => x.i).join() === '4,3,2,1',
-    'el orden es vencido, sin estimacion, contando, esperando',
-    'lo accionable primero; lo que ni ha empezado, al final');
+  ok(o.map((x) => x.i).join() === '4,2,3,1',
+    'el orden es vencido, contando, sin estimacion, esperando',
+    'arriba lo que dice el reloj; abajo lo que no sabemos');
+}
+
+/**
+ * EL CASO QUE DECIDIÓ EL ORDEN, fijado para que no se dé la vuelta solo.
+ *
+ * Con «sin estimación» por delante, un `+16:50` —que sólo crece y no cruza
+ * ningún umbral— se ponía encima de un `0:20`, que es el próximo suceso. Un
+ * crono sin estimación no es más accionable que uno contando: es que no es
+ * accionable en absoluto.
+ */
+{
+  const o = P.ordena([
+    f(1, { conEstimacion: false, transcurrido: 1010, transcurridoTxt: '16:50' }),
+    f(2, { restante: 20, restanteTxt: '0:20' }),
+  ]);
+  ok(o[0].i === 2, 'un 0:20 contando va ANTES que un +16:50 sin estimacion',
+    'el que cuenta es el unico cuyo primero es lo siguiente que va a pasar');
 }
 
 
