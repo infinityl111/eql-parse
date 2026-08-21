@@ -112,6 +112,7 @@ contextBridge.exposeInMainWorld('eql', {
   marcoBounds: () => ipcRenderer.invoke('marco:bounds'),
   marcoMueve: (b) => ipcRenderer.invoke('marco:mueve', b),
   marcoOpacidad: (id, v) => ipcRenderer.invoke('marco:opacidad', { id, v }),
+  marcoLetra: (id, v) => ipcRenderer.invoke('marco:letra', { id, v }),
   panelCronos: (hay) => ipcRenderer.invoke('cronos:panel', { hay }),
   observacionesDe: (claves) => ipcRenderer.invoke('cronos:observaciones', { claves }),
   encProgress: () => ipcRenderer.invoke('enc:progress'),

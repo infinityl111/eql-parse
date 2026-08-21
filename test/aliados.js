@@ -209,6 +209,46 @@ console.log('\nlos segundos en que tu personaje no era tuyo');
     sc?.[0].causa);
 }
 
+// ── 5a bis. «POR CONSTRUCCIÓN» TAMBIÉN SE COMPRUEBA ───────────────────────
+//
+// `#activosSinMando` suma tramos sin mirar si se solapan, y lo justifica así:
+// «los tramos no se solapan por construcción —`abrirSinControl` no abre uno
+// nuevo si hay otro abierto—». Es cierto hoy, y descansa en UNA línea de una
+// función que nadie vigila. Una afirmación por construcción es una afirmación:
+// si la construcción cambia, caduca en silencio y lo que se rompe es una suma.
+{
+  const f = pelea([
+    [30, 'You slash Fright for 100 points of damage.'],
+    [31, 'You lose control of yourself!'],
+    [35, 'You lose control of yourself!'],
+    [40, 'You have control of yourself again.'],
+    [45, 'You slash Fright for 90 points of damage.'],
+  ], []);
+  const sc = f.sinControl ?? [];
+  ok(sc.length === 1, 'dos «pierdes el control» seguidos NO abren dos tramos', sc.length);
+  ok(sc[0]?.segundos === 10, 'y el que hay va de la PRIMERA al cierre', sc[0]?.segundos);
+
+  // Y el control por el otro lado: cerrado uno, el siguiente SÍ abre otro.
+  // Los golpes van seguidos a propósito: con más de `idleSec` entre ellos la
+  // pelea se parte en dos y el segundo tramo se queda en la otra mitad — que es
+  // lo que le pasó a este control la primera vez que se escribió.
+  const dos = pelea([
+    [30, 'You slash Fright for 100 points of damage.'],
+    [31, 'You lose control of yourself!'],
+    [33, 'You have control of yourself again.'],
+    [36, 'You lose control of yourself!'],
+    [38, 'You have control of yourself again.'],
+    [42, 'You slash Fright for 90 points of damage.'],
+  ], []);
+  ok((dos.sinControl ?? []).length === 2,
+    'CONTROL: cerrado el primero, el segundo sí abre otro tramo',
+    'sin esto, el «no se solapan» de arriba lo cumpliría también una función que no abre nunca');
+  // Ninguno empieza antes de que acabe el anterior: es lo que la suma da por hecho.
+  const orden = [...(dos.sinControl ?? [])].sort((a, b) => a.desde - b.desde);
+  ok(orden.every((x, i) => i === 0 || x.desde >= (orden[i - 1].hasta ?? Infinity)),
+    'y no se solapan, que es lo que la suma da por hecho');
+}
+
 // ── 5b. EL FALSADOR: no es una tendencia, es un «no» ───────────────────────
 //
 // Con miedo no puedes actuar. No es que normalmente no actúes: no puedes. Así

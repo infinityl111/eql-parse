@@ -266,7 +266,29 @@ function startPush() {
       // El overlay va a la mitad de ritmo: está encima del juego y cada
       // repintado suyo compite con los fotogramas de EQ. Medio segundo es de
       // sobra para unas cifras que se leen de reojo.
-      if (++n % 2 === 0) overlayWin?.webContents.send('snapshot', snap);
+      /**
+       * ── Y EL PANEL DE TEMPORIZADORES TAMBIÉN, QUE NO LO RECIBÍA ──────────
+       *
+       * `send()` ahí arriba reparte a todos los overlays y lo dice por escrito
+       * —«sin esto el panel de temporizadores se quedaría congelado»—, pero el
+       * empuje del snapshot no pasa por `send()`: nombra las ventanas una a
+       * una, y el panel vive en el mapa `overlays`. **Nunca le llegó ni uno.**
+       *
+       * Lo que eso significaba, medido con la sonda: el panel se pinta UNA vez
+       * al abrirse y se queda quieto. La cuenta atrás no avanza —58:59 durante
+       * dos segundos y medio—, una muerte no lo reinicia, y cerrar un
+       * temporizador con su × no quita la fila aunque sí lo quite de la
+       * configuración. Un panel que se abre bien y no se mueve más se ve como
+       * un panel que funciona hasta que miras el reloj.
+       *
+       * Va al mismo ritmo que el overlay, medio segundo: enseña mm:ss.
+       */
+      if (++n % 2 === 0) {
+        overlayWin?.webContents.send('snapshot', snap);
+        for (const w of overlays.values()) {
+          if (w && !w.isDestroyed()) w.webContents.send('snapshot', snap);
+        }
+      }
       lastErr = null;
     } catch (err) {
       // Un fallo aquí solía matar el temporizador entero: la ventana y el
@@ -694,6 +716,20 @@ ipcMain.handle('marco:mueve', (e, b) => {
   });
   return true;
 });
+/**
+ * EL TAMANO DEL CONTENIDO DE UN OVERLAY. Se guarda y ya esta: el efecto es CSS
+ * y lo aplica la propia ventana, asi que aqui solo se recuerda por overlay.
+ *
+ * Los topes son los del marco —`LETRA` en `ui/marco-overlay.js`— y se repiten
+ * porque este proceso no importa modulos de la interfaz. Si alli cambian, aqui
+ * se queda un recorte mas estrecho: nunca al reves, que es lo que importa.
+ */
+ipcMain.handle('marco:letra', (_e, { id, v }) => {
+  const n = Math.min(1.8, Math.max(0.8, Number(v) || 1));
+  if (id) guardaMarco(id, { letra: n });
+  return true;
+});
+
 ipcMain.handle('marco:opacidad', (e, { id, v }) => {
   const w = BrowserWindow.fromWebContents(e.sender);
   if (!w || w.isDestroyed()) return false;

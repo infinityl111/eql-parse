@@ -64,12 +64,22 @@
   .mo-se { bottom: 0; right: 0; cursor: nwse-resize; }
   .mo-esq:hover { background: rgba(111,199,216,.35); }
 
-  .mo-op { position: fixed; bottom: 2px; left: 50%; transform: translateX(-50%);
-           z-index: 8; display: flex; align-items: center; gap: 4px;
-           -webkit-app-region: no-drag; opacity: 0; transition: opacity .2s; }
-  .pan:hover .mo-op, .mo-op:focus-within { opacity: 1; }
-  .mo-op-i { font-size: 10px; color: var(--bone-faint); }
-  .mo-op input { width: 74px; height: 3px; accent-color: var(--t-cold); }
+  /* Los dos mandos juntos y abajo: aparecen al pasar el ratón y no ocupan sitio
+     mientras no los usas. Van FUERA de lo que escala el tamaño, o al agrandar
+     la letra se agrandarían ellos y se comerían el panel. */
+  .mo-mandos { position: fixed; bottom: 2px; left: 50%; transform: translateX(-50%);
+               z-index: 8; display: flex; align-items: center; gap: 10px;
+               -webkit-app-region: no-drag; opacity: 0; transition: opacity .2s; }
+  .pan:hover .mo-mandos, .mo-mandos:focus-within { opacity: 1; }
+  .mo-op, .mo-le { display: flex; align-items: center; gap: 4px; }
+  .mo-op-i, .mo-le-i { font-size: 10px; color: var(--bone-faint); }
+  .mo-le-i { font-weight: 700; }
+  .mo-op input, .mo-le input { width: 62px; height: 3px; accent-color: var(--t-cold); }
+
+  /* EL TAMAÑO ESCALA EL CONTENIDO, no la ventana ni los mandos. `zoom` y no
+     `font-size` porque las medidas de este panel están en píxeles: cambiar la
+     letra sola dejaría las filas del mismo alto y el texto cortado. */
+  .pan-bar, .pan-lista, .pan-vacio { zoom: var(--mo-letra, 1); }
 </style>
 </head>
 <body>

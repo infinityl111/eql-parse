@@ -6977,8 +6977,22 @@ async function showMigration() {
   const pintar = (html) => { bar.innerHTML = html; bar.style.display = 'block'; };
   const cerrar = () => { bar.style.display = 'none'; bar.innerHTML = ''; };
 
+  /**
+   * EL MOTIVO VA ATADO A LA GENERACIÓN QUE LO PROVOCA, y por eso la clave lleva
+   * el número dentro: `mig.body.13`.
+   *
+   * Este texto llevaba desde la 1.15.0 hablando de los hechizos resistidos —el
+   * motivo de AQUELLA reconstrucción— mientras `RECONSTRUIR_DESDE` había subido
+   * por otra cosa. Un cartel que explica un motivo caducado es peor que no
+   * explicar ninguno: quien lo lee decide con él.
+   *
+   * Con el número dentro de la clave no se pueden desincronizar: subir la
+   * constante sin escribir el texto nuevo deja la clave sin traducción, y eso
+   * lo caza `test/formato.js` en los cinco idiomas antes de publicar.
+   */
+  const motivo = `mig.body.${m.current}`;
   pintar(`<div class="mig-h">${esc(t('mig.title'))}</div>
-    <p>${esc(t('mig.body', { n: m.fights }))}</p>
+    <p>${esc(t(motivo, { n: m.fights }))}</p>
     ${/*
       El aviso va JUNTO AL BOTÓN, antes de pulsarlo. Mientras el cierre de pelea
       se decida con dos relojes, reconstruir puede mover fronteras: quien pulsa

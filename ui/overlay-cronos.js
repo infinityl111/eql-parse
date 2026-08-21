@@ -114,7 +114,11 @@ async function refresca(snap) {
   for (const f of ordena(fichas)) ultimo.orden[f.i] = f;
 
   const reconstruido = pinta({
-    fichas, total: lista.length, zona, opacidad: cfg.overlays?.[ID]?.opacidad ?? 1,
+    fichas, total: lista.length, zona,
+    opacidad: cfg.overlays?.[ID]?.opacidad ?? 1,
+    // El tamaño se recuerda por overlay, igual que la posición y la
+    // transparencia: éste se mira de lejos y el principal de cerca.
+    letra: cfg.overlays?.[ID]?.letra ?? 1,
   });
   if (reconstruido) engancha(lista);
 }
@@ -124,7 +128,24 @@ function engancha(lista) {
   conectarMarco(host, {
     bounds: () => window.eql.marcoBounds?.(),
     mueve: (b) => window.eql.marcoMueve?.(b),
-    opacidad: (v) => window.eql.marcoOpacidad?.(ID, v),
+    /**
+     * LO QUE SE ELIGE SE GUARDA FUERA **Y** SE ANOTA AQUÍ.
+     *
+     * El modelo del próximo repintado sale de `cfg`, y `cfg` sólo se refresca
+     * cuando el proceso principal difunde la configuración. Sin anotarlo, el
+     * deslizador volvía a su sitio de fábrica en el siguiente repintado —medio
+     * segundo después— y lo que acababas de elegir se deshacía solo.
+     */
+    opacidad: (v) => {
+      cfg.overlays = cfg.overlays ?? {};
+      cfg.overlays[ID] = { ...(cfg.overlays[ID] ?? {}), opacidad: v };
+      window.eql.marcoOpacidad?.(ID, v);
+    },
+    letra: (v) => {
+      cfg.overlays = cfg.overlays ?? {};
+      cfg.overlays[ID] = { ...(cfg.overlays[ID] ?? {}), letra: v };
+      window.eql.marcoLetra?.(ID, v);
+    },
   });
   /**
    * LA X DE UNA LÍNEA CIERRA EL CRONO, no la ventana.

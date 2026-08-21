@@ -45,6 +45,19 @@ export const MINIMO = { ancho: 220, alto: 120 };
 export const OPACIDAD = { min: 0.25, max: 1, paso: 0.05, por_defecto: 1 };
 
 /**
+ * EL TAMAÑO, y por qué es un multiplicador y no una cifra en píxeles.
+ *
+ * Un overlay se mira de reojo y desde donde se juega, así que el tamaño que
+ * sirve depende de la pantalla y de la distancia — no hay un número bueno para
+ * todos. Se multiplica lo que ya hay, que está afinado, en vez de sustituirlo.
+ *
+ * Los topes no son de estilo: por debajo de 0,8 las filas dejan de leerse en la
+ * pantalla en la que se afinaron, y por encima de 1,8 una sola fila ocupa el
+ * panel entero y deja de ser una lista.
+ */
+export const LETRA = { min: 0.8, max: 1.8, paso: 0.1, por_defecto: 1 };
+
+/**
  * Encaja unas medidas dentro de lo permitido.
  *
  * Pura y con los mínimos dentro: redimensionar por la esquina de arriba mueve
@@ -76,37 +89,87 @@ export function opacidadValida(v) {
   return Math.min(OPACIDAD.max, Math.max(OPACIDAD.min, n));
 }
 
+/** Y un tamaño válido, con la misma regla: lo que no es número es el de por defecto. */
+export function letraValida(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return LETRA.por_defecto;
+  return Math.min(LETRA.max, Math.max(LETRA.min, n));
+}
+
 /** Las cuatro esquinas y el deslizador, para meter en cualquier overlay. */
-export function marco({ opacidad = OPACIDAD.por_defecto } = {}) {
+export function marco({ opacidad = OPACIDAD.por_defecto, letra = LETRA.por_defecto } = {}) {
   return `${ESQUINAS.map((e) => `<div class="mo-esq mo-${e.id}" data-esq="${e.id}"></div>`).join('')}
-    <label class="mo-op" title="${esc(t('mo.opacidad'))}">
-      <span class="mo-op-i">◐</span>
-      <input type="range" min="${OPACIDAD.min}" max="${OPACIDAD.max}"
-        step="${OPACIDAD.paso}" value="${opacidadValida(opacidad)}">
-    </label>`;
+    <div class="mo-mandos">
+      <label class="mo-op" title="${esc(t('mo.opacidad'))}">
+        <span class="mo-op-i">◐</span>
+        <input type="range" min="${OPACIDAD.min}" max="${OPACIDAD.max}"
+          step="${OPACIDAD.paso}" value="${opacidadValida(opacidad)}">
+      </label>
+      ${/*
+        EL TAMAÑO VA AL LADO DE LA TRANSPARENCIA Y DENTRO DEL OVERLAY, que es
+        donde se ve el efecto. En Ajustes habría que cambiarlo, mirar la otra
+        ventana, volver y corregir — tres pasos para acertar un número que se
+        acierta arrastrando.
+      */''}
+      <label class="mo-le" title="${esc(t('mo.letra'))}">
+        <span class="mo-le-i">A</span>
+        <input type="range" min="${LETRA.min}" max="${LETRA.max}"
+          step="${LETRA.paso}" value="${letraValida(letra)}">
+      </label>
+    </div>`;
 }
 
 /* ── EL CABLEADO ──────────────────────────────────────────────────────────
  * Lo único que toca el navegador. Todo lo de arriba se prueba sin DOM. */
 
 /**
- * @param {HTMLElement} host  dónde viven las esquinas y el deslizador
- * @param {object} api        `{ bounds(), mueve(b), opacidad(v) }`
+ * ── SE LLAMA DESPUÉS DE CADA RECONSTRUCCIÓN, Y POR ESO VA PARTIDA EN DOS ──
+ *
+ * Esto salía por la puerta con `if (host.dataset.moConectado === '1') return`,
+ * y los escuchadores colgaban de las esquinas y de los deslizadores — que son
+ * hijos del host y **desaparecen cada vez que le reescriben el `innerHTML`**.
+ * O sea que los mandos funcionaban hasta el primer repintado y después eran
+ * adornos.
+ *
+ * No se veía porque el panel estaba congelado: sin snapshots no había
+ * repintado, así que el primer cableado duraba para siempre. Arreglado el
+ * empuje, el fallo salió a la primera pasada de la sonda — el deslizador de
+ * tamaño no movía nada.
+ *
+ * Es la misma trampa que documenta `ui/piezas.js` y la misma cura: lo delegado
+ * va en el `host`, que sobrevive; lo que depende de los nodos nuevos —aplicar
+ * los valores que traen puestos— se hace en CADA llamada.
+ *
+ * @param {HTMLElement} host  dónde viven las esquinas y los deslizadores
+ * @param {object} api        `{ bounds(), mueve(b), opacidad(v), letra(v) }`
  */
 export function conectar(host, api = {}) {
-  if (!host || host.dataset.moConectado === '1') return;
-  host.dataset.moConectado = '1';
+  if (!host) return;
 
   const pinta = (v) => host.style.setProperty('--mo-op', opacidadValida(v));
+  const pintaLetra = (v) => host.style.setProperty('--mo-letra', letraValida(v));
 
-  const slider = host.querySelector('.mo-op input');
-  if (slider) {
-    pinta(slider.value);
-    slider.addEventListener('input', () => {
-      pinta(slider.value);
-      api.opacidad?.(opacidadValida(slider.value));
-    });
-  }
+  // LOS VALORES, EN CADA LLAMADA: los nodos son nuevos y traen lo que diga el
+  // modelo. Sin esto, el overlay se repinta y vuelve a su tamaño de fábrica.
+  const dOp = host.querySelector('.mo-op input');
+  if (dOp) pinta(dOp.value);
+  const dLe = host.querySelector('.mo-le input');
+  if (dLe) pintaLetra(dLe.value);
+
+  if (host.dataset.moConectado === '1') return;
+  host.dataset.moConectado = '1';
+
+  host.addEventListener('input', (e) => {
+    if (e.target.matches('.mo-op input')) {
+      pinta(e.target.value);
+      api.opacidad?.(opacidadValida(e.target.value));
+      return;
+    }
+    if (e.target.matches('.mo-le input')) {
+      pintaLetra(e.target.value);
+      api.letra?.(letraValida(e.target.value));
+    }
+  });
 
   /**
    * EL ARRASTRE SE MIDE EN COORDENADAS DE PANTALLA, no de ventana.
@@ -116,28 +179,28 @@ export function conectar(host, api = {}) {
    * mueves tú y lo que se mueve ella— y el arrastre se acelera solo. Con
    * `screenX` la referencia está quieta.
    */
-  for (const nodo of host.querySelectorAll('[data-esq]')) {
-    nodo.addEventListener('pointerdown', async (e) => {
-      e.preventDefault();
-      nodo.setPointerCapture(e.pointerId);
-      const inicio = await api.bounds?.();
-      if (!inicio) return;
-      const x0 = e.screenX;
-      const y0 = e.screenY;
-      const mueve = (ev) => {
-        api.mueve?.(encaja(inicio, nodo.dataset.esq, ev.screenX - x0, ev.screenY - y0));
-      };
-      const suelta = () => {
-        nodo.removeEventListener('pointermove', mueve);
-        nodo.removeEventListener('pointerup', suelta);
-        nodo.removeEventListener('pointercancel', suelta);
-      };
-      nodo.addEventListener('pointermove', mueve);
-      nodo.addEventListener('pointerup', suelta);
-      nodo.addEventListener('pointercancel', suelta);
-    });
-  }
+  host.addEventListener('pointerdown', async (e) => {
+    const nodo = e.target.closest?.('[data-esq]');
+    if (!nodo) return;
+    e.preventDefault();
+    nodo.setPointerCapture(e.pointerId);
+    const inicio = await api.bounds?.();
+    if (!inicio) return;
+    const x0 = e.screenX;
+    const y0 = e.screenY;
+    const mueve = (ev) => {
+      api.mueve?.(encaja(inicio, nodo.dataset.esq, ev.screenX - x0, ev.screenY - y0));
+    };
+    const suelta = () => {
+      nodo.removeEventListener('pointermove', mueve);
+      nodo.removeEventListener('pointerup', suelta);
+      nodo.removeEventListener('pointercancel', suelta);
+    };
+    nodo.addEventListener('pointermove', mueve);
+    nodo.addEventListener('pointerup', suelta);
+    nodo.addEventListener('pointercancel', suelta);
+  });
 }
 
 /** Lo que este módulo produce, declarado. */
-export const CLAVES = ['mo.opacidad'];
+export const CLAVES = ['mo.opacidad', 'mo.letra'];

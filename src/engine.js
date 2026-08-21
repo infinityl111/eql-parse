@@ -2038,10 +2038,19 @@ export class Engine extends EventEmitter {
    *    porque juntaba dos entradas a la misma instancia, y en una instancia
    *    nueva el bicho no ha reaparecido: ha nacido.
    *
-   *  · MUERTE → PRIMERA MENCION, acumulados al leer en `#anotaVisto`. Esos ya
-   *    vienen dentro de una visita por construccion: una mencion pendiente se
-   *    cierra con la primera linea que lo nombre, y si te fuiste de la zona sin
-   *    que lo nombrara, se queda abierta y no produce hueco.
+   *  · MUERTE → PRIMERA MENCION, acumulados al leer en `#anotaVisto`. Estan
+   *    dentro de una visita PORQUE SE TIRAN AL ENTRAR EN UNA ZONA, no «por
+   *    construccion»: aqui ponia eso, y era falso.
+   *
+   *    El pendiente se guarda en `nombre + zona`, asi que al salir y volver a
+   *    la MISMA zona la clave coincidia, el pendiente seguia vivo y la primera
+   *    linea de la visita siguiente lo cerraba. Medido el 21/08/2026 sobre el
+   *    registro entero: **610 huecos de 5.602 (11 %) cruzaban una entrada**, y
+   *    **120 claves de 592** sacaban de ahi su minimo, que es justo lo que se
+   *    publica como techo.
+   *
+   *    Lo que si es cierto sin mecanismo: si te fuiste sin que lo nombrara, el
+   *    pendiente se queda abierto y no produce hueco.
    *
    * Medido el 20/08/2026 sobre 1.986 peleas y el registro: 95 claves con cota,
    * mediana 8m 49s por mencion y 10m 29s por muerte, y de las 50 que tienen las

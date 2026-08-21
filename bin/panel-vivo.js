@@ -61,20 +61,33 @@ const { lee, fin } = await arrancaListo({
  * veces con contenido y otras vacío — y un vacío así es indistinguible de un
  * panel roto. Se espera a que **deje de cambiar**, no a que diga lo que quiero:
  * esperar a ver lo que espero sería una prueba que se aprueba sola.
+ *
+ * ── SE ESPERA A LA FORMA, NO AL TEXTO, Y ESO LO ENSEÑÓ UN ARREGLO ─────────
+ *
+ * Esto comparaba el `innerHTML` entero, y funcionaba porque el panel estaba
+ * CONGELADO: no le llegaba ningún snapshot. Arreglado el empuje, la cuenta
+ * atrás cambia cada medio segundo y el HTML no se repite jamás — así que la
+ * espera se agotaba y la sonda declaraba roto un panel recién arreglado.
+ *
+ * **Una sonda escrita contra un artefacto quieto da por normal que esté
+ * quieto.** Se espera a `dataset.sig`, que es la firma del panel sin lo
+ * volátil: la propia definición de «la misma forma» que usa el pintor.
  */
 async function esperaEstable() {
   let previo = null;
   let iguales = 0;
   for (let i = 0; i < 40; i++) {
-    const ahora = await lee(`document.getElementById('pan').innerHTML`);
-    const hay = /pan-l|pan-vacio/.test(ahora ?? '');
-    if (hay && ahora === previo) {
+    const ahora = await lee(`(() => {
+      const h = document.getElementById('pan');
+      return { sig: h?.dataset.sig ?? null, filas: h?.querySelectorAll('.pan-l, .pan-vacio').length ?? 0 };
+    })()`);
+    if (ahora?.filas && ahora.sig && ahora.sig === previo) {
       iguales += 1;
       if (iguales >= 2) return true;
     } else {
       iguales = 0;
     }
-    previo = ahora;
+    previo = ahora?.sig ?? null;
     await espera(500);
   }
   return false;
@@ -127,6 +140,73 @@ ok(datos.filas.some((f) => f.tiempo && /\d:\d\d/.test(f.tiempo)), 'y el que cuen
 ok(datos.esquinas === 4, 'las cuatro esquinas de redimensión están puestas');
 ok(datos.deslizador, 'y el deslizador de transparencia');
 
+/**
+ * Y EL TAMAÑO, comprobado por lo que HACE y no por estar puesto.
+ *
+ * Un deslizador que existe y no escala nada se ve igual que uno que funciona:
+ * se mide la altura de una fila, se lleva el mando al máximo y se vuelve a
+ * medir. Si no crece, el mando es un adorno.
+ */
+const letra = await lee(`(() => {
+  const i = document.querySelector('.mo-le input');
+  if (!i) return null;
+  const antes = document.querySelector('.pan-l')?.getBoundingClientRect().height ?? 0;
+  i.value = i.max;
+  i.dispatchEvent(new Event('input', { bubbles: true }));
+  const despues = document.querySelector('.pan-l')?.getBoundingClientRect().height ?? 0;
+  return { antes, despues, max: i.max, mandos: !!document.querySelector('.mo-mandos') };
+})()`);
+
+ok(!!letra?.mandos, 'el tamaño está DENTRO del overlay, con la transparencia',
+  'en Ajustes habría que cambiarlo, mirar la otra ventana y volver');
+ok(letra && letra.despues > letra.antes,
+  'y al llevarlo al máximo, las filas crecen de verdad',
+  letra ? `${Math.round(letra.antes)} px → ${Math.round(letra.despues)} px (×${letra.max})` : 'sin mando');
+
+// Y AGUANTA EL REPINTADO, que llega medio segundo después: lo elegido sale del
+// modelo, y un modelo que no se entera lo deshace solo.
+await espera(2500);
+const tras = await lee(`(() => {
+  const f = document.querySelector('.pan-l');
+  const i = document.querySelector('.mo-le input');
+  return { alto: f?.getBoundingClientRect().height ?? 0, valor: i?.value ?? null };
+})()`);
+ok(tras && tras.alto > (letra?.antes ?? 0),
+  'y lo elegido sobrevive a los repintados',
+  tras ? `${Math.round(tras.alto)} px · el mando marca ${tras.valor}` : 'sin panel');
+
 // EL DENOMINADOR, siempre: «falla una» y «sólo miré una» se leen igual.
-console.log(`\n${mal} de 5 comprobaciones fallan\n`);
+/**
+ * EL PANEL ESTÁ VIVO, que es distinto de estar pintado.
+ *
+ * PINTAR NO ES SEGUIR PINTANDO. El panel se pintaba una vez al abrirse y se
+ * quedaba quieto: el empuje del snapshot nombraba las ventanas una a una y el
+ * panel vive en otro sitio, así que no le llegaba ni uno. La cuenta atrás no
+ * avanzaba, una muerte no lo reiniciaba y cerrar un temporizador no quitaba su
+ * fila. Se ve igual que uno que funciona hasta que miras el reloj dos veces.
+ */
+const reloj1 = await lee(`document.querySelector('.pan-contando .pan-t')?.textContent`);
+await espera(2500);
+const reloj2 = await lee(`document.querySelector('.pan-contando .pan-t')?.textContent`);
+ok(!!reloj1 && reloj1 !== reloj2, 'la cuenta atrás AVANZA sola',
+  `${reloj1} → ${reloj2}${reloj1 === reloj2 ? ' — el panel está congelado' : ''}`);
+
+/**
+ * Y LA × DE UNA FILA CIERRA ESE TEMPORIZADOR, no la ventana.
+ *
+ * Es lo que pidió Campeón y no se puede comprobar leyendo: el botón está en el
+ * HTML desde la 1.21.0, y que esté no dice que la lista de la configuración
+ * cambie. Se pulsa y se cuenta lo que queda.
+ */
+await lee(`document.querySelector('.pan-l .pan-x')?.click()`);
+let quedan = null;
+for (let i = 0; i < 20; i++) {
+  quedan = await lee(`document.querySelectorAll('.pan-l').length`);
+  if (quedan === CRONOS.length - 1) break;
+  await espera(400);
+}
+ok(quedan === CRONOS.length - 1, 'la × de una fila cierra ESE temporizador',
+  `quedan ${quedan} de ${CRONOS.length}`);
+
+console.log(`\n${mal} de 10 comprobaciones fallan\n`);
 fin(mal ? 1 : 0);

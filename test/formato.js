@@ -40,6 +40,7 @@ import { Parser } from '../src/parser.js';
 import { EncounterTracker } from '../src/encounter.js';
 import { Engine } from '../src/engine.js';
 import { FORMATO_VERSION, RECONSTRUIR_DESDE, FightStore } from '../src/store.js';
+import { t, setLang, TRANSLATED } from '../src/i18n.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -323,6 +324,56 @@ todo el que reconstruya, avisa`);
     sinAviso.length ? `sin aviso: ${sinAviso.map((t) => t.nombre).join(', ')}` : '');
   ok(fuente.includes("t('mig.fronteras')"),
     'y el aviso sale de un texto traducido, no de una cadena suelta');
+}
+
+/**
+ * EL MOTIVO DEL CARTEL VA ATADO A LA GENERACIÓN QUE LO PROVOCA.
+ *
+ * El texto del cartel de reconstruir llevaba desde la 1.15.0 hablando de los
+ * hechizos resistidos —el motivo de AQUELLA migración— mientras
+ * `RECONSTRUIR_DESDE` había subido dos veces por otras cosas. Nadie lo relee,
+ * y quien lo lee decide con él si pulsa un botón que le mueve el histórico.
+ *
+ * El arreglo no es acordarse: la clave del texto LLEVA EL NÚMERO DENTRO
+ * —`mig.body.13`— así que subir la constante sin escribir el motivo nuevo deja
+ * la clave sin traducir. Esto lo caza en los cinco idiomas, y con su control
+ * positivo al lado: la generación siguiente NO tiene texto, que es justo lo que
+ * tiene que pasar hasta que alguien lo escriba.
+ */
+console.log(`
+el cartel de reconstruir explica el motivo de ESTA generación`);
+{
+  const CLAVE = `mig.body.${RECONSTRUIR_DESDE}`;
+  for (const l of TRANSLATED) {
+    setLang(l);
+    const texto = t(CLAVE);
+    ok(!!texto && texto !== CLAVE, `${l}: hay motivo escrito para la generación ${RECONSTRUIR_DESDE}`,
+      texto === CLAVE ? 'SIN TRADUCIR: sube RECONSTRUIR_DESDE y escribe el motivo' : `${texto.length} caracteres`);
+  }
+  setLang('es');
+
+  // CONTROL POSITIVO: la generación siguiente no puede tener texto todavía.
+  const proxima = `mig.body.${RECONSTRUIR_DESDE + 1}`;
+  ok(t(proxima) === proxima, 'CONTROL: la generación siguiente aún no tiene motivo',
+    'si lo tuviera, esta guarda no distinguiría escrito de heredado');
+
+  // Y el pintor construye la clave con el número, no la escribe a mano.
+  const app = fs.readFileSync(new URL('../ui/app.js', import.meta.url), 'utf8');
+  ok(/mig\.body\.\$\{/.test(app), 'y el cartel arma su clave con la generación que recibe',
+    'escrita a mano volvería a envejecer');
+
+  // Los motivos de generaciones pasadas no se quedan: una traducción muerta
+  // acaba saliendo el día que alguien toque la clave.
+  const dic = fs.readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
+  const generaciones = [...new Set([...dic.matchAll(/'mig\.body\.(\d+)':/g)].map((m) => +m[1]))];
+  // CONTROL DE NO VACUIDAD: un «ninguno» de una expresión que no casa con nada
+  // se lee igual que un «ninguno» de verdad. Tiene que encontrar la de hoy.
+  ok(generaciones.includes(RECONSTRUIR_DESDE),
+    'CONTROL: la búsqueda encuentra la generación de hoy en el diccionario',
+    generaciones.length ? `encontradas: ${generaciones.join(', ')}` : 'NO ENCUENTRA NINGUNA');
+  const viejas = generaciones.filter((v) => v !== RECONSTRUIR_DESDE);
+  ok(viejas.length === 0, 'y no quedan motivos de generaciones pasadas',
+    viejas.length ? `sobran: ${viejas.join(', ')}` : 'ninguno');
 }
 
 /**

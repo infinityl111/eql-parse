@@ -133,11 +133,11 @@ function lineaDe(f) {
  * usar la misma llamada como firma de `pintaEstable` — igual que en la sección.
  */
 export function construye(modelo = {}, conNumero = true) {
-  const { fichas = [], total = null, opacidad = 1, zona = null } = modelo;
+  const { fichas = [], total = null, opacidad = 1, letra = 1, zona = null } = modelo;
   const orden = ordena(fichas).map((f) => (conNumero ? f : { ...f, restanteTxt: '' }));
   const vacio = claveDelVacio({ total: total ?? fichas.length, visibles: orden.length });
 
-  return `${marco({ opacidad })}
+  return `${marco({ opacidad, letra })}
     <div class="pan-bar">
       <span class="eyebrow">${esc(t('cro.title'))}</span>
       ${zona ? `<span class="pan-z">${esc(zona)}</span>` : ''}
@@ -159,5 +159,5 @@ export function construye(modelo = {}, conNumero = true) {
 export const CLAVES = [
   'cro.title', 'cro.disponible', 'cro.esperando', 'cro.desdeMuerte',
   'cro.close', 'cro.vacio',
-  'cro.cotaH1', 'cro.cotaHn', 'pan.fueraDeZona', 'mo.opacidad',
+  'cro.cotaH1', 'cro.cotaHn', 'pan.fueraDeZona', 'mo.opacidad', 'mo.letra',
 ];

@@ -246,7 +246,10 @@ export const FORMATO_VERSION = 13;
  * no depende de qué reloj cerró la pelea. El aviso de `rebuild.js` se queda:
  * las cifras de daño siguen pudiendo moverse.
  *
- * Al subirlo, repasa `mig.body` — el cartel explica los motivos de ESA
+ * Al subirlo, ESCRIBE `mig.body.<n>` con el número nuevo: la clave del cartel
+ * lleva dentro la generación que lo provoca, así que el motivo no se puede
+ * quedar viejo — subir esto sin escribirlo deja la clave sin traducir y
+ * `test/formato.js` lo caza en los cinco idiomas. El cartel explica ESA
  * migración, y un texto puesto por un motivo que ya no aplica sobrevive porque
  * nadie lo relee.
  *

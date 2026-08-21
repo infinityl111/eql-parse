@@ -85,6 +85,26 @@ console.log('\nel marco produce sus cuatro esquinas y su deslizador');
     'sin el valor, cada repintado lo devuelve al máximo');
 }
 
+console.log('\nel tamaño tiene los mismos topes que la opacidad, y por lo mismo');
+{
+  ok(M.letraValida(0) === M.LETRA.min, 'un cero sube al mínimo',
+    'por debajo de 0,8 las filas dejan de leerse donde se afinaron');
+  ok(M.letraValida(9) === M.LETRA.max, 'y un exceso baja al máximo',
+    'por encima de 1,8 una fila se come el panel y deja de ser una lista');
+  ok(M.letraValida('1.3') === 1.3, 'una cadena vale: del deslizador viene texto');
+  ok(M.letraValida(undefined) === M.LETRA.por_defecto, 'y sin valor, el de por defecto');
+  ok(M.letraValida(NaN) === M.LETRA.por_defecto, 'CONTROL: NaN tampoco pasa');
+
+  const h = M.marco({ opacidad: 0.7, letra: 1.3 });
+  ok(h.includes('mo-le') && h.includes('value="1.3"'),
+    'y el marco lo pinta con su valor puesto',
+    'sin el valor, cada repintado lo devuelve a 1');
+  ok((h.match(/type="range"/g) ?? []).length === 2,
+    'los dos mandos están, no uno', 'transparencia y tamaño, dentro del overlay');
+  ok(M.marco({}).includes(`value="${M.LETRA.por_defecto}"`),
+    'CONTROL: sin decir nada, sale el de por defecto');
+}
+
 console.log('\nlos cinco idiomas');
 for (const l of TRANSLATED) {
   setLang(l);
