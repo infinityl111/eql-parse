@@ -1,5 +1,50 @@
 [
  {
+  "tag": "v1.22.0",
+  "nombre": "1.22.0 — todo lo que has matado, en una lista",
+  "fecha": "2026-08-21T08:01:59Z",
+  "cuerpo": "## Todo lo que has matado alguna vez, en una lista\n\nLa pestaña **Vigilar un enemigo** ya no está vacía: trae los enemigos de tu histórico\ncon su zona y su dificultad ya puestas. Buscas por nombre o por zona, pulsas\n**Seguir** y el temporizador nace completo. No hay que escribir nada\nni tener el bicho delante.\n\nCada uno dice cuántas veces ha caído ahí y cuándo fue la última, y los que ya\nsigues vienen marcados. Lo más reciente va arriba: la zona de anoche sale la\nprimera sin buscarla.\n\n## Temporizadores que no encontraban sus muertes\n\nEn las zonas con dificultad, un temporizador podía quedarse en\n«Esperando su primera muerte» para siempre aunque hubieras matado a ese enemigo allí\nmuchas veces, y entonces no se reiniciaba nunca. Ya los encuentra: vuelven a\ncontar, con sus observaciones y su techo.\n\n## Un cuarto estado: el que no estima nada\n\nUn temporizador puede saber cuándo murió el enemigo y no saber cuánto tarda en\nvolver. Antes eso se quedaba mudo, o decía «Ya debería estar», que es afirmar\nalgo sin tener con qué. Ahora dice lo único que se puede decir, y es un hecho:\ncuánto lleva desde que murió.\n\n## El panel, ordenado por lo que va a pasar\n\nArriba lo que dice el reloj —los que ya deberían estar y los que están\ncontando—; debajo, aquello de lo que no sabemos el tiempo. Un temporizador sin\nestimación no es más urgente que uno al que le quedan veinte segundos, y estaba\npor delante.\n\n## Lo que escribes no se borra solo\n\nEl campo de poner el tiempo a mano volvía a su valor anterior si el\ntemporizador se repintaba mientras escribías. Ya no: lo que has tocado se\nconserva.\n",
+  "url": "https://github.com/infinityl111/eql-parse/releases/tag/v1.22.0",
+  "exe": {
+   "url": "https://api.github.com/repos/infinityl111/eql-parse/releases/assets/523431356",
+   "id": 523431356,
+   "node_id": "RA_kwDOTtrlTs4fMu28",
+   "name": "EQL-Parse-1.22.0-setup.exe",
+   "label": "",
+   "uploader": {
+    "login": "infinityl111",
+    "id": 283182182,
+    "node_id": "U_kgDOEOEEZg",
+    "avatar_url": "https://avatars.githubusercontent.com/u/283182182?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/infinityl111",
+    "html_url": "https://github.com/infinityl111",
+    "followers_url": "https://api.github.com/users/infinityl111/followers",
+    "following_url": "https://api.github.com/users/infinityl111/following{/other_user}",
+    "gists_url": "https://api.github.com/users/infinityl111/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/infinityl111/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/infinityl111/subscriptions",
+    "organizations_url": "https://api.github.com/users/infinityl111/orgs",
+    "repos_url": "https://api.github.com/users/infinityl111/repos",
+    "events_url": "https://api.github.com/users/infinityl111/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/infinityl111/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+   },
+   "content_type": "application/x-msdownload",
+   "state": "uploaded",
+   "size": 78926872,
+   "digest": "sha256:24b6cc1e11687c59286c22db4b962261ab7ca7878a91ccfef187898a8327ee39",
+   "download_count": 0,
+   "created_at": "2026-08-21T08:02:09Z",
+   "updated_at": "2026-08-21T08:02:13Z",
+   "browser_download_url": "https://github.com/infinityl111/eql-parse/releases/download/v1.22.0/EQL-Parse-1.22.0-setup.exe"
+  },
+  "bytes": 78926872,
+  "descarga": "https://github.com/infinityl111/eql-parse/releases/download/v1.22.0/EQL-Parse-1.22.0-setup.exe"
+ },
+ {
   "tag": "v1.21.0",
   "nombre": "1.21.0 — los temporizadores, en un panel encima del juego",
   "fecha": "2026-08-20T20:34:37Z",
@@ -36,7 +81,7 @@
    "state": "uploaded",
    "size": 78918894,
    "digest": "sha256:8d1c0b140c3f560fca3f01f794ae05ad394d1cff20f2a936da8df2bc067eaf9a",
-   "download_count": 0,
+   "download_count": 6,
    "created_at": "2026-08-20T20:34:40Z",
    "updated_at": "2026-08-20T20:34:45Z",
    "browser_download_url": "https://github.com/infinityl111/eql-parse/releases/download/v1.21.0/EQL-Parse-1.21.0-setup.exe"
@@ -81,7 +126,7 @@
    "state": "uploaded",
    "size": 78906271,
    "digest": "sha256:0e1571bdf64a71b3c983de76261c576b482287396f42272f6b0c3461f5800dae",
-   "download_count": 2,
+   "download_count": 3,
    "created_at": "2026-08-20T18:26:49Z",
    "updated_at": "2026-08-20T18:26:53Z",
    "browser_download_url": "https://github.com/infinityl111/eql-parse/releases/download/v1.20.1/EQL-Parse-1.20.1-setup.exe"
