@@ -4,7 +4,7 @@ import { advise } from '../src/advisor.js';
 import { RANGES } from '../src/ranges.js';
 import { mergePets, mergeOwnerPets, ownerPets, ensureIdentidad } from '../src/aggregate.js';
 import { fightToChat } from '../src/share.js';
-import { construye as construyeCronos } from './cronos-vista.js';
+import { construye as construyeCronos, fichaCandidato } from './cronos-vista.js';
 import { conectar as conectarPiezas, desplegadas } from './piezas.js';
 import { SUELO_COTA, lecturaDelVisto } from '../src/cronos.js';
 import { estadoCrono, avisoDeVarios, claveCrono, ordenCola, ESTADO, PERIODOS_SOSPECHA, PRECISION, enemigosDeLaPelea, MIN_OBS_DISCREPA, puedeAfirmarDiscrepancia } from '../src/cronos.js';
@@ -6293,6 +6293,105 @@ async function renderCronos(snap, cajaSec) {
    * del campo de texto se lo pide a la enciclopedia, que suma las muertes de
    * todas las zonas de esa dificultad: aquí no hace falta ese rodeo.
    */
+  /**
+   * LA FICHA AL PASAR EL RATÓN, y por qué se pide y no se pinta de antemano.
+   *
+   * Son 657 candidatos: llevar la ficha de cada uno dentro de la lista serían
+   * 657 consultas al puente y otro tanto de HTML para enseñar una. Se pide la
+   * del que se mira, se guarda por si vuelve, y si el ratón se ha ido antes de
+   * que conteste no se pinta nada — una ficha que aparece sobre otra fila es
+   * peor que ninguna.
+   */
+  /**
+   * LA FICHA VIVE FUERA DE LA SECCIÓN, colgada del documento.
+   *
+   * Dentro de `host` la destruiría el primer repintado —y esta sección se
+   * repinta al cambiar de estado un crono—, así que el manejador acabaría
+   * escribiendo en un nodo suelto: la ficha no saldría y no habría error que lo
+   * dijera. Fuera, sobrevive a las reconstrucciones y no estorba: nace oculta.
+   */
+  const laFicha = () => document.getElementById('croFicha') ?? (() => {
+    const d = document.createElement('div');
+    d.id = 'croFicha';
+    d.className = 'cro-ficha';
+    d.hidden = true;
+    document.body.appendChild(d);
+    return d;
+  })();
+  state.croFichas = state.croFichas ?? new Map();
+  let mirando = null;
+
+  const coloca = (fila, caja) => {
+    const r = fila.getBoundingClientRect();
+    const alto = caja.offsetHeight || 240;
+    caja.style.left = `${Math.max(8, r.left - 8)}px`;
+    // Debajo si cabe, y encima si no: una ficha cortada por abajo no se lee.
+    caja.style.top = r.bottom + alto + 12 > window.innerHeight
+      ? `${Math.max(8, r.top - alto - 6)}px`
+      : `${r.bottom + 6}px`;
+  };
+
+  const pide = async (c) => {
+    const k = `${c.nombre}|${c.base ?? ''}|${c.diff ?? ''}`;
+    if (state.croFichas.has(k)) return state.croFichas.get(k);
+    const clave = { nombre: c.nombre, base: c.base ?? null, diff: c.diff ?? null, mode: null };
+    const [con, cotas, at] = await Promise.all([
+      window.eql.considerDe?.([clave]).catch(() => ({})) ?? {},
+      window.eql.cotaDe?.([clave]).catch(() => ({})) ?? {},
+      /**
+       * EL BOTÍN SALE DEL CAJÓN DE SU DIFICULTAD, que es hasta donde llega la
+       * enciclopedia — puede juntar varias zonas de esa misma dificultad. No se
+       * disimula: la ficha lo dice cuando pasa.
+       */
+      window.eql.encFoeAt?.(c.nombre, c.diff == null ? 'sin marca' : `D${c.diff}`).catch(() => null) ?? null,
+    ]);
+    const cota = cotas[claveCrono(clave)] ?? null;
+    const lista = (at?.lootList ?? []);
+    const v = {
+      nombre: c.nombre,
+      zonaTxt: c.base ? `${c.base}${c.diff != null ? ` · ${c.diffLabel ?? `D${c.diff}`}` : ''}` : t('cro.sinZona'),
+      consider: con[claveCrono(clave)] ?? null,
+      muertesTxt: c.muertes === 1 ? t('cro.candCuenta1', { p: c.peleas })
+        : t('cro.candCuenta', { n: c.muertes, p: c.peleas }),
+      cota: cota ? { txt: cronoRestante(cota.segundos), huecos: cota.huecos } : null,
+      bajas: at?.kills ?? c.muertes,
+      masZonas: Math.max(0, (at?.zones?.length ?? 1) - 1),
+      botin: lista.slice(0, 6),
+      botinMas: Math.max(0, lista.length - 6),
+    };
+    state.croFichas.set(k, v);
+    return v;
+  };
+
+  for (const fila of host.querySelectorAll('[data-vista="sug"] .pz-fila')) {
+    fila.addEventListener('mouseenter', async () => {
+      const b = fila.querySelector('[data-alta]');
+      const c = candidatos[b ? +b.dataset.alta : candidatos.findIndex(
+        (x) => `cand|${x.nombre}|${x.base ?? ''}|${x.diff ?? ''}|${x.mode ?? ''}` === fila.dataset.id)];
+      if (!c) return;
+      mirando = fila;
+      const v = await pide(c);
+      /**
+       * DESPUÉS DE LA ESPERA, NADA DEL DOM SE DA POR BUENO. El ratón puede
+       * haberse ido a otra fila y la sección puede haberse repintado debajo:
+       * se comprueba lo uno y lo otro antes de escribir.
+       */
+      const caja = laFicha();
+      if (mirando !== fila || !caja || !fila.isConnected) return;
+      caja.innerHTML = fichaCandidato(v);
+      caja.hidden = false;
+      coloca(fila, caja);
+    });
+    fila.addEventListener('mouseleave', () => {
+      if (mirando !== fila) return;
+      mirando = null;
+      // Se vuelve a buscar en vez de usar la de antes: entre medias ha podido
+      // repintarse cualquier cosa, y un nodo suelto se esconde sin efecto.
+      const suya = document.getElementById('croFicha');
+      if (suya) suya.hidden = true;
+    });
+  }
+
   host.querySelectorAll('[data-alta]').forEach((b) => b.addEventListener('click', async (e) => {
     // El botón vive dentro del `summary` de su fila: sin esto, pulsarlo
     // desplegaría además la fila, que no es lo que se ha pedido.

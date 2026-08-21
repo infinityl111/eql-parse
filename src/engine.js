@@ -665,6 +665,24 @@ export class Engine extends EventEmitter {
     if (ev.kind === 'aa') {
       this.store?.appendAA({ t: ev.t, at: Math.round(ev.t * 1000), balance: ev.balance ?? null });
     }
+    /**
+     * EL `/con`, QUE SE RECONOCIA Y SE TIRABA.
+     *
+     * `patterns.js` lo lee entero desde hace versiones —peldaño y nivel— y no
+     * lo leia nadie: el evento se generaba y moria aqui. Ahora se guarda por
+     * (zona, dificultad, nombre) con su hora, que es lo que pide `CONSIDER.md`.
+     *
+     * El nivel NO es propiedad del nombre: el mismo bicho en la misma zona y
+     * dificultad da 36, 37, 39 y 40. Por eso se guarda cada observacion y quien
+     * lo ensene dira un RANGO con su recuento, nunca una cifra.
+     */
+    if (ev.kind === 'con' && ev.mob) {
+      this.store?.appendCon({
+        t: ev.t, at: Math.round(ev.t * 1000), mob: ev.mob,
+        con: ev.con ?? null, level: ev.level ?? null,
+        zona: this.parser?.zone ?? null,
+      });
+    }
     if (ev.kind === 'cast' && ev.source === (this.self ?? 'You') && ev.ability) this.classProof(ev);
     if (ev.kind === 'stance' && ev.stance) this.#checkConflict('stance', ev.stance);
     if (ev.kind === 'invocation' && ev.invocation) this.#checkConflict('invocation', ev.invocation);
@@ -2267,6 +2285,52 @@ export class Engine extends EventEmitter {
    */
   candidatosCrono(abiertos = []) {
     return candidatosDe(this.store?.index ?? [], { abiertos });
+  }
+
+  /**
+   * LO QUE EL `/con` HA DICHO DE CADA CLAVE.
+   *
+   * Devuelve, por clave: el RANGO de niveles observados con su recuento, los
+   * peldaños vistos con el suyo, y cuándo fue la última. **Nunca una cifra de
+   * nivel**: medido, el mismo nombre en la misma zona y dificultad da 36, 37,
+   * 39 y 40, así que un número sería elegir uno de los cuatro.
+   *
+   * `niveles: null` no es «nivel cero»: es que ninguna de sus consideraciones
+   * traía nivel —la línea no siempre lo lleva— o que no hay ninguna. Las dos
+   * cosas se distinguen mirando `obs`.
+   */
+  considerDe(claves = []) {
+    const out = {};
+    const pide = claves.filter((c) => c?.nombre);
+    for (const c of pide) out[claveCrono(c)] = null;
+    for (const e of this.store?.con ?? []) {
+      for (const c of pide) {
+        if (e.mob !== c.nombre) continue;
+        if (c.base != null && (e.zoneBase ?? null) !== c.base) continue;
+        if (c.diff != null && (e.diff ?? null) !== c.diff) continue;
+        const k = claveCrono(c);
+        const v = out[k] ?? { obs: 0, conNivel: 0, min: null, max: null, cons: {}, ultima: null };
+        v.obs += 1;
+        if (Number.isFinite(e.level)) {
+          v.conNivel += 1;
+          v.min = v.min == null ? e.level : Math.min(v.min, e.level);
+          v.max = v.max == null ? e.level : Math.max(v.max, e.level);
+        }
+        if (e.con) v.cons[e.con] = (v.cons[e.con] ?? 0) + 1;
+        if (v.ultima == null || e.t > v.ultima) v.ultima = e.t;
+        out[k] = v;
+      }
+    }
+    for (const k of Object.keys(out)) {
+      const v = out[k];
+      if (!v) continue;
+      out[k] = {
+        ...v,
+        cons: Object.entries(v.cons).map(([palabra, n]) => ({ palabra, n }))
+          .sort((a, b) => b.n - a.n || a.palabra.localeCompare(b.palabra)),
+      };
+    }
+    return out;
   }
 
   encDeaths() { return this.enc?.deaths(this.self) ?? null; }

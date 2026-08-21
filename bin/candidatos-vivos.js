@@ -21,7 +21,7 @@
  *
  * Uso:  npm run candidatos  ·  node bin/candidatos-vivos.js
  */
-import { arrancaListo, abreSeccion, espera } from './sonda.js';
+import { arrancaListo, abreSeccion, espera, hace } from './sonda.js';
 
 /**
  * EL HISTÓRICO SE SIEMBRA CON LA FORMA ENFERMA, no con la sana.
@@ -53,11 +53,27 @@ const siembra = async (store) => {
   store.append(pelea(T, 2, 'Ancient Croaker', 30), T);
   store.append(pelea(T + 600e3, 2, 'Ancient Croaker', 45), T + 600e3);
   store.append(pelea(T + 900e3, 3, 'a shin ghoul knight', 20), T + 900e3);
+  /**
+   * LAS CONSIDERACIONES SE SIEMBRAN AQUÍ Y NO EN EL REGISTRO, y el motivo es
+   * del arranque: con el almacén ya sembrado, la aplicación NO relee el
+   * registro entero —sólo lo hace la primera vez, con el almacén vacío—, así
+   * que unas líneas de `/con` al principio del fichero no se leerían nunca.
+   *
+   * Que el `/con` del registro llegue a guardarse lo prueba `test/ultima-muerte`
+   * alimentando al motor de verdad; lo que se mide AQUÍ es la ficha.
+   *
+   * Dos niveles distintos del mismo bicho en la misma zona y dificultad, que es
+   * el caso que decide: el nivel no es propiedad del nombre y tiene que salir
+   * como rango.
+   */
+  const zona = `${ZONA} 2 (${TAG[2]})`;
+  store.appendCon({ t: Math.round(T / 1000) + 10, mob: 'Ancient Croaker', con: 'scowls at you', level: 36, zona });
+  store.appendCon({ t: Math.round(T / 1000) + 70, mob: 'Ancient Croaker', con: 'scowls at you', level: 40, zona });
 };
 
 const { lee, fin } = await arrancaListo({
   nombre: 'eql-candidatos-vivos',
-  registro: [`[${new Date().toDateString()}] Logging to 'eqlog.txt' is now *ON*.`],
+  registro: [`[${hace(600)}] Logging to 'eqlog.txt' is now *ON*.`],
   siembra,
   config: { cronos: [] },
 });
@@ -113,6 +129,45 @@ ok(filas.every((f) => f.id?.includes(`|${ZONA}|`)),
 ok(filas.some((f) => /2/.test(f.cuenta)), 'con su recuento de muertes',
   filas.map((f) => f.cuenta).join(' · '));
 
+/**
+ * LA FICHA AL PASAR EL RATÓN. Se dispara `mouseenter` sobre la fila y se lee lo
+ * que aparece: el nivel tiene que salir como RANGO —36–40, de las dos
+ * consideraciones del registro— y el bloque de la wiki tiene que decir que
+ * está pendiente, no faltar.
+ */
+const iCroaker = filas.findIndex((f) => f.nombre === 'Ancient Croaker');
+await lee(`(() => {
+  const f = document.querySelectorAll('[data-vista="sug"] .pz-fila')[${iCroaker}];
+  f?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+  return !!f;
+})()`);
+let tarjeta = null;
+for (let j = 0; j < 20; j++) {
+  tarjeta = await lee(`(() => {
+    const c = document.getElementById('croFicha');
+    if (!c || c.hidden) return null;
+    return {
+      texto: c.textContent.replace(/\\s+/g, ' ').trim(),
+      bloques: c.querySelectorAll('.cf-bloque').length,
+      pendiente: !!c.querySelector('.cf-pendiente'),
+    };
+  })()`);
+  if (tarjeta) break;
+  await espera(400);
+}
+console.log(`     ficha: ${tarjeta?.texto?.slice(0, 150) ?? '(ninguna)'}`);
+console.log('');
+
+ok(!!tarjeta, 'al pasar el ratón sale la ficha del candidato');
+ok(tarjeta && /36[^0-9]{1,3}40/.test(tarjeta.texto),
+  'y el nivel del /consider sale como RANGO, no como cifra',
+  'el mismo bicho da 36 y 40 en la misma zona: un número sería elegir uno');
+ok(tarjeta && /consideraciones|consideración/.test(tarjeta.texto),
+  'con cuántas consideraciones lo sostienen');
+ok(tarjeta && tarjeta.bloques === 2 && tarjeta.pendiente,
+  'el botín va en DOS bloques, y el de la wiki dice que está pendiente',
+  'un hueco vacío se leería como «no suelta nada»');
+
 // Se abre el primero, que es el de las dos muertes.
 const i = filas.findIndex((f) => f.nombre === 'Ancient Croaker');
 ok(i >= 0 && filas[i].puede, 'el que no tiene temporizador enseña su botón');
@@ -148,5 +203,5 @@ ok(ficha && /observaci/i.test(ficha.texto), 'y trae su recuento de observaciones
   'con dos muertes en peleas distintas tiene que haber una');
 
 // EL DENOMINADOR, siempre: «falla una» y «sólo miré una» se leen igual.
-console.log(`\n${mal} de 7 comprobaciones fallan\n`);
+console.log(`\n${mal} de 11 comprobaciones fallan\n`);
 fin(mal ? 1 : 0);

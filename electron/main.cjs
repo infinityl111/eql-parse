@@ -698,6 +698,8 @@ ipcMain.handle('cronos:cota', (_e, { claves }) => engine.cotaDe(claves));
 // TODO lo que has matado alguna vez, para poder abrir un crono sin tenerlo
 // delante. `abiertos` sólo sirve para marcar los que ya tienen temporizador.
 ipcMain.handle('cronos:candidatos', (_e, { abiertos }) => engine.candidatosCrono(abiertos));
+// Lo que el `/con` ha dicho de cada clave: rango de niveles y peldanos.
+ipcMain.handle('cronos:consider', (_e, { claves }) => engine.considerDe(claves));
 
 /**
  * EL MARCO. Mover una ventana solo puede hacerlo el proceso principal, asi que

@@ -60,7 +60,7 @@ import { FightStore, FORMATO_VERSION } from './store.js';
 // tirantes. Van los dos porque el fallo que esta lista evita —un aviso viejo
 // estampado sobre una pelea que ya está bien— es silencioso.
 const FICHEROS = ['fights.ndjson', 'fights.idx', 'encyclopedia.json', 'loot.ndjson',
-  'aa.ndjson', 'spells.ndjson', 'tramos.ndjson', 'dudas.ndjson'];
+  'aa.ndjson', 'spells.ndjson', 'tramos.ndjson', 'dudas.ndjson', 'con.ndjson'];
 
 /**
  * AVISO QUE VIAJA CON EL RESULTADO, no un comentario que nadie lee.

@@ -843,6 +843,8 @@ export class FightStore {
     // botín sin pelea: no pertenecen a ningún combate, pasan entre unos y
     // otros. Si el fichero no está, no hay hitos y ya está — no es un error.
     this.aaPath = path.join(dir, 'aa.ndjson');
+    // Las consideraciones del `/con`: una línea del juego por cada una.
+    this.conPath = path.join(dir, 'con.ndjson');
     this.aa = [];
     this.aaSeen = new Set();
     // El daño por postura de las peleas viejas, y el motivo de las que no lo
@@ -886,9 +888,9 @@ export class FightStore {
    * si acabas de quitar a alguien— hasta el próximo arranque.
    */
   setCompanions(list) {
-    const antes = [...this.companions].sort().join(' ');
+    const antes = [...this.companions].sort().join('\u0000');
     this.companions = new Set([...(list ?? [])].filter(Boolean));
-    if ([...this.companions].sort().join(' ') !== antes) this.cache.clear();
+    if ([...this.companions].sort().join('\u0000') !== antes) this.cache.clear();
     return this.companions.size;
   }
 
@@ -1004,6 +1006,7 @@ export class FightStore {
     this.dropped = 0;
     this.#loadLoot();
     this.#loadAA();
+    this.#loadCon();
     this.#loadSpells();
     this.#loadTramos();
     this.#loadDudas();
@@ -1288,6 +1291,69 @@ export class FightStore {
       if (sm) this.cache.delete(sm.uid);
       return true;
     } catch { return false; }
+  }
+
+  /**
+   * LAS CONSIDERACIONES DEL `/con`, tal y como las escribe el juego.
+   *
+   * La línea trae tres cosas y no son la misma clase de dato, así que se
+   * guardan las tres por separado y sin mezclarse:
+   *
+   *   `con`     el peldaño —«scowls at you», «regards you»…—. Es una relación
+   *             DECLARADA por el juego y persiste: no se contradice.
+   *   `level`   el nivel, cuando la línea lo trae. **No es propiedad del
+   *             nombre**: `a zol ghoul knight` da 36, 37, 39 y 40 en la misma
+   *             zona y dificultad, así que se guarda cada observación y quien
+   *             lo enseñe dirá un RANGO con su recuento, nunca una cifra.
+   *   `zona`    la del momento, cruda; la base y la dificultad se sacan de ella
+   *             con `parseZone`, igual que en el resumen de una pelea.
+   *
+   * Se deduplica por instante y nombre porque releer el registro las vuelve a
+   * generar, igual que las peleas.
+   */
+  appendCon(e) {
+    const t = Math.round(e?.t ?? 0);
+    const mob = e?.mob ?? null;
+    if (!t || !mob) return null;
+    // Sin `load()` delante no hay memoria de lo ya visto, y quedarse sin ella
+    // no es motivo para perder la línea: se crea vacía.
+    this.con = this.con ?? [];
+    this.conSeen = this.conSeen ?? new Set();
+    const k = `${t}\u0000${mob}`;
+    if (this.conSeen.has(k)) return null;
+    const z = e.zona ? parseZone(e.zona) : null;
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      const fila = {
+        t, at: e.at ?? t * 1000, mob,
+        con: e.con ?? null,
+        level: Number.isFinite(e.level) ? e.level : null,
+        zoneBase: z?.base ?? null, diff: z?.diff ?? null,
+      };
+      fs.appendFileSync(this.conPath, `${JSON.stringify(fila)}\n`);
+      this.conSeen.add(k);
+      this.con.push(fila);
+      return fila;
+    } catch { return null; }
+  }
+
+  #loadCon() {
+    this.con = [];
+    this.conSeen = new Set();
+    try {
+      for (const line of fs.readFileSync(this.conPath, 'utf8').split('\n')) {
+        if (!line.trim()) continue;
+        try {
+          const e = JSON.parse(line);
+          if (!e?.t || !e?.mob) continue;
+          const k = `${e.t}\u0000${e.mob}`;
+          if (this.conSeen.has(k)) continue;
+          this.conSeen.add(k);
+          this.con.push(e);
+        } catch { /* línea rota: se salta */ }
+      }
+      this.con.sort((a, b) => a.t - b.t);
+    } catch { /* sin fichero: no se ha considerado nada */ }
   }
 
   #loadAA() {

@@ -2159,6 +2159,35 @@ th.zgap, td.zgap { padding: 0; border-bottom: 0; }
 .cro-mano { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--slate-700); }
 .cro-mano label { font-size: 11px; color: var(--bone-faint); }
 
+/* ── La ficha del candidato, al pasar el ratón ──────────────────────────
+   Flota sobre la lista y no la empuja: si empujara, la fila que estás
+   mirando se movería debajo del ratón y la ficha saldría y entraría sola. */
+.cro-ficha { position: fixed; z-index: 40; width: 280px; max-height: 62vh;
+  overflow-y: auto; pointer-events: none;
+  background: var(--slate-850); border: 1px solid var(--slate-600);
+  border-radius: 9px; padding: 9px 11px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.cf-h { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.cf-h b { font-size: 12.5px; }
+.cf-zona { font-size: 10.5px; color: var(--bone-dim); }
+.cf-nivel { margin-top: 5px; font-size: 11.5px; }
+.cf-obs, .cf-peldano { font-size: 10.5px; color: var(--bone-dim); margin-left: 5px; }
+.cf-peldano { display: block; margin: 2px 0 0; color: var(--bone-faint); }
+.cf-muertes, .cf-cota { margin-top: 4px; font-size: 11px; color: var(--bone-dim);
+  font-variant-numeric: tabular-nums; }
+.cf-huecos { color: var(--bone-faint); font-size: 10px; }
+/* Lo que falta se ve como falta, no como cero. */
+.cf-no { color: var(--bone-faint); font-style: italic; }
+.cf-bloque { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--slate-700); }
+.cf-tit { font-size: 10px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+  color: var(--bone-dim); }
+.cf-sub { font-size: 10px; color: var(--bone-faint); margin-top: 1px; }
+.cf-items { list-style: none; margin: 5px 0 0; padding: 0; font-size: 11px; }
+.cf-items li { display: flex; gap: 8px; justify-content: space-between; padding: 1px 0; }
+.cf-n { color: var(--bone-dim); font-variant-numeric: tabular-nums; }
+.cf-mas { font-size: 10px; color: var(--bone-faint); margin-top: 3px; }
+/* El bloque de la wiki se ve pendiente: ni vacío ni igual que el medido. */
+.cf-pendiente { opacity: .75; }
+
 /* Lo que escribe el jugador va al final del cuerpo y separado por una linea:
    manda sobre las otras dos fuentes, pero no es lo que se viene a mirar. */
 .cro-man { display: flex; gap: 6px; margin-top: 9px; padding-top: 9px;

@@ -344,6 +344,84 @@ console.log('\nLA COTA SOLO CUENTA HUECOS DENTRO DE UNA MISMA VISITA');
   fs.rmSync(dir2, { recursive: true, force: true });
 }
 
+console.log('\nLA LINEA DEL /consider LLEGA DESDE EL REGISTRO AL ALMACEN');
+{
+  /**
+   * `patterns.js` la reconocia entera desde hace versiones y no la leia nadie:
+   * el evento se generaba y moria en el motor. Esto lo comprueba por el camino
+   * de verdad —linea → parser → `feedEvent` → almacen— y no llamando a
+   * `appendCon` a mano, que probaria el almacen y no el cableado.
+   */
+  const dirL = fs.mkdtempSync(path.join(os.tmpdir(), 'eql-conlog-'));
+  const e = new Engine();
+  e.self = 'Campeon';
+  e.parser = new Parser({ self: 'Campeon' });
+  e.tracker = new EncounterTracker({ self: 'Campeon', idleSec: 20 });
+  e.store = new FightStore(dirL);
+  e.store.load();
+  const LINEAS = [
+    '[Fri Aug 21 12:19:03 2026] You have entered The Ruins of Old Guk 2 (Adaptive).',
+    '[Fri Aug 21 12:19:13 2026] Ancient Croaker scowls at you, ready to attack -- looks kind of dangerous (Lvl: 36)',
+    '[Fri Aug 21 12:19:53 2026] Ancient Croaker scowls at you, ready to attack -- looks kind of dangerous (Lvl: 40)',
+  ];
+  for (const l of LINEAS) { const ev = e.parser.parse(l); if (ev) e.feedEvent(ev); }
+
+  ok((e.store.con ?? []).length === 2, 'las dos consideraciones llegan al almacen',
+    `${(e.store.con ?? []).length} de 2`);
+  const uno = e.store.con?.[0];
+  ok(uno?.zoneBase === 'The Ruins of Old Guk' && uno?.diff === 2,
+    'con la zona de ese momento, base y dificultad aparte', `${uno?.zoneBase} D${uno?.diff}`);
+  ok(uno?.level === 36 && e.store.con?.[1]?.level === 40,
+    'y cada nivel tal cual lo dijo la linea', 'sin promediar ni quedarse con el ultimo');
+  ok(fs.existsSync(path.join(dirL, 'con.ndjson')), 'y se escriben en su fichero, no solo en memoria');
+  fs.rmSync(dirL, { recursive: true, force: true });
+}
+
+console.log('\nEL /consider SE GUARDA, Y EL NIVEL SALE COMO RANGO');
+{
+  /**
+   * `patterns.js` leía la línea entera —peldaño y nivel— desde hace versiones y
+   * no la leía nadie. Ahora se guarda por (zona, dificultad, nombre).
+   *
+   * Y el nivel NO es propiedad del nombre: el mismo bicho en la misma zona y
+   * dificultad da 36, 37, 39 y 40. Por eso se devuelve un rango con su
+   * recuento, y nunca una cifra.
+   */
+  const dir3 = fs.mkdtempSync(path.join(os.tmpdir(), 'eql-con-'));
+  const st = new FightStore(dir3);
+  const ZONA = 'The Ruins of Old Guk 3 (Fused)';
+  let t = 1787200000;
+  for (const n of [36, 37, 39, 40]) {
+    st.appendCon({ t: t += 60, mob: 'a zol ghoul knight', con: 'scowls at you', level: n, zona: ZONA });
+  }
+  // Uno sin nivel: la línea no siempre lo trae.
+  st.appendCon({ t: t += 60, mob: 'a zol ghoul knight', con: 'glares at you', level: null, zona: ZONA });
+  // Y otro de OTRA dificultad, que es otra clave.
+  st.appendCon({ t: t += 60, mob: 'a zol ghoul knight', con: 'scowls at you', level: 30, zona: 'The Ruins of Old Guk 2 (Adaptive)' });
+
+  const leido = new FightStore(dir3);
+  leido.load();
+  const m = motor(leido);
+  const d3 = { nombre: 'a zol ghoul knight', base: 'The Ruins of Old Guk', diff: 3, mode: null };
+  const r = m.considerDe([d3])[claveCrono(d3)];
+  ok(r?.obs === 5, 'se guardan todas las consideraciones de esa clave', `${r?.obs}`);
+  ok(r?.min === 36 && r?.max === 40, 'y el nivel sale como RANGO', `${r?.min}–${r?.max}`);
+  ok(r?.conNivel === 4,
+    'con cuántas de ellas traían nivel', 'no es lo mismo «no lo dijo» que «no lo consideraste»');
+  ok(r?.cons?.[0]?.palabra === 'scowls at you' && r?.cons?.[0]?.n === 4,
+    'y el peldaño más visto, con su recuento', JSON.stringify(r?.cons));
+  ok(r?.cons?.length === 2, 'los dos peldaños se guardan, no sólo el último',
+    'el peldaño cambia a propósito: es lo que mide el progreso de facción');
+
+  const d2 = { nombre: 'a zol ghoul knight', base: 'The Ruins of Old Guk', diff: 2, mode: null };
+  ok(m.considerDe([d2])[claveCrono(d2)]?.obs === 1,
+    'CONTROL: la otra dificultad es otra clave, y tiene la suya');
+  const nunca = { nombre: 'a kobold king', base: 'The Ruins of Old Guk', diff: 3, mode: null };
+  ok(m.considerDe([nunca])[claveCrono(nunca)] === null,
+    'y de quien no has considerado nunca se devuelve null, no un cero');
+  fs.rmSync(dir3, { recursive: true, force: true });
+}
+
 console.log('\nCONTROL POSITIVO: con la forma REAL del fallo, la prueba se pone roja');
 {
   /**

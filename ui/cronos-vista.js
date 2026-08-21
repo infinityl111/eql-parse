@@ -228,6 +228,77 @@ function candidatoDe(c, i) {
 }
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * LA FICHA DE UN CANDIDATO · lo que se ve al pasar el ratón por su fila
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Contesta «¿éste cuál era?» sin salir de la lista: qué es, dónde, cuánto lo
+ * has matado, si tiene techo y qué te ha soltado.
+ *
+ * ── EL NIVEL VA COMO RANGO Y CON SU RECUENTO, NUNCA COMO CIFRA ────────────
+ *
+ * **No es propiedad del nombre.** Medido: `a zol ghoul knight` da 36, 37, 39 y
+ * 40 en la MISMA zona y la MISMA dificultad. Un número sería elegir uno de los
+ * cuatro y presentarlo como el dato; el rango con su `n` dice lo que se sabe y
+ * lo poco que se ha mirado. Y si sus consideraciones no traían nivel, se dice
+ * —que no es lo mismo que no haberlo considerado nunca.
+ *
+ * ── Y EL BOTÍN EN DOS BLOQUES ETIQUETADOS ────────────────────────────────
+ *
+ * Lo TUYO está medido: sale de lo que has recogido de ese bicho. Lo de la wiki
+ * **no lo tenemos raspado**, y ese bloque se queda diciendo que está pendiente
+ * en vez de desaparecer. Un hueco vacío se lee como «no suelta nada»; un
+ * «pendiente de raspar» se lee como lo que es — nuestra tarea, no su botín.
+ *
+ * Aquí no se toca el DOM ni se lee ningún reloj: entra un modelo con los textos
+ * ya formateados y sale una cadena.
+ */
+export function fichaCandidato(f = {}) {
+  const nivel = (() => {
+    if (!f.consider?.obs) return `<div class="cf-nivel cf-no">${esc(t('cro.fSinCon'))}</div>`;
+    const c = f.consider;
+    const rango = c.conNivel
+      ? (c.min === c.max ? t('cro.fNivelUno', { a: c.min }) : t('cro.fNivel', { a: c.min, b: c.max }))
+      : t('cro.fSinNivel');
+    const cuenta = c.obs === 1 ? t('cro.fNivelObs1') : t('cro.fNivelObs', { n: c.obs });
+    const peldano = c.cons?.[0]?.palabra
+      ? `<span class="cf-peldano">${esc(t('cro.fPeldano', { p: c.cons[0].palabra }))}</span>` : '';
+    return `<div class="cf-nivel"><b>${esc(rango)}</b>
+      <span class="cf-obs">${esc(cuenta)}</span>${peldano}</div>`;
+  })();
+
+  const cota = f.cota
+    ? `<div class="cf-cota">${esc(t('cro.cota', { t: f.cota.txt }))}
+       <span class="cf-huecos">${esc(f.cota.huecos === 1
+    ? t('cro.cotaH1') : t('cro.cotaHn', { n: f.cota.huecos }))}</span></div>`
+    : `<div class="cf-cota cf-no">${esc(t('cro.fSinCota'))}</div>`;
+
+  const items = f.botin ?? [];
+  const mio = items.length
+    ? `<ul class="cf-items">${items.map((x) => `<li><span>${esc(x.item)}</span>
+        <span class="cf-n">×${x.n}</span></li>`).join('')}
+      </ul>${f.botinMas ? `<div class="cf-mas">${esc(t('cro.fMas', { n: f.botinMas }))}</div>` : ''}`
+    : `<div class="cf-no">${esc(t('cro.fBotinNada'))}</div>`;
+
+  return `<div class="cf">
+    <div class="cf-h"><b>${esc(f.nombre)}</b><span class="cf-zona">${esc(f.zonaTxt ?? '')}</span></div>
+    ${nivel}
+    <div class="cf-muertes">${esc(f.muertesTxt ?? '')}</div>
+    ${cota}
+    <div class="cf-bloque">
+      <div class="cf-tit">${esc(t('cro.fBotinMio'))}</div>
+      <div class="cf-sub">${esc(t('cro.fBotinMioSub', { n: f.bajas ?? 0 }))}${
+  f.masZonas ? ` · ${esc(t('cro.fBotinVarias', { n: f.masZonas }))}` : ''}</div>
+      ${mio}
+    </div>
+    <div class="cf-bloque cf-pendiente">
+      <div class="cf-tit">${esc(t('cro.fBotinWiki'))}</div>
+      <div class="cf-sub">${esc(t('cro.fBotinWikiNo'))}</div>
+    </div>
+  </div>`;
+}
+
+/**
  * EL CONSTRUCTOR. `conNumero` en false devuelve el mismo HTML sin las cuentas
  * atrás: es la firma que usa `pintaEstable` para no reconstruir en cada tic.
  */
@@ -350,4 +421,8 @@ export const CLAVES = [
   'cro.candSub', 'cro.candBuscarPh', 'cro.candVacio', 'cro.candMano',
   'cro.candCuenta', 'cro.candCuenta1', 'cro.candUltima', 'cro.candPoner',
   'cro.candYa', 'cro.candNota',
+  'cro.fNivel', 'cro.fNivelUno', 'cro.fNivelObs', 'cro.fNivelObs1',
+  'cro.fSinNivel', 'cro.fSinCon', 'cro.fPeldano', 'cro.fSinCota',
+  'cro.fBotinMio', 'cro.fBotinMioSub', 'cro.fBotinVarias', 'cro.fBotinNada',
+  'cro.fBotinWiki', 'cro.fBotinWikiNo', 'cro.fMas',
 ];

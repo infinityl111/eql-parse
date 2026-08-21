@@ -117,6 +117,33 @@ function todoElHtml() {
         muertes: 1, peleas: 1, ultimaTxt: '11 ago', ya: true },
     ],
   }));
+  /**
+   * LA FICHA DEL CANDIDATO, con sus casos: con nivel y sin él, considerado y
+   * nunca considerado, con cota y sin ella, con botín y sin ninguno. Cada uno
+   * enciende un rótulo distinto, y sin los cuatro quedarían declarados y
+   * muertos.
+   */
+  trozos.push(V.fichaCandidato({
+    nombre: 'a zol ghoul knight', zonaTxt: 'The Ruins of Old Guk · D3',
+    consider: { obs: 4, conNivel: 4, min: 36, max: 40, cons: [{ palabra: 'scowls at you', n: 3 }] },
+    muertesTxt: '177 muertes en 120 peleas',
+    cota: { txt: '9:31', huecos: 17 }, bajas: 177, masZonas: 2,
+    botin: [{ item: 'Phosphorous Powder', n: 278 }], botinMas: 12,
+  }));
+  trozos.push(V.fichaCandidato({
+    nombre: 'a zol ghoul knight', zonaTxt: 'Befallen · D2',
+    consider: { obs: 1, conNivel: 1, min: 36, max: 36, cons: [] },
+    muertesTxt: '1 muerte', cota: { txt: '9:31', huecos: 1 }, bajas: 1, botin: [],
+  }));
+  // Considerado y SIN nivel: la línea no siempre lo trae, y no es lo mismo que
+  // no haberlo considerado nunca.
+  trozos.push(V.fichaCandidato({
+    nombre: 'Ancient Croaker', zonaTxt: 'The Plane of Sky',
+    consider: { obs: 2, conNivel: 0, min: null, max: null, cons: [] },
+    muertesTxt: '2 muertes en 2 peleas', cota: null, bajas: 2, botin: [],
+  }));
+  // Y nunca considerado.
+  trozos.push(V.fichaCandidato({ nombre: 'x', zonaTxt: 'y', consider: null, muertesTxt: '1 muerte', botin: [] }));
   return trozos.join('\n');
 }
 
