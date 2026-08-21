@@ -188,6 +188,9 @@ async function checkUpdate() {
         + ' no se ofrece nada. La release está a medio publicar.');
       return;
     }
+    // A LA VENTANA PRINCIPAL Y A NADIE MÁS, a propósito: el cartel de versión
+    // nueva vive ahí, y es la única que registra `onUpdate`. Los overlays no
+    // tienen dónde enseñarlo ni botón que pulsar.
     if (cfg.skipVersion !== info.version) mainWin?.webContents.send('update', info);
   } catch { /* sin red: se reintenta en la próxima comprobación */ }
 }
@@ -324,9 +327,19 @@ async function boot() {
   import('../src/wiki.js').then(({ WikiClient }) => { wiki = new WikiClient(app.getPath('userData')); });
   triggerDefs = loadTriggers() ?? STARTER_TRIGGERS;
   engine.triggers.load(triggerDefs);
-  // Una pelea cerrada va al overlay por su propio canal y no en el snapshot:
-  // ocupa demasiado para mandarla dos veces por segundo cuando sólo cambia al
-  // terminar un combate.
+  /**
+   * Una pelea cerrada va al overlay por su propio canal y no en el snapshot:
+   * ocupa demasiado para mandarla dos veces por segundo cuando sólo cambia al
+   * terminar un combate.
+   *
+   * VA A UNA SOLA VENTANA A PROPÓSITO, y queda dicho aquí porque el fallo del
+   * snapshot vivió detrás de un comentario que describía el reparto bueno
+   * mientras el código hacía otro. **El único que lo escucha es
+   * `ui/overlay.js`**, que es quien apila las peleas cerradas; ni la ventana
+   * principal —que las lee del almacén— ni el panel de temporizadores tienen
+   * dónde ponerlas. Comprobado en vivo: `bin/canales-vivos.js` cierra una pelea
+   * y exige verla aparecer en la pila del overlay.
+   */
   engine.on('encounter', (f) => {
     if (f && overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send('fight:closed', f);
   });
@@ -354,7 +367,14 @@ async function boot() {
       notCompanions: cfg.notCompanions ?? [], detected: name,
     });
   });
-  // Sólo habla la ventana principal, para no oír el aviso dos veces.
+  /**
+   * NO PUEDE IR POR `send()`: el aviso viaja DISTINTO a cada ventana. Sólo
+   * habla la principal —para no oírlo dos veces— así que el overlay recibe el
+   * mismo aviso con `speak` a null. Dos destinos y dos cargas, a mano y por eso.
+   *
+   * Y del mapa `overlays` no lo escucha nadie: el panel de temporizadores no
+   * registra `onAlert`. Si algún día lo hiciera, hay que añadirlo aquí.
+   */
   engine.on('alert', (a) => {
     if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('alert', { ...a, speak: cfg.tts.enabled ? a.speak : null });
     if (overlayWin && !overlayWin.isDestroyed()) overlayWin.webContents.send('alert', { ...a, speak: null });

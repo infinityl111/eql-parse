@@ -15,6 +15,7 @@
     "campos": "node bin/campos-todos.js",
     "panel": "node bin/panel-vivo.js",
     "candidatos": "node bin/candidatos-vivos.js",
+    "canales": "node bin/canales-vivos.js",
     "capturas": "electron bin/capturas.cjs",
     "pliegue": "electron bin/pliegue.cjs",
     "vacios": "node bin/vacios.js",
