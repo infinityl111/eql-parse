@@ -724,6 +724,20 @@ const rules = [
   { kind: 'loot', hint: 'You looted',
     re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse ([a-z].*)$`),
     map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], cola: m[4] }) },
+  /**
+   * ── LO QUE DESTRUYES: la única fila NEGATIVA del botín ───────────────────
+   *
+   * `You successfully destroyed 3 Spider Silk.` Todo lo demás del botín suma;
+   * ésta resta, y hasta hoy no la reconocía nadie: **156 líneas, 73 objetos
+   * distintos y 1.490 unidades** medidas sobre los tres registros —la cola de
+   * la 2.0.0 decía 103, y ha crecido—.
+   *
+   * Va en su propio `kind` y no dentro de `loot`: no se ha recogido nada de
+   * ningún cadáver, así que meterla ahí obligaría a que todo lector de botín se
+   * acordara del signo. Su cantidad se cuenta APARTE, en `destruidos`, y nunca
+   * dentro del `n` de lo recogido.
+   */
+  { kind: 'destruido', hint: 'successfully destroyed', re: /^You successfully destroyed (\d+) (.+?)\.$/, map: (m) => ({ qty: +m[1], item: m[2] }) },
   // ═══ MONEDA ═══
   //
   // Es botín, y hasta la 1.12.0 se reconocía y se tiraba: 1.392 líneas en un

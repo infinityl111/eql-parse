@@ -676,6 +676,24 @@ export class Engine extends EventEmitter {
      * dificultad da 36, 37, 39 y 40. Por eso se guarda cada observacion y quien
      * lo ensene dira un RANGO con su recuento, nunca una cifra.
      */
+    /**
+     * LO DESTRUIDO, que es la unica fila negativa del botin.
+     *
+     * Se guarda en el mismo fichero lateral que el botin huerfano —es un hecho
+     * del registro sobre un objeto y una cantidad— pero MARCADO, y quien lo
+     * cuenta lo lleva a su propio cubo: sumarlo a lo recogido diria que has
+     * ganado tres cuando has perdido tres.
+     */
+    if (ev.kind === 'destruido' && ev.item) {
+      const z = this.parser?.zone ? parseZone(this.parser.zone) : null;
+      this.store?.appendLoot({
+        item: ev.item, qty: ev.qty ?? 1, from: null, de: null, destruido: true,
+        t: ev.t, at: Math.round(ev.t * 1000),
+        zone: this.parser?.zone ?? null,
+        zoneBase: z?.base ?? null, diff: z?.diff ?? null, diffTag: z?.tag ?? null,
+      });
+      this.storeSeq++;
+    }
     if (ev.kind === 'con' && ev.mob) {
       this.store?.appendCon({
         t: ev.t, at: Math.round(ev.t * 1000), mob: ev.mob,

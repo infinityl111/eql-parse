@@ -55,11 +55,16 @@ import { parseZone, diffKey, labelDiff, DIFFS, SIN_MARCA, SIN_ZONA } from './zon
  *      otra mitad. Medido sobre un almacén real: 19 bases de 51 con el dígito
  *      dentro. Se cura al leer el almacén —`rehacerZona`— y esta generación es
  *      lo que obliga a plegar de nuevo lo que ya estaba contado.
+ *   5  LO DESTRUIDO, que es la única fila NEGATIVA del botín. `You
+ *      successfully destroyed` no lo reconocía nadie —156 líneas, 73 objetos
+ *      y 1.490 unidades medidas el 21/08/2026 sobre los tres registros— y
+ *      ahora se cuenta APARTE, en `destruidos`: si entrara en `n`, destruir
+ *      tres diría que has ganado tres.
  *
  * Rehacerla cuesta lo que cuesta leer el histórico, no lo que cuesta releer el
  * registro: medido sobre 2.118 peleas, 1,5 s.
  */
-export const ENC_VERSION = 4;
+export const ENC_VERSION = 5;
 const FICHERO = 'encyclopedia.json';
 
 export class Encyclopedia {
@@ -170,6 +175,18 @@ export class Encyclopedia {
       if (!l?.item) { this.lastLoot = i; continue; }
       const e = this.loot.get(l.item) ?? { n: 0, sinFuente: 0, sinPelea: 0, tarde: 0 };
       const q = l.qty ?? 1;
+      /**
+       * LO DESTRUIDO NO SUMA A LO RECOGIDO. Es la única fila negativa del
+       * botín: si entrara en `n`, destruir tres diría que has ganado tres.
+       * Va a su propio cubo y sale a la lista con su nombre.
+       */
+      if (l.destruido) {
+        e.destruidos = (e.destruidos ?? 0) + q;
+        this.loot.set(l.item, e);
+        this.lastLoot = i;
+        n++;
+        continue;
+      }
       e.n += q;
       if (l.de) {
         e.tarde = (e.tarde ?? 0) + q;
@@ -452,7 +469,8 @@ export class Encyclopedia {
     const porObjeto = new Map();
     for (const [item, g] of this.loot) {
       porObjeto.set(item, { item, n: g.n, sinFuente: g.sinFuente,
-        sinPelea: g.sinPelea ?? 0, from: [], porDif: new Map() });
+        // Lo destruido viaja con su nombre y NUNCA dentro de `n`.
+        sinPelea: g.sinPelea ?? 0, destruidos: g.destruidos ?? 0, from: [], porDif: new Map() });
     }
     for (const e of this.ledger.porNombre.values()) {
       for (const [item, n] of e.loot) {

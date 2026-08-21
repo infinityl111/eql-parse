@@ -5330,6 +5330,13 @@ function encBotin() {
       </button>`).join('')}
       ${o.sinFuente ? `<div class="hint">${esc(t('enc.noSource', { n: o.sinFuente }))}</div>` : ''}
       ${o.sinPelea ? `<div class="hint">${esc(t('enc.noFight', { n: o.sinPelea }))}</div>` : ''}
+      ${/*
+        LO DESTRUIDO VA EN SU PROPIA LÍNEA Y CON SU SIGNO. No se resta de lo
+        recogido: son dos hechos distintos —cuántos te salieron y cuántos
+        destruiste— y restarlos dejaría un solo número que no contesta
+        ninguna de las dos preguntas.
+      */''}
+      ${o.destruidos ? `<div class="hint">${esc(t('enc.destruidos', { n: o.destruidos }))}</div>` : ''}
     </div>`).join('')}</div>
     <div class="hint">${esc(t('enc.lootNote'))}</div>`
     : `<div class="hint">${esc(t('enc.noMatch'))}</div>`}`;
