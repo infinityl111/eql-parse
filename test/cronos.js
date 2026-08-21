@@ -30,6 +30,7 @@ import {
   valorDe, estadoCrono, avisoDeVarios, debeReiniciar,
   precisionDe, ESTADO, PERIODOS_SOSPECHA, PRECISION, claveCrono, mismaClave, ordenCola,
   candidatosDe } from '../src/cronos.js';
+import * as V2 from '../src/cronos.js';
 
 let failed = 0;
 const ok = (cond, msg, extra) => {
@@ -470,6 +471,25 @@ console.log('\nel aviso de varios: la rama fuerte ya se puede disparar');
    */
   ok(avisoDeVarios(2, 50) === 'varios-a-la-vez',
     'CONTROL: con las dos cosas manda la demostrada, no la deducida');
+}
+
+console.log('\nel visto dice DE DÓNDE sale');
+{
+  /**
+   * Una línea del registro y una pelea guardada del almacén no son la misma
+   * afirmación. `lecturaDelVisto` saca `kind` con el dato para que el rótulo
+   * pueda decir cuál es: sin él, el respaldo del almacén salía rotulado «en una
+   * línea de combate», que es una procedencia prestada.
+   */
+  const l1 = V2.lecturaDelVisto({ visto: { t: 990, kind: 'melee' }, ahora: 1000 });
+  ok(l1.esta === true && l1.kind === 'melee', 'una línea reciente: está ahí, y dice de qué línea',
+    JSON.stringify(l1));
+  const l2 = V2.lecturaDelVisto({ visto: { t: 100, kind: 'pelea' }, ahora: 1000 });
+  ok(l2.esta === false && l2.kind === 'pelea', 'y una pelea vieja se marca como pelea',
+    JSON.stringify(l2));
+  const l3 = V2.lecturaDelVisto({ ultimaMuerte: 100, ahora: 1000 });
+  ok(l3 && l3.kind === null, 'CONTROL: sin visto, no se inventa procedencia',
+    'se cuenta desde su última muerte y `kind` va en null');
 }
 
 console.log('\nlos candidatos del histórico entero');

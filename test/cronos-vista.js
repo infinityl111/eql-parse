@@ -88,6 +88,18 @@ function todoElHtml() {
       crono: { cota: { txt: '10:19', huecos: 10 }, visto: { desdeTxt: '12m', pasado: true } },
     })],
   }));
+  /**
+   * EL VISTO SEGUN DE DONDE SALGA. Una linea del registro y una pelea
+   * guardada no son la misma afirmacion, y cada una lleva su rotulo: sin
+   * esto, el respaldo del almacen se rotulaba como «en una linea de
+   * combate», que es una procedencia prestada.
+   */
+  trozos.push(V.construye({
+    fichas: [ficha({ crono: { visto: { txt: '2m', esta: true, kind: 'melee' } } })],
+  }));
+  trozos.push(V.construye({
+    fichas: [ficha({ crono: { visto: { txt: '2m', esta: false, kind: 'pelea' } } })],
+  }));
   // La pestaña de alta, VACÍA: el histórico sin una sola muerte.
   trozos.push(V.construye({ fichas: [], vista: 'sug', candidatos: [] }));
   /**

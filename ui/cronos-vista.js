@@ -160,7 +160,8 @@ function fichaDe({ crono, estado, obs = {}, i, conNumero = true, abierta = false
       cota ? `<div class="cro-cotapor">${esc(t('cro.cotaPor'))}</div>` : '',
       visto?.txt
         ? `<div class="cro-visto"><b>${esc(t('cro.visto', { t: visto.txt }))}</b> — ${
-          esc(t('cro.vistoTipo'))}${visto.esta ? ` · <b>${esc(t('cro.vistoEsta'))}</b>` : ''}</div>`
+          esc(t(visto.kind === 'pelea' ? 'cro.vistoPelea' : 'cro.vistoTipo'))}${
+          visto.esta ? ` · <b>${esc(t('cro.vistoEsta'))}</b>` : ''}</div>`
         : (visto?.desdeTxt
           ? `<div class="cro-visto">${esc(t('cro.sinVer', { t: visto.desdeTxt }))}${
             cota && visto.pasado ? ` — ${esc(t('cro.sinVerCota', { t: cota.txt }))}` : ''}</div>`
@@ -342,7 +343,7 @@ export const CLAVES = [
   'cro.obs0', 'cro.obs1', 'cro.obsN', 'cro.obsPocas', 'cro.retenido',
   'cro.segun', 'cro.sinZona', 'cro.varios', 'cro.quizaVarios',
   'cro.cota', 'cro.cotaH1', 'cro.cotaHn', 'cro.cotaPor',
-  'cro.visto', 'cro.vistoTipo', 'cro.vistoEsta', 'cro.sinVer', 'cro.sinVerCota',
+  'cro.visto', 'cro.vistoTipo', 'cro.vistoPelea', 'cro.vistoEsta', 'cro.sinVer', 'cro.sinVerCota',
   'cro.manualPh', 'cro.setManual',
   'cro.agrZona', 'cro.agrNada', 'cro.filContando', 'cro.filDisponible',
   'cro.discrepa', 'cro.discrepaWiki',

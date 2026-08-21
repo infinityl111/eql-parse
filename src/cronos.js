@@ -516,12 +516,21 @@ export function lecturaDelVisto({
   const desde = visto?.t != null ? Math.max(0, ahora - visto.t)
     : (ultimaMuerte != null ? Math.max(0, ahora - ultimaMuerte) : null);
   if (desde == null) return null;
+  /**
+   * Y DE DONDE SALE VIAJA CON EL DATO. `kind` puede ser una linea del registro
+   * -`melee`, `spell`...- o `pelea`, que es el respaldo del almacen: «estuvo en
+   * un combate». NO son la misma afirmacion y quien lo pinta tiene que poder
+   * decir cual es; sin esto, un visto sacado de una pelea guardada se rotulaba
+   * como «en una linea de combate», que es una procedencia prestada.
+   */
+  const kind = visto?.kind ?? null;
   // Recien nombrado es «esta ahi». El corte es el mismo suelo que usa la cota,
   // porque es lo que puede pasar sin que el registro lo nombre estando delante.
-  if (visto?.t != null && desde <= suelo) return { segundos: desde, esta: true };
+  if (visto?.t != null && desde <= suelo) return { segundos: desde, esta: true, kind };
   return {
     segundos: desde,
     esta: false,
+    kind,
     pasado: cota?.segundos != null ? desde > cota.segundos : false,
   };
 }

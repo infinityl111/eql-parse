@@ -6144,9 +6144,11 @@ async function renderCronos(snap, cajaSec) {
             cota: cotas[claveCrono(c)] ?? null,
           });
           if (!l) return null;
+          // `kind` viaja con el dato: una linea del registro y una pelea guardada
+          // no son la misma afirmacion, y el rotulo tiene que poder decir cual.
           return l.esta
-            ? { txt: cronoRestante(l.segundos), esta: true }
-            : { desdeTxt: cronoRestante(l.segundos), pasado: l.pasado };
+            ? { txt: cronoRestante(l.segundos), esta: true, kind: l.kind }
+            : { desdeTxt: cronoRestante(l.segundos), pasado: l.pasado, kind: l.kind };
         })(),
       },
       estado: {
