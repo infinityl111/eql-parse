@@ -384,6 +384,34 @@ const rules = [
   { kind: 'control', hint: 'control of yourself', re: /^You have control of yourself again\.$/, map: () => ({ target: 'You', on: false }) },
   { kind: 'stagger', hint: 'staggers', re: /^(.+?) staggers\.$/, map: (m) => ({ target: m[1] }) },
   { kind: 'proc', hint: 'feels alive', re: /^Your (.+?)(?: \((.+?)\))? feels alive with power\.$/, map: (m) => ({ item: m[1], effect: m[2] ?? null }) },
+  /**
+   * ── LAS OTRAS DOS FORMAS DE LA MISMA FAMILIA, Y EL KIND ES PROVISIONAL ───
+   *
+   * Medido sobre los tres registros (2,4 millones de líneas): la línea de
+   * `feels alive with power` no está sola. Hay otras dos, y **ninguna la
+   * reconocía nadie** — caían en desconocidas:
+   *
+   *     117  Your Brell's Girdle (Exaltation) shimmers briefly.
+   *      63  Your Moonstone Ring (Exaltation) pulses with light as your vision
+   *          sharpens.
+   *
+   * Con ellas, los objetos con paréntesis `(Exaltation)` son SEIS y no cuatro.
+   *
+   * NO VAN BAJO `proc`, y eso es deliberado: **un `kind` es una afirmación
+   * sobre la mecánica del juego**, y no sabemos si esto es un proc. Lo que
+   * sabemos es lo que dice la línea —un objeto tuyo con una etiqueta entre
+   * paréntesis hace algo— y eso es todo lo que el nombre promete. `what`
+   * separa las dos formas sin inventar una tercera cosa.
+   *
+   * QUÉ FALTA PARA CERRARLO, y lo contesta Campeón: si `Exaltation` es el
+   * mecanismo de exaltación de objetos y no el nombre de un proc; si las tres
+   * formas son el mismo suceso; y si hace algo que el registro escriba —medido,
+   * ninguna línea de daño lleva esa habilidad, ni en el mismo segundo ni en los
+   * treinta siguientes—. Hasta entonces se reconocen y se cuentan, que es lo
+   * único afirmable. Ver el apéndice de `BARRIDO-PATRONES.md`.
+   */
+  { kind: 'objeto_evento', what: 'shimmers', hint: 'shimmers briefly', re: /^Your (.+?)(?: \((.+?)\))? shimmers briefly\.$/, map: (m) => ({ item: m[1], etiqueta: m[2] ?? null }) },
+  { kind: 'objeto_evento', what: 'pulses', hint: 'pulses with light', re: /^Your (.+?)(?: \((.+?)\))? pulses with light as your vision sharpens\.$/, map: (m) => ({ item: m[1], etiqueta: m[2] ?? null }) },
   { kind: 'pet_frenzy', hint: 'accelerated frenzy', re: /^(.+?) enters an accelerated frenzy\.$/, map: (m) => ({ pet: m[1] }) },
   { kind: 'buff_fade', hint: 'has worn off', re: /^(?:Your pet's |Your )?(.+?) spell has worn off\.$/, map: (m) => ({ ability: m[1] }) },
   /**
