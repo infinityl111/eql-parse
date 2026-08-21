@@ -109,7 +109,8 @@ function fichaDe({ crono, estado, obs = {}, i, conNumero = true, abierta = false
    *
    * La cota es un TECHO medido, no un periodo: «no mas de 10m19s». Su numero
    * de huecos va SIEMPRE al lado, porque una cota de un hueco es cierta y
-   * floja — y de las 95 claves que la tienen, 46 son de uno solo.
+   * floja — y son mas de la mitad: 56 de 108, remedido el 21/08/2026 sobre
+   * las 2.118 peleas de hoy con las claves ya curadas.
    *
    * Y el visto contesta lo que la cota no puede: si esta ahi AHORA. Las dos
    * juntas son las que dicen algo que ninguna dice sola:

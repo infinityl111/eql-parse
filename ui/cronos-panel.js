@@ -7,8 +7,9 @@
  * lo que ya hace la cola: ordenar por **el que antes vuelve**.
  *
  * Una línea por crono: nombre, tiempo o «ya debería estar», y **el número de
- * huecos que sostiene la cota**. Ese número no es adorno: de las 95 claves con
- * cota, 46 se apoyan en un solo hueco, y una cota de un hueco es cierta y
+ * huecos que sostiene la cota**. Ese número no es adorno: **más de la mitad de
+ * las cotas se apoyan en un solo hueco** —56 de 108, remedido el 21/08/2026
+ * sobre 2.118 peleas por muerte→muerte— y una cota de un hueco es cierta y
  * floja. Sin el número al lado, las dos se leen igual.
  *
  * ── LOS QUE YA DEBERÍAN ESTAR, ARRIBA ─────────────────────────────────────

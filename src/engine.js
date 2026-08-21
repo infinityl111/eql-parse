@@ -1897,16 +1897,37 @@ export class Engine extends EventEmitter {
    * Devuelve `{ clave: { t, kind } }`. Sin entrada = no lo hemos nombrado desde
    * su ultima muerte, que es un hecho y no una sospecha.
    */
+  /**
+   * ── EL RESPALDO ESTABA MUERTO JUSTO EN EL CASO PARA EL QUE SE ESCRIBIÓ ────
+   *
+   * Aquí ponía `if (!this.vistos) return out;` **encima del bucle**, y el
+   * respaldo del almacén vive DENTRO del bucle. `this.vistos` no existe hasta
+   * que se anota la primera línea —se crea dentro de `#anotaVisto`—, así que
+   * entre abrir la aplicación y la primera línea nombrada, esta función
+   * devolvía el objeto vacío: exactamente la situación que el respaldo existe
+   * para cubrir, y que su propio comentario describe —«el mapa de arriba nace
+   * vacío en cada apertura porque la aplicación no relee el registro».
+   *
+   * Con el juego cerrado, que es cuando uno mira su histórico, no llega ninguna
+   * línea y el respaldo no corría NUNCA.
+   *
+   * Y no se veía: la ficha del crono se queda sin la fila del visto, que es lo
+   * mismo que se ve cuando de verdad no se le ha nombrado. Medido sobre el
+   * almacén real el 21/08/2026: **242 de 731 claves tienen respaldo de pelea**
+   * y ninguna lo enseñaba hasta que entrara una línea.
+   *
+   * Un mapa que aún no existe es «no hemos anotado nada», no «no hay nada».
+   */
   vistoDe(claves = []) {
     const out = {};
-    if (!this.vistos) return out;
+    const vistos = this.vistos ?? new Map();
     for (const c of claves) {
       if (!c?.nombre) continue;
       // La zona del crono es la BASE; la del registro trae la dificultad
       // dentro. Se casa por prefijo, que es lo unico que las relaciona sin
       // volver a analizar el nombre de la zona.
       let mejor = null;
-      for (const [k, v] of this.vistos) {
+      for (const [k, v] of vistos) {
         const [nombre, zona] = k.split('\u0000');
         if (nombre !== c.nombre) continue;
         if (c.base && zona && !zona.startsWith(c.base)) continue;
@@ -1957,9 +1978,28 @@ export class Engine extends EventEmitter {
    *    cierra con la primera linea que lo nombre, y si te fuiste de la zona sin
    *    que lo nombrara, se queda abierta y no produce hueco.
    *
-   * Medido sobre el historico: 95 claves con cota, mediana 8m 49s por mencion
-   * y 10m 29s por muerte, y de las 50 que tienen las dos, 47 mas apretadas por
-   * mencion, 3 iguales y NINGUNA mas floja.
+   * Medido el 20/08/2026 sobre 1.986 peleas y el registro: 95 claves con cota,
+   * mediana 8m 49s por mencion y 10m 29s por muerte, y de las 50 que tienen las
+   * dos, 47 mas apretadas por mencion, 3 iguales y NINGUNA mas floja.
+   *
+   * ── Y ESA CIFRA NO CUENTA LO QUE CUENTA ESTA FUNCION ─────────────────────
+   *
+   * Las 95 salen de medir las DOS cotas contra el REGISTRO, con visitas del
+   * registro —que ve todos los cambios de zona, tambien los que no tuvieron
+   * pelea—. Esta funcion deduce la visita del INDICE, que es mas grueso: junta
+   * dos entradas a la misma instancia si entre medias no hubo pelea guardada
+   * en otro sitio. El propio estudio lo dice: con visitas del registro, la de
+   * muerte→muerte no son 108 claves, son 65.
+   *
+   * REMEDIDO el 21/08/2026 sobre las 2.118 peleas de hoy, por este camino y
+   * solo por muerte→muerte —sin registro delante, que es como corre en una
+   * medicion—: **108 claves de 731**, mediana 10m 13s, y 56 de las 108
+   * sostenidas por UN solo hueco. Con las claves sin curar salian 119 de 775,
+   * y las 11 de diferencia no son cobertura perdida: 44 claves eran dos
+   * mitades del mismo bicho y ahora cuentan una vez; 7 pierden la cota porque
+   * al juntarse heredan la multiplicidad o un hueco por debajo del suelo de la
+   * otra mitad. Cero claves ganan cota al curar: un hueco solo vale dentro de
+   * una visita, y las dos mitades estan separadas EN EL TIEMPO.
    */
   cotaDe(claves = []) {
     const pide = claves.filter((c) => c?.nombre);

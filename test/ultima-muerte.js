@@ -227,6 +227,54 @@ console.log('\nLOS CANDIDATOS DEL HISTÓRICO ENTERO, desde el motor');
     `${rey?.muertes} muertes en ${rey?.peleas} peleas — dos en un mismo combate son dos individuos`);
 }
 
+console.log('\nEL RESPALDO DEL «VISTO» CORRE CON LA APLICACIÓN RECIÉN ABIERTA');
+{
+  /**
+   * `vistoDe` salía por la puerta con `if (!this.vistos) return out`, y el
+   * respaldo del almacén vive DENTRO del bucle. `this.vistos` no existe hasta
+   * que se anota la primera línea del registro, así que el respaldo estaba
+   * muerto justo en el caso para el que se escribió: la aplicación recién
+   * abierta, sin líneas nuevas, mirando el histórico con el juego cerrado.
+   *
+   * Medido sobre el almacén real: 242 de 731 claves tienen respaldo de pelea y
+   * ninguna lo enseñaba.
+   */
+  const T4 = 1787000000000 + 18000e3;
+  store.append({
+    zone: "Nagafen's Lair 2 (Adaptive)", zoneBase: "Nagafen's Lair", diff: 2, diffTag: null,
+    duration: 90, total: 800, start: Math.round(T4 / 1000),
+    kills: [], killTimes: [],
+    rows: [{ name: 'Campeon', side: 'ally' }, { name: 'a kobold king', side: 'enemy' }],
+  }, T4);
+  const s3 = new FightStore(dir);
+  s3.load();
+
+  const clave = { nombre: 'a kobold king', base: "Nagafen's Lair", diff: 2, mode: null };
+  // SIN `vistos`, que es como nace el motor: ni un `Map` vacío hay todavía.
+  const recienAbierta = motor(s3);
+  const r = recienAbierta.vistoDe([clave])[claveCrono(clave)];
+  ok(!!r, 'sin una sola línea leída, el respaldo del almacén contesta',
+    r ? `de una pelea, t=${r.t} kind=${r.kind}` : 'DEVUELVE VACÍO: el respaldo no ha corrido');
+  ok(r?.kind === 'pelea', 'y dice de dónde sale: de una pelea, no de una línea',
+    'no son la misma afirmación y no se mezclan');
+
+  /**
+   * CONTROL: no contesta que sí a cualquiera. De un nombre que sólo aparece en
+   * peleas donde MURIÓ no hay «visto»: su muerte es justo lo contrario.
+   */
+  const s4 = new FightStore(dir);
+  s4.load();
+  const croaker = { nombre: 'Ancient Croaker', base: 'The Ruins of Old Guk', diff: 2, mode: null };
+  ok(!motor(s4).vistoDe([croaker])[claveCrono(croaker)],
+    'CONTROL: el que sólo sale en la pelea en que murió no tiene visto');
+
+  // Y con el mapa vivo puesto, una línea manda sobre la pelea.
+  const conLinea = motor(s3);
+  conLinea.vistos = new Map([[`a kobold king Nagafen's Lair 2 (Adaptive)`, { t: 9e9, kind: 'melee' }]]);
+  ok(conLinea.vistoDe([clave])[claveCrono(clave)]?.kind === 'melee',
+    'y una línea del registro manda sobre el respaldo', 'es más reciente y dice más');
+}
+
 console.log('\nCONTROL POSITIVO: con la forma REAL del fallo, la prueba se pone roja');
 {
   /**
