@@ -738,6 +738,33 @@ const rules = [
    * dentro del `n` de lo recogido.
    */
   { kind: 'destruido', hint: 'successfully destroyed', re: /^You successfully destroyed (\d+) (.+?)\.$/, map: (m) => ({ qty: +m[1], item: m[2] }) },
+  /**
+   * ── LA ZONA QUE SE TE ABRE, EN SUS DOS FORMAS ────────────────────────────
+   *
+   * `The Plane of Sky is now available to you.` y `Nagafen's Lair - Solo is now
+   * available to you.` Es la cadena de la instancia: el juego te dice que ya
+   * puedes entrar, y con qué modo cuando lo hay.
+   *
+   * MEDIDO HOY sobre los tres registros —2.402.895 líneas—, y las cifras
+   * heredadas de la cola no eran éstas:
+   *
+   *       74  sin modo          «The Plane of Sky is now available to you.»
+   *       41  con modo Group    «X - Group is now available to you.»
+   *       32  con modo Solo     «X - Solo is now available to you.»
+   *
+   * O sea **73 con modo y 74 sin él**, no «85 contra 23». Ninguna la reconocía
+   * nadie: las 147 caían en desconocidas.
+   *
+   * DOS REGLAS Y NO UNA con el modo opcional, y es a propósito: con `(?: -
+   * (.+?))?` el separador ` - ` puede colarse dentro del nombre de la zona
+   * —los hay con guion— y no habría forma de saber si `Foo - Bar` es zona con
+   * modo o zona a secas. La forma ancha va PRIMERO, que es la específica.
+   *
+   * El `modo` se guarda tal cual lo escribe el juego. Qué signifique cada uno
+   * es mecánica, y la mecánica la contesta Campeón.
+   */
+  { kind: 'zona_disponible', what: 'con-modo', hint: 'is now available to you', re: /^(.+?) - (.+?) is now available to you\.$/, map: (m) => ({ zona: m[1], modo: m[2] }) },
+  { kind: 'zona_disponible', what: 'sin-modo', hint: 'is now available to you', re: /^(.+?) is now available to you\.$/, map: (m) => ({ zona: m[1], modo: null }) },
   // ═══ MONEDA ═══
   //
   // Es botín, y hasta la 1.12.0 se reconocía y se tiraba: 1.392 líneas en un
