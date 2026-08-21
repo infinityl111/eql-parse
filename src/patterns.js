@@ -691,6 +691,20 @@ const rules = [
   { kind: 'loot', hint: 'You looted',
     re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse and stored it in your tradeskill depot\\.?$`),
     map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], depot: true }) },
+  /**
+   * EL SEXTO FINAL, y llegó por donde decía la red: `Dragon Hoard`.
+   *
+   * Lo cazaba la cola sin interpretar —`cola: 'and stored it in your Dragon
+   * Hoard'`—, que es exactamente para lo que se puso, así que el objeto nunca
+   * se perdió: lo que faltaba era TIPARLO, como los otros cinco destinos.
+   *
+   * Medido hoy sobre los tres registros: **16 líneas**. La cola de la 2.0.0
+   * decía 7, y ha crecido. Y como la del monedero y la del depósito, ésta
+   * también viene SIN PUNTO al final.
+   */
+  { kind: 'loot', hint: 'You looted',
+    re: new RegExp(`^You looted ${QTY}(.+?) from (.+?)'s corpse and stored it in your Dragon Hoard\\.?$`),
+    map: (m) => ({ qty: m[1] ? +m[1] : 1, item: m[2], from: m[3], hoard: true }) },
   // ── Y LA RED, que es lo que de verdad arregla el fallo ────────────────────
   //
   // Cuatro finales bastaron durante meses; el quinto costó un objeto y NADIE LO

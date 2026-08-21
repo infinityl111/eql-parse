@@ -1888,6 +1888,9 @@ export class EncounterTracker extends EventEmitter {
         item: ev.item, qty: ev.qty ?? 1, from: ev.from ?? null,
         sold: ev.sold ?? null, upgraded: ev.upgraded ?? null,
         stored: ev.stored ?? false, depot: ev.depot ?? false,
+        // El sexto destino, tipado en la 1.24.0. Se contaba como recogido y su
+        // destino viajaba en `cola`, sin interpretar.
+        hoard: ev.hoard ?? false,
         // La cola desconocida de un final que aún no tiene regla. Viaja hasta la
         // ficha en vez de perderse: ver la red del final del botín en
         // `patterns.js`.

@@ -533,6 +533,7 @@ export function fichaBotin(f, tardio) {
       ${l.upgraded ? `<span class="rpb-tag up">${esc(t('loot.upgraded'))} ${esc(l.upgraded)}</span>` : ''}
       ${l.stored ? `<span class="rpb-tag">${esc(t('rp.botin.monedero'))}</span>` : ''}
       ${l.depot ? `<span class="rpb-tag">${esc(t('rp.botin.depot'))}</span>` : ''}
+      ${l.hoard ? `<span class="rpb-tag">${esc(t('rp.botin.hoard'))}</span>` : ''}
       ${l.cola ? `<span class="rpb-tag ojo" title="${esc(t('rp.botin.cola', { cola: l.cola }))}">${esc(t('rp.botin.cola', { cola: l.cola }))}</span>` : ''}
       ${tarde ? `<span class="rpb-tag tarde">${esc(t('rp.botin.tras'))}</span>` : ''}
       ${l.amb ? `<span class="rpb-tag duda" title="${esc(t('rp.botin.amb'))}">?</span>` : ''}
