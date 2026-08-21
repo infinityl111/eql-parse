@@ -117,6 +117,38 @@ release.
 Al terminar imprime el comando de subida. **Guárdalo.** Y falla si alguna
 `{{clave}}` no resolvió, en vez de escribir un fichero con las llaves dentro.
 
+### 4 bis. PUERTA DEL FORMATO — sólo si sube un número de formato
+
+> **Si esta versión sube `FORMATO_VERSION`, `RECONSTRUIR_DESDE` o
+> `ENC_VERSION`, esta puerta es obligatoria y va ANTES del instalador.**
+
+```sh
+node bin/puerta-formato.js v<versión-anterior>
+```
+
+**Qué vigila, y por qué no lo ve ninguna de las otras.** El instalador puede
+estar perfecto, la release cuadrar entera y la web decir la verdad, y el usuario
+abrir su historial y encontrárselo **vacío o con otras cifras**. Los pasos 8, 9,
+10 y 12 miran la release y el sitio; **ninguno mira dentro del almacén de quien
+ya tenía datos**.
+
+Lo que hace: copia un almacén real, lo lee con el código de la versión anterior
+—de verdad, desde su etiqueta, en un worktree que se retira solo— y lo vuelve a
+leer con el de ahora sobre la misma carpeta.
+
+    NO ES «QUE SE ABRA». ES QUE DIGA LO MISMO.
+
+Compara, pelea a pelea, daño, duración, abatidos y combatientes, y el recuento
+del botín. Y trae **control positivo**: guarda una pelea NUEVA y la relee, porque
+una versión que hubiera dejado de escribir pasaría la puerta con las viejas
+intactas.
+
+**Si falla, no hay release.** No se sigue al paso 5.
+
+*Estrenada en la 1.24.0, que sube `ENC_VERSION` de 4 a 5: 2.212 peleas, 200
+comparadas una a una, mismo botín, y la enciclopedia rehecha sola por
+`otra-generacion`.*
+
 ### 5. `npm run dist` — EL INSTALADOR, ANTES QUE LA RELEASE
 
 Sale en `dist/`. **Instálalo y ábrelo antes de seguir.**
